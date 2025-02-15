@@ -8,7 +8,7 @@ mutable struct WingAerodynamics
     panels::Vector{Panel}
     n_panels::Int
     wings::Vector{Wing}
-    va::Union{Nothing, Vector{Float64}}
+    va::Union{Nothing, Vector{Float64}, Tuple{Vector{Float64}, Float64}}
     gamma_distribution::Union{Nothing, Vector{Float64}}
     alpha_uncorrected::Union{Nothing, Vector{Float64}}
     alpha_corrected::Union{Nothing, Vector{Float64}}

@@ -15,9 +15,9 @@ Represents a wing section with leading edge, trailing edge, and aerodynamic prop
 struct Section
     LE_point::Vector{Float64}
     TE_point::Vector{Float64}
-    aero_input::Vector{Any}
+    aero_input::Union{String, Tuple{String, Vector{Float64}}}
     
-    function Section(LE_point::Vector{Float64}, TE_point::Vector{Float64}, aero_input::Vector{String})
+    function Section(LE_point::Vector{Float64}, TE_point::Vector{Float64}, aero_input::Union{String, Tuple{String, Vector{Float64}}})
         new(LE_point, TE_point, aero_input)
     end
     
@@ -68,7 +68,7 @@ end
 Add a new section to the wing.
 """
 function add_section!(wing::Wing, LE_point::Vector{Float64}, 
-                     TE_point::Vector{Float64}, aero_input::Vector{String})
+                     TE_point::Vector{Float64}, aero_input::Union{String, Tuple{String, Vector{Float64}}})
     push!(wing.sections, Section(LE_point, TE_point, aero_input))
 end
 
@@ -112,7 +112,7 @@ function refine_aerodynamic_mesh(wing::Wing)
     n_current = length(wing.sections)
     LE = zeros(Float64, n_current, 3)
     TE = zeros(Float64, n_current, 3)
-    aero_input = Vector{Any}()
+    aero_input = Vector{typeof(wing.sections[1].aero_input)}()
     
     for (i, section) in enumerate(wing.sections)
         LE[i,:] = section.LE_point
@@ -182,7 +182,7 @@ end
 
 Interpolate aerodynamic input between two sections.
 """
-function calculate_new_aero_input(aero_input::Vector{Any}, 
+function calculate_new_aero_input(aero_input::Union{Vector{String}, Vector{Tuple{String, Vector{Float64}}}}, 
                                 section_index::Int,
                                 left_weight::Float64,
                                 right_weight::Float64)
@@ -191,10 +191,10 @@ function calculate_new_aero_input(aero_input::Vector{Any},
         throw(ArgumentError("Different aero models over the span are not supported"))
     end
     
-    model_type = aero_input[section_index][1]
+    model_type = isa(aero_input[section_index], String) ? aero_input[section_index] : aero_input[section_index][1]
     
     if model_type == "inviscid"
-        return ["inviscid"]
+        return ("inviscid")
         
     elseif model_type == "polar_data"
         polar_left = aero_input[section_index][2]
@@ -220,7 +220,7 @@ function calculate_new_aero_input(aero_input::Vector{Any},
         CD_interp = CD_left_common .* left_weight .+ CD_right_common .* right_weight
         CM_interp = CM_left_common .* left_weight .+ CM_right_common .* right_weight
         
-        return ["polar_data", [alpha_common, CL_interp, CD_interp, CM_interp]]
+        return ("polar_data", [alpha_common, CL_interp, CD_interp, CM_interp])
         
     elseif model_type == "lei_airfoil_breukels"
         tube_diameter_left = aero_input[section_index][2][1]
@@ -234,7 +234,7 @@ function calculate_new_aero_input(aero_input::Vector{Any},
         @debug "Interpolation weights" left_weight right_weight
         @debug "Interpolated parameters" tube_diameter_i chamber_height_i
         
-        return ["lei_airfoil_breukels", [tube_diameter_i, chamber_height_i]]
+        return ("lei_airfoil_breukels", [tube_diameter_i, chamber_height_i])
     else
         throw(ArgumentError("Unsupported aero model: $(model_type)"))
     end
@@ -263,9 +263,9 @@ Returns:
 function refine_mesh_for_linear_cosine_distribution(
     spanwise_panel_distribution::String,
     n_sections::Int,
-    LE::Matrix{Float64},
-    TE::Matrix{Float64},
-    aero_input::Vector{Any})
+    LE::Union{Matrix{Float64}, Adjoint{Float64, Matrix{Float64}}},
+    TE::Union{Matrix{Float64}, Adjoint{Float64, Matrix{Float64}}},
+    aero_input::Union{Vector{String}, Vector{Tuple{String, Vector{Float64}}}})
 
     # 1. Compute quarter chord line
     quarter_chord = LE .+ 0.25 .* (TE .- LE)
@@ -438,7 +438,7 @@ function refine_mesh_by_splitting_provided_sections(wing::Wing)
     # Calculate distribution
     n_new_sections = wing.n_panels + 1 - n_sections_provided
     n_section_pairs = n_sections_provided - 1
-    new_sections_per_pair, remaining = divmod(n_new_sections, n_section_pairs)
+    new_sections_per_pair, remaining = divrem(n_new_sections, n_section_pairs)
     
     # Initialize results
     new_sections = Section[]

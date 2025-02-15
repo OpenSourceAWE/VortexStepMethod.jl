@@ -108,7 +108,7 @@ Create a 3D plot of wing geometry including panels and filaments.
 """
 function create_geometry_plot(wing_aero, title, view_elevation, view_azimuth)
     panels = wing_aero.panels
-    va = wing_aero.va
+    va = isa(wing_aero.va, Tuple) ? wing_aero.va[1] : wing_aero.va
 
     # Extract geometric data
     corner_points = [panel.corner_points for panel in panels]
@@ -304,10 +304,17 @@ function plot_distribution(y_coordinates_list, results_list, label_list;
             ylabel=L"F_%$component"
         )
         for (y_coords, results, label) in zip(y_coordinates_list, results_list, label_list)
-            # Extract force components properly
-            forces = getindex.(results["F_distribution"], idx)
+            # Extract force components for the current direction (idx)
+            forces = results["F_distribution"][idx, :]
+            
+            # Verify dimensions match
+            if length(y_coords) != length(forces)
+                @warn "Dimension mismatch in force plotting" length(y_coords) length(forces) component
+                continue  # Skip this component instead of throwing error
+            end
+            
             plot!(plt[6+idx], y_coords, forces,
-                  label="$label ΣF_$component: $(round(results["F$component"], digits=2))N")
+                label="$label ΣF_$component: $(round(results["F$component"], digits=2))N")
         end
     end
 
@@ -387,7 +394,7 @@ function generate_polar_data(
         ] * Umag
         
         # Solve and store results
-        results = solve(solver, wing_aero; gamma_distribution=gamma)
+        results = solve(solver, wing_aero, gamma_distribution[i, :])
         
         cl[i] = results["cl"]
         cd[i] = results["cd"]
@@ -473,7 +480,10 @@ function plot_polars(
     # Load literature data if provided
     if !isempty(literature_path_list)
         for path in literature_path_list
-            data = readdlm(path, ',', skiprows=1)
+            # Read all data first
+            data = readdlm(path, ',')
+            # Skip the header row by taking data from row 2 onwards
+            data = data[2:end, :]
             push!(polar_data_list, [data[:,3], data[:,1], data[:,2]])
         end
     end
@@ -486,15 +496,15 @@ function plot_polars(
     n_solvers = length(solver_list)
     
     # Plot CL vs angle
-    sp1 = subplot!(plt, 1)
+    plot!(plt[1])  # Use plt[1] instead of subplot!(plt, 1)
     for (i, (polar_data, label)) in enumerate(zip(polar_data_list, label_list))
         style = i ≤ n_solvers ? (:solid, :star, 7) : (:solid, :circle, 5)
-        plot!(sp1, polar_data[1], polar_data[2],
+        plot!(plt[1], polar_data[1], polar_data[2],
               label=label, linestyle=style[1], marker=style[2], markersize=style[3])
     end
-    title!(sp1, L"C_L vs %$angle_type")
-    xlabel!(sp1, "$angle_type [deg]")
-    ylabel!(sp1, L"C_L")
+    title!(plt[1], L"C_L vs %$angle_type")
+    xlabel!(plt[1], "$angle_type [deg]")
+    ylabel!(plt[1], L"C_L")
     
     # Continue with CD, CS, and CL-CD plots similarly...
     # [Additional subplots omitted for brevity]

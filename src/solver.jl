@@ -77,10 +77,10 @@ function solve(solver::Solver, wing_aero::WingAerodynamics, gamma_distribution=n
 
     # Fill arrays from panels
     for (i, panel) in enumerate(panels)
-        x_airf_array[i, :] = panel.x_airf
-        y_airf_array[i, :] = panel.y_airf
-        z_airf_array[i, :] = panel.z_airf
-        va_array[i, :] = panel.va
+        x_airf_array[i, :] .= panel.x_airf
+        y_airf_array[i, :] .= panel.y_airf
+        z_airf_array[i, :] .= panel.z_airf
+        va_array[i, :] .= panel.va
         chord_array[i] = panel.chord
     end
 

@@ -19,11 +19,11 @@ wing = Wing(n_panels, spanwise_panel_distribution="linear")
 add_section!(wing, 
     [0.0, span/2, 0.0],   # Left tip LE 
     [chord, span/2, 0.0],  # Left tip TE
-    ["inviscid"])
+    "inviscid")
 add_section!(wing, 
     [0.0, -span/2, 0.0],  # Right tip LE
     [chord, -span/2, 0.0], # Right tip TE
-    ["inviscid"])
+    "inviscid")
 
 # Step 3: Initialize aerodynamics
 wa = WingAerodynamics([wing])
