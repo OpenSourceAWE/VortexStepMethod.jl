@@ -200,16 +200,23 @@ end
     calculate_cl(panel::Panel, alpha::Float64)
 
 Calculate lift coefficient for given angle of attack.
+
+# Arguments
+- `panel::Panel`: Panel object
+- `alpha::Float64`: Angle of attack in radians
+
+# Returns
+- `Float64`: Lift coefficient (Cl)
 """
 function calculate_cl(panel::Panel, alpha::Float64)
     if panel.panel_aero_model == "lei_airfoil_breukels"
-        cl = evalpoly(deg2rad(alpha), panel.cl_coefficients)
+        cl = evalpoly(rad2deg(alpha), reverse(panel.cl_coefficients))
         if abs(alpha) > (π/9)  # Outside ±20 degrees
             cl = 2 * cos(alpha) * sin(alpha)^2
         end
         return cl
     elseif panel.panel_aero_model == "inviscid"
-        return 2π * alpha
+        return 2π * alpha  # Changed: 2 * π to 2π for more idiomatic Julia
     elseif panel.panel_aero_model == "polar_data"
         return linear_interpolation(
             panel.panel_polar_data[:,1],
@@ -228,8 +235,8 @@ Calculate drag and moment coefficients for given angle of attack.
 """
 function calculate_cd_cm(panel::Panel, alpha::Float64)
     if panel.panel_aero_model == "lei_airfoil_breukels"
-        cd = evalpoly(deg2rad(alpha), panel.cd_coefficients)
-        cm = evalpoly(deg2rad(alpha), panel.cm_coefficients)
+        cd = evalpoly(rad2deg(alpha), reverse(panel.cd_coefficients))
+        cm = evalpoly(rad2deg(alpha), reverse(panel.cm_coefficients))
         if abs(alpha) > (π/9)  # Outside ±20 degrees
             cd = 2 * sin(alpha)^3
         end

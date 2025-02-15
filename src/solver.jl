@@ -167,7 +167,6 @@ function solve(solver::Solver, wing_aero::WingAerodynamics, gamma_distribution=n
         panels,
         solver.is_only_f_and_gamma_output
     )
-
     return results
 end
 
