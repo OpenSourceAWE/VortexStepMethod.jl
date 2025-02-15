@@ -1,0 +1,14 @@
+name = "VortexStepMethod"
+uuid = "ed3cd733-9f0f-46a9-93e0-89b8d4998dd9"
+authors = ["1-Bart-1 <bart@vandelint.net>"]
+version = "0.1.0"
+
+[deps]
+Colors = "5ae59095-9a9b-59fe-a467-6f913c188581"
+DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
+LaTeXStrings = "b964fa9f-0449-5b57-a5c2-d3ea65f4040f"
+LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+Logging = "56ddb016-857b-54e1-b83d-db4d58db5568"
+Measures = "442fdcdd-2543-5da2-b0f3-8c86c306513e"
+Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
+Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
