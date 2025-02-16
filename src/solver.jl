@@ -60,7 +60,7 @@ end
 Main solving routine for the aerodynamic model.
 """
 function solve(solver::Solver, wing_aero::WingAerodynamics, gamma_distribution=nothing)
-    isnothing(wing_aero.va) && throw(ArgumentError("Inflow conditions are not set"))
+    isnothing(wing_aero.panels[1].va) && throw(ArgumentError("Inflow conditions are not set, use set_va!(wing_aero, va)"))
     
     # Initialize variables
     panels = wing_aero.panels

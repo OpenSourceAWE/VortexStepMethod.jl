@@ -239,12 +239,12 @@ Calculate lift coefficient for given angle of attack.
 function calculate_cl(panel::Panel, alpha::Float64)
     if panel.panel_aero_model == "lei_airfoil_breukels"
         cl = evalpoly(rad2deg(alpha), reverse(panel.cl_coefficients))
-        if abs(alpha) > (π/9)  # Outside ±20 degrees
+        if abs(alpha) > (π/9)
             cl = 2 * cos(alpha) * sin(alpha)^2
         end
         return cl
     elseif panel.panel_aero_model == "inviscid"
-        return 2π * alpha  # Changed: 2 * π to 2π for more idiomatic Julia
+        return 2π * alpha
     elseif panel.panel_aero_model == "polar_data"
         return linear_interpolation(
             panel.panel_polar_data[:,1],
