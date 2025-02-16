@@ -4,6 +4,8 @@ The Vortex Step Method (VSM) is an enhanced lifting line method that improves up
 
 The software presented here includes a couple of examples: a rectangular wing and a leading-edge inflatable kite.
 
+This package was translated from the Python code available at https://github.com/awegroup/Vortex-Step-Method .
+
 ## Citation
 If you use this project in your research, please consider citing it. 
 Citation details can be found in the [CITATION.cff](CITATION.cff) file included in this repository.
