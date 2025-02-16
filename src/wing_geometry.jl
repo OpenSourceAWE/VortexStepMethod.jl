@@ -23,7 +23,7 @@ struct Section
     
     # Default constructor
     function Section()
-        new(zeros(3), zeros(3), Any[])
+        new(zeros(3), zeros(3), "")
     end
 end
 

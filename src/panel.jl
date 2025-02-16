@@ -119,6 +119,34 @@ mutable struct Panel
 end
 
 """
+    calculate_relative_alpha_and_relative_velocity(panel::Panel, induced_velocity::Vector{Float64})
+
+Calculate the relative angle of attack and relative velocity of the panel.
+
+# Arguments
+- `panel::Panel`: The panel object
+- `induced_velocity::Vector{Float64}`: Induced velocity at the control point
+
+# Returns
+- `Tuple{Float64,Vector{Float64}}`: Tuple containing:
+  - alpha: Relative angle of attack of the panel (in radians)
+  - relative_velocity: Relative velocity vector of the panel
+"""
+function calculate_relative_alpha_and_relative_velocity(
+    panel::Panel, 
+    induced_velocity::Vector{Float64}
+)
+    # Calculate relative velocity and angle of attack
+    # Constants throughout iterations: panel.va, panel.x_airf, panel.y_airf
+    relative_velocity = panel.va .+ induced_velocity
+    v_normal = dot(panel.x_airf, relative_velocity)
+    v_tangential = dot(panel.y_airf, relative_velocity)
+    alpha = atan(v_normal / v_tangential)
+    
+    return alpha, relative_velocity
+end
+
+"""
     compute_lei_coefficients(section_1::Section, section_2::Section)
 
 Compute lift, drag and moment coefficients for Lei airfoil using Breukels model.
