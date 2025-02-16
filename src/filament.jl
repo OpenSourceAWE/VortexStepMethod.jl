@@ -30,7 +30,8 @@ end
 
 Calculate induced velocity by a bound vortex filament at a point in space.
 """
-function velocity_3D_bound_vortex(
+function velocity_3D_bound_vortex!(
+    vel::Vector{Float64},
     filament::BoundFilament,
     XVP::Vector{Float64},
     gamma::Float64,
@@ -40,36 +41,31 @@ function velocity_3D_bound_vortex(
     r1 = XVP - filament.x1
     r2 = XVP - filament.x2
 
-    # Cross products
-    r1Xr0 = cross(r1, r0)
-    r2Xr0 = cross(r2, r0)
-
     # Cut-off radius
     epsilon = core_radius_fraction * norm(r0)
     
     # Check point location relative to filament
-    if norm(r1Xr0) / norm(r0) > epsilon
-        r1Xr2 = cross(r1, r2)
-        return (gamma / (4π)) * r1Xr2 / (norm(r1Xr2)^2) * 
+    if norm(cross(r1, r0)) / norm(r0) > epsilon
+        vel .= (gamma / (4π)) * cross(r1, r2) / (norm(cross(r1, r2))^2) * 
                dot(r0, r1/norm(r1) - r2/norm(r2))
-    elseif norm(r1Xr0) / norm(r0) == 0
-        return zeros(3)
+    elseif norm(cross(r1, r0)) / norm(r0) == 0
+        vel .= zeros(3)
     else
         @info "inside core radius"
-        @info "distance from control point to filament: $(norm(r1Xr0) / norm(r0))"
+        @info "distance from control point to filament: $(norm(cross(r1, r0)) / norm(r0))"
         
         # Project onto core radius
         r1_proj = dot(r1, r0) * r0 / (norm(r0)^2) + 
-                  epsilon * r1Xr0 / norm(r1Xr0)
+                  epsilon * cross(r1, r0) / norm(cross(r1, r0))
         r2_proj = dot(r2, r0) * r0 / (norm(r0)^2) + 
-                  epsilon * r2Xr0 / norm(r2Xr0)
-        r1Xr2_proj = cross(r1_proj, r2_proj)
+                  epsilon * cross(r2, r0) / norm(cross(r2, r0))
         
-        vel_ind_proj = (gamma / (4π)) * r1Xr2_proj / (norm(r1Xr2_proj)^2) * 
+        vel_ind_proj = (gamma / (4π)) * cross(r1_proj, r2_proj) / (norm(cross(r1_proj, r2_proj))^2) * 
                       dot(r0, r1_proj/norm(r1_proj) - r2_proj/norm(r2_proj))
         
-        return norm(r1Xr0) / (norm(r0) * epsilon) * vel_ind_proj
+        vel .= norm(cross(r1, r0)) / (norm(r0) * epsilon) * vel_ind_proj
     end
+    nothing
 end
 
 """
@@ -88,46 +84,52 @@ Calculate induced velocity by a trailing vortex filament.
 Reference: Rick Damiani et al. "A vortex step method for nonlinear airfoil polar data 
 as implemented in KiteAeroDyn".
 """
-function velocity_3D_trailing_vortex(
+function velocity_3D_trailing_vortex!(
+    vel::Vector{Float64},
     filament::BoundFilament,
     XVP::Vector{Float64},
     gamma::Float64,
-    Uinf::Float64
+    Uinf::Float64,
+    work_vectors::NTuple{10,Vector{Float64}}
 )
-    r0 = filament.x2 - filament.x1  # Vortex filament
-    r1 = XVP - filament.x1          # Control point to first end
-    r2 = XVP - filament.x2          # Control point to second end
+    r0, r1, r2, r_perp, r1Xr2, r1Xr0, r2Xr0, normr1r2 = work_vectors[1:8]
+    r0 .= filament.x2 .- filament.x1  # Vortex filament
+    r1 .= XVP .- filament.x1          # Control point to first end
+    r2 .= XVP .- filament.x2          # Control point to second end
 
     # Vector perpendicular to core radius
-    r_perp = dot(r1, r0) * r0 / (norm(r0)^2)
+    r_perp .= dot(r1, r0) .* r0 ./ (norm(r0)^2)
     
     # Cut-off radius
     epsilon = sqrt(4 * ALPHA0 * NU * norm(r_perp) / Uinf)
 
-    # Cross products
-    r1Xr0 = cross(r1, r0)
-    r2Xr0 = cross(r2, r0)
+    cross3!(r1Xr2, r1, r2)
+    cross3!(r1Xr0, r1, r0)
+    cross3!(r2Xr0, r2, r0)
+
+    normr1r2 .= (r1./norm(r1)) .- (r2./norm(r2))
 
     # Check point location relative to filament
     if norm(r1Xr0) / norm(r0) > epsilon
-        r1Xr2 = cross(r1, r2)
-        return (gamma / (4π)) * r1Xr2 / (norm(r1Xr2)^2) * 
-               dot(r0, r1/norm(r1) - r2/norm(r2))
+        vel .= (gamma / (4π)) .* r1Xr2 ./ (norm(r1Xr2)^2) .* 
+            dot(r0, normr1r2)
     elseif norm(r1Xr0) / norm(r0) == 0
-        return zeros(3)
+        vel .= zeros(3)
     else
         # Project onto core radius
         r1_proj = dot(r1, r0) * r0 / (norm(r0)^2) + 
                   epsilon * r1Xr0 / norm(r1Xr0)
         r2_proj = dot(r2, r0) * r0 / (norm(r0)^2) + 
                   epsilon * r2Xr0 / norm(r2Xr0)
-        r1Xr2_proj = cross(r1_proj, r2_proj)
         
-        vel_ind_proj = (gamma / (4π)) * r1Xr2_proj / (norm(r1Xr2_proj)^2) * 
+        cross3!(r1Xr2, r1_proj, r2_proj)
+
+        vel_ind_proj = (gamma / (4π)) * r1Xr2 / (norm(r1Xr2)^2) * 
                       dot(r0, r1_proj/norm(r1_proj) - r2_proj/norm(r2_proj))
         
-        return norm(r1Xr0) / (norm(r0) * epsilon) * vel_ind_proj
+        vel .= norm(r1Xr0) / (norm(r0) * epsilon) * vel_ind_proj
     end
+    nothing
 end
 
 """
@@ -149,32 +151,52 @@ end
 
 Calculate induced velocity by a semi-infinite trailing vortex filament.
 """
-function velocity_3D_trailing_vortex_semiinfinite(
+function velocity_3D_trailing_vortex_semiinfinite!(
+    vel::Vector{Float64},
     filament::SemiInfiniteFilament,
     Vf::Vector{Float64},
     XVP::Vector{Float64},
     GAMMA::Float64,
-    Uinf::Float64
+    Uinf::Float64,
+    work_vectors::NTuple{10,Vector{Float64}}
 )
+    r1, r_perp, r1XVf = work_vectors[1:3]
     GAMMA = -GAMMA * filament.filament_direction
-    r1 = XVP - filament.x1
-    r1XVf = cross(r1, Vf)
-    
+    r1 .= XVP .- filament.x1
+
     # Calculate core radius
-    r_perp = dot(r1, Vf) * Vf
+    r_perp .= dot(r1, Vf) .* Vf
     epsilon = sqrt(4 * ALPHA0 * NU * norm(r_perp) / Uinf)
-    
+
+    cross3!(r1XVf, r1, Vf)
+
     if norm(r1XVf) / norm(Vf) > epsilon
         K = GAMMA / (4π) / norm(r1XVf)^2 * (1 + dot(r1, Vf) / norm(r1))
-        return K * r1XVf
+        vel .= K .* r1XVf
     elseif norm(r1XVf) / norm(Vf) == 0
-        return zeros(3)
+        vel .= zeros(3)
     else
         r1_proj = dot(r1, Vf) * Vf + 
                   epsilon * (r1/norm(r1) - Vf) / norm(r1/norm(r1) - Vf)
-        r1XVf_proj = cross(r1_proj, Vf)
-        K = GAMMA / (4π) / norm(r1XVf_proj)^2 * 
+        K = GAMMA / (4π) / norm(cross(r1_proj, Vf))^2 * 
             (1 + dot(r1_proj, Vf) / norm(r1_proj))
-        return K * r1XVf_proj
+        vel .= K * cross(r1_proj, Vf)
     end
+    nothing
+end
+
+
+"""
+    cross3!(result::AbstractVector{T}, a::AbstractVector{T}, b::AbstractVector{T}) where T
+
+Compute cross product of 3D vectors in-place.
+"""
+@inline function cross3!(result::AbstractVector{T}, a::AbstractVector{T}, b::AbstractVector{T}) where T
+    x = a[2]*b[3] - a[3]*b[2]
+    y = a[3]*b[1] - a[1]*b[3]
+    z = a[1]*b[2] - a[2]*b[1]
+    result[1] = x
+    result[2] = y
+    result[3] = z
+    nothing
 end

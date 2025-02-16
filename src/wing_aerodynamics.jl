@@ -14,6 +14,10 @@ mutable struct WingAerodynamics
     alpha_corrected::Union{Nothing, Vector{Float64}}
     stall_angle_list::Vector{Float64}
 
+    alpha_array::Vector{Float64}
+    Umag_array::Vector{Float64}
+    work_vectors::NTuple{10,Vector{Float64}}
+
     function WingAerodynamics(
         wings::Vector{Wing};
         aerodynamic_center_location::Float64=0.25,
@@ -52,6 +56,10 @@ mutable struct WingAerodynamics
         # Initialize rest of the struct
         n_panels = length(panels)
         stall_angle_list = calculate_stall_angle_list(panels)
+
+        alpha_array = zeros(n_panels)
+        Umag_array = zeros(n_panels)    
+        work_vectors = ntuple(_ -> Vector{Float64}(undef, 3), 10)
         
         new(
             panels,
@@ -61,7 +69,10 @@ mutable struct WingAerodynamics
             nothing,  # gamma_distribution
             nothing,  # alpha_uncorrected
             nothing,  # alpha_corrected
-            stall_angle_list
+            stall_angle_list,
+            alpha_array,
+            Umag_array,
+            work_vectors
         )
     end
 end
@@ -214,7 +225,8 @@ function calculate_AIC_matrices(wa::WingAerodynamics, model::String,
                 va_norm_array[jring],
                 va_unit_array[jring, :],
                 1.0,
-                core_radius_fraction
+                core_radius_fraction,
+                wa.work_vectors
             )
             
             AIC[:, icp, jring] = velocity_induced

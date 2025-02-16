@@ -105,7 +105,7 @@ mutable struct Panel
             BoundFilament(bound_point_1, TE_point_1),
             BoundFilament(TE_point_2, bound_point_2)
         ]
-        
+
         new(
             TE_point_1, LE_point_1, TE_point_2, LE_point_2,
             chord, nothing, corner_points, panel_aero_model,
@@ -329,40 +329,48 @@ function calculate_velocity_induced_single_ring_semiinfinite(
     va_norm::Float64,
     va_unit::Vector{Float64},
     gamma::Float64,
-    core_radius_fraction::Float64
+    core_radius_fraction::Float64,
+    work_vectors::NTuple{10,Vector{Float64}}
 )
     velind = zeros(Float64, 3)
+    tempvel = zeros(3)
 
     # Process each filament
     for (i, filament) in enumerate(panel.filaments)
-        tempvel = if i == 1  # bound filament
-            evaluation_point_on_bound ? 
-                zeros(Float64, 3) : 
-                velocity_3D_bound_vortex(
+        if i == 1  # bound filament
+            if evaluation_point_on_bound
+                tempvel .= zeros(Float64, 3)
+            else
+                velocity_3D_bound_vortex!(
+                    tempvel,
                     filament,
                     evaluation_point,
                     gamma,
                     core_radius_fraction
                 )
+            end
         elseif i ∈ (2, 3)  # trailing filaments
-            velocity_3D_trailing_vortex(
+            velocity_3D_trailing_vortex!(
+                tempvel,
                 filament,
                 evaluation_point,
                 gamma,
-                va_norm
+                va_norm,
+                work_vectors
             )
         elseif i ∈ (4, 5)  # semi-infinite trailing filaments
-            velocity_3D_trailing_vortex_semiinfinite(
+            velocity_3D_trailing_vortex_semiinfinite!(
+                tempvel,
                 filament,
                 va_unit,
                 evaluation_point,
                 gamma,
-                va_norm
+                va_norm,
+                work_vectors
             )
         else
-            zeros(Float64, 3)
+            tempvel .= zeros(Float64, 3)
         end
-
         velind .+= tempvel
     end
 

@@ -61,20 +61,20 @@ Main solving routine for the aerodynamic model.
 """
 function solve(solver::Solver, wing_aero::WingAerodynamics, gamma_distribution=nothing)
     isnothing(wing_aero.va) && throw(ArgumentError("Inflow conditions are not set"))
-
+    
     # Initialize variables
     panels = wing_aero.panels
     n_panels = length(panels)
-    alpha_array = zeros(n_panels)
+    alpha_array = wing_aero.alpha_array
     relaxation_factor = solver.relaxation_factor
-
+    
     # Preallocate arrays
     x_airf_array = zeros(n_panels, 3)
     y_airf_array = zeros(n_panels, 3)
     z_airf_array = zeros(n_panels, 3)
     va_array = zeros(n_panels, 3)
     chord_array = zeros(n_panels)
-
+    
     # Fill arrays from panels
     for (i, panel) in enumerate(panels)
         x_airf_array[i, :] .= panel.x_airf
@@ -111,10 +111,10 @@ function solve(solver::Solver, wing_aero::WingAerodynamics, gamma_distribution=n
     end
 
     @debug "Initial gamma_new: $gamma_initial"
-
     # Run main iteration loop
     converged, gamma_new, alpha_array, Umag_array = gamma_loop(
         solver,
+        wing_aero,
         gamma_initial,
         AIC_x,
         AIC_y,
@@ -127,12 +127,12 @@ function solve(solver::Solver, wing_aero::WingAerodynamics, gamma_distribution=n
         panels,
         relaxation_factor
     )
-
     # Try again with reduced relaxation factor if not converged
     if !converged && relaxation_factor > 1e-3
         @warn "Running again with half the relaxation_factor = $(relaxation_factor/2)"
         converged, gamma_new, alpha_array, Umag_array = gamma_loop(
             solver,
+            wing_aero,
             gamma_initial,
             AIC_x,
             AIC_y,
@@ -181,6 +181,7 @@ Main iteration loop for calculating circulation distribution.
 """
 function gamma_loop(
     solver::Solver,
+    wing_aero::WingAerodynamics,
     gamma_new::Vector{Float64},
     AIC_x::Matrix{Float64},
     AIC_y::Matrix{Float64},
@@ -194,10 +195,8 @@ function gamma_loop(
     relaxation_factor::Float64
 )
     converged = false
-    n_panels = length(panels)
-
-    alpha_array = zeros(n_panels)
-    Umag_array = zeros(n_panels)
+    alpha_array = wing_aero.alpha_array
+    Umag_array = wing_aero.Umag_array
 
     iters = 0
     for i in 1:solver.max_iterations
@@ -223,7 +222,7 @@ function gamma_loop(
         Umagw_array = norm.(Uinfcrossz_array)
         
         cl_array = [calculate_cl(panel, alpha) for (panel, alpha) in zip(panels, alpha_array)]
-        gamma_new = 0.5 .* Umag_array.^2 ./ Umagw_array .* cl_array .* chord_array
+        gamma_new .= 0.5 .* Umag_array.^2 ./ Umagw_array .* cl_array .* chord_array
 
         # Apply damping if needed
         if solver.is_with_artificial_damping
