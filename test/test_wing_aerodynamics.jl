@@ -1,9 +1,12 @@
 # using VortexStepMethod: Wing, WingAerodynamics, BoundFilament, SemiInfiniteFilament, add_section!, set_va!, solve, calculate_cl
 using VortexStepMethod
-using VortexStepMethod: calculate_cl, calculate_cd_cm, calculate_projected_area
+using VortexStepMethod: calculate_cl, calculate_cd_cm, calculate_projected_area, calculate_AIC_matrices
 using LinearAlgebra
 using Test
 using Logging
+
+# ENV["JULIA_DEBUG"] = "all"
+# global_logger(ConsoleLogger(stderr, Logging.Debug))
 
 include("utils.jl")
 
@@ -99,4 +102,110 @@ include("utils.jl")
     # Check array shapes
     @test length(results_NEW["cl_distribution"]) == length(wing_aero.panels)
     @test length(results_NEW["cd_distribution"]) == length(wing_aero.panels)
+end
+
+
+@testset "Induction Matrix Creation" begin
+    # Setup
+    n_panels = 3
+    N = n_panels + 1  # number of SECTIONS
+    max_chord = 1.0
+    span = 2.36
+    AR = span^2 / (π * span * max_chord / 4)
+    dist = "cos"
+    coord = generate_coordinates_el_wing(max_chord, span, N, dist)
+
+    Atot = max_chord / 2 * span / 2 * π
+    @debug "N: $N"
+    @debug "size(coord): $(size(coord))"
+
+    Umag = 20.0
+    aoa = 5.7106 * π / 180
+    Uinf = [cos(aoa), 0.0, sin(aoa)] .* Umag
+
+    # Create wing geometry
+    core_radius_fraction = 1e-20
+    coord_left_to_right = flip_created_coord_in_pairs(deepcopy(coord))
+    wing = Wing(n_panels; spanwise_panel_distribution="unchanged")
+    for idx in 1:2:size(coord_left_to_right, 1)
+        add_section!(
+            wing,
+            coord_left_to_right[idx,:],
+            coord_left_to_right[idx+1,:],
+            "inviscid"
+        )
+    end
+    
+    wing_aero = WingAerodynamics([wing])
+    set_va!(wing_aero, (Uinf, 0.0))
+
+    # Calculate reference matrices using thesis functions
+    controlpoints, rings, bladepanels, ringvec, coord_L = 
+        create_geometry_general(coord, Uinf, N, "5fil", "LLT")
+    
+    # Test LLT matrices
+    @testset "LLT Matrices" begin
+        # Calculate reference matrices
+        MatrixU, MatrixV, MatrixW = thesis_induction_matrix_creation(
+            deepcopy(ringvec),
+            deepcopy(controlpoints),
+            deepcopy(rings),
+            deepcopy(Uinf),
+            zeros(N-1),
+            nothing,  # data_airf not needed
+            nothing,  # conv_crit not needed
+            "LLT"
+        )
+
+        # Calculate new matrices
+        va_norm_array = fill(norm(Uinf), length(coord))
+        va_unit_array = repeat(reshape(Uinf ./ norm(Uinf), 1, 3), length(coord))
+        AIC_x, AIC_y, AIC_z = calculate_AIC_matrices(
+            wing_aero,
+            "LLT",
+            core_radius_fraction,
+            va_norm_array,
+            va_unit_array
+        )
+
+        # Compare matrices
+        @test isapprox(MatrixU, AIC_x, atol=1e-5)
+        @test isapprox(MatrixV, -AIC_y, atol=1e-5)
+        @test isapprox(MatrixW, AIC_z, atol=1e-5)
+    end
+
+    # Test VSM matrices
+    @testset "VSM Matrices" begin
+        # Calculate reference matrices for VSM
+        controlpoints, rings, bladepanels, ringvec, coord_L = 
+            create_geometry_general(coord, Uinf, N, "5fil", "VSM")
+        
+        MatrixU, MatrixV, MatrixW = thesis_induction_matrix_creation(
+            deepcopy(ringvec),
+            deepcopy(controlpoints),
+            deepcopy(rings),
+            deepcopy(Uinf),
+            zeros(N-1),
+            nothing,
+            nothing,
+            "VSM"
+        )
+
+        # Calculate new matrices
+        va_norm_array = fill(norm(Uinf), length(coord))
+        va_unit_array = repeat(reshape(Uinf ./ norm(Uinf), 1, 3), length(coord))
+        AIC_x, AIC_y, AIC_z = calculate_AIC_matrices(
+            wing_aero,
+            "VSM",
+            core_radius_fraction,
+            va_norm_array,
+            va_unit_array
+        )
+
+        # Compare matrices with higher precision for VSM
+        @test isapprox(MatrixU, AIC_x, atol=1e-8)
+        @test isapprox(MatrixV, -AIC_y, atol=1e-8)
+        @test isapprox(MatrixW, AIC_z, atol=1e-8)
+        @show MatrixU MatrixV MatrixW
+    end
 end
