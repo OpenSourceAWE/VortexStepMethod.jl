@@ -6,6 +6,25 @@ The software presented here includes a couple of examples: a rectangular wing an
 
 This package was translated from the Python code available at https://github.com/awegroup/Vortex-Step-Method .
 
+## Input
+- geometry, defined by section
+  - rec wing two section, two point + polars
+  - kite: model of polars included, n sections to define
+
+- flow
+  - v_app vector
+
+- config
+  - how many panels
+    -> two sections make a panel
+
+Surfplan output file can be converted to an input for the vortex step method with a tool that is in this repo.
+
+## Output
+- cl, cd, cs (side force coefficient)
+- spanwise distribution of forces
+  -> moment coefficients (not yet implemented)
+
 ## Citation
 If you use this project in your research, please consider citing it. 
 Citation details can be found in the [CITATION.cff](CITATION.cff) file included in this repository.
