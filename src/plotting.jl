@@ -262,7 +262,6 @@ function plot_distribution(y_coordinates_list, results_list, label_list;
     # CL plot
     for (y_coordinates_i, result_i, label_i) in zip(y_coordinates_list, results_list, label_list)
         value = "$(round(result_i["cl"], digits=2))"
-        println(label_i)
         if label_i == "LLT"
             label = label_i * L" $~C_L$: " * value
         else
@@ -282,7 +281,6 @@ function plot_distribution(y_coordinates_list, results_list, label_list;
     # CD plot
     for (y_coordinates_i, result_i, label_i) in zip(y_coordinates_list, results_list, label_list)
         value = "$(round(result_i["cl"], digits=2))"
-        println(label_i)
         if label_i == "LLT"
             label = label_i * L" $~C_D$: " * value
         else
@@ -300,17 +298,6 @@ function plot_distribution(y_coordinates_list, results_list, label_list;
     axs[1, 2].legend()
 
     fig.tight_layout() 
-
-#     # CD Distribution
-#     plot!(res[2], 
-#         title=L"C_D Distribution",
-#         xlabel="Spanwise Position y/b",
-#         ylabel=L"Drag Coefficient C_D"
-#     )
-#     for (y_coords, results, label) in zip(y_coordinates_list, results_list, label_list)
-#         plot!(res[2], y_coords, results["cd_distribution"],
-#               label="$label CD: $(round(results["cd"], digits=2))")
-#     end
 
 #     # Gamma Distribution
 #     plot!(res[3],
