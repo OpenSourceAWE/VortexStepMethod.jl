@@ -3,7 +3,7 @@ using LinearAlgebra
 using Test
 using BenchmarkTools
 
-function create_test_filament()
+function create_test_filament2()
     x1 = [0.0, 0.0, 0.0]
     direction = [1.0, 0.0, 0.0]
     filament_direction = 1
@@ -41,7 +41,7 @@ end
     work_vectors = ntuple(_ -> Vector{Float64}(undef, 3), 10)
 
     @testset "Allocation Tests" begin
-        filament = create_test_filament()
+        filament = create_test_filament2()
         control_point = [0.5, 0.5, 2.0]
         induced_velocity = zeros(3)
         
@@ -60,7 +60,7 @@ end
     end
 
     @testset "Calculate Induced Velocity" begin
-        filament = create_test_filament()
+        filament = create_test_filament2()
         control_point = [0.5, 0.5, 2.0]
         induced_velocity = zeros(3)
         
@@ -83,7 +83,7 @@ end
     end
 
     @testset "Point on Filament" begin
-        filament = create_test_filament()
+        filament = create_test_filament2()
         test_points = [
             [0.0, 0.0, 0.0],  # Start point
             [0.5, 0.0, 0.0],  # Along filament
@@ -106,7 +106,7 @@ end
     end
 
     @testset "Different Gamma Values" begin
-        filament = create_test_filament()
+        filament = create_test_filament2()
         control_point = [0.5, 1.0, 0.0]
         v1 = zeros(3)
         v2 = zeros(3)
@@ -121,7 +121,7 @@ end
     end
 
     @testset "Symmetry" begin
-        filament = create_test_filament()
+        filament = create_test_filament2()
         vel_pos = zeros(3)
         vel_neg = zeros(3)
         
