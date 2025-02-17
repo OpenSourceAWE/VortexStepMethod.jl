@@ -40,6 +40,8 @@ vsm_solver = Solver(aerodynamic_model_type="VSM")
 @time results_llt = solve(llt_solver, wa)
 @time results_vsm = solve(vsm_solver, wa)
 @time results_vsm = solve(vsm_solver, wa)
+# time Python: 32.0ms
+# time Julia:   1.5ms
 
 # Print results comparison
 println("\nLifting Line Theory Results:")
