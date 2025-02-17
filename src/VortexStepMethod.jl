@@ -26,6 +26,13 @@ Basic 3-dimensional vector, stack allocated, mutable.
 """
 const MVec3    = MVector{3, Float64}
 
+"""
+   const PosVector=Union{MVec3, Vector}
+
+Position vector, either a `MVec3` or a `Vector` for use in function signatures.
+"""
+const PosVector=Union{MVec3, Vector}
+
 # Include core functionality
 include("wing_geometry.jl")
 include("filament.jl")
