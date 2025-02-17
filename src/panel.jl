@@ -374,7 +374,8 @@ function calculate_velocity_induced_single_ring_semiinfinite(
                     filament,
                     evaluation_point,
                     gamma,
-                    core_radius_fraction
+                    core_radius_fraction,
+                    work_vectors
                 )
             end
         elseif i ∈ (2, 3)  # trailing filaments
