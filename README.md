@@ -8,6 +8,28 @@ The software presented here includes a couple of examples: a rectangular wing an
 
 This package was translated from the Python code available at https://github.com/awegroup/Vortex-Step-Method .
 
+## Installation
+Install [Julia 1.10](https://ufechner7.github.io/2024/08/09/installing-julia-with-juliaup.html) or later, if you haven't already. On Linux, make sure that Python3 and Matplotlib are installed:
+```
+sudo apt install python3-matplotlib
+```
+
+Before installing this software it is suggested to create a new project, for example like this:
+```bash
+mkdir test
+cd test
+julia --project=.
+```
+Then add VortexStepMethod from  Julia's package manager, by typing:
+```julia
+using Pkg
+pkg"add VortexStepMethod"
+``` 
+at the Julia prompt. You can run the unit tests with the command:
+```julia
+pkg"test VortexStepMethod"
+```
+
 ## Input
 - geometry, defined by section
   - rec wing two section, two point + polars
