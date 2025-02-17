@@ -1,6 +1,7 @@
 module VortexStepMethod
 
 using LinearAlgebra
+using StaticArrays
 using Logging
 using Statistics
 using Colors
@@ -17,6 +18,13 @@ export calculate_results, solve_circulation_distribution
 export add_section!, set_va!
 export calculate_span, calculate_projected_area
 export plot_wing, plot_circulation_distribution, plot_geometry, plot_distribution, plot_polars
+
+"""
+   const MVec3    = MVector{3, Float64}
+
+Basic 3-dimensional vector, stack allocated, mutable.
+"""
+const MVec3    = MVector{3, Float64}
 
 # Include core functionality
 include("wing_geometry.jl")
