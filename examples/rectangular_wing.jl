@@ -52,15 +52,15 @@ println("CL = $(round(results_vsm["cl"], digits=4))")
 println("CD = $(round(results_vsm["cd"], digits=4))")
 println("Projected area = $(round(results_vsm["projected_area"], digits=4)) m²")
 
-# # Step 6: Plot geometry
-# plot_geometry(
-#       wa,
-#       "rectangular_wing_geometry";
-#       data_type=".pdf",
-#       save_path=".",
-#       is_save=false,
-#       is_show=true,
-# )
+# Step 6: Plot geometry
+plot_geometry(
+      wa,
+      "rectangular_wing_geometry";
+      data_type=".pdf",
+      save_path=".",
+      is_save=false,
+      is_show=true,
+)
 
 # # Step 7: Plot spanwise distributions
 # y_coordinates = [panel.aerodynamic_center[2] for panel in wa.panels]
