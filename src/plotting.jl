@@ -171,6 +171,12 @@ function create_geometry_plot(wing_aero, title, view_elevation, view_azimuth)
     ax.set_ylabel("y")
     ax.set_zlabel("z")
     set_axes_equal!(ax)
+    
+    # Set the initial view
+    ax.view_init(elev=view_elevation, azim=view_azimuth)
+
+    # Ensure the figure is fully rendered
+    fig.canvas.draw()
 
     return fig
 end
