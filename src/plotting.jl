@@ -108,7 +108,7 @@ Create a 3D plot of wing geometry including panels and filaments.
 """
 function create_geometry_plot(wing_aero, title, view_elevation, view_azimuth)
     set_plot_style()
-    
+
     panels = wing_aero.panels
     va = isa(wing_aero.va, Tuple) ? wing_aero.va[1] : wing_aero.va
 
@@ -167,6 +167,11 @@ function create_geometry_plot(wing_aero, title, view_elevation, view_azimuth)
     va_vector_begin = -2 * max_chord * va / va_mag
     va_vector_end = va_vector_begin + 1.5 * va / va_mag
     plot_line_segment!(ax, [va_vector_begin, va_vector_end], :lightblue, "va")
+
+    # Add legends for the first occurrence of each label
+    handles, labels = ax.get_legend_handles_labels()
+    by_label = Dict(zip(labels, handles))
+    ax.legend(values(by_label), keys(by_label))
 
     # Set labels and make axes equal
     ax.set_xlabel("x")
