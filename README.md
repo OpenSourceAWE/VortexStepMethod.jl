@@ -10,7 +10,7 @@ including low aspect ratio wings, as well as configurations with sweep, dihedral
 
 The software presented here includes a couple of examples: a rectangular wing and a leading-edge inflatable kite.
 
-This package was translated from the Python code available at https://github.com/awegroup/Vortex-Step-Method .
+This package was translated from the Python code version 1.0.0 available at https://github.com/ocayon/Vortex-Step-Method .
 
 ## Installation
 Install [Julia 1.10](https://ufechner7.github.io/2024/08/09/installing-julia-with-juliaup.html) or later, 
