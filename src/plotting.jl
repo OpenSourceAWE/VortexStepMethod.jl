@@ -278,6 +278,27 @@ function plot_distribution(y_coordinates_list, results_list, label_list;
     axs[1, 1].set_xlabel(L"Spanwise Position $y/b$")
     axs[1, 1].set_ylabel(L"Lift Coefficient $C_L$")
     axs[1, 1].legend()
+    
+    # CD plot
+    for (y_coordinates_i, result_i, label_i) in zip(y_coordinates_list, results_list, label_list)
+        value = "$(round(result_i["cl"], digits=2))"
+        println(label_i)
+        if label_i == "LLT"
+            label = label_i * L" $~C_D$: " * value
+        else
+            label = label_i * L" $C_D$: " * value
+        end
+        axs[1, 2].plot(
+            y_coordinates_i,
+            result_i["cd_distribution"],
+            label=label
+        )
+    end
+    axs[1, 2].set_title(L"$C_D$ Distribution", size=16)
+    axs[1, 2].set_xlabel(L"Spanwise Position $y/b$")
+    axs[1, 2].set_ylabel(L"Drag Coefficient $C_D$")
+    axs[1, 2].legend()
+
     fig.tight_layout() 
 
 #     # CD Distribution
