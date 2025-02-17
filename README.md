@@ -35,6 +35,33 @@ at the Julia prompt. You can run the unit tests with the command:
 pkg"test VortexStepMethod"
 ```
 
+## Running the examples
+If you have git installed, check out this repo because it makes it easier to understand the code:
+```bash
+mkdir repos
+cd repos
+git clone https://github.com/Albatross-Kite-Transport/VortexStepMethod.jl
+cd VortexStepMethod.jl
+```
+You can launch Julia with:
+```bash
+julia --project
+```
+or with:
+```bash
+./bin/run_julia
+```
+In Julia, first update the packages:
+```julia
+using Pkg
+Pkg.update()
+```
+and then you can execute the first example:
+```julia
+include("examples/rectangular_wing.jl")
+```
+To browse the code, it is suggested to use [VSCode](https://code.visualstudio.com/) with the Julia plugin.
+
 ## Input
 Three kinds of input data is needed:
 
