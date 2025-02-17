@@ -50,10 +50,10 @@ mutable struct Panel
     function Panel(
         section_1::Section,
         section_2::Section,
-        aerodynamic_center::Vector{Float64},
-        control_point::Vector{Float64},
-        bound_point_1::Vector{Float64},
-        bound_point_2::Vector{Float64},
+        aerodynamic_center::PosVector,
+        control_point::PosVector,
+        bound_point_1::PosVector,
+        bound_point_2::PosVector,
         x_airf::Vector{Float64},
         y_airf::Vector{Float64},
         z_airf::Vector{Float64}
@@ -352,10 +352,10 @@ Calculate the velocity induced by a vortex ring at a control point.
 """
 function calculate_velocity_induced_single_ring_semiinfinite(
     panel::Panel,
-    evaluation_point::Vector{Float64},
+    evaluation_point::PosVector,
     evaluation_point_on_bound::Bool,
     va_norm::Float64,
-    va_unit::Vector{Float64},
+    va_unit::VelVector,
     gamma::Float64,
     core_radius_fraction::Float64,
     work_vectors::NTuple{10,Vector{Float64}}
@@ -421,7 +421,7 @@ Only needed for VSM, as LLT bound and filament align, thus no induced velocity.
 """
 function calculate_velocity_induced_bound_2D(
     panel::Panel, 
-    evaluation_point::Vector{Float64}
+    evaluation_point::PosVector
 )
     # r3 perpendicular to the bound vortex
     r3 = evaluation_point - (panel.bound_point_1 + panel.bound_point_2) / 2

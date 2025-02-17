@@ -62,8 +62,8 @@ mutable struct Wing
 end
 
 """
-    add_section!(wing::Wing, LE_point::Vector{Float64}, 
-                TE_point::Vector{Float64}, aero_input::Vector{Any})
+    add_section!(wing::Wing, LE_point::PosVector, 
+                TE_point::PosVector, aero_input::Vector{Any})
 
 Add a new section to the wing.
 """
