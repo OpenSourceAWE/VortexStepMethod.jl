@@ -48,12 +48,12 @@ Represents a wing composed of multiple sections with aerodynamic properties.
 mutable struct Wing
     n_panels::Int
     spanwise_panel_distribution::String
-    spanwise_direction::Vector{Float64}
+    spanwise_direction::PosVector
     sections::Vector{Section}
     
     function Wing(n_panels::Int;
                  spanwise_panel_distribution::String="linear",
-                 spanwise_direction::Vector{Float64}=[0.0, 1.0, 0.0])
+                 spanwise_direction::PosVector=MVec3([0.0, 1.0, 0.0]))
         new(n_panels, 
             spanwise_panel_distribution, 
             spanwise_direction, 
@@ -67,8 +67,8 @@ end
 
 Add a new section to the wing.
 """
-function add_section!(wing::Wing, LE_point::Vector{Float64}, 
-                     TE_point::Vector{Float64}, aero_input::Union{String, Tuple{String, Vector{Float64}}})
+function add_section!(wing::Wing, LE_point::PosVector, 
+                     TE_point::PosVector, aero_input::Union{String, Tuple{String, Vector{Float64}}})
     push!(wing.sections, Section(LE_point, TE_point, aero_input))
 end
 
