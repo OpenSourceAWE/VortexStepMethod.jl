@@ -107,6 +107,8 @@ end
 Create a 3D plot of wing geometry including panels and filaments.
 """
 function create_geometry_plot(wing_aero, title, view_elevation, view_azimuth)
+    set_plot_style()
+    
     panels = wing_aero.panels
     va = isa(wing_aero.va, Tuple) ? wing_aero.va[1] : wing_aero.va
 
@@ -171,7 +173,7 @@ function create_geometry_plot(wing_aero, title, view_elevation, view_azimuth)
     ax.set_ylabel("y")
     ax.set_zlabel("z")
     set_axes_equal!(ax)
-    
+
     # Set the initial view
     ax.view_init(elev=view_elevation, azim=view_azimuth)
 

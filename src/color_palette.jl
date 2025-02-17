@@ -71,7 +71,7 @@ Set the default style for plots using LaTeX.
 """
 function set_plot_style()
     # plt.style.use('seaborn-whitegrid')
-    plt.style.use("seaborn-v0_8-whitegrid")
+    # plt.style.use("seaborn-v0_8-whitegrid")
     rcParams = plt.PyDict(plt.matplotlib."rcParams")
     rcParams["text.usetex"] = true
     rcParams["font.family"] = "serif"
