@@ -81,10 +81,10 @@ end
 
 Set 3D plot axes to equal scale.
 """
-function set_axes_equal!(ax)
-    x_lims = ax.get_xlim3d()
-    y_lims = ax.get_ylim3d()
-    z_lims = ax.get_zlim3d()
+function set_axes_equal!(ax; zoom=1.8)
+    x_lims = ax.get_xlim3d() ./ zoom
+    y_lims = ax.get_ylim3d() ./ zoom
+    z_lims = ax.get_zlim3d() ./ zoom
     
     x_range = abs(x_lims[2] - x_lims[1])
     y_range = abs(y_lims[2] - y_lims[1])
@@ -106,7 +106,7 @@ end
 
 Create a 3D plot of wing geometry including panels and filaments.
 """
-function create_geometry_plot(wing_aero, title, view_elevation, view_azimuth)
+function create_geometry_plot(wing_aero, title, view_elevation, view_azimuth; zoom=1.8)
     set_plot_style()
 
     panels = wing_aero.panels
@@ -171,20 +171,20 @@ function create_geometry_plot(wing_aero, title, view_elevation, view_azimuth)
     # Add legends for the first occurrence of each label
     handles, labels = ax.get_legend_handles_labels()
     by_label = Dict(zip(labels, handles))
-    ax.legend(values(by_label), keys(by_label))
+    ax.legend(values(by_label), keys(by_label), bbox_to_anchor = (0,0,1.1,1))
 
     # Set labels and make axes equal
     ax.set_xlabel("x")
     ax.set_ylabel("y")
     ax.set_zlabel("z")
-    set_axes_equal!(ax)
+    set_axes_equal!(ax; zoom)
 
     # Set the initial view
     ax.view_init(elev=view_elevation, azim=view_azimuth)
 
     # Ensure the figure is fully rendered
     fig.canvas.draw()
-    plt.tight_layout()
+    plt.tight_layout(rect=(0,0,1,0.97))
 
     return fig
 end

@@ -76,7 +76,8 @@ function set_plot_style()
     rcParams["text.usetex"] = true
     rcParams["font.family"] = "serif"
     rcParams["font.serif"] = ["Computer Modern Roman"]
-    rcParams["axes.titlesize"] = 14
+    rcParams["axes.titlesize"] = 28
+    # rcParams["axes.ymargin"] = 0.1
     rcParams["axes.labelsize"] = 12
     rcParams["axes.linewidth"] = 1
     rcParams["lines.linewidth"] = 1
