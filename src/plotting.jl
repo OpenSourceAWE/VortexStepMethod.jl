@@ -387,11 +387,14 @@ function generate_polar_data(
         end
         
         # Update inflow conditions
-        wing_aero.va = [
-            cos(α) * cos(β),
-            sin(β),
-            sin(α)
-        ] * Umag
+        set_va!(
+            wing_aero, 
+            [
+                cos(α) * cos(β),
+                sin(β),
+                sin(α)
+            ] * Umag
+        )
         
         # Solve and store results
         results = solve(solver, wing_aero, gamma_distribution[i, :])
@@ -488,27 +491,80 @@ function plot_polars(
         end
     end
     
-    # Create plots
-    layout = @layout [grid(2,2)]
-    plt = plot(layout=layout, size=(1000, 1000), title=title)
+    # Create plots with 2x2 layout
+    plt = plot(
+        layout=(2,2),
+        size=(1000, 1000),
+        plot_title=title
+    )
     
     # Number of computational results (excluding literature)
     n_solvers = length(solver_list)
     
     # Plot CL vs angle
-    plot!(plt[1])  # Use plt[1] instead of subplot!(plt, 1)
+    plot!(plt[1])
     for (i, (polar_data, label)) in enumerate(zip(polar_data_list, label_list))
         style = i ≤ n_solvers ? (:solid, :star, 7) : (:solid, :circle, 5)
         plot!(plt[1], polar_data[1], polar_data[2],
               label=label, linestyle=style[1], marker=style[2], markersize=style[3])
+        
+        # Limit y-range if CL > 10
+        if maximum(polar_data[2]) > 10
+            ylims!(plt[1], (-0.5, 2.0))
+        end
     end
-    title!(plt[1], L"C_L vs %$angle_type")
+    title!(plt[1], L"C_L \textrm{ vs } %$angle_type")
     xlabel!(plt[1], "$angle_type [deg]")
     ylabel!(plt[1], L"C_L")
-    
-    # Continue with CD, CS, and CL-CD plots similarly...
-    # [Additional subplots omitted for brevity]
-    
+
+    # Plot CD vs angle
+    plot!(plt[2])
+    for (i, (polar_data, label)) in enumerate(zip(polar_data_list, label_list))
+        style = i ≤ n_solvers ? (:solid, :star, 7) : (:solid, :circle, 5)
+        plot!(plt[2], polar_data[1], polar_data[3],
+              label=label, linestyle=style[1], marker=style[2], markersize=style[3])
+        
+        # Limit y-range if CD > 10
+        if maximum(polar_data[3]) > 10
+            ylims!(plt[2], (-0.2, 0.5))
+        end
+    end
+    title!(plt[2], L"C_D \textrm{ vs } %$angle_type")
+    xlabel!(plt[2], "$angle_type [deg]")
+    ylabel!(plt[2], L"C_D")
+
+    # Plot CS vs angle (if available)
+    plot!(plt[3])
+    for (i, (polar_data, label)) in enumerate(zip(polar_data_list, label_list))
+        # Check if CS data is available (length > 3)
+        if length(polar_data) > 3
+            style = i ≤ n_solvers ? (:solid, :star, 7) : (:solid, :circle, 5)
+            plot!(plt[3], polar_data[1], polar_data[4],
+                  label=label, linestyle=style[1], marker=style[2], markersize=style[3])
+        end
+    end
+    title!(plt[3], L"C_S \textrm{ vs } %$angle_type")
+    xlabel!(plt[3], "$angle_type [deg]")
+    ylabel!(plt[3], L"C_S")
+
+    # Plot CL vs CD
+    plot!(plt[4])
+    for (i, (polar_data, label)) in enumerate(zip(polar_data_list, label_list))
+        style = i ≤ n_solvers ? (:solid, :star, 7) : (:solid, :circle, 5)
+        plot!(plt[4], polar_data[2], polar_data[3],  # Note: CD on x-axis, CL on y-axis
+              label=label, linestyle=style[1], marker=style[2], markersize=style[3])
+        
+        # Limit ranges if values > 10
+        if maximum(polar_data[2]) > 10 || maximum(polar_data[3]) > 10
+            ylims!(plt[4], (-0.5, 2.0))
+            xlims!(plt[4], (-0.2, 0.5))
+        end
+    end
+    title!(plt[4], L"C_L \textrm{ vs } C_D \textrm{ (over } %$angle_type \textrm{ range)}")
+    xlabel!(plt[4], L"C_D")
+    ylabel!(plt[4], L"C_L")
+
+    # Save and show plot
     if is_save
         save_plot(plt, save_path, title, data_type=data_type)
     end
@@ -516,4 +572,6 @@ function plot_polars(
     if is_show
         show_plot(plt)
     end
+
+    return plt
 end
