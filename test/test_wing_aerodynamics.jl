@@ -63,7 +63,7 @@ include("utils.jl")
         cd_cm = calculate_cd_cm(panel, alpha[i])
         drag[i] = dyn_visc * cd_cm[1] * panel.chord
         moment[i] = dyn_visc * cd_cm[2] * panel.chord^2
-        @info "lift: $lift, drag: $drag, moment: $moment"
+        # @info "lift: $lift, drag: $drag, moment: $moment"
     end
     Fmag = hcat(lift, drag, moment)
 
@@ -103,7 +103,6 @@ include("utils.jl")
     @test length(results_NEW["cl_distribution"]) == length(wing_aero.panels)
     @test length(results_NEW["cd_distribution"]) == length(wing_aero.panels)
 end
-
 
 @testset "Induction Matrix Creation" begin
     # Setup
@@ -206,6 +205,149 @@ end
         @test isapprox(MatrixU, AIC_x, atol=1e-8)
         @test isapprox(MatrixV, -AIC_y, atol=1e-8)
         @test isapprox(MatrixW, AIC_z, atol=1e-8)
-        @show MatrixU MatrixV MatrixW
+    end
+end
+
+
+@testset "Wing Geometry Creation" begin
+    function create_geometry(; model="VSM", wing_type="rectangular", plotting=false, N=40)
+        max_chord = 1.0
+        span = 17.0
+        AR = span^2 / (π * span * max_chord / 4)
+        @debug "AR: $AR"
+        Umag = 20.0
+        aoa = 5.7106 * π / 180
+        Uinf = [cos(aoa), 0.0, sin(aoa)] .* Umag
+    
+        coord = if wing_type == "rectangular"
+            twist = range(-0.5, 0.5, length=N)
+            beta = range(-2, 2, length=N)
+            generate_coordinates_rect_wing(
+                fill(max_chord, N),
+                span,
+                twist,
+                beta,
+                N,
+                "lin"
+            )
+        elseif wing_type == "curved"
+            generate_coordinates_curved_wing(
+                max_chord, span, π/4, 5, N, "cos"
+            )
+        elseif wing_type == "elliptical"
+            generate_coordinates_el_wing(max_chord, span, N, "cos")
+        else
+            error("Invalid wing type")
+        end
+    
+        coord_left_to_right = flip_created_coord_in_pairs(deepcopy(coord))
+        wing = Wing(N; spanwise_panel_distribution="unchanged")
+        for i in 1:2:size(coord_left_to_right, 1)
+            add_section!(
+                wing,
+                coord_left_to_right[i,:],
+                coord_left_to_right[i+1,:],
+                "inviscid"
+            )
+        end
+        wing_aero = WingAerodynamics([wing])
+        set_va!(wing_aero, (Uinf, 0.0))
+        
+        return wing_aero, coord, Uinf, model
+    end
+
+    for model in ["VSM", "LLT"]
+        @debug "model: $model"
+        for wing_type in ["rectangular", "curved", "elliptical"]
+            @debug "wing_type: $wing_type"
+            wing_aero, coord, Uinf, model = create_geometry(
+                model=model, wing_type=wing_type
+            )
+            
+            # Generate geometry
+            expected_controlpoints, expected_rings, expected_bladepanels, 
+                expected_ringvec, expected_coord_L = create_geometry_general(
+                coord, Uinf, div(size(coord,1), 2), "5fil", model
+            )
+
+            for i in 1:length(wing_aero.panels)
+                @debug "i: $i"
+                # Handle control points
+                index_reversed = length(wing_aero.panels) - i + 1
+                panel = wing_aero.panels[index_reversed]
+                
+                evaluation_point = if model == "VSM"
+                    panel.control_point
+                else  # LLT
+                    panel.aerodynamic_center
+                end
+
+                @test isapprox(evaluation_point, expected_controlpoints[i]["coordinates"], atol=1e-4)
+                @test isapprox(panel.chord, expected_controlpoints[i]["chord"], atol=1e-4)
+                @test isapprox(panel.x_airf, expected_controlpoints[i]["normal"], atol=1e-4)
+                @test isapprox(panel.y_airf, expected_controlpoints[i]["tangential"], atol=1e-4)
+                @test isapprox(
+                    hcat(panel.x_airf, panel.y_airf, panel.z_airf),
+                    expected_controlpoints[i]["airf_coord"],
+                    atol=1e-4
+                )
+                
+                if model == "VSM"
+                    @test isapprox(
+                        panel.aerodynamic_center,
+                        expected_controlpoints[i]["coordinates_aoa"],
+                        atol=1e-4
+                    )
+                end
+
+                # Handle rings
+                expected_ring_i = expected_rings[i]
+                expected_ring_i_list = [
+                    expected_ring_i[1],
+                    expected_ring_i[2],
+                    expected_ring_i[3],
+                    expected_ring_i[4],
+                    expected_ring_i[5]
+                ]
+
+                filaments = panel.filaments
+                filament_list = [
+                    filaments[1],
+                    filaments[3],
+                    filaments[5],
+                    filaments[2],
+                    filaments[4]
+                ]
+
+                for (j, fil) in enumerate(filament_list)
+                    if j == 1  # bound filaments
+                        @test isapprox(fil.x1, expected_ring_i_list[j]["x1"], atol=1e-4)
+                        @test isapprox(fil.x2, expected_ring_i_list[j]["x2"], atol=1e-4)
+                    elseif j ∈ (2, 4)  # trailing filaments
+                        @test isapprox(fil.x1, expected_ring_i_list[j]["x1"], atol=1e-4)
+                        @test isapprox(fil.x2, expected_ring_i_list[j]["x2"], atol=1e-4)
+                    else  # semi-infinite filaments
+                        @test isapprox(fil.x1, expected_ring_i_list[j]["x1"], atol=1e-4)
+                    end
+                end
+
+                # Handle bladepanels
+                exp_bladepanels = expected_bladepanels[i]
+                @test isapprox(panel.LE_point_2, exp_bladepanels["p1"], atol=1e-4)
+                @test isapprox(panel.LE_point_1, exp_bladepanels["p2"], atol=1e-4)
+                @test isapprox(panel.TE_point_1, exp_bladepanels["p3"], atol=1e-4)
+                @test isapprox(panel.TE_point_2, exp_bladepanels["p4"], atol=1e-4)
+
+                # Handle ringvec
+                exp_ringvec = expected_ringvec[i]
+                r0 = panel.bound_point_1 - panel.bound_point_2
+                r3 = evaluation_point - (panel.bound_point_1 + panel.bound_point_2) / 2
+                @test isapprox(r0, exp_ringvec["r0"], atol=1e-4)
+                @test isapprox(r3, exp_ringvec["r3"], atol=1e-4)
+
+                # Handle coord_L
+                @test all(isapprox.(panel.aerodynamic_center, expected_coord_L[:, i]))
+            end
+        end
     end
 end

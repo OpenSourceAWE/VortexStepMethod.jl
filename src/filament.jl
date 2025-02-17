@@ -35,35 +35,45 @@ function velocity_3D_bound_vortex!(
     filament::BoundFilament,
     XVP::Vector{Float64},
     gamma::Float64,
-    core_radius_fraction::Float64
+    core_radius_fraction::Float64,
+    work_vectors::NTuple{10, Vector{Float64}}
 )
+    r1, r2, r1Xr2, r1Xr0, r2Xr0, r1r2norm, r1_proj, r2_proj, r1_projXr2_proj, vel_ind_proj = work_vectors
     r0 = filament.r0
-    r1 = XVP - filament.x1
-    r2 = XVP - filament.x2
+    r1 .= XVP .- filament.x1
+    r2 .= XVP .- filament.x2
 
     # Cut-off radius
     epsilon = core_radius_fraction * norm(r0)
+
+    cross3!(r1Xr2, r1, r2)
+    cross3!(r1Xr0, r1, r0)
+    r1r2norm .= r1./norm(r1) .- r2./norm(r2)
     
     # Check point location relative to filament
-    if norm(cross(r1, r0)) / norm(r0) > epsilon
-        vel .= (gamma / (4π)) * cross(r1, r2) / (norm(cross(r1, r2))^2) * 
-               dot(r0, r1/norm(r1) - r2/norm(r2))
-    elseif norm(cross(r1, r0)) / norm(r0) == 0
+    if norm(r1Xr0) / norm(r0) > epsilon
+        vel .= (gamma / (4π)) .* r1Xr2 ./ (norm(r1Xr2)^2) .* 
+            dot(r0, r1r2norm)
+    elseif norm(r1Xr0) / norm(r0) == 0
         vel .= zeros(3)
     else
         @info "inside core radius"
-        @info "distance from control point to filament: $(norm(cross(r1, r0)) / norm(r0))"
+        @info "distance from control point to filament: $(norm(r1Xr0) / norm(r0))"
         
         # Project onto core radius
-        r1_proj = dot(r1, r0) * r0 / (norm(r0)^2) + 
-                  epsilon * cross(r1, r0) / norm(cross(r1, r0))
-        r2_proj = dot(r2, r0) * r0 / (norm(r0)^2) + 
-                  epsilon * cross(r2, r0) / norm(cross(r2, r0))
-        
-        vel_ind_proj = (gamma / (4π)) * cross(r1_proj, r2_proj) / (norm(cross(r1_proj, r2_proj))^2) * 
-                      dot(r0, r1_proj/norm(r1_proj) - r2_proj/norm(r2_proj))
-        
-        vel .= norm(cross(r1, r0)) / (norm(r0) * epsilon) * vel_ind_proj
+        cross3!(r2Xr0, r2, r0)
+        r1_proj .= dot(r1, r0) .* r0 ./ (norm(r0)^2) .+ 
+                  epsilon .* r1Xr0 ./ norm(r1Xr0)
+        r2_proj .= dot(r2, r0) .* r0 ./ (norm(r0)^2) .+ 
+                  epsilon .* r2Xr0 ./ norm(r2Xr0)
+        cross3!(r1_projXr2_proj, r1_proj, r2_proj)
+
+        vel_ind_proj .= (gamma / (4π)) .* r1_projXr2_proj ./ (norm(r1_projXr2_proj)^2) .* 
+                      dot(r0, r1_proj/norm(r1_proj) .- r2_proj/norm(r2_proj))
+
+        @show vel_ind_proj r1_projXr2_proj
+
+        vel .= norm(r1Xr0) ./ (norm(r0) * epsilon) .* vel_ind_proj
     end
     nothing
 end
