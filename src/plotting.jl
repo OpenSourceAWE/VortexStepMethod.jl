@@ -280,17 +280,6 @@ function plot_distribution(y_coordinates_list, results_list, label_list;
     axs[1, 1].legend()
     fig.tight_layout() 
 
-#     # CL Distribution
-#     plot!(res[1], 
-#         title=L"C_L Distribution",
-#         xlabel="Spanwise Position y/b",
-#         ylabel=L"Lift Coefficient C_L"
-#     )
-#     for (y_coords, results, label) in zip(y_coordinates_list, results_list, label_list)
-#         plot!(res[1], y_coords, results["cl_distribution"], 
-#               label="$label CL: $(round(results["cl"], digits=2))")
-#     end
-
 #     # CD Distribution
 #     plot!(res[2], 
 #         title=L"C_D Distribution",
