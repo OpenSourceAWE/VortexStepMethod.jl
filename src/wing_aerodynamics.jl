@@ -83,10 +83,10 @@ end
 Structure to hold calculated panel properties.
 """
 struct PanelProperties
-    aero_centers::Vector{Vector{Float64}}
-    control_points::Vector{Vector{Float64}}
-    bound_points_1::Vector{Vector{Float64}}
-    bound_points_2::Vector{Vector{Float64}}
+    aero_centers::Vector{PosVector}
+    control_points::Vector{PosVector}
+    bound_points_1::Vector{PosVector}
+    bound_points_2::Vector{PosVector}
     x_airf::Vector{Vector{Float64}}
     y_airf::Vector{Vector{Float64}}
     z_airf::Vector{Vector{Float64}}

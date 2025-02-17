@@ -19,7 +19,7 @@ struct BoundFilament <: Filament
     length::Float64        # Filament length
     r0::Vector{Float64}    # Vector from x1 to x2
 
-    function BoundFilament(x1::Vector{Float64}, x2::Vector{Float64})
+    function BoundFilament(x1::PosVector, x2::PosVector)
         new(x1, x2, norm(x2 - x1), x2 - x1)
     end
 end
@@ -31,9 +31,9 @@ end
 Calculate induced velocity by a bound vortex filament at a point in space.
 """
 function velocity_3D_bound_vortex!(
-    vel::Vector{Float64},
+    vel::VelVector,
     filament::BoundFilament,
-    XVP::Vector{Float64},
+    XVP::PosVector,
     gamma::Float64,
     core_radius_fraction::Float64,
     work_vectors::NTuple{10, Vector{Float64}}
@@ -95,9 +95,9 @@ Reference: Rick Damiani et al. "A vortex step method for nonlinear airfoil polar
 as implemented in KiteAeroDyn".
 """
 function velocity_3D_trailing_vortex!(
-    vel::Vector{Float64},
+    vel::VelVector,
     filament::BoundFilament,
-    XVP::Vector{Float64},
+    XVP::PosVector,
     gamma::Float64,
     Uinf::Float64,
     work_vectors::NTuple{10,Vector{Float64}}
@@ -162,10 +162,10 @@ end
 Calculate induced velocity by a semi-infinite trailing vortex filament.
 """
 function velocity_3D_trailing_vortex_semiinfinite!(
-    vel::Vector{Float64},
+    vel::VelVector,
     filament::SemiInfiniteFilament,
-    Vf::Vector{Float64},
-    XVP::Vector{Float64},
+    Vf::VelVector,
+    XVP::PosVector,
     GAMMA::Float64,
     Uinf::Float64,
     work_vectors::NTuple{10,Vector{Float64}}
