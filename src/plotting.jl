@@ -226,38 +226,52 @@ function plot_geometry(wing_aero, title;
     end
 end
 
-# """
-#     plot_distribution(y_coordinates_list, results_list, label_list; kwargs...)
+"""
+    plot_distribution(y_coordinates_list, results_list, label_list; kwargs...)
 
-# Plot spanwise distributions of aerodynamic properties.
+Plot spanwise distributions of aerodynamic properties.
 
-# # Arguments
-# - `y_coordinates_list`: List of spanwise coordinates
-# - `results_list`: List of result dictionaries
-# - `label_list`: List of labels for different results
-# - `title`: Plot title (default: "spanwise_distribution")
-# - `data_type`: File extension for saving (default: ".pdf")
-# - `save_path`: Path to save plots
-# - `is_save`: Whether to save plots (default: true)
-# - `is_show`: Whether to display plots (default: true)
-# """
-# function plot_distribution(y_coordinates_list, results_list, label_list;
-#                          title="spanwise_distribution",
-#                          data_type=".pdf",
-#                          save_path=nothing,
-#                          is_save=true,
-#                          is_show=true)
+# Arguments
+- `y_coordinates_list`: List of spanwise coordinates
+- `results_list`: List of result dictionaries
+- `label_list`: List of labels for different results
+- `title`: Plot title (default: "spanwise_distribution")
+- `data_type`: File extension for saving (default: ".pdf")
+- `save_path`: Path to save plots
+- `is_save`: Whether to save plots (default: true)
+- `is_show`: Whether to display plots (default: true)
+"""
+function plot_distribution(y_coordinates_list, results_list, label_list;
+                         title="spanwise_distribution",
+                         data_type=".pdf",
+                         save_path=nothing,
+                         is_save=true,
+                         is_show=true)
     
-#     length(results_list) == length(label_list) || throw(ArgumentError(
-#         "Number of results ($(length(results_list))) must match number of labels ($(length(label_list)))"
-#     ))
+    length(results_list) == length(label_list) || throw(ArgumentError(
+        "Number of results ($(length(results_list))) must match number of labels ($(length(label_list)))"
+    ))
 
-#     # Create plot with layout
-#     res = plot(
-#         layout=(3,3),
-#         size=(1200, 800),
-#         plot_title=title
-#     )
+    # Set the plot style
+    set_plot_style()
+
+    # Initializing plot
+    fig, axs = plt.subplots(3, 3, figsize=(16, 10))
+    fig.suptitle(title, fontsize=16)
+
+    # CL plot
+    for (y_coordinates_i, result_i, label_i) in zip(y_coordinates_list, results_list, label_list)
+        value = "$(round(result_i["cl"], digits=2))"
+        axs[1, 1].plot(
+            y_coordinates_i,
+            result_i["cl_distribution"],
+            label=label_i * L" $C_L$: " * value
+        )
+    end
+    axs[1, 1].set_title(L"$C_L$ Distribution")
+    axs[1, 1].set_xlabel(L"Spanwise Position $y/b$")
+    axs[1, 1].set_ylabel(L"Lift Coefficient $C_L$")
+    axs[1, 1].legend()
 
 #     # CL Distribution
 #     plot!(res[1], 
@@ -343,7 +357,7 @@ end
 #     end
 
 #     return res
-# end
+end
 
 # """
 #     generate_polar_data(solver, wing_aero, angle_range; kwargs...)
