@@ -184,6 +184,7 @@ function create_geometry_plot(wing_aero, title, view_elevation, view_azimuth)
 
     # Ensure the figure is fully rendered
     fig.canvas.draw()
+    plt.tight_layout()
 
     return fig
 end
