@@ -6,7 +6,7 @@ using Logging
 using Statistics
 using Colors
 using DelimitedFiles
-using Plots
+using ControlPlots
 using Measures
 using LaTeXStrings
 

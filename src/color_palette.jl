@@ -95,15 +95,15 @@ function set_plot_style()
     end
 end
 
-"""
-    apply_palette!(p::Plots.Plot, colors::Vector{String})
+# """
+#     apply_palette!(p::Plots.Plot, colors::Vector{String})
 
-Apply the color palette to a plot.
-"""
-function apply_palette!(p::Plots.Plot, colors::Vector{String})
-    for (i, series) in enumerate(p.series_list)
-        color_name = colors[mod1(i, length(colors))]
-        series.plotattributes[:linecolor] = get_color(color_name)
-    end
-    return p
-end
+# Apply the color palette to a plot.
+# """
+# function apply_palette!(p::Plots.Plot, colors::Vector{String})
+#     for (i, series) in enumerate(p.series_list)
+#         color_name = colors[mod1(i, length(colors))]
+#         series.plotattributes[:linecolor] = get_color(color_name)
+#     end
+#     return p
+# end
