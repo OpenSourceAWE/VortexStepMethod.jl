@@ -54,9 +54,9 @@ mutable struct Panel
         control_point::PosVector,
         bound_point_1::PosVector,
         bound_point_2::PosVector,
-        x_airf::Vector{Float64},
-        y_airf::Vector{Float64},
-        z_airf::Vector{Float64}
+        x_airf::PosVector,
+        y_airf::PosVector,
+        z_airf::PosVector
     )
         # Initialize basic geometry
         TE_point_1 = copy(section_1.TE_point)
