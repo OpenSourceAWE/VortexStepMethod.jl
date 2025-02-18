@@ -299,7 +299,6 @@ function plot_distribution(y_coordinates_list, results_list, label_list;
 
     # Gamma Distribution
     for (y_coordinates_i, result_i, label_i) in zip(y_coordinates_list, results_list, label_list)
-        value = "$(round(result_i["cl"], digits=2))"
         axs[1, 3].plot(
             y_coordinates_i,
             result_i["gamma_distribution"],
@@ -313,7 +312,6 @@ function plot_distribution(y_coordinates_list, results_list, label_list;
 
     # Geometric Alpha
     for (y_coordinates_i, result_i, label_i) in zip(y_coordinates_list, results_list, label_list)
-        value = "$(round(result_i["cl"], digits=2))"
         axs[2, 1].plot(
             y_coordinates_i,
             result_i["alpha_geometric"],
@@ -325,9 +323,8 @@ function plot_distribution(y_coordinates_list, results_list, label_list;
     axs[2, 1].set_ylabel(L"Angle of Attack $\alpha$ (deg)")
     axs[2, 1].legend()
 
-    # Corrected Alpha
+    # Calculated/ Corrected Alpha
     for (y_coordinates_i, result_i, label_i) in zip(y_coordinates_list, results_list, label_list)
-        value = "$(round(result_i["cl"], digits=2))"
         axs[2, 2].plot(
             y_coordinates_i,
             result_i["alpha_at_ac"],
@@ -339,17 +336,30 @@ function plot_distribution(y_coordinates_list, results_list, label_list;
     axs[2, 2].set_ylabel(L"Angle of Attack $\alpha$ (deg)")
     axs[2, 2].legend()
 
+    # Uncorrected Alpha plot
+    for (y_coordinates_i, result_i, label_i) in zip(y_coordinates_list, results_list, label_list)
+        axs[2, 3].plot(
+            y_coordinates_i,
+            result_i["alpha_uncorrected"],
+            label=label_i
+        )
+    end
+    axs[2, 3].set_title(L"$\alpha$ Uncorrected (if VSM, at the control point)", size=16)
+    axs[2, 3].set_xlabel(L"Spanwise Position $y/b$")
+    axs[2, 3].set_ylabel(L"Angle of Attack $\alpha$ (deg)")
+    axs[2, 3].legend()
+
+    # Force Components
+    for (idx, component) in enumerate(["x", "y", "z"])
+        println(idx)
+        println(component)
+        axs[3, idx].set_title("Force in $component direction", size=16)
+        axs[3, idx].set_xlabel(L"Spanwise Position $y/b$")
+        axs[3, idx].set_ylabel(raw"$F_\mathrm" * "{$component}" * raw"$")
+    end
+
     fig.tight_layout() 
 
-#     # Corrected Alpha
-#     plot!(res[5],
-#         title=L"\alpha Corrected",
-#         xlabel="Spanwise Position y/b",
-#         ylabel=L"Angle of Attack \alpha (deg)"
-#     )
-#     for (y_coords, results, label) in zip(y_coordinates_list, results_list, label_list)
-#         plot!(res[5], y_coords, rad2deg.(results["alpha_at_ac"]), label=label)
-#     end
 
 #     # Force Components
 #     for (idx, component) in enumerate(["x", "y", "z"])
