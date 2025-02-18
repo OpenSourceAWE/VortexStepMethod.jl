@@ -500,16 +500,38 @@ function calculate_results(wa::WingAerodynamics,
             dot(ftotal_induced_va, [0.0, 1.0, 0.0]),
             dot(ftotal_induced_va, [0.0, 0.0, 1.0])
         ] * panel.width
+        
+        # ### Converting forces to the global reference frame
+        # fx_global_2D = jit_dot(ftotal_induced_va, np.array([1, 0, 0]))
+        # fy_global_2D = jit_dot(ftotal_induced_va, np.array([0, 1, 0]))
+        # fz_global_2D = jit_dot(ftotal_induced_va, np.array([0, 0, 1]))
+        
+        # fx_global_3D = fx_global_2D * panel_width
+        # fy_global_3D = fy_global_2D * panel_width
+        # fz_global_3D = fz_global_2D * panel_width
 
         # Update sums
         lift_wing_3D_sum += lift_prescribed_va * panel.width
         drag_wing_3D_sum += drag_prescribed_va * panel.width  
         side_wing_3D_sum += side_prescribed_va * panel.width
+
+        # TODO make this work
+        # fx_global_3D_sum += fx_global_3D
+        # fy_global_3D_sum += fy_global_3D
+        # fz_global_3D_sum += fz_global_3D
         
         # Store coefficients
         push!(cl_prescribed_va, lift_prescribed_va / (q_inf * panel.chord))
         push!(cd_prescribed_va, drag_prescribed_va / (q_inf * panel.chord))
         push!(cs_prescribed_va, side_prescribed_va / (q_inf * panel.chord))
+
+        # TODO translate this
+        # fx_global_3D_list.append(fx_global_3D)
+        # fy_global_3D_list.append(fy_global_3D)
+        # fz_global_3D_list.append(fz_global_3D)
+        # f_global_3D_list.append(
+        #     np.array([fx_global_3D, fy_global_3D, fz_global_3D])
+        # )
     end
 
     if is_only_f_and_gamma_output
