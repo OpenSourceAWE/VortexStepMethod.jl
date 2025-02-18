@@ -539,28 +539,23 @@ function plot_polars(
         # Update label with Reynolds number
         label_list[i] = "$(label_list[i]) Re = $(round(Int, rey*1e-5))e5"
     end
-    println(label_list)
     
-#     # Load literature data if provided
-#     if !isempty(literature_path_list)
-#         for path in literature_path_list
-#             # Read all data first
-#             data = readdlm(path, ',')
-#             # Skip the header row by taking data from row 2 onwards
-#             data = data[2:end, :]
-#             push!(polar_data_list, [data[:,3], data[:,1], data[:,2]])
-#         end
-#     end
+    # Load literature data if provided
+    if !isempty(literature_path_list)
+        for path in literature_path_list
+            # Read all data first
+            data = readdlm(path, ',')
+            # Skip the header row by taking data from row 2 onwards
+            data = data[2:end, :]
+            push!(polar_data_list, [data[:,3], data[:,1], data[:,2]])
+        end
+    end
     
-#     # Create plots with 2x2 layout
-#     res = plot(
-#         layout=(2,2),
-#         size=(1000, 1000),
-#         plot_title=title
-#     )
+    # Initializing plot
+    fig, axs = plt.subplots(2, 2, figsize=(14, 14))
     
-#     # Number of computational results (excluding literature)
-#     n_solvers = length(solver_list)
+    # Number of computational results (excluding literature)
+    n_solvers = length(solver_list)
     
 #     # Plot CL vs angle
 #     plot!(res[1])
