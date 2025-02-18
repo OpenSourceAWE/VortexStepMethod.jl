@@ -311,17 +311,22 @@ function plot_distribution(y_coordinates_list, results_list, label_list;
     axs[1, 3].set_ylabel(L"Circulation~\Gamma")
     axs[1, 3].legend()
 
-    fig.tight_layout() 
+    # Geometric Alpha
+    for (y_coordinates_i, result_i, label_i) in zip(y_coordinates_list, results_list, label_list)
+        value = "$(round(result_i["cl"], digits=2))"
+        axs[2, 1].plot(
+            y_coordinates_i,
+            result_i["alpha_geometric"],
+            label=label_i
+        )
+    end
+    axs[2, 1].set_title(L"$\alpha$ Geometric", size=16)
+    axs[2, 1].set_xlabel(L"Spanwise Position $y/b$")
+    axs[2, 1].set_ylabel(L"Angle of Attack $\alpha$ (deg)")
+    axs[2, 1].legend()
 
-#     # Gamma Distribution
-#     plot!(res[3],
-#         title=L"\Gamma Distribution",
-#         xlabel="Spanwise Position y/b",
-#         ylabel=L"Circulation \Gamma"
-#     )
-#     for (y_coords, results, label) in zip(y_coordinates_list, results_list, label_list)
-#         plot!(res[3], y_coords, results["gamma_distribution"], label=label)
-#     end
+
+    fig.tight_layout() 
 
 #     # Geometric Alpha
 #     plot!(res[4],
