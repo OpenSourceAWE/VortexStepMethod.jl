@@ -325,18 +325,21 @@ function plot_distribution(y_coordinates_list, results_list, label_list;
     axs[2, 1].set_ylabel(L"Angle of Attack $\alpha$ (deg)")
     axs[2, 1].legend()
 
+    # Corrected Alpha
+    for (y_coordinates_i, result_i, label_i) in zip(y_coordinates_list, results_list, label_list)
+        value = "$(round(result_i["cl"], digits=2))"
+        axs[2, 2].plot(
+            y_coordinates_i,
+            result_i["alpha_at_ac"],
+            label=label_i
+        )
+    end
+    axs[2, 2].set_title(L"$\alpha$ result (corrected to aerodynamic center)", size=16)
+    axs[2, 2].set_xlabel(L"Spanwise Position $y/b$")
+    axs[2, 2].set_ylabel(L"Angle of Attack $\alpha$ (deg)")
+    axs[2, 2].legend()
 
     fig.tight_layout() 
-
-#     # Geometric Alpha
-#     plot!(res[4],
-#         title=L"\alpha Geometric",
-#         xlabel="Spanwise Position y/b",
-#         ylabel=L"Angle of Attack \alpha (deg)"
-#     )
-#     for (y_coords, results, label) in zip(y_coordinates_list, results_list, label_list)
-#         plot!(res[4], y_coords, rad2deg.(results["alpha_geometric"]), label=label)
-#     end
 
 #     # Corrected Alpha
 #     plot!(res[5],
