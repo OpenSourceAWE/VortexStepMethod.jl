@@ -351,48 +351,43 @@ function plot_distribution(y_coordinates_list, results_list, label_list;
 
     # Force Components
     for (idx, component) in enumerate(["x", "y", "z"])
-        println(idx)
-        println(component)
         axs[3, idx].set_title("Force in $component direction", size=16)
         axs[3, idx].set_xlabel(L"Spanwise Position $y/b$")
         axs[3, idx].set_ylabel(raw"$F_\mathrm" * "{$component}" * raw"$")
+        for (y_coords, results, label) in zip(y_coordinates_list, results_list, label_list)
+            # Extract force components for the current direction (idx)
+            forces = results["F_distribution"][idx, :]
+            # Verify dimensions match
+            if length(y_coords) != length(forces)
+                @warn "Dimension mismatch in force plotting" length(y_coords) length(forces) component
+                continue  # Skip this component instead of throwing error
+            end
+            space=""
+            if label == "LLT"
+                space = "~"
+            end
+            axs[3, idx].plot(
+                y_coords,
+                forces,
+                label = "$label" * space * raw"$~\Sigma~F_\mathrm" * "{$component}:~" * 
+                         raw"$" * "$(round(results["F$component"], digits=2)) N"
+            )
+            axs[3, idx].legend()
+        end
     end
 
     fig.tight_layout() 
 
-
-#     # Force Components
-#     for (idx, component) in enumerate(["x", "y", "z"])
-#         plot!(res[6+idx],
-#             title="Force in $component direction",
-#             xlabel="Spanwise Position y/b",
-#             ylabel=L"F_%$component"
-#         )
-#         for (y_coords, results, label) in zip(y_coordinates_list, results_list, label_list)
-#             # Extract force components for the current direction (idx)
-#             forces = results["F_distribution"][idx, :]
-            
-#             # Verify dimensions match
-#             if length(y_coords) != length(forces)
-#                 @warn "Dimension mismatch in force plotting" length(y_coords) length(forces) component
-#                 continue  # Skip this component instead of throwing error
-#             end
-            
-#             plot!(res[6+idx], y_coords, forces,
-#                 label="$label ΣF_$component: $(round(results["F$component"], digits=2))N")
-#         end
-#     end
-
-#     # Save and show plot
-#     if is_save
-#         save_plot(res, save_path, title, data_type=data_type)
-#     end
+    # # Save and show plot
+    # if is_save
+    #     save_plot(fig, save_path, title, data_type=data_type)
+    # end
     
-#     if is_show
-#         show_plot(res)
-#     end
+    if is_show
+        show_plot(fig)
+    end
 
-#     return res
+    return fig
 end
 
 # """
