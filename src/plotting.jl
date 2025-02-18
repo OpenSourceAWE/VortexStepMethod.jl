@@ -390,155 +390,156 @@ function plot_distribution(y_coordinates_list, results_list, label_list;
     return fig
 end
 
-# """
-#     generate_polar_data(solver, wing_aero, angle_range; kwargs...)
+"""
+    generate_polar_data(solver, wing_aero, angle_range; kwargs...)
 
-# Generate polar data for aerodynamic analysis over a range of angles.
+Generate polar data for aerodynamic analysis over a range of angles.
 
-# # Arguments
-# - `solver`: Aerodynamic solver object
-# - `wing_aero`: Wing aerodynamics object
-# - `angle_range`: Range of angles to analyze
-# - `angle_type`: Type of angle variation ("angle_of_attack" or "side_slip")
-# - `angle_of_attack`: Initial angle of attack in radians
-# - `side_slip`: Initial side slip angle in radians
-# - `yaw_rate`: Yaw rate
-# - `Umag`: Magnitude of velocity
+# Arguments
+- `solver`: Aerodynamic solver object
+- `wing_aero`: Wing aerodynamics object
+- `angle_range`: Range of angles to analyze
+- `angle_type`: Type of angle variation ("angle_of_attack" or "side_slip")
+- `angle_of_attack`: Initial angle of attack in radians
+- `side_slip`: Initial side slip angle in radians
+- `yaw_rate`: Yaw rate
+- `Umag`: Magnitude of velocity
 
-# # Returns
-# - Tuple of polar data array and Reynolds number
-# """
-# function generate_polar_data(
-#     solver,
-#     wing_aero,
-#     angle_range;
-#     angle_type="angle_of_attack",
-#     angle_of_attack=0.0,
-#     side_slip=0.0,
-#     yaw_rate=0.0,
-#     Umag=10.0
-# )
-#     n_panels = length(wing_aero.panels)
-#     n_angles = length(angle_range)
+# Returns
+- Tuple of polar data array and Reynolds number
+"""
+function generate_polar_data(
+    solver,
+    wing_aero,
+    angle_range;
+    angle_type="angle_of_attack",
+    angle_of_attack=0.0,
+    side_slip=0.0,
+    yaw_rate=0.0,
+    Umag=10.0
+)
+    n_panels = length(wing_aero.panels)
+    n_angles = length(angle_range)
     
-#     # Initialize arrays
-#     cl = zeros(n_angles)
-#     cd = zeros(n_angles)
-#     cs = zeros(n_angles)
-#     gamma_distribution = zeros(n_angles, n_panels)
-#     cl_distribution = zeros(n_angles, n_panels)
-#     cd_distribution = zeros(n_angles, n_panels)
-#     cs_distribution = zeros(n_angles, n_panels)
-#     reynolds_number = zeros(n_angles)
+    # Initialize arrays
+    cl = zeros(n_angles)
+    cd = zeros(n_angles)
+    cs = zeros(n_angles)
+    gamma_distribution = zeros(n_angles, n_panels)
+    cl_distribution = zeros(n_angles, n_panels)
+    cd_distribution = zeros(n_angles, n_panels)
+    cs_distribution = zeros(n_angles, n_panels)
+    reynolds_number = zeros(n_angles)
     
-#     # Previous gamma for initialization
-#     gamma = nothing
+    # Previous gamma for initialization
+    gamma = nothing
     
-#     for (i, angle_i) in enumerate(angle_range)
-#         # Set angle based on type
-#         if angle_type == "angle_of_attack"
-#             α = deg2rad(angle_i)
-#             β = side_slip
-#         elseif angle_type == "side_slip"
-#             α = angle_of_attack
-#             β = deg2rad(angle_i)
-#         else
-#             throw(ArgumentError("angle_type must be 'angle_of_attack' or 'side_slip'"))
-#         end
+    for (i, angle_i) in enumerate(angle_range)
+        # Set angle based on type
+        if angle_type == "angle_of_attack"
+            α = deg2rad(angle_i)
+            β = side_slip
+        elseif angle_type == raw"side_slip"
+            α = angle_of_attack
+            β = deg2rad(angle_i)
+        else
+            throw(ArgumentError("angle_type must be 'angle_of_attack' or 'side_slip'"))
+        end
         
-#         # Update inflow conditions
-#         set_va!(
-#             wing_aero, 
-#             [
-#                 cos(α) * cos(β),
-#                 sin(β),
-#                 sin(α)
-#             ] * Umag
-#         )
+        # Update inflow conditions
+        set_va!(
+            wing_aero, 
+            [
+                cos(α) * cos(β),
+                sin(β),
+                sin(α)
+            ] * Umag
+        )
         
-#         # Solve and store results
-#         results = solve(solver, wing_aero, gamma_distribution[i, :])
+        # Solve and store results
+        results = solve(solver, wing_aero, gamma_distribution[i, :])
         
-#         cl[i] = results["cl"]
-#         cd[i] = results["cd"]
-#         cs[i] = results["cs"]
-#         gamma_distribution[i,:] = results["gamma_distribution"]
-#         cl_distribution[i,:] = results["cl_distribution"]
-#         cd_distribution[i,:] = results["cd_distribution"]
-#         cs_distribution[i,:] = results["cs_distribution"]
-#         reynolds_number[i] = results["Rey"]
+        cl[i] = results["cl"]
+        cd[i] = results["cd"]
+        cs[i] = results["cs"]
+        gamma_distribution[i,:] = results["gamma_distribution"]
+        cl_distribution[i,:] = results["cl_distribution"]
+        cd_distribution[i,:] = results["cd_distribution"]
+        cs_distribution[i,:] = results["cs_distribution"]
+        reynolds_number[i] = results["Rey"]
         
-#         # Store gamma for next iteration
-#         gamma = gamma_distribution[i,:]
-#     end
+        # Store gamma for next iteration
+        gamma = gamma_distribution[i,:]
+    end
     
-#     polar_data = [
-#         angle_range,
-#         cl,
-#         cd,
-#         cs,
-#         gamma_distribution,
-#         cl_distribution,
-#         cd_distribution,
-#         cs_distribution,
-#         reynolds_number
-#     ]
+    polar_data = [
+        angle_range,
+        cl,
+        cd,
+        cs,
+        gamma_distribution,
+        cl_distribution,
+        cd_distribution,
+        cs_distribution,
+        reynolds_number
+    ]
     
-#     return polar_data, reynolds_number[1]
-# end
+    return polar_data, reynolds_number[1]
+end
 
-# """
-#     plot_polars(solver_list, wing_aero_list, label_list; kwargs...)
+"""
+    plot_polars(solver_list, wing_aero_list, label_list; kwargs...)
 
-# Plot polar data comparing different solvers and configurations.
+Plot polar data comparing different solvers and configurations.
 
-# # Arguments
-# - `solver_list`: List of aerodynamic solvers
-# - `wing_aero_list`: List of wing aerodynamics objects
-# - `label_list`: List of labels for each configuration
-# - `literature_path_list`: Optional paths to literature data files
-# - `angle_range`: Range of angles to analyze
-# - Additional keyword arguments for plot customization
-# """
-# function plot_polars(
-#     solver_list,
-#     wing_aero_list,
-#     label_list;
-#     literature_path_list=String[],
-#     angle_range=range(0, 20, 2),
-#     angle_type="angle_of_attack",
-#     angle_of_attack=0.0,
-#     side_slip=0.0,
-#     yaw_rate=0.0,
-#     Umag=10.0,
-#     title="polar",
-#     data_type=".pdf",
-#     save_path=nothing,
-#     is_save=true,
-#     is_show=true
-# )
-#     # Validate inputs
-#     total_cases = length(wing_aero_list) + length(literature_path_list)
-#     if total_cases != length(label_list) || length(solver_list) != length(wing_aero_list)
-#         throw(ArgumentError("Mismatch in number of solvers ($(length(solver_list))), " *
-#                           "cases ($total_cases), and labels ($(length(label_list)))"))
-#     end
+# Arguments
+- `solver_list`: List of aerodynamic solvers
+- `wing_aero_list`: List of wing aerodynamics objects
+- `label_list`: List of labels for each configuration
+- `literature_path_list`: Optional paths to literature data files
+- `angle_range`: Range of angles to analyze
+- Additional keyword arguments for plot customization
+"""
+function plot_polars(
+    solver_list,
+    wing_aero_list,
+    label_list;
+    literature_path_list=String[],
+    angle_range=range(0, 20, 2),
+    angle_type="angle_of_attack",
+    angle_of_attack=0.0,
+    side_slip=0.0,
+    yaw_rate=0.0,
+    Umag=10.0,
+    title="polar",
+    data_type=".pdf",
+    save_path=nothing,
+    is_save=true,
+    is_show=true
+)
+    # Validate inputs
+    total_cases = length(wing_aero_list) + length(literature_path_list)
+    if total_cases != length(label_list) || length(solver_list) != length(wing_aero_list)
+        throw(ArgumentError("Mismatch in number of solvers ($(length(solver_list))), " *
+                          "cases ($total_cases), and labels ($(length(label_list)))"))
+    end
     
-#     # Generate polar data
-#     polar_data_list = []
-#     for (i, (solver, wing_aero)) in enumerate(zip(solver_list, wing_aero_list))
-#         polar_data, rey = generate_polar_data(
-#             solver, wing_aero, angle_range;
-#             angle_type=angle_type,
-#             angle_of_attack=angle_of_attack,
-#             side_slip=side_slip,
-#             yaw_rate=yaw_rate,
-#             Umag=Umag
-#         )
-#         push!(polar_data_list, polar_data)
-#         # Update label with Reynolds number
-#         label_list[i] = "$(label_list[i]) Re = $(round(Int, rey*1e-5))e5"
-#     end
+    # Generate polar data
+    polar_data_list = []
+    for (i, (solver, wing_aero)) in enumerate(zip(solver_list, wing_aero_list))
+        polar_data, rey = generate_polar_data(
+            solver, wing_aero, angle_range;
+            angle_type=angle_type,
+            angle_of_attack=angle_of_attack,
+            side_slip=side_slip,
+            yaw_rate=yaw_rate,
+            Umag=Umag
+        )
+        push!(polar_data_list, polar_data)
+        # Update label with Reynolds number
+        label_list[i] = "$(label_list[i]) Re = $(round(Int, rey*1e-5))e5"
+    end
+    println(label_list)
     
 #     # Load literature data if provided
 #     if !isempty(literature_path_list)
@@ -634,4 +635,4 @@ end
 #     end
 
 #     return res
-# end
+end

@@ -65,24 +65,24 @@ println("Projected area = $(round(results_vsm["projected_area"], digits=4)) m²"
 # Step 7: Plot spanwise distributions
 y_coordinates = [panel.aerodynamic_center[2] for panel in wa.panels]
 
-plot_distribution(
-    [y_coordinates, y_coordinates],
-    [results_vsm, results_llt],
-    ["VSM", "LLT"],
-    title="Spanwise Distributions"
-)
-
-# # Step 8: Plot polar curves
-# angle_range = range(0, 20, 20)
-# plot_polars(
-#     [llt_solver, vsm_solver],
-#     [wa, wa],
-#     ["LLT", "VSM"],
-#     angle_range=angle_range,
-#     angle_type="angle_of_attack",
-#     Umag=Umag,
-#     title="Rectangular Wing Polars"
+# plot_distribution(
+#     [y_coordinates, y_coordinates],
+#     [results_vsm, results_llt],
+#     ["VSM", "LLT"],
+#     title="Spanwise Distributions"
 # )
+
+# Step 8: Plot polar curves
+angle_range = range(0, 20, 20)
+plot_polars(
+    [llt_solver, vsm_solver],
+    [wa, wa],
+    ["LLT", "VSM"],
+    angle_range=angle_range,
+    angle_type="angle_of_attack",
+    Umag=Umag,
+    title="Rectangular Wing Polars"
+)
 
 # Save plots if needed
 # savefig("geometry.pdf")
