@@ -10,11 +10,11 @@ authors:
 title: "VortexStepMethod"
 keywords:
   - Airborne Wind Energy
-version: 0.1.0
+version: 1.0.0
 # doi: "11.1111/11111"
 # date-released: YYYY-MM-DD
 license: MIT
-url: "https://github.com/ocayon/Vortex-Step-Method"
+url: "https://github.com/Albatross-Kite-Transport/VortexStepMethod.jl"
 preferred-citation:
   type: article
   authors:
