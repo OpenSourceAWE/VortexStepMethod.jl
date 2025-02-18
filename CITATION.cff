@@ -1,11 +1,10 @@
-cff-version: 0.1.0
+cff-version: 1.2.0
 message: "If you are using this software, please cite it as shown below."
 authors:
-  -
-    family-names: "Cayon"
+  - family-names: "Cayon"
     given-names: "Oriol"
     orcid: "https://orcid.org/0000-0002-2065-8673"
-    family-names: "Poland"
+  - family-names: "Poland"
     given-names: "Jelle Agatho Wilhelm"
     orcid: "https://orcid.org/0000-0003-3164-5648"
 title: "VortexStepMethod"
@@ -31,4 +30,3 @@ preferred-citation:
   issue: 7
   volume: 16
   year: 2023
-  article-number: 3061
