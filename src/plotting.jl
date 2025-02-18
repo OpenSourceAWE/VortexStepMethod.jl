@@ -625,9 +625,9 @@ function plot_polars(
 #         save_plot(res, save_path, title, data_type=data_type)
 #     end
     
-#     if is_show
-#         show_plot(res)
-#     end
+    if is_show
+        show_plot(fig)
+    end
 
-#     return res
+    return fig
 end
