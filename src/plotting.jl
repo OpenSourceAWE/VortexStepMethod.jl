@@ -297,6 +297,20 @@ function plot_distribution(y_coordinates_list, results_list, label_list;
     axs[1, 2].set_ylabel(L"Drag Coefficient $C_D$")
     axs[1, 2].legend()
 
+    # Gamma Distribution
+    for (y_coordinates_i, result_i, label_i) in zip(y_coordinates_list, results_list, label_list)
+        value = "$(round(result_i["cl"], digits=2))"
+        axs[1, 3].plot(
+            y_coordinates_i,
+            result_i["gamma_distribution"],
+            label=label_i
+        )
+    end
+    axs[1, 3].set_title(L"\Gamma~Distribution", size=16)
+    axs[1, 3].set_xlabel(L"Spanwise Position $y/b$")
+    axs[1, 3].set_ylabel(L"Circulation~\Gamma")
+    axs[1, 3].legend()
+
     fig.tight_layout() 
 
 #     # Gamma Distribution
