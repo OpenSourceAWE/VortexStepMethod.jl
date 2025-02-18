@@ -116,7 +116,7 @@ Surfplan output file can be converted to an input for the vortex step method wit
 ## Output
 - CL, CD, CS (side force coefficient)
 - the spanwise distribution of forces  
-  --> moment coefficients (will be implemented in release 1.1)
+  --> moment coefficients (will be implemented in release 1.1) 
 
 ## Citation
 If you use this project in your research, please consider citing it. 
