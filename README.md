@@ -1,4 +1,6 @@
-[![Build Status](https://github.com/Albatross-Kite-Transport/VortexStepMethod.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/Albatross-Kite-Transport/VortexStepMethod.jl/actions/workflows/CI.yml?query=branch%3Amain)
+[![Build Status](https://github.com/Albatross-Kite-Transport/VortexStepMethod.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/Albatross-Kite-Transport/VortexStepMethod.jl/actions/workflows/CI.yml?query=branch%3Amain) [![Coverage](https://codecov.io/gh/Albatross-Kite-Transport/VortexStepMethod.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/Albatross-Kite-Transport/VortexStepMethod.jl)
+
+U
 
 # Simulation of a Kite using the Vortex Step Method
 
