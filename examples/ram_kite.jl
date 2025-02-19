@@ -3,7 +3,6 @@ using VortexStepMethod
 using CSV
 using DataFrames
 using LinearAlgebra
-using Plots
 
 # Create wing geometry
 wing = KiteWing("data/HL5_ram_air_kite_body.obj")
@@ -18,38 +17,6 @@ for (i, alpha) in enumerate(alphas)
     
     polars[i, :] .= [alpha, cd, cl, cm]
 end
-
-# Plot polars directly
-p = plot(layout=(2,2), size=(1000,1000))
-
-# CL vs alpha
-plot!(p[1], rad2deg.(polars[:,1]), polars[:,3],
-      label="CL",
-      xlabel="Angle of Attack [deg]",
-      ylabel="CL",
-      title="Lift Coefficient")
-
-# CD vs alpha
-plot!(p[2], rad2deg.(polars[:,1]), polars[:,2],
-      label="CD",
-      xlabel="Angle of Attack [deg]",
-      ylabel="CD",
-      title="Drag Coefficient")
-
-# CM vs alpha
-plot!(p[3], rad2deg.(polars[:,1]), polars[:,4],
-      label="CM",
-      xlabel="Angle of Attack [deg]",
-      ylabel="CM",
-      title="Moment Coefficient")
-
-# CL vs CD
-plot!(p[4], polars[:,2], polars[:,3],
-      label="Polar",
-      xlabel="CD",
-      ylabel="CL",
-      title="Lift-Drag Polar")
-display(p)
 
 for gamma in range(wing.gamma_tip - wing.gamma_tip/10, -wing.gamma_tip + wing.gamma_tip/10, 20)
     add_section!(wing, gamma, ("polar_data", polars))
