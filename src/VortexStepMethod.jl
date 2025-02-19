@@ -10,7 +10,7 @@ using Plots
 using Measures
 using LaTeXStrings
 using NonlinearSolve
-using Interpolations: linear_interpolation
+using Interpolations: linear_interpolation, Line
 
 # Export public interface
 export Wing, Section, KiteWing
