@@ -84,3 +84,4 @@ plot_polars(
     Umag=Umag,
     title="Rectangular Wing Polars"
 )
+nothing

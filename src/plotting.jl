@@ -114,7 +114,7 @@ end
 Create a 3D plot of wing geometry including panels and filaments.
 """
 function create_geometry_plot(wing_aero, title, view_elevation, view_azimuth; zoom=1.8)
-    set_plot_style()
+    set_plot_style(28)
 
     panels = wing_aero.panels
     va = isa(wing_aero.va, Tuple) ? wing_aero.va[1] : wing_aero.va
@@ -442,6 +442,8 @@ function generate_polar_data(
     
     # Previous gamma for initialization
     gamma = nothing
+
+    set_plot_style()
     
     for (i, angle_i) in enumerate(angle_range)
         # Set angle based on type
@@ -730,8 +732,8 @@ function plot_polars(
     fig.tight_layout(h_pad=2.5, rect=(0.01,0.01,0.99,0.99)) 
     
     # Save and show plot
-    if is_save
-        save_plot(res, save_path, title, data_type=data_type)
+    if is_save && !isnothing(save_path)
+        save_plot(fig, save_path, title, data_type=data_type)
     end
 
     if is_show
