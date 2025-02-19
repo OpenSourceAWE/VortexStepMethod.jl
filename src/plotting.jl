@@ -232,7 +232,10 @@ function plot_geometry(wing_aero, title;
         plt.ion()
         fig = create_geometry_plot(wing_aero, title, view_elevation, view_azimuth)
         plt.display(fig)
+    else
+        fig = create_geometry_plot(wing_aero, title, view_elevation, view_azimuth)
     end
+    fig
 end
 
 """
