@@ -4,9 +4,9 @@ using VortexStepMethod
 using VortexStepMethod: create_interpolations, find_circle_center_and_radius, calculate_inertia_tensor, calculate_com, read_faces
 using LinearAlgebra
 
-@testset "KiteGeometry Tests" begin
+@testset "Kite Geometry Tests" begin
     # Test data
-    test_obj_path = joinpath(@__DIR__, "data", "test.obj")
+    test_obj_path = joinpath(tempdir(), "test.obj")
     
     @testset "OBJ File Reading" begin
         # Create minimal test OBJ file
