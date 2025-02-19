@@ -51,12 +51,12 @@ Represents a wing composed of multiple sections with aerodynamic properties.
 mutable struct Wing <: AbstractWing
     n_panels::Int
     spanwise_panel_distribution::String
-    spanwise_direction::Vector{Float64}
+    spanwise_direction::PosVector
     sections::Vector{Section}
     
     function Wing(n_panels::Int;
                  spanwise_panel_distribution::String="linear",
-                 spanwise_direction::Vector{Float64}=[0.0, 1.0, 0.0])
+                 spanwise_direction::PosVector=MVec3([0.0, 1.0, 0.0]))
         new(n_panels, 
             spanwise_panel_distribution, 
             spanwise_direction, 
@@ -542,7 +542,7 @@ function calculate_projected_area(wing::AbstractWing,
     z_plane_vector = z_plane_vector ./ norm(z_plane_vector)
     
     # Project point onto plane
-    function project_onto_plane(point::Vector{Float64}, normal::Vector{Float64})
+    function project_onto_plane(point::PosVector, normal::Vector{Float64})
         return point .- dot(point, normal) .* normal
     end
     

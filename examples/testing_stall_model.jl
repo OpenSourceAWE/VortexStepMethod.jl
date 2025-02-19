@@ -3,7 +3,6 @@ using VortexStepMethod
 using CSV
 using DataFrames
 using LinearAlgebra
-using Plots
 
 # Find root directory
 root_dir = dirname(@__DIR__)

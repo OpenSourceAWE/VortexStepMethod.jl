@@ -460,9 +460,6 @@ function calculate_results(wa::WingAerodynamics,
     lift_wing_3D_sum = 0.0
     drag_wing_3D_sum = 0.0
     side_wing_3D_sum = 0.0
-    fx_global_3D_sum = 0.0
-    fy_global_3D_sum = 0.0
-    fz_global_3D_sum = 0.0
 
     # Get wing properties
     spanwise_direction = wa.wings[1].spanwise_direction
@@ -510,21 +507,34 @@ function calculate_results(wa::WingAerodynamics,
                            dot(drag_induced_va, spanwise_direction)
 
         # Global forces
-        f_global_3D[:,i] = [
+        f_global_3D[:,i] .= [
             dot(ftotal_induced_va, [1.0, 0.0, 0.0]),
             dot(ftotal_induced_va, [0.0, 1.0, 0.0]),
             dot(ftotal_induced_va, [0.0, 0.0, 1.0])
-        ] * panel.width
+        ] .* panel.width
 
         # Update sums
         lift_wing_3D_sum += lift_prescribed_va * panel.width
         drag_wing_3D_sum += drag_prescribed_va * panel.width  
         side_wing_3D_sum += side_prescribed_va * panel.width
+
+        # TODO make this work
+        # fx_global_3D_sum += fx_global_3D
+        # fy_global_3D_sum += fy_global_3D
+        # fz_global_3D_sum += fz_global_3D
         
         # Store coefficients
         push!(cl_prescribed_va, lift_prescribed_va / (q_inf * panel.chord))
         push!(cd_prescribed_va, drag_prescribed_va / (q_inf * panel.chord))
         push!(cs_prescribed_va, side_prescribed_va / (q_inf * panel.chord))
+
+        # TODO translate this
+        # fx_global_3D_list.append(fx_global_3D)
+        # fy_global_3D_list.append(fy_global_3D)
+        # fz_global_3D_list.append(fz_global_3D)
+        # f_global_3D_list.append(
+        #     np.array([fx_global_3D, fy_global_3D, fz_global_3D])
+        # )
     end
 
     if is_only_f_and_gamma_output
@@ -551,9 +561,9 @@ function calculate_results(wa::WingAerodynamics,
 
     # Create results dictionary
     results = Dict{String,Any}(
-        "Fx" => fx_global_3D_sum,
-        "Fy" => fy_global_3D_sum,
-        "Fz" => fz_global_3D_sum,
+        "Fx" => sum(f_global_3D[1,:]),
+        "Fy" => sum(f_global_3D[1,:]),
+        "Fz" => sum(f_global_3D[1,:]),
         "lift" => lift_wing_3D_sum,
         "drag" => drag_wing_3D_sum,
         "side" => side_wing_3D_sum,
@@ -641,89 +651,4 @@ function set_va!(wa::WingAerodynamics, va)
     # Update wake elements
     wa.panels = frozen_wake(va_distribution, wa.panels)
     wa._va = va_vec
-end
-
-# Continue calculate_results function
-"""
-    calculate_global_forces(wa::WingAerodynamics, results::Dict)
-
-Calculate global forces and coefficients.
-"""
-function calculate_global_forces(wa::WingAerodynamics, 
-                               panels::Vector{Panel},
-                               density::Float64,
-                               va::Vector{Float64},
-                               lift::Matrix{Float64},
-                               drag::Matrix{Float64},
-                               moment::Matrix{Float64})
-    
-    # Get wing properties
-    spanwise_direction = wa.wings[1].spanwise_direction
-    va_mag = norm(va)
-    va_unit = va / va_mag
-    q_inf = 0.5 * density * va_mag^2
-    
-    # Initialize result arrays
-    n_panels = length(panels)
-    cl_prescribed_va = zeros(n_panels)
-    cd_prescribed_va = zeros(n_panels)
-    cs_prescribed_va = zeros(n_panels)
-    f_global_3D = zeros(Float64, 3, n_panels)  # Add explicit type
-    
-    # Force summation variables
-    total_area = 0.0
-    lift_sum = 0.0
-    drag_sum = 0.0
-    side_sum = 0.0
-    f_global_sum = zeros(3)
-    
-    for (i, panel) in enumerate(panels)
-        # Get panel geometry
-        z_airf_span = panel.z_airf
-        y_airf_chord = panel.y_airf
-        x_airf_normal = panel.x_airf
-        panel_area = panel.chord * panel.width
-        total_area += panel_area
-        
-        # Calculate force directions
-        dir_lift = cross(va_unit, spanwise_direction)
-        dir_lift = dir_lift / norm(dir_lift)
-        
-        # Calculate forces
-        lift_force = lift[i] .* dir_lift  # Use broadcasting
-        drag_force = drag[i] .* va_unit
-        f_total = lift_force + drag_force
-        f_global_3D[:,i] .= panel.width .* f_total  # Use in-place assignment
-        
-        # Total force in panel frame
-        f_total = lift_force + drag_force
-        
-        # Store components
-        cl_prescribed_va[i] = dot(lift_force, dir_lift) / (q_inf * panel.chord)
-        cd_prescribed_va[i] = dot(drag_force, va_unit) / (q_inf * panel.chord)
-        cs_prescribed_va[i] = dot(f_total, spanwise_direction) / (q_inf * panel.chord)
-        
-        # Global forces
-        f_global = f_global_3D[:,i]
-        
-        # Update sums
-        lift_sum += dot(f_global, dir_lift)
-        drag_sum += dot(f_global, va_unit)
-        side_sum += dot(f_global, spanwise_direction)
-        f_global_sum += f_global
-    end
-    
-    return Dict(
-        "cl_distribution" => cl_prescribed_va,
-        "cd_distribution" => cd_prescribed_va,
-        "cs_distribution" => cs_prescribed_va,
-        "F_distribution" => f_global_3D,
-        "lift" => lift_sum,
-        "drag" => drag_sum,
-        "side" => side_sum,
-        "Fx" => f_global_sum[1],
-        "Fy" => f_global_sum[2],
-        "Fz" => f_global_sum[3],
-        "area" => total_area
-    )
 end
