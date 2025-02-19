@@ -52,29 +52,4 @@ include("solver.jl")
 include("color_palette.jl")
 include("plotting.jl")
 
-function create_wing_from_obj(obj_path, wing_mass, circle_center, radius, α_tip)
-   if !isfile(obj_path)
-      error("OBJ file not found: $obj_path")
-   end
-   data_dir = dirname(obj_path)
-   wing_path = joinpath(data_dir, "measurements.bin")
-   if isfile(wing_path)
-      wing = deserialize(wing_path)
-      new_wing = wing.mass != wing_mass ||
-               wing.radius != radius ||
-               wing.α_tip != α_tip
-      @info "Using cached wing struct. Delete $wing_path to create a new wing."
-      return deserialize()
-   end
-   if new_wing
-      vertices = read_vertices(obj_path)
-      faces = read_faces(obj_path)
-      com = calculate_com(vertices, faces)
-      inertia_tensor = calculate_inertia_tensor(vertices, faces, wing_mass, com)
-      gamma_range = -abs(deg2rad(α_tip)):0.01:abs(deg2rad(α_tip))
-      (interp_max, interp_min, gammas, max_xs, min_xs, inertia_tensor) = create_interpolations(vertices, circle_center, gamma_range)
-   end
-   (interp_max, interp_min, gammas, max_xs, min_xs, com) = deserialize(wing_path)
-end
-
 end # module
