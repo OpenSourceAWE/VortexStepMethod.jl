@@ -1,4 +1,5 @@
-using VortexStepMethod: Panel, Section, calculate_relative_alpha_and_relative_velocity
+using VortexStepMethod: Panel, Section, calculate_relative_alpha_and_relative_velocity, calculate_cl, calculate_cd_cm
+using Interpolations: linear_interpolation, Line
 using LinearAlgebra
 using Test
 using BenchmarkTools
@@ -112,48 +113,49 @@ end
     end
 
     # Generate mock polar data
-    alphas = -10:1:25
+    alphas = deg2rad.(-10:1:25)
     n_points = length(alphas)
     polar_data = zeros(n_points, 4)
+    big_polar_data = zeros(n_points, 4)
     
     # Fill polar data with realistic values
     for (i, alpha) in enumerate(alphas)
         cd = 0.015 + 0.015 * abs(alpha/10)^1.5  # Drag increases with angle
         cl = 0.1 * alpha + 0.01 * alpha^2 * exp(-alpha/20)  # Lift with stall behavior
         cm = -0.02 * alpha  # Linear pitching moment
-        polar_data[i,:] = [alpha, cd, cl, cm]
+        polar_data[i,:] = [alpha, cl, cd, cm]
+        big_polar_data[i,:] = [alpha, 1.1cl, 1.1cd, 1.1cm]
     end
-
+    
     # Create two sections with slightly different polar data
     section1 = Section([0.0, 0.0, 0.0], [1.0, 0.0, 0.0], ("polar_data", polar_data))
-    section2 = Section([0.0, 10.0, 0.0], [1.0, 10.0, 0.0], ("polar_data", polar_data * 1.1))
+    section2 = Section([0.0, 10.0, 0.0], [1.0, 10.0, 0.0], ("polar_data", big_polar_data))
     
     # Create panel
     panel = create_panel(section1, section2)
     
     @testset "Panel Polar Data Initialization" begin
         # Test if panel has polar data
-        @test hasattr(panel, :panel_polar_data)
+        @test hasproperty(panel, :panel_polar_data)
         @test !isnothing(panel.panel_polar_data)
         @test size(panel.panel_polar_data) == size(polar_data)
         
         # Test if panel polar data is correctly averaged
-        expected_data = (polar_data + polar_data * 1.1) / 2
+        expected_data = (polar_data + big_polar_data) / 2
         @test isapprox(panel.panel_polar_data, expected_data, rtol=1e-5)
     end
     
     @testset "Coefficient Interpolation" begin
-        test_alphas = [-5.0, 0.0, 5.0, 10.0]
+        test_alphas = deg2rad.([-5.0, 0.0, 5.0, 10.0])
         for alpha in test_alphas
             # Calculate coefficients using panel methods
-            alpha_rad = deg2rad(alpha)
-            cl = panel.calculate_cl(alpha_rad)
-            cd, cm = panel.calculate_cd_cm(alpha_rad)
+            cl = calculate_cl(panel, alpha)
+            cd, cm = calculate_cd_cm(panel, alpha)
             
             # Calculate expected values through interpolation
-            expected_cl = linear_interpolate(polar_data[:,1], polar_data[:,3], [alpha])[1]
-            expected_cd = linear_interpolate(polar_data[:,1], polar_data[:,2], [alpha])[1]
-            expected_cm = linear_interpolate(polar_data[:,1], polar_data[:,4], [alpha])[1]
+            expected_cl = linear_interpolation(polar_data[:,1], polar_data[:,2], extrapolation_bc=Line())(alpha)
+            expected_cd = linear_interpolation(polar_data[:,1], polar_data[:,3], extrapolation_bc=Line())(alpha)
+            expected_cm = linear_interpolation(polar_data[:,1], polar_data[:,4], extrapolation_bc=Line())(alpha)
             
             # Average with slightly different data (1.1 factor)
             expected_cl = (expected_cl + 1.1 * expected_cl) / 2
