@@ -99,24 +99,24 @@ path_cfd_lebesque = joinpath(
     "V3_CL_CD_RANS_Lebesque_2024_Rey_300e4.csv"
 )
 
-plot_polars(
-    [VSM, VSM_with_stall_correction],
-    [wing_aero_CAD_19ribs, wing_aero_CAD_19ribs],
-    [
-        "VSM CAD 19ribs",
-        "VSM CAD 19ribs , with stall correction",
-        "CFD_Lebesque Rey 30e5"
-    ];
-    literature_path_list=[path_cfd_lebesque],
-    angle_range=range(0, 25, length=25),
-    angle_type="angle_of_attack",
-    angle_of_attack=0,
-    side_slip=0,
-    yaw_rate=0,
-    Umag=10,
-    title="tutorial_testing_stall_model_n_panels_$(n_panels)_distribution_$(spanwise_panel_distribution)",
-    data_type=".pdf",
-    save_path=joinpath(save_folder, "polars"),
-    is_save=true,
-    is_show=true
-)
+# plot_polars(
+#     [VSM, VSM_with_stall_correction],
+#     [wing_aero_CAD_19ribs, wing_aero_CAD_19ribs],
+#     [
+#         "VSM CAD 19ribs",
+#         "VSM CAD 19ribs , with stall correction",
+#         "CFD_Lebesque Rey 30e5"
+#     ];
+#     literature_path_list=[path_cfd_lebesque],
+#     angle_range=range(0, 25, length=25),
+#     angle_type="angle_of_attack",
+#     angle_of_attack=0,
+#     side_slip=0,
+#     yaw_rate=0,
+#     Umag=10,
+#     title="tutorial_testing_stall_model_n_panels_$(n_panels)_distribution_$(spanwise_panel_distribution)",
+#     data_type=".pdf",
+#     save_path=joinpath(save_folder, "polars"),
+#     is_save=true,
+#     is_show=true
+# )
