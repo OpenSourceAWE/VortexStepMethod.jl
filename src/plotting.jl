@@ -557,8 +557,9 @@ function plot_polars(
             # Read all data first
             data = readdlm(path, ',')
             # Skip the header row by taking data from row 2 onwards
+            @show data[1, :]
             data = data[2:end, :]
-            push!(polar_data_list, [data[:,3], data[:,1], data[:,2]])
+            push!(polar_data_list, [data[:,3], data[:,1], data[:,2], zeros(length(data[:,1]))])
         end
     end
     
