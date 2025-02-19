@@ -107,11 +107,11 @@ function create_interpolations(vertices, circle_center_z, radius, gamma_tip)
         areas[j] = last_area + area
     end
 
-    itp_max = linear_interpolation(gamma_range, max_xs)
-    itp_min = linear_interpolation(gamma_range, min_xs)
-    itp_area = linear_interpolation(gamma_range, areas)
+    te_interp = linear_interpolation(gamma_range, max_xs)
+    le_interp = linear_interpolation(gamma_range, min_xs)
+    area_interp = linear_interpolation(gamma_range, areas)
     
-    return (itp_max, itp_min, itp_area, gamma_range, max_xs, min_xs)
+    return (le_interp, te_interp, area_interp, gamma_range, max_xs, min_xs)
 end
 
 # Calculate center of mass for a triangular surface mesh
