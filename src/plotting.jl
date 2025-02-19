@@ -628,7 +628,7 @@ function plot_polars(
         )
         # Limit y-range if CL > 10
         if maximum(polar_data[2]) > 10
-            axs[1, 1].set_ylim([-0.5, 2])
+            axs[1, 2].set_ylim([-0.5, 2])
         end
         println(label)
         title = raw"$C_D" * raw"$" * " vs $angle_type [°]"
@@ -637,21 +637,49 @@ function plot_polars(
         axs[1, 2].set_ylabel(L"$C_D$")
         axs[1, 2].legend()
     end
-    
 
-#     # Plot CS vs angle (if available)
-#     plot!(res[3])
-#     for (i, (polar_data, label)) in enumerate(zip(polar_data_list, label_list))
-#         # Check if CS data is available (length > 3)
-#         if length(polar_data) > 3
-#             style = i ≤ n_solvers ? (:solid, :star, 7) : (:solid, :circle, 5)
-#             plot!(res[3], polar_data[1], polar_data[4],
-#                   label=label, linestyle=style[1], marker=style[2], markersize=style[3])
-#         end
-#     end
-#     title!(res[3], L"C_S \textrm{ vs } %$angle_type")
-#     xlabel!(res[3], "$angle_type [deg]")
-#     ylabel!(res[3], L"C_S")
+
+    for (i, (polar_data, label)) in enumerate(zip(polar_data_list, label_list))
+        if i < n_solvers
+            linestyle = "-"
+            marker = "*"
+            markersize = 7
+        else
+            linestyle = "-"
+            marker = "."
+            markersize = 5
+        end
+        if contains(label, "LLT")
+            label = replace(label, "e5"  => raw"\cdot10^5")
+            label = replace(label, " "   => raw"~")
+            label = replace(label, "LLT" => raw"\mathrm{LLT}{~\,}")
+            label = raw"$" * label * raw"$"
+        else
+            label = replace(label, "e5" => raw"\cdot10^5")
+            label = replace(label, " " => "~")
+            label = replace(label, "VSM" => raw"\mathrm{VSM}")
+            label = raw"$" * label * raw"$"
+        end
+        axs[2, 1].plot(
+            polar_data[1],
+            polar_data[4],
+            label=label,
+            linestyle=linestyle,
+            marker=marker,
+            markersize=markersize,
+        )
+        # Limit y-range if CL > 10
+        if maximum(polar_data[2]) > 10
+            axs[2, 1].set_ylim([-0.5, 2])
+        end
+        println(label)
+        title = raw"$C_S" * raw"$" * " vs $angle_type [°]"
+        axs[2, 1].set_title(title)
+        axs[2, 1].set_xlabel("$angle_type [°]")
+        axs[2, 1].set_ylabel(L"$C_S$")
+        axs[2, 1].legend()
+    end
+    
 
 #     # Plot CL vs CD
 #     plot!(res[4])
@@ -674,7 +702,8 @@ function plot_polars(
 #     if is_save
 #         save_plot(res, save_path, title, data_type=data_type)
 #     end
-    
+
+    fig.tight_layout(h_pad=2.5, rect=(0.01,0.01,0.99,0.99)) 
     if is_show
         show_plot(fig)
     end
