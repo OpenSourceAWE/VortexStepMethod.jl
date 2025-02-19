@@ -37,6 +37,9 @@ jobs:
       - name: Install matplotlib
         run: if [ "$RUNNER_OS" = "Linux" ]; then sudo apt-get install -y python3-matplotlib; fi
         shell: bash
+      - name: Install LaTeX
+        run: if [ "$RUNNER_OS" = "Linux" ]; then sudo apt-get -qq install texlive-full texlive-fonts-extra cm-super texlive-latex-extra auctex; fi
+        shell: bash
       - uses: actions/checkout@v4
       - uses: julia-actions/setup-julia@v2
         with:
