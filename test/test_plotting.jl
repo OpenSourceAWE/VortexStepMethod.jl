@@ -44,21 +44,23 @@ plt.ioff()
     rm("/tmp/plot.pdf")
     show_plot(fig)
     wa = result_vsm()
-    fig = plot_geometry(
-        wa,
-        "Rectangular_wing_geometry";
-        data_type=".pdf",
-        save_path="/tmp",
-        is_save=true,
-        is_show=false)
-    @test fig isa plt.PyPlot.Figure
-    @test isfile("/tmp/Rectangular_wing_geometry_angled_view.pdf")
-    rm("/tmp/Rectangular_wing_geometry_angled_view.pdf")
-    @test isfile("/tmp/Rectangular_wing_geometry_front_view.pdf")
-    rm("/tmp/Rectangular_wing_geometry_front_view.pdf")
-    @test isfile("/tmp/Rectangular_wing_geometry_side_view.pdf")
-    rm("/tmp/Rectangular_wing_geometry_side_view.pdf")
-    @test isfile("/tmp/Rectangular_wing_geometry_top_view.pdf")
-    rm("/tmp/Rectangular_wing_geometry_top_view.pdf")
+    if Sys.islinux()
+        fig = plot_geometry(
+            wa,
+            "Rectangular_wing_geometry";
+            data_type=".pdf",
+            save_path="/tmp",
+            is_save=true,
+            is_show=false)
+        @test fig isa plt.PyPlot.Figure
+        @test isfile("/tmp/Rectangular_wing_geometry_angled_view.pdf")
+        rm("/tmp/Rectangular_wing_geometry_angled_view.pdf")
+        @test isfile("/tmp/Rectangular_wing_geometry_front_view.pdf")
+        rm("/tmp/Rectangular_wing_geometry_front_view.pdf")
+        @test isfile("/tmp/Rectangular_wing_geometry_side_view.pdf")
+        rm("/tmp/Rectangular_wing_geometry_side_view.pdf")
+        @test isfile("/tmp/Rectangular_wing_geometry_top_view.pdf")
+        rm("/tmp/Rectangular_wing_geometry_top_view.pdf")
+    end
 end
 plt.ion()

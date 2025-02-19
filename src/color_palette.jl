@@ -73,7 +73,7 @@ function set_plot_style(titel_size=16)
     # plt.style.use('seaborn-whitegrid')
     # plt.style.use("seaborn-v0_8-whitegrid")
     rcParams = plt.PyDict(plt.matplotlib."rcParams")
-    rcParams["text.usetex"] = Sys.islinux()
+    rcParams["text.usetex"] = true
     rcParams["font.family"] = "serif"
     rcParams["font.serif"] = ["Computer Modern Roman"]
     rcParams["axes.titlesize"] = titel_size
