@@ -218,7 +218,7 @@ function gamma_loop(
         v_tangential_array = vec(sum(y_airf_array .* relative_velocity_array, dims=2))
         alpha_array .= atan.(v_normal_array, v_tangential_array)
         
-        Umag_array = norm.(relative_velocity_crossz)
+        Umag_array .= norm.(relative_velocity_crossz)
         Umagw_array = norm.(Uinfcrossz_array)
         
         cl_array = [calculate_cl(panel, alpha) for (panel, alpha) in zip(panels, alpha_array)]

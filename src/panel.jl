@@ -248,9 +248,9 @@ function calculate_cl(panel::Panel, alpha::Float64)
     elseif panel.panel_aero_model == "polar_data"
         return linear_interpolation(
             panel.panel_polar_data[:,1],
-            panel.panel_polar_data[:,2],
-            alpha
-        )
+            panel.panel_polar_data[:,2];
+            extrapolation_bc=Line()
+        )(alpha)
     else
         throw(ArgumentError("Unsupported aero model: $(panel.panel_aero_model)"))
     end
@@ -274,14 +274,14 @@ function calculate_cd_cm(panel::Panel, alpha::Float64)
     elseif panel.panel_aero_model == "polar_data"
         cd = linear_interpolation(
             panel.panel_polar_data[:,1],
-            panel.panel_polar_data[:,3],
-            alpha
-        )
+            panel.panel_polar_data[:,3];
+            extrapolation_bc=Line()
+        )(alpha)
         cm = linear_interpolation(
             panel.panel_polar_data[:,1],
-            panel.panel_polar_data[:,4],
-            alpha
-        )
+            panel.panel_polar_data[:,4];
+            extrapolation_bc=Line()
+        )(alpha)
         return cd, cm
     else
         throw(ArgumentError("Unsupported aero model: $(panel.panel_aero_model)"))

@@ -7,8 +7,8 @@ Main structure for calculating aerodynamic properties of wings.
 mutable struct WingAerodynamics
     panels::Vector{Panel}
     n_panels::Int
-    wings::Vector{Wing}
-    va::Union{Nothing, Vector{Float64}, Tuple{Vector{Float64}, Float64}}
+    wings::Vector{AbstractWing}
+    _va::Union{Nothing, Vector{Float64}, Tuple{Vector{Float64}, Float64}}
     gamma_distribution::Union{Nothing, Vector{Float64}}
     alpha_uncorrected::Union{Nothing, Vector{Float64}}
     alpha_corrected::Union{Nothing, Vector{Float64}}
@@ -19,10 +19,10 @@ mutable struct WingAerodynamics
     work_vectors::NTuple{10,Vector{Float64}}
 
     function WingAerodynamics(
-        wings::Vector{Wing};
+        wings::Vector{T};
         aerodynamic_center_location::Float64=0.25,
         control_point_location::Float64=0.75
-    )
+    ) where T <: AbstractWing
         # Initialize panels
         panels = Panel[]
         for wing in wings
@@ -74,6 +74,21 @@ mutable struct WingAerodynamics
             Umag_array,
             work_vectors
         )
+    end
+end
+
+function Base.getproperty(obj::WingAerodynamics, sym::Symbol)
+    if sym === :va
+        return getfield(obj, :_va)
+    end
+    return getfield(obj, sym)
+end
+
+function Base.setproperty!(obj::WingAerodynamics, sym::Symbol, val)
+    if sym === :va
+        set_va!(obj, val)
+    else
+        setfield!(obj, sym, val)
     end
 end
 
@@ -635,5 +650,5 @@ function set_va!(wa::WingAerodynamics, va)
     
     # Update wake elements
     wa.panels = frozen_wake(va_distribution, wa.panels)
-    wa.va = va_vec
+    wa._va = va_vec
 end

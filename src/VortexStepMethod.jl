@@ -9,9 +9,11 @@ using DelimitedFiles
 using ControlPlots
 using Measures
 using LaTeXStrings
+using NonlinearSolve
+using Interpolations: linear_interpolation, Line
 
 # Export public interface
-export Wing, Section
+export Wing, Section, KiteWing
 export WingAerodynamics
 export Solver, solve
 export calculate_results, solve_circulation_distribution
@@ -35,8 +37,11 @@ Position vector, either a `MVec3` or a `Vector` for use in function signatures.
 const PosVector=Union{MVec3, Vector, SizedVector{3, Float64, Vector{Float64}}}
 const VelVector=Union{MVec3, Vector, SizedVector{3, Float64, Vector{Float64}}}
 
+abstract type AbstractWing end
+
 # Include core functionality
 include("wing_geometry.jl")
+include("kite_geometry.jl")
 include("filament.jl")
 include("panel.jl")
 include("wake.jl")
