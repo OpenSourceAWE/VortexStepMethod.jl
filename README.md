@@ -111,7 +111,7 @@ vel_app = [cos(alpha), 0.0, sin(alpha)] .* Umag
 set_va!(wa, (vel_app, 0.0))  # Second parameter is yaw rate
 ```
 
-Surfplan output file can be converted to an input for the vortex step method with a tool that is in this repo.
+Surfplan files can be converted to an input for `VortexStepMethod.jl` using the [SurfplanAdapter](https://github.com/jellepoland/SurfplanAdapter).
 
 ## Output
 - CL, CD, CS (side force coefficient)
