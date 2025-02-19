@@ -18,6 +18,7 @@ export calculate_results, solve_circulation_distribution
 export add_section!, set_va!
 export calculate_span, calculate_projected_area
 export plot_wing, plot_circulation_distribution, plot_geometry, plot_distribution, plot_polars
+export show_plot
 
 """
    const MVec3    = MVector{3, Float64}
