@@ -1,39 +1,46 @@
-# """
-#     save_plot(fig, save_path, title; data_type=".pdf")
+"""
+    save_plot(fig, save_path, title; data_type=".pdf")
 
-# Save a plot to a file.
+Save a plot to a file.
 
-# # Arguments
-# - `fig`: Plots figure object
-# - `save_path`: Path to save the plot
-# - `title`: Title of the plot
-# - `data_type`: File extension (default: ".pdf")
-# """
-# function save_plot(fig, save_path, title; data_type=".pdf")
-#     isnothing(save_path) && throw(ArgumentError("save_path should be provided"))
+# Arguments
+- `fig`: Plots figure object
+- `save_path`: Path to save the plot
+- `title`: Title of the plot
+- `data_type`: File extension (default: ".pdf")
+"""
+function save_plot(fig, save_path, title; data_type=".pdf")
+    isnothing(save_path) && throw(ArgumentError("save_path should be provided"))
     
-#     !isdir(save_path) && mkpath(save_path)
-#     full_path = joinpath(save_path, title * data_type)
+    !isdir(save_path) && mkpath(save_path)
+    full_path = joinpath(save_path, title * data_type)
     
-#     @debug "Attempting to save figure to: $full_path"
-#     @debug "Current working directory: $(pwd())"
+    @debug "Attempting to save figure to: $full_path"
+    @debug "Current working directory: $(pwd())"
     
-#     try
-#         savefig(fig, full_path)
-#         @debug "Figure saved successfully"
-        
-#         if isfile(full_path)
-#             @debug "File successfully saved to $full_path"
-#             @debug "File size: $(filesize(full_path)) bytes"
-#         else
-#             @info "File does not exist after save attempt: $full_path"
-#         end
-#     catch e
-#         @error "Error saving figure: $e"
-#         @error "Error type: $(typeof(e))"
-#         rethrow(e)
-#     end
+    try
+        fig.savefig(full_path)
+        @debug "Figure saved as $data_type"
+            
+        if isfile(full_path)
+            @debug "File successfully saved to $full_path"
+            @debug "File size: $(filesize(full_path)) bytes"
+        else
+            @info "File does not exist after save attempt: $full_path"
+        end
+    catch e
+        @error "Error saving figure: $e"
+        @error "Error type: $(typeof(e))"
+        rethrow(e)
+    end
+
+# if os.path.exists(full_path):
+#     logging.debug(f"File successfully saved to {full_path}")
+#     logging.debug(f"File size: {os.path.getsize(full_path)} bytes")
+# else:
+#     logging.info(f"File does not exist after save attempt: {full_path}")
 # end
+end
 
 """
     show_plot(fig; dpi=130)
@@ -183,7 +190,7 @@ function create_geometry_plot(wing_aero, title, view_elevation, view_azimuth; zo
     ax.view_init(elev=view_elevation, azim=view_azimuth)
 
     # Ensure the figure is fully rendered
-    fig.canvas.draw()
+    # fig.canvas.draw()
     plt.tight_layout(rect=(0,0,1,0.97))
 
     return fig
@@ -203,6 +210,7 @@ function plot_geometry(wing_aero, title;
                       view_azimuth=-120)
     
     if is_save
+        plt.ioff()
         # Angled view
         fig = create_geometry_plot(wing_aero, "$(title)_angled_view", 15, -120)
         save_plot(fig, save_path, "$(title)_angled_view", data_type=data_type)
@@ -221,6 +229,7 @@ function plot_geometry(wing_aero, title;
     end
 
     if is_show
+        plt.ion()
         fig = create_geometry_plot(wing_aero, title, view_elevation, view_azimuth)
         plt.display(fig)
     end
@@ -589,7 +598,6 @@ function plot_polars(
         if maximum(polar_data[2]) > 10
             axs[1, 1].set_ylim([-0.5, 2])
         end
-        println(label)
         title = raw"$C_L" * raw"$" * " vs $angle_type [°]"
         axs[1, 1].set_title(title)
         axs[1, 1].set_xlabel("$angle_type [°]")
@@ -630,7 +638,6 @@ function plot_polars(
         if maximum(polar_data[2]) > 10
             axs[1, 2].set_ylim([-0.5, 2])
         end
-        println(label)
         title = raw"$C_D" * raw"$" * " vs $angle_type [°]"
         axs[1, 2].set_title(title)
         axs[1, 2].set_xlabel("$angle_type [°]")
@@ -672,7 +679,6 @@ function plot_polars(
         if maximum(polar_data[2]) > 10
             axs[2, 1].set_ylim([-0.5, 2])
         end
-        println(label)
         title = raw"$C_S" * raw"$" * " vs $angle_type [°]"
         axs[2, 1].set_title(title)
         axs[2, 1].set_xlabel("$angle_type [°]")
@@ -714,7 +720,6 @@ function plot_polars(
             axs[2, 2].set_ylim([-0.5, 2])
             axs[2, 2].set_xlim([-0.5, 2])
         end
-        println(label)
         title = raw"$C_L" * raw"$" * " vs " * raw"$C_D" * raw"$"
         axs[2, 2].set_title(title)
         axs[2, 2].set_xlabel(L"$C_D$")
@@ -724,10 +729,10 @@ function plot_polars(
 
     fig.tight_layout(h_pad=2.5, rect=(0.01,0.01,0.99,0.99)) 
     
-#     # Save and show plot
-#     if is_save
-#         save_plot(res, save_path, title, data_type=data_type)
-#     end
+    # Save and show plot
+    if is_save
+        save_plot(res, save_path, title, data_type=data_type)
+    end
 
     if is_show
         show_plot(fig)
