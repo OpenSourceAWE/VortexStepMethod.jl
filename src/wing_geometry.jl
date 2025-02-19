@@ -8,16 +8,19 @@ Represents a wing section with leading edge, trailing edge, and aerodynamic prop
 - `LE_point::Vector{Float64}`: Leading edge point coordinates
 - `TE_point::Vector{Float64}`: Trailing edge point coordinates
 - `aero_input::Vector{Any}`: Aerodynamic input data for the section:
-    - `["inviscid"]`: Inviscid aerodynamics
-    - `["polar_data", [alpha,CL,CD,CM]]`: Polar data aerodynamics
-    - `["lei_airfoil_breukels", [d_tube,camber]]`: LEI airfoil with Breukels parameters
+    - `("inviscid")`: Inviscid aerodynamics
+    - `("polar_data", [alpha_column,CL_column,CD_column,CM_column])`: Polar data aerodynamics
+    - `("lei_airfoil_breukels", [d_tube,camber])`: LEI airfoil with Breukels parameters
 """
 struct Section
     LE_point::Vector{Float64}
     TE_point::Vector{Float64}
-    aero_input::Union{String, Tuple{String, Vector{Float64}}}
+    aero_input::Union{String, Tuple{String, Vector{Float64}}, Tuple{String, Matrix{Float64}}}
     
-    function Section(LE_point::Vector{Float64}, TE_point::Vector{Float64}, aero_input::Union{String, Tuple{String, Vector{Float64}}})
+    function Section(
+            LE_point::Vector{Float64}, 
+            TE_point::Vector{Float64}, 
+            aero_input::Union{String, Tuple{String, Vector{Float64}}, Tuple{String, Matrix{Float64}}})
         new(LE_point, TE_point, aero_input)
     end
     
@@ -45,7 +48,7 @@ Represents a wing composed of multiple sections with aerodynamic properties.
 - "split_provided": Split provided sections
 - "unchanged": Keep original sections
 """
-mutable struct Wing
+mutable struct Wing <: AbstractWing
     n_panels::Int
     spanwise_panel_distribution::String
     spanwise_direction::Vector{Float64}
@@ -68,7 +71,7 @@ end
 Add a new section to the wing.
 """
 function add_section!(wing::Wing, LE_point::Vector{Float64}, 
-                     TE_point::Vector{Float64}, aero_input::Union{String, Tuple{String, Vector{Float64}}})
+                     TE_point::Vector{Float64}, aero_input)
     push!(wing.sections, Section(LE_point, TE_point, aero_input))
 end
 
@@ -92,14 +95,14 @@ end
 
 
 """
-    refine_aerodynamic_mesh(wing::Wing)
+    refine_aerodynamic_mesh(wing::AbstractWing)
 
 Refine the aerodynamic mesh of the wing based on spanwise panel distribution.
 
 Returns:
     Vector{Section}: List of refined sections
 """
-function refine_aerodynamic_mesh(wing::Wing)
+function refine_aerodynamic_mesh(wing::AbstractWing)
     # Sort sections from left to right
     sort!(wing.sections, by=s -> s.LE_point[2], rev=true)
     
@@ -163,14 +166,22 @@ end
 
 Interpolate aerodynamic coefficients to a common alpha range.
 """
-function interpolate_to_common_alpha(alpha_common::Vector{Float64}, 
-                                   alpha_orig::Vector{Float64},
-                                   CL_orig::Vector{Float64},
-                                   CD_orig::Vector{Float64},
-                                   CM_orig::Vector{Float64})
-    CL_common = interpolate(alpha_orig, CL_orig, alpha_common)
-    CD_common = interpolate(alpha_orig, CD_orig, alpha_common)
-    CM_common = interpolate(alpha_orig, CM_orig, alpha_common)
+function interpolate_to_common_alpha(alpha_common, 
+                                   alpha_orig,
+                                   CL_orig,
+                                   CD_orig,
+                                   CM_orig)
+
+    # Create interpolation objects
+    itp_CL = linear_interpolation(alpha_orig, CL_orig)
+    itp_CD = linear_interpolation(alpha_orig, CD_orig)
+    itp_CM = linear_interpolation(alpha_orig, CM_orig)
+    
+    # Evaluate at common alpha points
+    CL_common = itp_CL.(alpha_common)
+    CD_common = itp_CD.(alpha_common)
+    CM_common = itp_CM.(alpha_common)
+
     return CL_common, CD_common, CM_common
 end
 
@@ -182,7 +193,7 @@ end
 
 Interpolate aerodynamic input between two sections.
 """
-function calculate_new_aero_input(aero_input::Union{Vector{String}, Vector{Tuple{String, Vector{Float64}}}}, 
+function calculate_new_aero_input(aero_input, 
                                 section_index::Int,
                                 left_weight::Float64,
                                 right_weight::Float64)
@@ -201,8 +212,14 @@ function calculate_new_aero_input(aero_input::Union{Vector{String}, Vector{Tuple
         polar_right = aero_input[section_index + 1][2]
         
         # Unpack polar data
-        alpha_left, CL_left, CD_left, CM_left = polar_left
-        alpha_right, CL_right, CD_right, CM_right = polar_right
+        @views begin
+            alpha_left, CL_left, CD_left, CM_left = (
+                polar_left[:, i] for i in 1:4
+            )
+            alpha_right, CL_right, CD_right, CM_right = (
+                polar_right[:, i] for i in 1:4
+            )
+        end
         
         # Create common alpha array
         alpha_common = sort(unique(vcat(alpha_left, alpha_right)))
@@ -220,7 +237,7 @@ function calculate_new_aero_input(aero_input::Union{Vector{String}, Vector{Tuple
         CD_interp = CD_left_common .* left_weight .+ CD_right_common .* right_weight
         CM_interp = CM_left_common .* left_weight .+ CM_right_common .* right_weight
         
-        return ("polar_data", [alpha_common, CL_interp, CD_interp, CM_interp])
+        return ("polar_data", hcat(alpha_common, CD_interp, CL_interp, CM_interp))
         
     elseif model_type == "lei_airfoil_breukels"
         tube_diameter_left = aero_input[section_index][2][1]
@@ -263,9 +280,9 @@ Returns:
 function refine_mesh_for_linear_cosine_distribution(
     spanwise_panel_distribution::String,
     n_sections::Int,
-    LE::Union{Matrix{Float64}, Adjoint{Float64, Matrix{Float64}}},
-    TE::Union{Matrix{Float64}, Adjoint{Float64, Matrix{Float64}}},
-    aero_input::Union{Vector{String}, Vector{Tuple{String, Vector{Float64}}}})
+    LE,
+    TE,
+    aero_input)
 
     # 1. Compute quarter chord line
     quarter_chord = LE .+ 0.25 .* (TE .- LE)
@@ -408,14 +425,14 @@ end
 
 
 """
-    refine_mesh_by_splitting_provided_sections(wing::Wing)
+    refine_mesh_by_splitting_provided_sections(wing::AbstractWing)
 
 Refine mesh by splitting provided sections into desired number of panels.
 
 Returns:
     Vector{Section}: Refined sections
 """
-function refine_mesh_by_splitting_provided_sections(wing::Wing)
+function refine_mesh_by_splitting_provided_sections(wing::AbstractWing)
     n_sections_provided = length(wing.sections)
     n_panels_provided = n_sections_provided - 1
     n_panels_desired = wing.n_panels
@@ -491,14 +508,14 @@ function refine_mesh_by_splitting_provided_sections(wing::Wing)
 end
 
 """
-    calculate_span(wing::Wing)
+    calculate_span(wing::AbstractWing)
 
 Calculate wing span along spanwise direction.
 
 Returns:
     Float64: Wing span
 """
-function calculate_span(wing::Wing)
+function calculate_span(wing::AbstractWing)
     # Normalize spanwise direction
     vector_axis = wing.spanwise_direction ./ norm(wing.spanwise_direction)
     
@@ -512,14 +529,14 @@ function calculate_span(wing::Wing)
 end
 
 """
-    calculate_projected_area(wing::Wing, z_plane_vector::Vector{Float64}=[0.0, 0.0, 1.0])
+    calculate_projected_area(wing::AbstractWing, z_plane_vector::Vector{Float64}=[0.0, 0.0, 1.0])
 
 Calculate projected wing area onto plane defined by normal vector.
 
 Returns:
     Float64: Projected area
 """
-function calculate_projected_area(wing::Wing, 
+function calculate_projected_area(wing::AbstractWing, 
                                 z_plane_vector::Vector{Float64}=[0.0, 0.0, 1.0])
     # Normalize plane normal vector
     z_plane_vector = z_plane_vector ./ norm(z_plane_vector)
@@ -557,8 +574,8 @@ function calculate_projected_area(wing::Wing,
 end
 
 # Add span property to Wing struct
-Base.propertynames(w::Wing) = (fieldnames(typeof(w))..., :span)
-function Base.getproperty(w::Wing, s::Symbol)
+Base.propertynames(w::AbstractWing) = (fieldnames(typeof(w))..., :span)
+function Base.getproperty(w::AbstractWing, s::Symbol)
     if s === :span
         return calculate_span(w)
     else

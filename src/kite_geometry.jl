@@ -69,7 +69,7 @@ function find_circle_center_and_radius(vertices)
     end
 
     prob = NonlinearProblem(r_diff!, [z_min], nothing)
-    result = solve(prob, NewtonRaphson(; autodiff=AutoFiniteDiff(; relstep = 1e-3, absstep = 1e-3)); abstol = 1e-2)
+    result = NonlinearSolve.solve(prob, NewtonRaphson(; autodiff=AutoFiniteDiff(; relstep = 1e-3, absstep = 1e-3)); abstol = 1e-2)
     r_diff!(zeros(1), result, nothing)
     z = result[1]
 
@@ -196,7 +196,7 @@ Represents a curved wing that inherits from Wing with additional geometric prope
 # Distribution types
 Same as Wing
 """
-mutable struct KiteWing <: Wing
+mutable struct KiteWing <: AbstractWing
     n_panels::Int
     spanwise_panel_distribution::String
     spanwise_direction::Vector{Float64}
@@ -206,32 +206,57 @@ mutable struct KiteWing <: Wing
     mass::Float64
     center_of_mass::Vector{Float64}
     circle_center_z::Float64
+    gamma_tip::Float64
     inertia_tensor::Matrix{Float64}
     radius::Float64
     le_interp::Function
     te_interp::Function
     area_interp::Function
 
-    function Wing(obj_path; mass=1.0, n_panels=54, spanwise_panel_distribution="linear", spanwise_direction=[0.0, 1.0, 0.0])
+    function KiteWing(obj_path; mass=1.0, n_panels=54, spanwise_panel_distribution="linear", spanwise_direction=[0.0, 1.0, 0.0])
         !isapprox(spanwise_direction, [0.0, 1.0, 0.0]) && @error "Spanwise direction has to be [0.0, 1.0, 0.0]"
         if !isfile(obj_path)
             error("OBJ file not found: $obj_path")
         end
         vertices, faces = read_faces(obj_path)
         center_of_mass = calculate_com(vertices, faces)
-        inertia_tensor = calculate_inertia_tensor(vertices, faces, wing_mass, com)
+        inertia_tensor = calculate_inertia_tensor(vertices, faces, mass, center_of_mass)
         
         circle_center_z, radius, gamma_tip = find_circle_center_and_radius(vertices)
-        le_interp, te_interp, area_interp, gammas, max_xs, min_xs = create_interpolations(vertices, circle_center_z, radius, gamma_tip)
-        le_interp = (γ) -> le_interp(γ)
-        te_interp = (γ) -> te_interp(γ)
-        area_interp = (γ) -> area_interp(γ)
+        le_interp_, te_interp_, area_interp_, gammas, max_xs, min_xs = create_interpolations(vertices, circle_center_z, radius, gamma_tip)
+        le_interp = (γ) -> le_interp_(γ)
+        te_interp = (γ) -> te_interp_(γ)
+        area_interp = (γ) -> area_interp_(γ)
 
         sections = Section[]
         new(
             n_panels, spanwise_panel_distribution, spanwise_direction, sections,
-            mass, center_of_mass, circle_center_z, inertia_tensor, radius,
+            mass, center_of_mass, circle_center_z, gamma_tip, inertia_tensor, radius,
             le_interp, te_interp, area_interp
         )
     end
+end
+
+"""
+    add_section!(wing::KiteWing, LE_point::PosVector, 
+                TE_point::PosVector, aero_input::Vector{Any})
+
+Add a new section to the wing.
+"""
+function add_section!(wing::KiteWing, gamma, aero_input; α=0.0)
+    LE_point = [0.0, 0.0, wing.circle_center_z] .+ [wing.le_interp(gamma), sin(gamma) * wing.radius, cos(gamma) * wing.radius]
+    if !isapprox(α, 0.0)
+        local_y_vec = [0.0, sin(-gamma), cos(gamma)] × [1.0, 0.0, 0.0]
+        TE_point = LE_point .+ rotate_v_around_k([wing.te_interp(gamma) - wing.le_interp(gamma), 0.0, 0.0], local_y_vec, α)
+    else
+        TE_point = LE_point .+ [wing.te_interp(gamma) - wing.le_interp(gamma), 0.0, 0.0]
+    end
+    push!(wing.sections, Section(LE_point, TE_point, aero_input))
+    nothing
+end
+
+function rotate_v_around_k(v, k, θ)
+    k = normalize(k)
+    v_rot = v * cos(θ) + (k × v) * sin(θ)  + k * (k ⋅ v) * (1 - cos(θ))
+    return v_rot
 end

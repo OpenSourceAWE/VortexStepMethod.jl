@@ -9,9 +9,11 @@ using DelimitedFiles
 using Plots
 using Measures
 using LaTeXStrings
+using NonlinearSolve
+using Interpolations: linear_interpolation
 
 # Export public interface
-export Wing, Section
+export Wing, Section, KiteWing
 export WingAerodynamics
 export Solver, solve
 export calculate_results, solve_circulation_distribution
@@ -34,15 +36,16 @@ Position vector, either a `MVec3` or a `Vector` for use in function signatures.
 const PosVector=Union{MVec3, Vector}
 const VelVector=Union{MVec3, Vector}
 
+abstract type AbstractWing end
+
 # Include core functionality
 include("wing_geometry.jl")
+include("kite_geometry.jl")
 include("filament.jl")
 include("panel.jl")
 include("wake.jl")
 include("wing_aerodynamics.jl")
 include("solver.jl")
-
-include("init.jl")
 
 # include plotting
 include("color_palette.jl")

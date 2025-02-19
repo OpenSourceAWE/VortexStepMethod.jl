@@ -7,7 +7,7 @@ Main structure for calculating aerodynamic properties of wings.
 mutable struct WingAerodynamics
     panels::Vector{Panel}
     n_panels::Int
-    wings::Vector{Wing}
+    wings::Vector{AbstractWing}
     _va::Union{Nothing, Vector{Float64}, Tuple{Vector{Float64}, Float64}}
     gamma_distribution::Union{Nothing, Vector{Float64}}
     alpha_uncorrected::Union{Nothing, Vector{Float64}}
@@ -19,10 +19,10 @@ mutable struct WingAerodynamics
     work_vectors::NTuple{10,Vector{Float64}}
 
     function WingAerodynamics(
-        wings::Vector{Wing};
+        wings::Vector{T};
         aerodynamic_center_location::Float64=0.25,
         control_point_location::Float64=0.75
-    )
+    ) where T <: AbstractWing
         # Initialize panels
         panels = Panel[]
         for wing in wings
