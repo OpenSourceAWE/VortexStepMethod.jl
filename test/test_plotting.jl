@@ -8,9 +8,9 @@ plt.ioff()
     res = plt.plot([1,2,3])
     @test fig isa plt.PyPlot.Figure
     @test res isa Vector{plt.PyObject}
+    save_plot(fig, "/tmp", "plot")
     @test isfile("/tmp/plot.pdf")
     rm("/tmp/plot.pdf")
     show_plot(fig)
-    save_plot(fig, "/tmp", "plot")
 end
 plt.ion()
