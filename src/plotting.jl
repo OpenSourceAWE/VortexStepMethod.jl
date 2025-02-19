@@ -556,6 +556,46 @@ function plot_polars(
     
     # Number of computational results (excluding literature)
     n_solvers = length(solver_list)
+    for (i, (polar_data, label)) in enumerate(zip(polar_data_list, label_list))
+        if i < n_solvers
+            linestyle = "-"
+            marker = "*"
+            markersize = 7
+        else
+            linestyle = "-"
+            marker = "."
+            markersize = 5
+        end
+        if contains(label, "LLT")
+            label = replace(label, "e5" => raw"\cdot10^5")
+            label = replace(label, " " => "~")
+            label = replace(label, "LLT" => raw"\mathrm{LLT}{~}")
+            label = raw"$" * label * raw"$"
+        else
+            label = replace(label, "e5" => raw"\cdot10^5")
+            label = replace(label, " " => "~")
+            label = replace(label, "VSM" => raw"\mathrm{VSM}")
+            label = raw"$" * label * raw"$"
+        end
+        axs[1, 1].plot(
+            polar_data[1],
+            polar_data[2],
+            label=label,
+            linestyle=linestyle,
+            marker=marker,
+            markersize=markersize,
+        )
+        # Limit y-range if CL > 10
+        if maximum(polar_data[2]) > 10
+            axs[1, 1].set_ylim([-0.5, 2])
+        end
+        println(label)
+        title = raw"$C_L" * raw"$"
+        # axs[1, 1].set_title(L"C_L \textrm{ vs } %$angle_type")
+        axs[1, 1].set_xlabel("$angle_type [°]")
+        axs[1, 1].set_ylabel(L"$C_L$")
+        axs[1, 1].legend()
+    end
     
 #     # Plot CL vs angle
 #     plot!(res[1])
