@@ -36,6 +36,7 @@ function find_circle_center_and_radius(vertices)
             end
         end
     end
+    @show v_min
 
     # Find vertex furthest in y, -z direction
     max_score = -Inf
@@ -59,22 +60,12 @@ function find_circle_center_and_radius(vertices)
         return nothing
     end
 
-    z_min = Inf
-    for v in vertices
-        if abs(v[2]) ≤ 0.1
-            if v[3] < z_min
-                z_min = v[3]
-            end
-        end
-    end
-
-    prob = NonlinearProblem(r_diff!, [z_min], nothing)
+    prob = NonlinearProblem(r_diff!, [v_min[3]-0.1], nothing)
     result = NonlinearSolve.solve(prob, NewtonRaphson(; autodiff=AutoFiniteDiff(; relstep = 1e-3, absstep = 1e-3)); abstol = 1e-2)
     r_diff!(zeros(1), result, nothing)
     z = result[1]
 
     gamma_tip = atan(-v_tip[2], (v_tip[3] - z))
-    @show rad2deg(gamma_tip)
 
     return z, r[1], gamma_tip
 end
