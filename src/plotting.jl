@@ -679,31 +679,56 @@ function plot_polars(
         axs[2, 1].set_ylabel(L"$C_S$")
         axs[2, 1].legend()
     end
+
+    for (i, (polar_data, label)) in enumerate(zip(polar_data_list, label_list))
+        if i < n_solvers
+            linestyle = "-"
+            marker = "*"
+            markersize = 7
+        else
+            linestyle = "-"
+            marker = "."
+            markersize = 5
+        end
+        if contains(label, "LLT")
+            label = replace(label, "e5"  => raw"\cdot10^5")
+            label = replace(label, " "   => raw"~")
+            label = replace(label, "LLT" => raw"\mathrm{LLT}{~\,}")
+            label = raw"$" * label * raw"$"
+        else
+            label = replace(label, "e5" => raw"\cdot10^5")
+            label = replace(label, " " => "~")
+            label = replace(label, "VSM" => raw"\mathrm{VSM}")
+            label = raw"$" * label * raw"$"
+        end
+        axs[2, 2].plot(
+            polar_data[2],
+            polar_data[3],
+            label=label,
+            linestyle=linestyle,
+            marker=marker,
+            markersize=markersize,
+        )
+        # Limit y-range if CL > 10
+        if maximum(polar_data[2]) > 10 || maximum(polar_data[3]) > 10
+            axs[2, 2].set_ylim([-0.5, 2])
+            axs[2, 2].set_xlim([-0.5, 2])
+        end
+        println(label)
+        title = raw"$C_L" * raw"$" * " vs " * raw"$C_D" * raw"$"
+        axs[2, 2].set_title(title)
+        axs[2, 2].set_xlabel(L"$C_D$")
+        axs[2, 2].set_ylabel(L"$C_L$")
+        axs[2, 2].legend()
+    end
+
+    fig.tight_layout(h_pad=2.5, rect=(0.01,0.01,0.99,0.99)) 
     
-
-#     # Plot CL vs CD
-#     plot!(res[4])
-#     for (i, (polar_data, label)) in enumerate(zip(polar_data_list, label_list))
-#         style = i ≤ n_solvers ? (:solid, :star, 7) : (:solid, :circle, 5)
-#         plot!(res[4], polar_data[2], polar_data[3],  # Note: CD on x-axis, CL on y-axis
-#               label=label, linestyle=style[1], marker=style[2], markersize=style[3])
-        
-#         # Limit ranges if values > 10
-#         if maximum(polar_data[2]) > 10 || maximum(polar_data[3]) > 10
-#             ylims!(res[4], (-0.5, 2.0))
-#             xlims!(res[4], (-0.2, 0.5))
-#         end
-#     end
-#     title!(res[4], L"C_L \textrm{ vs } C_D \textrm{ (over } %$angle_type \textrm{ range)}")
-#     xlabel!(res[4], L"C_D")
-#     ylabel!(res[4], L"C_L")
-
 #     # Save and show plot
 #     if is_save
 #         save_plot(res, save_path, title, data_type=data_type)
 #     end
 
-    fig.tight_layout(h_pad=2.5, rect=(0.01,0.01,0.99,0.99)) 
     if is_show
         show_plot(fig)
     end
