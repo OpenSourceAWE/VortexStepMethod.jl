@@ -8,4 +8,5 @@ println("Running tests...")
     include("test_semi_infinite_filament.jl")
     include("test_wing_aerodynamics.jl")
     include("test_wing_geometry.jl")
+    include("test_plotting.jl")
 end

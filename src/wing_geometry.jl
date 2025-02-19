@@ -13,8 +13,8 @@ Represents a wing section with leading edge, trailing edge, and aerodynamic prop
     - `["lei_airfoil_breukels", [d_tube,camber]]`: LEI airfoil with Breukels parameters
 """
 struct Section
-    LE_point::Vector{Float64}
-    TE_point::Vector{Float64}
+    LE_point::MVec3
+    TE_point::MVec3
     aero_input::Union{String, Tuple{String, Vector{Float64}}}
     
     function Section(LE_point::Vector{Float64}, TE_point::Vector{Float64}, aero_input::Union{String, Tuple{String, Vector{Float64}}})
@@ -48,12 +48,12 @@ Represents a wing composed of multiple sections with aerodynamic properties.
 mutable struct Wing
     n_panels::Int
     spanwise_panel_distribution::String
-    spanwise_direction::Vector{Float64}
+    spanwise_direction::PosVector
     sections::Vector{Section}
     
     function Wing(n_panels::Int;
                  spanwise_panel_distribution::String="linear",
-                 spanwise_direction::Vector{Float64}=[0.0, 1.0, 0.0])
+                 spanwise_direction::PosVector=MVec3([0.0, 1.0, 0.0]))
         new(n_panels, 
             spanwise_panel_distribution, 
             spanwise_direction, 
@@ -67,8 +67,8 @@ end
 
 Add a new section to the wing.
 """
-function add_section!(wing::Wing, LE_point::Vector{Float64}, 
-                     TE_point::Vector{Float64}, aero_input::Union{String, Tuple{String, Vector{Float64}}})
+function add_section!(wing::Wing, LE_point::PosVector, 
+                     TE_point::PosVector, aero_input::Union{String, Tuple{String, Vector{Float64}}})
     push!(wing.sections, Section(LE_point, TE_point, aero_input))
 end
 
@@ -263,8 +263,8 @@ Returns:
 function refine_mesh_for_linear_cosine_distribution(
     spanwise_panel_distribution::String,
     n_sections::Int,
-    LE::Union{Matrix{Float64}, Adjoint{Float64, Matrix{Float64}}},
-    TE::Union{Matrix{Float64}, Adjoint{Float64, Matrix{Float64}}},
+    LE::Union{Matrix{Float64}, Adjoint{Float64, Matrix{Float64}}, MMatrix{2, 3, Float64, 6}},
+    TE::Union{Matrix{Float64}, Adjoint{Float64, Matrix{Float64}}, MMatrix{2, 3, Float64, 6}},
     aero_input::Union{Vector{String}, Vector{Tuple{String, Vector{Float64}}}})
 
     # 1. Compute quarter chord line
@@ -525,7 +525,7 @@ function calculate_projected_area(wing::Wing,
     z_plane_vector = z_plane_vector ./ norm(z_plane_vector)
     
     # Project point onto plane
-    function project_onto_plane(point::Vector{Float64}, normal::Vector{Float64})
+    function project_onto_plane(point::PosVector, normal::Vector{Float64})
         return point .- dot(point, normal) .* normal
     end
     

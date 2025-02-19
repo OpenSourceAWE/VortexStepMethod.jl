@@ -1,5 +1,7 @@
 [![Build Status](https://github.com/Albatross-Kite-Transport/VortexStepMethod.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/Albatross-Kite-Transport/VortexStepMethod.jl/actions/workflows/CI.yml?query=branch%3Amain) [![Coverage](https://codecov.io/gh/Albatross-Kite-Transport/VortexStepMethod.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/Albatross-Kite-Transport/VortexStepMethod.jl)
 
+=======
+
 # Simulation of a 3D airfoil using the Vortex Step Method
 
 The Vortex Step Method (VSM) is an enhanced lifting line method that improves upon the classic approach by solving the 
@@ -116,7 +118,7 @@ Surfplan files can be converted to an input for `VortexStepMethod.jl` using the 
 ## Output
 - CL, CD, CS (side force coefficient)
 - the spanwise distribution of forces  
-  --> moment coefficients (not yet implemented)
+  --> moment coefficients (will be implemented in release 1.1) 
 
 ## Citation
 If you use this project in your research, please consider citing it. 

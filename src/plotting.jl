@@ -19,9 +19,9 @@ function save_plot(fig, save_path, title; data_type=".pdf")
     @debug "Current working directory: $(pwd())"
     
     try
-        savefig(fig, full_path)
-        @debug "Figure saved successfully"
-        
+        fig.savefig(full_path)
+        @debug "Figure saved as $data_type"
+            
         if isfile(full_path)
             @debug "File successfully saved to $full_path"
             @debug "File size: $(filesize(full_path)) bytes"
@@ -33,6 +33,13 @@ function save_plot(fig, save_path, title; data_type=".pdf")
         @error "Error type: $(typeof(e))"
         rethrow(e)
     end
+
+# if os.path.exists(full_path):
+#     logging.debug(f"File successfully saved to {full_path}")
+#     logging.debug(f"File size: {os.path.getsize(full_path)} bytes")
+# else:
+#     logging.info(f"File does not exist after save attempt: {full_path}")
+# end
 end
 
 """
@@ -45,7 +52,7 @@ Display a plot at specified DPI.
 - `dpi`: Dots per inch for the figure (default: 130)
 """
 function show_plot(fig; dpi=130)
-    display(fig)
+    plt.display(fig)
 end
 
 """
@@ -61,7 +68,7 @@ Plot a line segment in 3D with arrow.
 - `width`: Line width (default: 3)
 """
 function plot_line_segment!(ax, segment, color, label; width=3)
-    plot!(ax, 
+    ax.plot( 
         [segment[1][1], segment[2][1]],
         [segment[1][2], segment[2][2]],
         [segment[1][3], segment[2][3]],
@@ -69,9 +76,9 @@ function plot_line_segment!(ax, segment, color, label; width=3)
     )
     
     dir = segment[2] - segment[1]
-    quiver!(ax,
+    ax.quiver(
         [segment[1][1]], [segment[1][2]], [segment[1][3]],
-        quiver=([dir[1]], [dir[2]], [dir[3]]),
+        [dir[1]], [dir[2]], [dir[3]],
         color=color
     )
 end
@@ -81,10 +88,10 @@ end
 
 Set 3D plot axes to equal scale.
 """
-function set_axes_equal!(ax)
-    x_lims = xlims(ax)
-    y_lims = ylims(ax)
-    z_lims = zlims(ax)
+function set_axes_equal!(ax; zoom=1.8)
+    x_lims = ax.get_xlim3d() ./ zoom
+    y_lims = ax.get_ylim3d() ./ zoom
+    z_lims = ax.get_zlim3d() ./ zoom
     
     x_range = abs(x_lims[2] - x_lims[1])
     y_range = abs(y_lims[2] - y_lims[1])
@@ -96,9 +103,9 @@ function set_axes_equal!(ax)
     y_mid = mean(y_lims)
     z_mid = mean(z_lims)
     
-    xlims!(ax, (x_mid - max_range/2, x_mid + max_range/2))
-    ylims!(ax, (y_mid - max_range/2, y_mid + max_range/2))
-    zlims!(ax, (z_mid - max_range/2, z_mid + max_range/2))
+    ax.set_xlim3d((x_mid - max_range/2, x_mid + max_range/2))
+    ax.set_ylim3d((y_mid - max_range/2, y_mid + max_range/2))
+    ax.set_zlim3d((z_mid - max_range/2, z_mid + max_range/2))
 end
 
 """
@@ -106,7 +113,9 @@ end
 
 Create a 3D plot of wing geometry including panels and filaments.
 """
-function create_geometry_plot(wing_aero, title, view_elevation, view_azimuth)
+function create_geometry_plot(wing_aero, title, view_elevation, view_azimuth; zoom=1.8)
+    set_plot_style(28)
+
     panels = wing_aero.panels
     va = isa(wing_aero.va, Tuple) ? wing_aero.va[1] : wing_aero.va
 
@@ -116,11 +125,9 @@ function create_geometry_plot(wing_aero, title, view_elevation, view_azimuth)
     aerodynamic_centers = [panel.aerodynamic_center for panel in panels]
 
     # Create plot
-    plt = plot3d(
-        title=title,
-        size=(800, 800),
-        camera=(view_azimuth, view_elevation)
-    )
+    fig = plt.figure(figsize=(14, 14))
+    ax = fig.add_subplot(111, projection="3d")
+    ax.set_title(title)
 
     # Plot panels
     legend_used = Dict{String,Bool}()
@@ -135,14 +142,17 @@ function create_geometry_plot(wing_aero, title, view_elevation, view_azimuth)
         push!(y_corners, y_corners[1])
         push!(z_corners, z_corners[1])
         
-        plot!(plt, x_corners, y_corners, z_corners,
-              color=:grey, linewidth=1,
-              label=i == 1 ? "Panel Edges" : "")
+        ax.plot(x_corners, 
+                y_corners, 
+                z_corners,
+                color=:grey, 
+                linewidth=1,
+                label=i == 1 ? "Panel Edges" : "")
         
         # Plot control points and aerodynamic centers
-        scatter!(plt, [control_points[i][1]], [control_points[i][2]], [control_points[i][3]],
+        ax.scatter([control_points[i][1]], [control_points[i][2]], [control_points[i][3]],
                 color=:green, label=i == 1 ? "Control Points" : "")
-        scatter!(plt, [aerodynamic_centers[i][1]], [aerodynamic_centers[i][2]], [aerodynamic_centers[i][3]],
+        ax.scatter([aerodynamic_centers[i][1]], [aerodynamic_centers[i][2]], [aerodynamic_centers[i][3]],
                 color=:blue, label=i == 1 ? "Aerodynamic Centers" : "")
 
         # Plot filaments
@@ -153,7 +163,7 @@ function create_geometry_plot(wing_aero, title, view_elevation, view_azimuth)
             x1, x2, color = filament
             @debug "Legend: $legend"
             show_legend = !get(legend_used, legend, false)
-            plot_line_segment!(plt, [x1, x2], color, show_legend ? legend : "")
+            plot_line_segment!(ax, [x1, x2], color, show_legend ? legend : "")
             legend_used[legend] = true
         end
     end
@@ -163,15 +173,27 @@ function create_geometry_plot(wing_aero, title, view_elevation, view_azimuth)
     va_mag = norm(va)
     va_vector_begin = -2 * max_chord * va / va_mag
     va_vector_end = va_vector_begin + 1.5 * va / va_mag
-    plot_line_segment!(plt, [va_vector_begin, va_vector_end], :lightblue, "va")
+    plot_line_segment!(ax, [va_vector_begin, va_vector_end], :lightblue, "va")
+
+    # Add legends for the first occurrence of each label
+    handles, labels = ax.get_legend_handles_labels()
+    by_label = Dict(zip(labels, handles))
+    ax.legend(values(by_label), keys(by_label), bbox_to_anchor = (0,0,1.1,1))
 
     # Set labels and make axes equal
-    xlabel!(plt, "x")
-    ylabel!(plt, "y")
-    zlabel!(plt, "z")
-    set_axes_equal!(plt)
+    ax.set_xlabel("x")
+    ax.set_ylabel("y")
+    ax.set_zlabel("z")
+    set_axes_equal!(ax; zoom)
 
-    return plt
+    # Set the initial view
+    ax.view_init(elev=view_elevation, azim=view_azimuth)
+
+    # Ensure the figure is fully rendered
+    # fig.canvas.draw()
+    plt.tight_layout(rect=(0,0,1,0.97))
+
+    return fig
 end
 
 """
@@ -188,6 +210,7 @@ function plot_geometry(wing_aero, title;
                       view_azimuth=-120)
     
     if is_save
+        plt.ioff()
         # Angled view
         fig = create_geometry_plot(wing_aero, "$(title)_angled_view", 15, -120)
         save_plot(fig, save_path, "$(title)_angled_view", data_type=data_type)
@@ -206,8 +229,9 @@ function plot_geometry(wing_aero, title;
     end
 
     if is_show
+        plt.ion()
         fig = create_geometry_plot(wing_aero, title, view_elevation, view_azimuth)
-        display(fig)
+        plt.display(fig)
     end
 end
 
@@ -237,97 +261,142 @@ function plot_distribution(y_coordinates_list, results_list, label_list;
         "Number of results ($(length(results_list))) must match number of labels ($(length(label_list)))"
     ))
 
-    # Create plot with layout
-    plt = plot(
-        layout=(3,3),
-        size=(1200, 800),
-        plot_title=title
-    )
+    # Set the plot style
+    set_plot_style()
 
-    # CL Distribution
-    plot!(plt[1], 
-        title=L"C_L Distribution",
-        xlabel="Spanwise Position y/b",
-        ylabel=L"Lift Coefficient C_L"
-    )
-    for (y_coords, results, label) in zip(y_coordinates_list, results_list, label_list)
-        plot!(plt[1], y_coords, results["cl_distribution"], 
-              label="$label CL: $(round(results["cl"], digits=2))")
-    end
+    # Initializing plot
+    fig, axs = plt.subplots(3, 3, figsize=(16, 10))
+    fig.suptitle(title, fontsize=16)
 
-    # CD Distribution
-    plot!(plt[2], 
-        title=L"C_D Distribution",
-        xlabel="Spanwise Position y/b",
-        ylabel=L"Drag Coefficient C_D"
-    )
-    for (y_coords, results, label) in zip(y_coordinates_list, results_list, label_list)
-        plot!(plt[2], y_coords, results["cd_distribution"],
-              label="$label CD: $(round(results["cd"], digits=2))")
+    # CL plot
+    for (y_coordinates_i, result_i, label_i) in zip(y_coordinates_list, results_list, label_list)
+        value = "$(round(result_i["cl"], digits=2))"
+        if label_i == "LLT"
+            label = label_i * L" $~C_L$: " * value
+        else
+            label = label_i * L" $C_L$: " * value
+        end
+        axs[1, 1].plot(
+            y_coordinates_i,
+            result_i["cl_distribution"],
+            label=label
+        )
     end
+    axs[1, 1].set_title(L"$C_L$ Distribution", size=16)
+    axs[1, 1].set_xlabel(L"Spanwise Position $y/b$")
+    axs[1, 1].set_ylabel(L"Lift Coefficient $C_L$")
+    axs[1, 1].legend()
+    
+    # CD plot
+    for (y_coordinates_i, result_i, label_i) in zip(y_coordinates_list, results_list, label_list)
+        value = "$(round(result_i["cl"], digits=2))"
+        if label_i == "LLT"
+            label = label_i * L" $~C_D$: " * value
+        else
+            label = label_i * L" $C_D$: " * value
+        end
+        axs[1, 2].plot(
+            y_coordinates_i,
+            result_i["cd_distribution"],
+            label=label
+        )
+    end
+    axs[1, 2].set_title(L"$C_D$ Distribution", size=16)
+    axs[1, 2].set_xlabel(L"Spanwise Position $y/b$")
+    axs[1, 2].set_ylabel(L"Drag Coefficient $C_D$")
+    axs[1, 2].legend()
 
     # Gamma Distribution
-    plot!(plt[3],
-        title=L"\Gamma Distribution",
-        xlabel="Spanwise Position y/b",
-        ylabel=L"Circulation \Gamma"
-    )
-    for (y_coords, results, label) in zip(y_coordinates_list, results_list, label_list)
-        plot!(plt[3], y_coords, results["gamma_distribution"], label=label)
+    for (y_coordinates_i, result_i, label_i) in zip(y_coordinates_list, results_list, label_list)
+        axs[1, 3].plot(
+            y_coordinates_i,
+            result_i["gamma_distribution"],
+            label=label_i
+        )
     end
+    axs[1, 3].set_title(L"\Gamma~Distribution", size=16)
+    axs[1, 3].set_xlabel(L"Spanwise Position $y/b$")
+    axs[1, 3].set_ylabel(L"Circulation~\Gamma")
+    axs[1, 3].legend()
 
     # Geometric Alpha
-    plot!(plt[4],
-        title=L"\alpha Geometric",
-        xlabel="Spanwise Position y/b",
-        ylabel=L"Angle of Attack \alpha (deg)"
-    )
-    for (y_coords, results, label) in zip(y_coordinates_list, results_list, label_list)
-        plot!(plt[4], y_coords, rad2deg.(results["alpha_geometric"]), label=label)
+    for (y_coordinates_i, result_i, label_i) in zip(y_coordinates_list, results_list, label_list)
+        axs[2, 1].plot(
+            y_coordinates_i,
+            result_i["alpha_geometric"],
+            label=label_i
+        )
     end
+    axs[2, 1].set_title(L"$\alpha$ Geometric", size=16)
+    axs[2, 1].set_xlabel(L"Spanwise Position $y/b$")
+    axs[2, 1].set_ylabel(L"Angle of Attack $\alpha$ (deg)")
+    axs[2, 1].legend()
 
-    # Corrected Alpha
-    plot!(plt[5],
-        title=L"\alpha Corrected",
-        xlabel="Spanwise Position y/b",
-        ylabel=L"Angle of Attack \alpha (deg)"
-    )
-    for (y_coords, results, label) in zip(y_coordinates_list, results_list, label_list)
-        plot!(plt[5], y_coords, rad2deg.(results["alpha_at_ac"]), label=label)
+    # Calculated/ Corrected Alpha
+    for (y_coordinates_i, result_i, label_i) in zip(y_coordinates_list, results_list, label_list)
+        axs[2, 2].plot(
+            y_coordinates_i,
+            result_i["alpha_at_ac"],
+            label=label_i
+        )
     end
+    axs[2, 2].set_title(L"$\alpha$ result (corrected to aerodynamic center)", size=16)
+    axs[2, 2].set_xlabel(L"Spanwise Position $y/b$")
+    axs[2, 2].set_ylabel(L"Angle of Attack $\alpha$ (deg)")
+    axs[2, 2].legend()
+
+    # Uncorrected Alpha plot
+    for (y_coordinates_i, result_i, label_i) in zip(y_coordinates_list, results_list, label_list)
+        axs[2, 3].plot(
+            y_coordinates_i,
+            result_i["alpha_uncorrected"],
+            label=label_i
+        )
+    end
+    axs[2, 3].set_title(L"$\alpha$ Uncorrected (if VSM, at the control point)", size=16)
+    axs[2, 3].set_xlabel(L"Spanwise Position $y/b$")
+    axs[2, 3].set_ylabel(L"Angle of Attack $\alpha$ (deg)")
+    axs[2, 3].legend()
 
     # Force Components
     for (idx, component) in enumerate(["x", "y", "z"])
-        plot!(plt[6+idx],
-            title="Force in $component direction",
-            xlabel="Spanwise Position y/b",
-            ylabel=L"F_%$component"
-        )
+        axs[3, idx].set_title("Force in $component direction", size=16)
+        axs[3, idx].set_xlabel(L"Spanwise Position $y/b$")
+        axs[3, idx].set_ylabel(raw"$F_\mathrm" * "{$component}" * raw"$")
         for (y_coords, results, label) in zip(y_coordinates_list, results_list, label_list)
             # Extract force components for the current direction (idx)
             forces = results["F_distribution"][idx, :]
-            
             # Verify dimensions match
             if length(y_coords) != length(forces)
                 @warn "Dimension mismatch in force plotting" length(y_coords) length(forces) component
                 continue  # Skip this component instead of throwing error
             end
-            
-            plot!(plt[6+idx], y_coords, forces,
-                label="$label ΣF_$component: $(round(results["F$component"], digits=2))N")
+            space=""
+            if label == "LLT"
+                space = "~"
+            end
+            axs[3, idx].plot(
+                y_coords,
+                forces,
+                label = "$label" * space * raw"$~\Sigma~F_\mathrm" * "{$component}:~" * 
+                         raw"$" * "$(round(results["F$component"], digits=2)) N"
+            )
+            axs[3, idx].legend()
         end
     end
 
-    # Save and show plot
-    if is_save
-        save_plot(plt, save_path, title, data_type=data_type)
-    end
+    fig.tight_layout() 
+
+    # # Save and show plot
+    # if is_save
+    #     save_plot(fig, save_path, title, data_type=data_type)
+    # end
     
     if is_show
-        show_plot(plt)
+        show_plot(fig)
     end
 
-    return plt
+    return fig
 end
 
 """
@@ -373,13 +442,15 @@ function generate_polar_data(
     
     # Previous gamma for initialization
     gamma = nothing
+
+    set_plot_style()
     
     for (i, angle_i) in enumerate(angle_range)
         # Set angle based on type
         if angle_type == "angle_of_attack"
             α = deg2rad(angle_i)
             β = side_slip
-        elseif angle_type == "side_slip"
+        elseif angle_type == raw"side_slip"
             α = angle_of_attack
             β = deg2rad(angle_i)
         else
@@ -486,92 +557,189 @@ function plot_polars(
             # Read all data first
             data = readdlm(path, ',')
             # Skip the header row by taking data from row 2 onwards
+            @show data[1, :]
             data = data[2:end, :]
-            push!(polar_data_list, [data[:,3], data[:,1], data[:,2]])
+            push!(polar_data_list, [data[:,3], data[:,1], data[:,2], zeros(length(data[:,1]))])
         end
     end
     
-    # Create plots with 2x2 layout
-    plt = plot(
-        layout=(2,2),
-        size=(1000, 1000),
-        plot_title=title
-    )
+    # Initializing plot
+    fig, axs = plt.subplots(2, 2, figsize=(14, 14))
     
     # Number of computational results (excluding literature)
     n_solvers = length(solver_list)
-    
-    # Plot CL vs angle
-    plot!(plt[1])
     for (i, (polar_data, label)) in enumerate(zip(polar_data_list, label_list))
-        style = i ≤ n_solvers ? (:solid, :star, 7) : (:solid, :circle, 5)
-        plot!(plt[1], polar_data[1], polar_data[2],
-              label=label, linestyle=style[1], marker=style[2], markersize=style[3])
-        
+        if i < n_solvers
+            linestyle = "-"
+            marker = "*"
+            markersize = 7
+        else
+            linestyle = "-"
+            marker = "."
+            markersize = 5
+        end
+        if contains(label, "LLT")
+            label = replace(label, "e5"  => raw"\cdot10^5")
+            label = replace(label, " "   => raw"~")
+            label = replace(label, "LLT" => raw"\mathrm{LLT}{~\,}")
+            label = raw"$" * label * raw"$"
+        else
+            label = replace(label, "e5" => raw"\cdot10^5")
+            label = replace(label, " " => "~")
+            label = replace(label, "VSM" => raw"\mathrm{VSM}")
+            label = raw"$" * label * raw"$"
+        end
+        axs[1, 1].plot(
+            polar_data[1],
+            polar_data[2],
+            label=label,
+            linestyle=linestyle,
+            marker=marker,
+            markersize=markersize,
+        )
         # Limit y-range if CL > 10
         if maximum(polar_data[2]) > 10
-            ylims!(plt[1], (-0.5, 2.0))
+            axs[1, 1].set_ylim([-0.5, 2])
         end
+        title = raw"$C_L" * raw"$" * " vs $angle_type [°]"
+        axs[1, 1].set_title(title)
+        axs[1, 1].set_xlabel("$angle_type [°]")
+        axs[1, 1].set_ylabel(L"$C_L$")
+        axs[1, 1].legend()
     end
-    title!(plt[1], L"C_L \textrm{ vs } %$angle_type")
-    xlabel!(plt[1], "$angle_type [deg]")
-    ylabel!(plt[1], L"C_L")
 
-    # Plot CD vs angle
-    plot!(plt[2])
     for (i, (polar_data, label)) in enumerate(zip(polar_data_list, label_list))
-        style = i ≤ n_solvers ? (:solid, :star, 7) : (:solid, :circle, 5)
-        plot!(plt[2], polar_data[1], polar_data[3],
-              label=label, linestyle=style[1], marker=style[2], markersize=style[3])
-        
-        # Limit y-range if CD > 10
-        if maximum(polar_data[3]) > 10
-            ylims!(plt[2], (-0.2, 0.5))
+        if i < n_solvers
+            linestyle = "-"
+            marker = "*"
+            markersize = 7
+        else
+            linestyle = "-"
+            marker = "."
+            markersize = 5
         end
-    end
-    title!(plt[2], L"C_D \textrm{ vs } %$angle_type")
-    xlabel!(plt[2], "$angle_type [deg]")
-    ylabel!(plt[2], L"C_D")
-
-    # Plot CS vs angle (if available)
-    plot!(plt[3])
-    for (i, (polar_data, label)) in enumerate(zip(polar_data_list, label_list))
-        # Check if CS data is available (length > 3)
-        if length(polar_data) > 3
-            style = i ≤ n_solvers ? (:solid, :star, 7) : (:solid, :circle, 5)
-            plot!(plt[3], polar_data[1], polar_data[4],
-                  label=label, linestyle=style[1], marker=style[2], markersize=style[3])
+        if contains(label, "LLT")
+            label = replace(label, "e5"  => raw"\cdot10^5")
+            label = replace(label, " "   => raw"~")
+            label = replace(label, "LLT" => raw"\mathrm{LLT}{~\,}")
+            label = raw"$" * label * raw"$"
+        else
+            label = replace(label, "e5" => raw"\cdot10^5")
+            label = replace(label, " " => "~")
+            label = replace(label, "VSM" => raw"\mathrm{VSM}")
+            label = raw"$" * label * raw"$"
         end
+        axs[1, 2].plot(
+            polar_data[1],
+            polar_data[3],
+            label=label,
+            linestyle=linestyle,
+            marker=marker,
+            markersize=markersize,
+        )
+        # Limit y-range if CL > 10
+        if maximum(polar_data[2]) > 10
+            axs[1, 2].set_ylim([-0.5, 2])
+        end
+        title = raw"$C_D" * raw"$" * " vs $angle_type [°]"
+        axs[1, 2].set_title(title)
+        axs[1, 2].set_xlabel("$angle_type [°]")
+        axs[1, 2].set_ylabel(L"$C_D$")
+        axs[1, 2].legend()
     end
-    title!(plt[3], L"C_S \textrm{ vs } %$angle_type")
-    xlabel!(plt[3], "$angle_type [deg]")
-    ylabel!(plt[3], L"C_S")
 
-    # Plot CL vs CD
-    plot!(plt[4])
+
     for (i, (polar_data, label)) in enumerate(zip(polar_data_list, label_list))
-        style = i ≤ n_solvers ? (:solid, :star, 7) : (:solid, :circle, 5)
-        plot!(plt[4], polar_data[2], polar_data[3],  # Note: CD on x-axis, CL on y-axis
-              label=label, linestyle=style[1], marker=style[2], markersize=style[3])
-        
-        # Limit ranges if values > 10
+        if i < n_solvers
+            linestyle = "-"
+            marker = "*"
+            markersize = 7
+        else
+            linestyle = "-"
+            marker = "."
+            markersize = 5
+        end
+        if contains(label, "LLT")
+            label = replace(label, "e5"  => raw"\cdot10^5")
+            label = replace(label, " "   => raw"~")
+            label = replace(label, "LLT" => raw"\mathrm{LLT}{~\,}")
+            label = raw"$" * label * raw"$"
+        else
+            label = replace(label, "e5" => raw"\cdot10^5")
+            label = replace(label, " " => "~")
+            label = replace(label, "VSM" => raw"\mathrm{VSM}")
+            label = raw"$" * label * raw"$"
+        end
+        axs[2, 1].plot(
+            polar_data[1],
+            polar_data[4],
+            label=label,
+            linestyle=linestyle,
+            marker=marker,
+            markersize=markersize,
+        )
+        # Limit y-range if CL > 10
+        if maximum(polar_data[2]) > 10
+            axs[2, 1].set_ylim([-0.5, 2])
+        end
+        title = raw"$C_S" * raw"$" * " vs $angle_type [°]"
+        axs[2, 1].set_title(title)
+        axs[2, 1].set_xlabel("$angle_type [°]")
+        axs[2, 1].set_ylabel(L"$C_S$")
+        axs[2, 1].legend()
+    end
+
+    for (i, (polar_data, label)) in enumerate(zip(polar_data_list, label_list))
+        if i < n_solvers
+            linestyle = "-"
+            marker = "*"
+            markersize = 7
+        else
+            linestyle = "-"
+            marker = "."
+            markersize = 5
+        end
+        if contains(label, "LLT")
+            label = replace(label, "e5"  => raw"\cdot10^5")
+            label = replace(label, " "   => raw"~")
+            label = replace(label, "LLT" => raw"\mathrm{LLT}{~\,}")
+            label = raw"$" * label * raw"$"
+        else
+            label = replace(label, "e5" => raw"\cdot10^5")
+            label = replace(label, " " => "~")
+            label = replace(label, "VSM" => raw"\mathrm{VSM}")
+            label = raw"$" * label * raw"$"
+        end
+        axs[2, 2].plot(
+            polar_data[2],
+            polar_data[3],
+            label=label,
+            linestyle=linestyle,
+            marker=marker,
+            markersize=markersize,
+        )
+        # Limit y-range if CL > 10
         if maximum(polar_data[2]) > 10 || maximum(polar_data[3]) > 10
-            ylims!(plt[4], (-0.5, 2.0))
-            xlims!(plt[4], (-0.2, 0.5))
+            axs[2, 2].set_ylim([-0.5, 2])
+            axs[2, 2].set_xlim([-0.5, 2])
         end
+        title = raw"$C_L" * raw"$" * " vs " * raw"$C_D" * raw"$"
+        axs[2, 2].set_title(title)
+        axs[2, 2].set_xlabel(L"$C_D$")
+        axs[2, 2].set_ylabel(L"$C_L$")
+        axs[2, 2].legend()
     end
-    title!(plt[4], L"C_L \textrm{ vs } C_D \textrm{ (over } %$angle_type \textrm{ range)}")
-    xlabel!(plt[4], L"C_D")
-    ylabel!(plt[4], L"C_L")
 
-    # Save and show plot
-    if is_save
-        save_plot(plt, save_path, title, data_type=data_type)
-    end
+    fig.tight_layout(h_pad=2.5, rect=(0.01,0.01,0.99,0.99)) 
     
-    if is_show
-        show_plot(plt)
+    # Save and show plot
+    if is_save && !isnothing(save_path)
+        save_plot(fig, save_path, title, data_type=data_type)
     end
 
-    return plt
+    if is_show
+        show_plot(fig)
+    end
+
+    return fig
 end

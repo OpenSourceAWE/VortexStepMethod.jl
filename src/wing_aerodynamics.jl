@@ -502,11 +502,24 @@ function calculate_results(wa::WingAerodynamics,
         lift_wing_3D_sum += lift_prescribed_va * panel.width
         drag_wing_3D_sum += drag_prescribed_va * panel.width  
         side_wing_3D_sum += side_prescribed_va * panel.width
+
+        # TODO make this work
+        # fx_global_3D_sum += fx_global_3D
+        # fy_global_3D_sum += fy_global_3D
+        # fz_global_3D_sum += fz_global_3D
         
         # Store coefficients
         push!(cl_prescribed_va, lift_prescribed_va / (q_inf * panel.chord))
         push!(cd_prescribed_va, drag_prescribed_va / (q_inf * panel.chord))
         push!(cs_prescribed_va, side_prescribed_va / (q_inf * panel.chord))
+
+        # TODO translate this
+        # fx_global_3D_list.append(fx_global_3D)
+        # fy_global_3D_list.append(fy_global_3D)
+        # fz_global_3D_list.append(fz_global_3D)
+        # f_global_3D_list.append(
+        #     np.array([fx_global_3D, fy_global_3D, fz_global_3D])
+        # )
     end
 
     if is_only_f_and_gamma_output

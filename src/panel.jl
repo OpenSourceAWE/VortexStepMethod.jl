@@ -25,10 +25,10 @@ Represents a panel in a vortex step method simulation.
 - `filaments::Vector{BoundFilament}`: Panel filaments
 """
 mutable struct Panel
-    TE_point_1::Vector{Float64}
-    LE_point_1::Vector{Float64}
-    TE_point_2::Vector{Float64}
-    LE_point_2::Vector{Float64}
+    TE_point_1::MVec3
+    LE_point_1::MVec3
+    TE_point_2::MVec3
+    LE_point_2::MVec3
     chord::Float64
     va::Union{Nothing,Vector{Float64}}
     corner_points::Matrix{Float64}
@@ -37,13 +37,13 @@ mutable struct Panel
     cd_coefficients::Union{Nothing,Vector{Float64}}
     cm_coefficients::Union{Nothing,Vector{Float64}}
     panel_polar_data::Union{Nothing,Matrix{Float64}}
-    aerodynamic_center::Vector{Float64}
-    control_point::Vector{Float64}
-    bound_point_1::Vector{Float64}
-    bound_point_2::Vector{Float64}
-    x_airf::Vector{Float64}
-    y_airf::Vector{Float64}
-    z_airf::Vector{Float64}
+    aerodynamic_center::MVec3
+    control_point::MVec3
+    bound_point_1::MVec3
+    bound_point_2::MVec3
+    x_airf::MVec3
+    y_airf::MVec3
+    z_airf::MVec3
     width::Float64
     filaments::Vector{Union{BoundFilament, SemiInfiniteFilament}}
 
@@ -54,9 +54,9 @@ mutable struct Panel
         control_point::PosVector,
         bound_point_1::PosVector,
         bound_point_2::PosVector,
-        x_airf::Vector{Float64},
-        y_airf::Vector{Float64},
-        z_airf::Vector{Float64}
+        x_airf::PosVector,
+        y_airf::PosVector,
+        z_airf::PosVector
     )
         # Initialize basic geometry
         TE_point_1 = copy(section_1.TE_point)

@@ -1,5 +1,5 @@
 using LinearAlgebra
-using Plots
+using ControlPlots
 using VortexStepMethod
 
 # Step 1: Define wing parameters
@@ -55,36 +55,33 @@ println("Projected area = $(round(results_vsm["projected_area"], digits=4)) m²"
 # Step 6: Plot geometry
 plot_geometry(
       wa,
-      "rectangular_wing_geometry";
+      "Rectangular_wing_geometry";
       data_type=".pdf",
       save_path=".",
       is_save=false,
       is_show=true,
 )
+nothing
 
-# # Step 7: Plot spanwise distributions
-# y_coordinates = [panel.aerodynamic_center[2] for panel in wa.panels]
+# Step 7: Plot spanwise distributions
+y_coordinates = [panel.aerodynamic_center[2] for panel in wa.panels]
 
-# plot_distribution(
-#     [y_coordinates, y_coordinates],
-#     [results_vsm, results_llt],
-#     ["VSM", "LLT"],
-#     title="Spanwise Distributions"
-# )
+plot_distribution(
+    [y_coordinates, y_coordinates],
+    [results_vsm, results_llt],
+    ["VSM", "LLT"],
+    title="Spanwise Distributions"
+)
 
-# # Step 8: Plot polar curves
-# angle_range = range(0, 20, 20)
-# plot_polars(
-#     [llt_solver, vsm_solver],
-#     [wa, wa],
-#     ["LLT", "VSM"],
-#     angle_range=angle_range,
-#     angle_type="angle_of_attack",
-#     Umag=Umag,
-#     title="Rectangular Wing Polars"
-# )
-
-# Save plots if needed
-# savefig("geometry.pdf")
-# savefig("distributions.pdf")
-# savefig("polars.pdf")
+# Step 8: Plot polar curves
+angle_range = range(0, 20, 20)
+plot_polars(
+    [llt_solver, vsm_solver],
+    [wa, wa],
+    ["LLT", "VSM"],
+    angle_range=angle_range,
+    angle_type="angle_of_attack",
+    Umag=Umag,
+    title="Rectangular Wing Polars"
+)
+nothing
