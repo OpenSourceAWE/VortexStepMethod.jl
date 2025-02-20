@@ -733,7 +733,7 @@ function plot_polars(
         axs[2, 2].legend()
     end
 
-    fig.tight_layout(h_pad=2.5, rect=(0.01,0.01,0.99,0.99)) 
+    fig.tight_layout(h_pad=3.5, rect=(0.01,0.01,0.99,0.99)) 
     
     # Save and show plot
     if is_save && !isnothing(save_path)
