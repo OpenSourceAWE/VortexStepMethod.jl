@@ -15,9 +15,10 @@ This package was translated from the Python code version 1.0.0 available at http
 
 ## Installation
 Install [Julia 1.10](https://ufechner7.github.io/2024/08/09/installing-julia-with-juliaup.html) or later, 
-if you haven't already. On Linux, make sure that Python3 and Matplotlib are installed:
+if you haven't already. On Linux, make sure that Python3, Matplotlib and LaTeX are installed:
 ```
 sudo apt install python3-matplotlib
+sudo apt install texlive-full texlive-fonts-extra cm-super
 ```
 
 Before installing this software it is suggested to create a new project, for example like this:
