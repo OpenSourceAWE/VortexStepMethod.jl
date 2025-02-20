@@ -714,8 +714,8 @@ function plot_polars(
             label = raw"$" * label * raw"$"
         end
         axs[2, 2].plot(
-            polar_data[2],
             polar_data[3],
+            polar_data[2],
             label=label,
             linestyle=linestyle,
             marker=marker,
