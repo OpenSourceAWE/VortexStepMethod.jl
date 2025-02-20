@@ -49,7 +49,6 @@ include("wing_aerodynamics.jl")
 include("solver.jl")
 
 # include plotting
-include("color_palette.jl")
 include("plotting.jl")
 
 end # module
