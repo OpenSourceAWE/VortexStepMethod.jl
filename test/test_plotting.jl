@@ -4,9 +4,9 @@ using Test
 
 function result_vsm()
     # Step 1: Define wing parameters
-    n_panels = 20            # Number of panels
-    span = 20.0             # Wing span [m]
-    chord = 1.0             # Chord length [m]
+    n_panels = 20          # Number of panels
+    span = 20.0            # Wing span [m]
+    chord = 1.0            # Chord length [m]
     Umag = 20.0            # Magnitude of inflow velocity [m/s]
     density = 1.225        # Air density [kg/m³]
     alpha_deg = 30.0       # Angle of attack [degrees]
