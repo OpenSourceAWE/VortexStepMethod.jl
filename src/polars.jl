@@ -1,9 +1,9 @@
-using Distributed, Timers, Serialization, SharedArrays
-using Xfoil
-using Pkg
-using ControlPlots
+# using Distributed, Timers, Serialization, SharedArrays
+# using Xfoil
+# using Pkg
+# using ControlPlots
 
-function distributed_create_polars(foil_file, v_wind, middle_length, tip_length)
+function distributed_create_polars(foil_path, polar_path, v_wind, area, width, x_turn)
     procs = addprocs()
 
     function normalize!(x, y)
@@ -20,7 +20,6 @@ function distributed_create_polars(foil_file, v_wind, middle_length, tip_length)
 
         function turn_trailing_edge!(angle, x, y, lower_turn, upper_turn)
             theta = deg2rad(angle)
-            x_turn = 0.75
             turn_distance = upper_turn - lower_turn
             smooth_idx = []
             rm_idx = []
@@ -57,60 +56,26 @@ function distributed_create_polars(foil_file, v_wind, middle_length, tip_length)
             nothing
         end
 
-        function calculate_constants(d_trailing_edge_angle_, x_, y_, cp, lower, upper)
-            d_trailing_edge_angle = deg2rad(d_trailing_edge_angle_)
-            x = deepcopy(x_)
-            y = deepcopy(y_)
-            c_te = 0.0
-            if d_trailing_edge_angle > 0
-                x_ref, y_ref = 0.75, upper
-            else
-                x_ref, y_ref = 0.75, lower
-            end
-            
-            # straighten out the trailing_edge in order to find the trailing edge torque constant
-            for i in eachindex(x)
-                x_rel = x[i] - x_ref
-                y_rel = y[i] - y_ref
-                x[i] = x_ref + x_rel * cos(-d_trailing_edge_angle) + y_rel * sin(-d_trailing_edge_angle)
-                y[i] = y_ref - x_rel * sin(-d_trailing_edge_angle) + y_rel * cos(-d_trailing_edge_angle)
-            end
-            
-            x2 = []
-            y2 = []
-            for i in 1:(length(x)-1)
-                if x[i] > x_ref && lower < y[i] < upper
-                    push!(x2, x[i])
-                    push!(y2, y[i])
-                    dx = x[i+1] - x[i]
-                    cp_avg = (cp[i] + cp[i+1]) / 2
-                    c_te -= dx * cp_avg * (x[i] - x_ref) # clockwise torque around (x_ref, y_ref)
-                end
-            end
-            return c_te
-        end
-
-        function solve_alpha!(cls, cds, c_tes, alphas, alpha_idxs, d_trailing_edge_angle, re, x_, y_, lower, upper, kite_speed, speed_of_sound)
+        function solve_alpha!(cls, cds, cms, alphas, alpha_idxs, d_trailing_edge_angle, re, x_, y_, lower, upper, kite_speed, speed_of_sound)
             x = deepcopy(x_)
             y = deepcopy(y_)
             turn_trailing_edge!(d_trailing_edge_angle, x, y, lower, upper)
             Xfoil.set_coordinates(x, y)
             x, y = Xfoil.pane(npan=140)
-            @show d_trailing_edge_angle
+            @info d_trailing_edge_angle
             reinit = true
             for (alpha, alpha_idx) in zip(alphas, alpha_idxs)
                 converged = false
                 cl = 0.0
                 cd = 0.0
                 # Solve for the given angle of attack
-                cl, cd, _, cm, converged = Xfoil.solve_alpha(alpha, re; iter=50, reinit=reinit, mach=kite_speed/speed_of_sound, xtrip=(0.05, 0.05)) # TODO: use 5% point
+                cl, cd, _, cm, converged = Xfoil.solve_alpha(alpha, re; iter=50, reinit=reinit, mach=kite_speed/speed_of_sound, xtrip=(0.05, 0.05))
                 reinit = false
                 if converged
                     _, cp = Xfoil.cpdump()
-                    c_te = calculate_constants(d_trailing_edge_angle, x, y, cp, lower, upper)
                     cls[alpha_idx] = cl
                     cds[alpha_idx] = cd
-                    c_tes[alpha_idx] = c_te
+                    cms[alpha_idx] = cm
                 end
             end
             return nothing
@@ -119,16 +84,16 @@ function distributed_create_polars(foil_file, v_wind, middle_length, tip_length)
         function run_solve_alpha(alphas, d_trailing_edge_angle, re, x_, y_, lower, upper, kite_speed, speed_of_sound)
             cls = Float64[NaN for _ in alphas]
             cds = Float64[NaN for _ in alphas]
-            c_tes = Float64[NaN for _ in alphas]
+            cms = Float64[NaN for _ in alphas]
             neg_idxs = sort(findall(alphas .< 0.0), rev=true)
             neg_alphas = alphas[neg_idxs]
             pos_idxs = sort(findall(alphas .>= 0.0))
             pos_alphas = alphas[pos_idxs]
-            solve_alpha!(cls, cds, c_tes, neg_alphas, neg_idxs, d_trailing_edge_angle, 
+            solve_alpha!(cls, cds, cms, neg_alphas, neg_idxs, d_trailing_edge_angle, 
                                 re, x_, y_, lower, upper, kite_speed, speed_of_sound)
-            solve_alpha!(cls, cds, c_tes, pos_alphas, pos_idxs, d_trailing_edge_angle, 
+            solve_alpha!(cls, cds, cms, pos_alphas, pos_idxs, d_trailing_edge_angle, 
                                 re, x_, y_, lower, upper, kite_speed, speed_of_sound)
-            return cls, cds, c_tes
+            return cls, cds, cms
         end
     end
 
@@ -139,13 +104,13 @@ function distributed_create_polars(foil_file, v_wind, middle_length, tip_length)
         min_upper_distance = Inf
         for (xi, yi) in zip(x, y)
             if yi < 0
-                lower_distance = abs(xi - 0.75)
+                lower_distance = abs(xi - x_turn)
                 if lower_distance < min_lower_distance
                     min_lower_distance = lower_distance
                     lower_trailing_edge = yi
                 end
             else
-                upper_distance = abs(xi - 0.75)
+                upper_distance = abs(xi - x_turn)
                 if upper_distance < min_upper_distance
                     min_upper_distance = upper_distance
                     upper_trailing_edge = yi
@@ -163,26 +128,59 @@ function distributed_create_polars(foil_file, v_wind, middle_length, tip_length)
         return matrix[rows_to_keep, cols_to_keep]
     end
 
-    println("Creating polars")
-    if !endswith(foil_file, ".dat")
-        foil_file *= ".dat"
+    function replace_nan!(matrix)
+        rows, cols = size(matrix)
+        distance = max(rows, cols)
+        for i in 1:rows
+            for j in 1:cols
+                if isnan(matrix[i, j])
+                    neighbors = []
+                    for d in 1:distance
+                        found = false
+                        if i-d >= 1 && !isnan(matrix[i-d, j]);
+                            push!(neighbors, matrix[i-d, j])
+                            found = true
+                        end
+                        if i+d <= rows && !isnan(matrix[i+d, j])
+                            push!(neighbors, matrix[i+d, j])
+                            found = true
+                        end
+                        if j-d >= 1 && !isnan(matrix[i, j-d])
+                            push!(neighbors, matrix[i, j-d])
+                            found = true
+                        end
+                        if j+d <= cols && !isnan(matrix[i, j+d])
+                            push!(neighbors, matrix[i, j+d])
+                            found = true
+                        end
+                        if found; break; end
+                    end
+                    if !isempty(neighbors)
+                        matrix[i, j] = sum(neighbors) / length(neighbors)
+                    end
+                end
+            end
+        end
+        return nothing
     end
-    polar_file = foil_file[1:end-4] * "_polar.bin"
 
-    # alphas = -90:1.0:90
-    alphas = -1.0:1.0:1.0
-    # d_trailing_edge_angles = -90:1.0:90
-    d_trailing_edge_angles = -1.0:1.0:1.0
+    @info "Creating polars"
+
+    alphas = -90:1.0:90
+    # alphas = -1.0:1.0:1.0
+    d_trailing_edge_angles = -90:1.0:90
+    # d_trailing_edge_angles = -1.0:1.0:1.0
     cl_matrix = SharedArray{Float64}((length(alphas), length(d_trailing_edge_angles)), init = (a) -> fill!(a, NaN))
     cd_matrix = SharedArray{Float64}((length(alphas), length(d_trailing_edge_angles)), init = (a) -> fill!(a, NaN))
-    c_te_matrix = SharedArray{Float64}((length(alphas), length(d_trailing_edge_angles)), init = (a) -> fill!(a, NaN))
+    cm_matrix = SharedArray{Float64}((length(alphas), length(d_trailing_edge_angles)), init = (a) -> fill!(a, NaN))
     
     kite_speed = v_wind
     speed_of_sound = 343
-    reynolds_number = kite_speed * (middle_length + tip_length)/2 / 1.460e-5
+    chord_length = area / width
+    reynolds_number = kite_speed * chord_length / 1.460e-5 # wikipedia
 
     # Read airfoil coordinates from a file.
-    x, y = open(foil_file, "r") do f
+    x, y = open(foil_path, "r") do f
         x = Float64[]
         y = Float64[]
         for line in eachline(f)
@@ -203,24 +201,37 @@ function distributed_create_polars(foil_file, v_wind, middle_length, tip_length)
 
     try
         @sync @distributed for j in eachindex(d_trailing_edge_angles)
-            cl_matrix[:, j], cd_matrix[:, j], c_te_matrix[:, j] = run_solve_alpha(alphas, d_trailing_edge_angles[j], 
+            cl_matrix[:, j], cd_matrix[:, j], cm_matrix[:, j] = run_solve_alpha(alphas, d_trailing_edge_angles[j], 
                             reynolds_number, x, y, lower, upper, kite_speed, speed_of_sound)
         end
     catch e
-        println(e)
+        rmprocs(procs)
+        throw(e)
     finally
-        println("Removing processes")
+        @info "Removing processes"
         rmprocs(procs)
     end
 
-    println("cl_matrix")
-    [println(cl_matrix[i, :]) for i in eachindex(alphas)]
+    @info "cl_matrix" begin
+        display(cl_matrix)
+    end
 
-    println("Relative trailing_edge height: ", upper - lower)
-    println("Reynolds number for flying speed of $kite_speed is $reynolds_number")
+    replace_nan!(cl_matrix)
+    replace_nan!(cd_matrix)
+    replace_nan!(cm_matrix)
 
-    serialize(polar_file, (alphas, d_trailing_edge_angles, Matrix(cl_matrix), Matrix(cd_matrix), Matrix(c_te_matrix)))
+    cl_interp_ = extrapolate(scale(interpolate(cl_matrix, BSpline(Linear())), alphas, d_trailing_edge_angles), NaN)
+    cd_interp_ = extrapolate(scale(interpolate(cd_matrix, BSpline(Linear())), alphas, d_trailing_edge_angles), NaN)
+    cm_interp_ = extrapolate(scale(interpolate(cm_matrix, BSpline(Linear())), alphas, d_trailing_edge_angles), NaN)
+
+    cl_interp = (α, β) -> cl_interp_(α, β)
+    cd_interp = (α, β) -> cd_interp_(α, β)
+    cm_interp = (α, β) -> cm_interp_(α, β)
+
+    @info "Relative trailing_edge height: $upper - $lower"
+    @info "Reynolds number for flying speed of $kite_speed is $reynolds_number"
+
+    serialize(polar_path, (cl_interp, cd_interp, cm_interp))
     toc()
+    return (cl_interp, cd_interp, cm_interp)
 end
-
-distributed_create_polars("data/centre_line_profile_with_billow", 9.81, 2.0, 1.0)

@@ -5,7 +5,7 @@ using DataFrames
 using LinearAlgebra
 
 # Create wing geometry
-wing = KiteWing("data/HL5_ram_air_kite_body.obj", "data/centre_line_with_profile.dat")
+wing = KiteWing("data/HL5_ram_air_kite_body.obj", "data/centre_line_profile_with_billow.dat")
 
 # for gamma in range(wing.gamma_tip - wing.gamma_tip/10, -wing.gamma_tip + wing.gamma_tip/10, 20)
 #     add_section!(wing, gamma, ("dat_file", "data/centre_line_with_profile.dat"))

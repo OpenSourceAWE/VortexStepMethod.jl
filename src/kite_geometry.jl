@@ -38,13 +38,13 @@ function find_circle_center_and_radius(vertices)
     end
     @show v_min
 
-    # Find vertex furthest in y, -z direction
+    # Find vertex furthest in -y, -z direction
     max_score = -Inf
     v_tip .= 0.0
     for v in vertices
-        # Score each vertex based on y and -z components
-        # Higher y and lower z gives higher score
-        score = v[2] - v[3]  # y - z
+        # Score each vertex based on -y and -z components
+        # lower y and lower z gives higher score
+        score = -v[2] - v[3]  # - y - z
         if score > max_score
             max_score = score
             v_tip .= v
@@ -66,13 +66,14 @@ function find_circle_center_and_radius(vertices)
     z = result[1]
 
     gamma_tip = atan(-v_tip[2], (v_tip[3] - z))
+    @assert gamma_tip > 0.0
 
     return z, r[1], gamma_tip
 end
 
 # Create interpolations for max and min x coordinates
 function create_interpolations(vertices, circle_center_z, radius, gamma_tip)
-    gamma_range = range(-abs(gamma_tip)+1e-6, abs(gamma_tip)-1e-6, 100)
+    gamma_range = range(-gamma_tip+1e-6, gamma_tip-1e-6, 100)
     vz_centered = [v[3] - circle_center_z for v in vertices]
     
     max_xs = zeros(length(gamma_range))
@@ -204,7 +205,7 @@ mutable struct KiteWing <: AbstractWing
     te_interp::Function
     area_interp::Function
 
-    function KiteWing(obj_path, dat_path=nothing; mass=1.0, n_panels=54, spanwise_panel_distribution="linear", spanwise_direction=[0.0, 1.0, 0.0])
+    function KiteWing(obj_path, foil_path=nothing; n_sections=20, crease_frac=0.75, wind_vel=10., mass=1.0, n_panels=54, spanwise_panel_distribution="linear", spanwise_direction=[0.0, 1.0, 0.0])
         !isapprox(spanwise_direction, [0.0, 1.0, 0.0]) && @error "Spanwise direction has to be [0.0, 1.0, 0.0]"
         if !isfile(obj_path)
             error("OBJ file not found: $obj_path")
@@ -220,8 +221,19 @@ mutable struct KiteWing <: AbstractWing
         area_interp = (γ) -> area_interp_(γ)
 
         sections = Section[]
-        if !isnothing(dat_path)
-            
+        if !endswith(foil_path, ".dat")
+            foil_path *= ".dat"
+        end
+        polar_path = foil_file[1:end-4] * "_polar.bin"
+        if !isnothing(foil_path) && !ispath(polar_path)
+            width = 2gamma_tip * radius
+            (cl_interp, cd_interp, cm_interp) = 
+                distributed_create_polars(foil_path, polar_path, wind_vel, area_interp(gamma_tip), width, crease_frac)
+        elseif !isnothing(foil_path) && ispath(polar_path)
+            (cl_interp, cd_interp, cm_interp) = deserialize(polar_path)
+        end
+        for gamma in range(-gamma_tip, gamma_tip, n_sections)
+            add_section!(wing, gamma, ("interpolations", (cl_interp, cd_interp, cm_interp)))
         end
         new(
             n_panels, spanwise_panel_distribution, spanwise_direction, sections,
