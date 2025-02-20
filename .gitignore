@@ -1,2 +1,4 @@
 Manifest.toml
 .vscode/settings.json
+venv
+results/TUDELFT_V3_LEI_KITE/polars/$C_L$ vs $C_D$.pdf
