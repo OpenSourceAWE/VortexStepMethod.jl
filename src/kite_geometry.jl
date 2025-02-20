@@ -204,7 +204,7 @@ mutable struct KiteWing <: AbstractWing
     te_interp::Function
     area_interp::Function
 
-    function KiteWing(obj_path; mass=1.0, n_panels=54, spanwise_panel_distribution="linear", spanwise_direction=[0.0, 1.0, 0.0])
+    function KiteWing(obj_path, dat_path=nothing; mass=1.0, n_panels=54, spanwise_panel_distribution="linear", spanwise_direction=[0.0, 1.0, 0.0])
         !isapprox(spanwise_direction, [0.0, 1.0, 0.0]) && @error "Spanwise direction has to be [0.0, 1.0, 0.0]"
         if !isfile(obj_path)
             error("OBJ file not found: $obj_path")
@@ -220,6 +220,9 @@ mutable struct KiteWing <: AbstractWing
         area_interp = (γ) -> area_interp_(γ)
 
         sections = Section[]
+        if !isnothing(dat_path)
+            
+        end
         new(
             n_panels, spanwise_panel_distribution, spanwise_direction, sections,
             mass, center_of_mass, circle_center_z, gamma_tip, inertia_tensor, radius,

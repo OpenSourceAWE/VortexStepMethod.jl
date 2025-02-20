@@ -5,22 +5,11 @@ using DataFrames
 using LinearAlgebra
 
 # Create wing geometry
-wing = KiteWing("data/HL5_ram_air_kite_body.obj")
+wing = KiteWing("data/HL5_ram_air_kite_body.obj", "data/centre_line_with_profile.dat")
 
-alphas = deg2rad.(-10:1:25)  # Range of angles from -10 to 25 degrees
-polars = zeros(length(alphas), 4)  # Matrix for [alpha, CD, CL, CM]
-for (i, alpha) in enumerate(alphas)
-    # Simplified aerodynamic coefficients
-    cd = 0.015 + 0.015 * abs(alpha/10)^1.5  # Drag increases with angle
-    cl = 5.0 * alpha + 0.01 * alpha^2 * exp(-alpha/20)  # Lift with stall behavior
-    cm = -0.02 * alpha  # Linear pitching moment
-    
-    polars[i, :] .= [alpha, cd, cl, cm]
-end
-
-for gamma in range(wing.gamma_tip - wing.gamma_tip/10, -wing.gamma_tip + wing.gamma_tip/10, 20)
-    add_section!(wing, gamma, ("polar_data", polars))
-end
+# for gamma in range(wing.gamma_tip - wing.gamma_tip/10, -wing.gamma_tip + wing.gamma_tip/10, 20)
+#     add_section!(wing, gamma, ("dat_file", "data/centre_line_with_profile.dat"))
+# end
 wing_aero = WingAerodynamics([wing])
 
 # Create solvers
