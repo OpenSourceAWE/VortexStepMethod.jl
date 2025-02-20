@@ -2,7 +2,7 @@ using VortexStepMethod
 using ControlPlots
 using Test
 
-function result_vsm()
+function create_wa()
     # Step 1: Define wing parameters
     n_panels = 20          # Number of panels
     span = 20.0            # Wing span [m]
@@ -43,7 +43,7 @@ plt.ioff()
     @test isfile("/tmp/plot.pdf")
     rm("/tmp/plot.pdf")
     show_plot(fig)
-    wa = result_vsm()
+    wa = create_wa()
     if Sys.islinux()
         fig = plot_geometry(
             wa,
@@ -61,6 +61,23 @@ plt.ioff()
         rm("/tmp/Rectangular_wing_geometry_side_view.pdf")
         @test isfile("/tmp/Rectangular_wing_geometry_top_view.pdf")
         rm("/tmp/Rectangular_wing_geometry_top_view.pdf")
+        # Step 5: Initialize the solvers
+        vsm_solver = Solver(aerodynamic_model_type="VSM")
+        llt_solver = Solver(aerodynamic_model_type="LLT")
+        # Step 6: Solve the VSM and LLT
+        results_vsm = solve(vsm_solver, wa)
+        results_llt = solve(llt_solver, wa)
+        # Step 7: Plot spanwise distributions
+        y_coordinates = [panel.aerodynamic_center[2] for panel in wa.panels]
+
+        fig = plot_distribution(
+            [y_coordinates, y_coordinates],
+            [results_vsm, results_llt],
+            ["VSM", "LLT"],
+            title="Spanwise Distributions"
+        )
+        @test fig isa plt.PyPlot.Figure
     end
 end
 plt.ion()
+nothing
