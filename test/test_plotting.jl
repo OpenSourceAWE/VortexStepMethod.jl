@@ -61,12 +61,15 @@ plt.ioff()
         rm("/tmp/Rectangular_wing_geometry_side_view.pdf")
         @test isfile("/tmp/Rectangular_wing_geometry_top_view.pdf")
         rm("/tmp/Rectangular_wing_geometry_top_view.pdf")
+
         # Step 5: Initialize the solvers
         vsm_solver = Solver(aerodynamic_model_type="VSM")
         llt_solver = Solver(aerodynamic_model_type="LLT")
+
         # Step 6: Solve the VSM and LLT
         results_vsm = solve(vsm_solver, wa)
         results_llt = solve(llt_solver, wa)
+
         # Step 7: Plot spanwise distributions
         y_coordinates = [panel.aerodynamic_center[2] for panel in wa.panels]
 
@@ -77,6 +80,26 @@ plt.ioff()
             title="Spanwise Distributions"
         )
         @test fig isa plt.PyPlot.Figure
+
+        # Step 8: Plot polar curves
+        Umag = 20.0            # Magnitude of inflow velocity [m/s]
+        angle_range = range(0, 20, 20)
+        fig = plot_polars(
+            [llt_solver, vsm_solver],
+            [wa, wa],
+            ["LLT", "VSM"],
+            angle_range=angle_range,
+            angle_type="angle_of_attack",
+            Umag=Umag,
+            title="Rectangular Wing Polars",
+            data_type=".pdf",
+            save_path="/tmp",
+            is_save=true,
+            is_show=false
+        )
+        @test fig isa plt.PyPlot.Figure
+        @test isfile("/tmp/Rectangular_Wing_Polars.pdf")
+        rm("/tmp/Rectangular_Wing_Polars.pdf")
     end
 end
 plt.ion()
