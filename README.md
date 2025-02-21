@@ -9,7 +9,7 @@ including low aspect ratio wings, as well as configurations with sweep, dihedral
 
 The software presented here includes a couple of examples: a rectangular wing, a leading-edge inflatable kite and a ram-air kite.
 
-This package was translated from the Python code version 1.0.0 available at https://github.com/ocayon/Vortex-Step-Method with some extensions as documented in [News.md](./News.md).
+This package was translated from the Python code version 1.0.0 available at https://github.com/ocayon/Vortex-Step-Method with some extensions as documented in [News.md](https://github.com/Albatross-Kite-Transport/VortexStepMethod.jl/blob/main/NEWS.md).
 
 ## Installation
 Install [Julia 1.10](https://ufechner7.github.io/2024/08/09/installing-julia-with-juliaup.html) or later, 
