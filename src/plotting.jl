@@ -248,16 +248,16 @@ end
 Plot wing geometry from different viewpoints and optionally save/show plots.
 
 # Arguments:
-- wing_aero: struct of type WingAerodynamics
+- `wing_aero`: struct of type WingAerodynamics
 - title: plot title
 
 # Keyword arguments:
-- data_type: string with the file type postfix (default: ".pdf")
-- save_path: path for saving the graphic (default: `nothing``)- is_save
-- is_save: boolean value, indicates if the graphic shall be saved (default: `false`)
-- is_show: boolean value, indicates if the graphic shall be displayed (default: `false`)
-- view_elevation: initial view elevation angle (default: 15) [°]
-- view_azimuth: initial view azimuth angle (default: -120) [°]
+- `data_type``: string with the file type postfix (default: ".pdf")
+- `save_path`: path for saving the graphic (default: `nothing`)
+- `is_save`: boolean value, indicates if the graphic shall be saved (default: `false`)
+- `is_show`: boolean value, indicates if the graphic shall be displayed (default: `false`)
+- `view_elevation`: initial view elevation angle (default: 15) [°]
+- `view_azimuth`: initial view azimuth angle (default: -120) [°]
 
 """
 function plot_geometry(wing_aero::WingAerodynamics, title;
