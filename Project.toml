@@ -1,7 +1,7 @@
 name = "VortexStepMethod"
 uuid = "ed3cd733-9f0f-46a9-93e0-89b8d4998dd9"
 authors = ["1-Bart-1 <bart@vandelint.net>"]
-version = "0.1.1"
+version = "0.1.2"
 
 [deps]
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
