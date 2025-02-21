@@ -5,7 +5,7 @@
 Set the default style for plots using LaTeX.
 
 # Arguments:
-- `titel_size: size of the plot title in points (default: 16)
+- `titel_size`: size of the plot title in points (default: 16)
 """
 function set_plot_style(titel_size=16)
     rcParams = plt.PyDict(plt.matplotlib."rcParams")
@@ -112,12 +112,15 @@ function plot_line_segment!(ax, segment, color, label; width=3)
 end
 
 """
-    set_axes_equal!(ax)
+    set_axes_equal!(ax; zoom=1.8)
 
 Set 3D plot axes to equal scale.
 
 # Arguments
 - ax: 3D plot axis
+
+# Keyword arguments
+zoom: zoom factor (default: 1.8)
 """
 function set_axes_equal!(ax; zoom=1.8)
     x_lims = ax.get_xlim3d() ./ zoom
@@ -153,7 +156,8 @@ Create a 3D plot of wing geometry including panels and filaments.
 # Keyword arguments
 - zoom: zoom factor (default: 1.8)
 """
-function create_geometry_plot(wing_aero::WingAerodynamics, title, view_elevation, view_azimuth; zoom=1.8)
+function create_geometry_plot(wing_aero::WingAerodynamics, title, view_elevation, view_azimuth; 
+                              zoom=1.8)
     set_plot_style(28)
 
     panels = wing_aero.panels
@@ -245,16 +249,16 @@ end
 Plot wing geometry from different viewpoints and optionally save/show plots.
 
 # Arguments:
-- wing_aero: struct of type WingAerodynamics
+- `wing_aero`: struct of type WingAerodynamics
 - title: plot title
 
 # Keyword arguments:
-- data_type: string with the file type postfix (default: ".pdf")
-- save_path: path for saving the graphic (default: `nothing``)- is_save
-- is_save: boolean value, indicates if the graphic shall be saved (default: `false`)
-- is_show: boolean value, indicates if the graphic shall be displayed (default: `false`)
-- view_elevation: initial view elevation angle (default: 15) [°]
-- view_azimuth: initial view azimuth angle (default: -120) [°]
+- `data_type``: string with the file type postfix (default: ".pdf")
+- `save_path`: path for saving the graphic (default: `nothing`)
+- `is_save`: boolean value, indicates if the graphic shall be saved (default: `false`)
+- `is_show`: boolean value, indicates if the graphic shall be displayed (default: `false`)
+- `view_elevation`: initial view elevation angle (default: 15) [°]
+- `view_azimuth`: initial view azimuth angle (default: -120) [°]
 
 """
 function plot_geometry(wing_aero::WingAerodynamics, title;
@@ -565,10 +569,10 @@ end
 
 """
     plot_polars(solver_list, wing_aero_list, label_list;
-    literature_path_list=String[], angle_range=range(0, 20, 2), angle_type="angle_of_attack", angle_of_attack=0.0,
-    side_slip=0.0, v_a=10.0, title="polar", data_type=".pdf", save_path=nothing, 
-    is_save=true,
-    is_show=true)
+    literature_path_list=String[], angle_range=range(0, 20, 2), angle_type="angle_of_attack", 
+    angle_of_attack=0.0, side_slip=0.0, v_a=10.0, 
+    title="polar", data_type=".pdf", save_path=nothing, 
+    is_save=true, is_show=true)
 
 Plot polar data comparing different solvers and configurations.
 
