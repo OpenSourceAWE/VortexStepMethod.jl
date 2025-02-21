@@ -78,10 +78,10 @@ angle_range = range(0, 20, 20)
 plot_polars(
     [llt_solver, vsm_solver],
     [wa, wa],
-    ["LLT", "VSM"],
-    angle_range=angle_range,
+    ["LLT", "VSM"];
+    angle_range,
     angle_type="angle_of_attack",
-    v_a=v_a,
+    v_a,
     title="Rectangular Wing Polars"
 )
 nothing
