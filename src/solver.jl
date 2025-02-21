@@ -261,63 +261,6 @@ function gamma_loop(
 end
 
 """
-    calculate_artificial_damping(solver::Solver, gamma::Vector{Float64}, 
-                               alpha::Vector{Float64}, stall_angle_list::Vector{Float64})
-
-Calculate artificial damping for numerical stability.
-"""
-function calculate_artificial_damping(
-    solver::Solver,
-    gamma::Vector{Float64},
-    alpha::Vector{Float64},
-    stall_angle_list::Vector{Float64}
-)
-    # Check for stall condition
-    is_stalled = false
-    if solver.aerodynamic_model_type == "LLT" || 
-       (solver.artificial_damping.k2 == 0 && solver.artificial_damping.k4 == 0)
-        return zeros(length(gamma)), is_stalled
-    end
-
-    for (ia, alpha_i) in enumerate(alpha)
-        if alpha_i > stall_angle_list[ia]
-            is_stalled = true
-            break
-        end
-    end
-
-    !is_stalled && return zeros(length(gamma)), is_stalled
-
-    # Calculate damping
-    n_gamma = length(gamma)
-    damp = zeros(n_gamma)
-
-    for ig in 1:n_gamma
-        # Handle boundary cases
-        gim2, gim1, gi, gip1, gip2 = if ig == 1
-            gamma[1], gamma[1], gamma[1], gamma[2], gamma[3]
-        elseif ig == 2
-            gamma[1], gamma[1], gamma[2], gamma[3], gamma[4]
-        elseif ig == n_gamma - 1
-            gamma[n_gamma-3], gamma[n_gamma-2], gamma[n_gamma-1], gamma[n_gamma], gamma[n_gamma]
-        elseif ig == n_gamma
-            gamma[n_gamma-2], gamma[n_gamma-1], gamma[n_gamma], gamma[n_gamma], gamma[n_gamma]
-        else
-            gamma[ig-2], gamma[ig-1], gamma[ig], gamma[ig+1], gamma[ig+2]
-        end
-
-        dif2 = (gip1 - gi) - (gi - gim1)
-        dif4 = (gip2 - 3.0 * gip1 + 3.0 * gi - gim1) - 
-               (gip1 - 3.0 * gi + 3.0 * gim1 - gim2)
-        
-        damp[ig] = solver.artificial_damping.k2 * dif2 - 
-                   solver.artificial_damping.k4 * dif4
-    end
-
-    return damp, is_stalled
-end
-
-"""
     smooth_circulation(circulation::Vector{Float64}, 
                       smoothness_factor::Float64, 
                       damping_factor::Float64)
