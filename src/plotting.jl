@@ -156,7 +156,8 @@ Create a 3D plot of wing geometry including panels and filaments.
 # Keyword arguments
 - zoom: zoom factor (default: 1.8)
 """
-function create_geometry_plot(wing_aero::WingAerodynamics, title, view_elevation, view_azimuth; zoom=1.8)
+function create_geometry_plot(wing_aero::WingAerodynamics, title, view_elevation, view_azimuth; 
+                              zoom=1.8)
     set_plot_style(28)
 
     panels = wing_aero.panels
