@@ -36,6 +36,8 @@ Save a plot to a file.
 - `fig`: Plots figure object
 - `save_path`: Path to save the plot
 - `title`: Title of the plot
+
+# Keyword arguments
 - `data_type`: File extension (default: ".pdf")
 """
 function save_plot(fig, save_path, title; data_type=".pdf")
@@ -62,13 +64,6 @@ function save_plot(fig, save_path, title; data_type=".pdf")
         @error "Error type: $(typeof(e))"
         rethrow(e)
     end
-
-# if os.path.exists(full_path):
-#     logging.debug(f"File successfully saved to {full_path}")
-#     logging.debug(f"File size: {os.path.getsize(full_path)} bytes")
-# else:
-#     logging.info(f"File does not exist after save attempt: {full_path}")
-# end
 end
 
 """
@@ -78,6 +73,8 @@ Display a plot at specified DPI.
 
 # Arguments
 - `fig`: Plots figure object
+
+# Keyword arguments
 - `dpi`: Dots per inch for the figure (default: 130)
 """
 function show_plot(fig; dpi=130)
@@ -94,6 +91,8 @@ Plot a line segment in 3D with arrow.
 - `segment`: Array of two points defining the segment
 - `color`: Color of the segment
 - `label`: Label for the legend
+
+# Keyword Arguments
 - `width`: Line width (default: 3)
 """
 function plot_line_segment!(ax, segment, color, label; width=3)
@@ -150,6 +149,8 @@ Create a 3D plot of wing geometry including panels and filaments.
 - title: plot title
 - view_elevation: initial view elevation angle [°]
 - view_azimuth: initial view azimuth angle [°]
+
+# Keyword arguments
 - zoom: zoom factor (default: 1.8)
 """
 function create_geometry_plot(wing_aero::WingAerodynamics, title, view_elevation, view_azimuth; zoom=1.8)
@@ -294,7 +295,9 @@ function plot_geometry(wing_aero::WingAerodynamics, title;
 end
 
 """
-    plot_distribution(y_coordinates_list, results_list, label_list; kwargs...)
+    plot_distribution(y_coordinates_list, results_list, label_list;  
+                      title="spanwise_distribution", data_type=".pdf",
+                      save_path=nothing, is_save=false, is_show=true)
 
 Plot spanwise distributions of aerodynamic properties.
 
@@ -306,7 +309,7 @@ Plot spanwise distributions of aerodynamic properties.
 # Keyword arguments
 - `title`: Plot title (default: "spanwise_distribution")
 - `data_type`: File extension for saving (default: ".pdf")
-- `save_path`: Path to save plots
+- `save_path`: Path to save plots (default: nothing)
 - `is_save`: Whether to save plots (default: false)
 - `is_show`: Whether to display plots (default: true)
 """
