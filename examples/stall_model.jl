@@ -1,4 +1,3 @@
-using Revise
 using VortexStepMethod
 using CSV
 using DataFrames
