@@ -563,6 +563,7 @@ function plot_polars(
         throw(ArgumentError("Mismatch in number of solvers ($(length(solver_list))), " *
                           "cases ($total_cases), and labels ($(length(label_list)))"))
     end
+    main_title = replace(title, " "  => "_")
     
     # Generate polar data
     polar_data_list = []
@@ -763,7 +764,7 @@ function plot_polars(
     
     # Save and show plot
     if is_save && !isnothing(save_path)
-        save_plot(fig, save_path, title, data_type=data_type)
+        save_plot(fig, save_path, main_title, data_type=data_type)
     end
 
     if is_show
