@@ -91,3 +91,4 @@ plot_polars(
     is_save=false,
     is_show=true
 )
+nothing
