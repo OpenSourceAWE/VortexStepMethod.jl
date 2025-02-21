@@ -12,14 +12,9 @@ DocMeta.setdocmeta!(VortexStepMethod, :DocTestSetup, :(using VortexStepMethod); 
 makedocs(;
     modules=[VortexStepMethod],
     authors="Uwe Fechner <uwe.fechner.msc@gmail.com>, Bart van de Lint <bart@vandelint.net> and contributors",
-    repo="https://github.com/Albatross-Kite-Transport/VortexStepMethod.jl/blob/{commit}{path}#{line}",
     sitename="VortexStepMethod.jl",
     checkdocs=:none,
-    format=Documenter.HTML(;
-        prettyurls=get(ENV, "CI", "false") == "true",
-        canonical="https://github.com/Albatross-Kite-Transport/VortexStepMethod.jl",
-        assets=String[],
-    ),
+    format = Documenter.HTML(prettyurls = haskey(ENV, "CI")),
     pages=[
         "Home" => "index.md",
         "Exported Functions" => "functions.md",
