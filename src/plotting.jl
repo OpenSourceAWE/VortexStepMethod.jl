@@ -463,7 +463,9 @@ function plot_distribution(y_coordinates_list, results_list, label_list;
 end
 
 """
-    generate_polar_data(solver, wing_aero::WingAerodynamics, angle_range; kwargs...)
+    generate_polar_data(solver, wing_aero::WingAerodynamics, angle_range;     
+                        angle_type="angle_of_attack", angle_of_attack=0.0,
+                        side_slip=0.0, v_a=10.0)
 
 Generate polar data for aerodynamic analysis over a range of angles.
 
@@ -474,9 +476,9 @@ Generate polar data for aerodynamic analysis over a range of angles.
 
 # Keyword arguments
 - `angle_type`: Type of angle variation ("angle_of_attack" or "side_slip")
-- `angle_of_attack`: Initial angle of attack in radians
-- `side_slip`: Initial side slip angle in radians
-- `v_a`: Magnitude of velocity
+- `angle_of_attack`: Initial angle of attack [rad]
+- `side_slip`: Initial side slip angle in [rad]
+- `v_a`: norm of apparent wind speed [m/s]
 
 # Returns
 - Tuple of polar data array and Reynolds number
