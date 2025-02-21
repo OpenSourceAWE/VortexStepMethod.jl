@@ -3,15 +3,13 @@
 
 # Simulation of a 3D airfoil using the Vortex Step Method
 
-The Vortex Step Method (VSM) is an enhanced lifting line method that improves upon the classic approach by solving the 
-circulation system at the three-quarter chord position, among the most important details. This adjustment allows for 
-more accurate calculations of lift and drag forces, particularly addressing the shortcomings in induced drag prediction. 
+The Vortex Step Method (VSM) is an enhanced lifting line method that improves upon the classic approach by solving the circulation system at the three-quarter chord position, among the most important details. This adjustment allows for more accurate calculations of lift and drag forces, particularly addressing the shortcomings in induced drag prediction. 
 VSM is further refined by coupling it with 2D viscous airfoil polars, making it well-suited for complex geometries, 
 including low aspect ratio wings, as well as configurations with sweep, dihedral, and anhedral angles.
 
-The software presented here includes a couple of examples: a rectangular wing and a leading-edge inflatable kite.
+The software presented here includes a couple of examples: a rectangular wing, a leading-edge inflatable kite and a ram-air kite.
 
-This package was translated from the Python code version 1.0.0 available at https://github.com/ocayon/Vortex-Step-Method .
+This package was translated from the Python code version 1.0.0 available at https://github.com/ocayon/Vortex-Step-Method with some extensions as documented in [News.md](News.md).
 
 ## Installation
 Install [Julia 1.10](https://ufechner7.github.io/2024/08/09/installing-julia-with-juliaup.html) or later, 
