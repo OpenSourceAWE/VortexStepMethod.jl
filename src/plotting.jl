@@ -463,20 +463,20 @@ function plot_distribution(y_coordinates_list, results_list, label_list;
 end
 
 """
-    generate_polar_data(solver, wing_aero, angle_range; kwargs...)
+    generate_polar_data(solver, wing_aero::WingAerodynamics, angle_range; kwargs...)
 
 Generate polar data for aerodynamic analysis over a range of angles.
 
 # Arguments
 - `solver`: Aerodynamic solver object
-- `wing_aero`: Wing aerodynamics object
+- `wing_aero`: Wing aerodynamics struct
 - `angle_range`: Range of angles to analyze
 
 # Keyword arguments
 - `angle_type`: Type of angle variation ("angle_of_attack" or "side_slip")
 - `angle_of_attack`: Initial angle of attack in radians
 - `side_slip`: Initial side slip angle in radians
-- `yaw_rate`: Yaw rate
+- `yaw_rate`: Yaw rate (not yet used)
 - `v_a`: Magnitude of velocity
 
 # Returns
@@ -484,7 +484,7 @@ Generate polar data for aerodynamic analysis over a range of angles.
 """
 function generate_polar_data(
     solver,
-    wing_aero,
+    wing_aero::WingAerodynamics,
     angle_range;
     angle_type="angle_of_attack",
     angle_of_attack=0.0,
@@ -579,9 +579,17 @@ Plot polar data comparing different solvers and configurations.
 
 # Keyword arguments
 - `literature_path_list`: Optional paths to literature data files
-- `angle_range`: Range of angles to analyze
+- `angle_range`: Range of angles to analyze [°]
 - `angle_type`: "angle_of_attack" or "side_slip"; (default: `angle_of_attack`) 
-- `angle_of_attack:` AoA to be used for plotting the polars (default: 0.0)
+- `angle_of_attack:` AoA to be used for plotting the polars (default: 0.0) [rad]
+- `side_slip`: side slip angle (default: 0.0) [rad]
+- `yaw_rate`: yaw rate (default: 0.0)
+- v_a: norm of apparent wind speed (default: 10.0) [m/s]
+- title: plot title
+- `data_type`: File extension for saving (default: ".pdf")
+- `save_path`: Path to save plots (default: nothing)
+- `is_save`: Whether to save plots (default: true)
+- `is_show`: Whether to display plots (default: true)
 """
 function plot_polars(
     solver_list,
@@ -613,11 +621,11 @@ function plot_polars(
     for (i, (solver, wing_aero)) in enumerate(zip(solver_list, wing_aero_list))
         polar_data, rey = generate_polar_data(
             solver, wing_aero, angle_range;
-            angle_type=angle_type,
-            angle_of_attack=angle_of_attack,
-            side_slip=side_slip,
-            yaw_rate=yaw_rate,
-            v_a=v_a
+            angle_type,
+            angle_of_attack,
+            side_slip,
+            yaw_rate,
+            v_a
         )
         push!(polar_data_list, polar_data)
         # Update label with Reynolds number
@@ -807,7 +815,7 @@ function plot_polars(
 
     # Save and show plot
     if is_save && !isnothing(save_path)
-        save_plot(fig, save_path, main_title, data_type=data_type)
+        save_plot(fig, save_path, main_title; data_type)
     end
 
     if is_show
