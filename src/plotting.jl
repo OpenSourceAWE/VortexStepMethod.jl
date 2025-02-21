@@ -476,7 +476,6 @@ Generate polar data for aerodynamic analysis over a range of angles.
 - `angle_type`: Type of angle variation ("angle_of_attack" or "side_slip")
 - `angle_of_attack`: Initial angle of attack in radians
 - `side_slip`: Initial side slip angle in radians
-- `yaw_rate`: Yaw rate (not yet used)
 - `v_a`: Magnitude of velocity
 
 # Returns
@@ -489,7 +488,6 @@ function generate_polar_data(
     angle_type="angle_of_attack",
     angle_of_attack=0.0,
     side_slip=0.0,
-    yaw_rate=0.0,
     v_a=10.0
 )
     n_panels = length(wing_aero.panels)
@@ -566,7 +564,7 @@ end
 """
     plot_polars(solver_list, wing_aero_list, label_list;
     literature_path_list=String[], angle_range=range(0, 20, 2), angle_type="angle_of_attack", angle_of_attack=0.0,
-    side_slip=0.0, yaw_rate=0.0, v_a=10.0, title="polar", data_type=".pdf", save_path=nothing, 
+    side_slip=0.0, v_a=10.0, title="polar", data_type=".pdf", save_path=nothing, 
     is_save=true,
     is_show=true)
 
@@ -583,7 +581,6 @@ Plot polar data comparing different solvers and configurations.
 - `angle_type`: "angle_of_attack" or "side_slip"; (default: `angle_of_attack`) 
 - `angle_of_attack:` AoA to be used for plotting the polars (default: 0.0) [rad]
 - `side_slip`: side slip angle (default: 0.0) [rad]
-- `yaw_rate`: yaw rate (default: 0.0)
 - v_a: norm of apparent wind speed (default: 10.0) [m/s]
 - title: plot title
 - `data_type`: File extension for saving (default: ".pdf")
@@ -600,7 +597,6 @@ function plot_polars(
     angle_type="angle_of_attack",
     angle_of_attack=0.0,
     side_slip=0.0,
-    yaw_rate=0.0,
     v_a=10.0,
     title="polar",
     data_type=".pdf",
@@ -624,7 +620,6 @@ function plot_polars(
             angle_type,
             angle_of_attack,
             side_slip,
-            yaw_rate,
             v_a
         )
         push!(polar_data_list, polar_data)
