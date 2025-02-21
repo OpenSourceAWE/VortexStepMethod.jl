@@ -6,7 +6,7 @@ using VortexStepMethod
 n_panels = 20          # Number of panels
 span = 20.0            # Wing span [m]
 chord = 1.0            # Chord length [m]
-Umag = 20.0            # Magnitude of inflow velocity [m/s]
+v_a = 20.0            # Magnitude of inflow velocity [m/s]
 density = 1.225        # Air density [kg/m³]
 alpha_deg = 30.0       # Angle of attack [degrees]
 alpha = deg2rad(alpha_deg)
@@ -28,7 +28,7 @@ add_section!(wing,
 wa = WingAerodynamics([wing])
 
 # Set inflow conditions
-vel_app = [cos(alpha), 0.0, sin(alpha)] .* Umag
+vel_app = [cos(alpha), 0.0, sin(alpha)] .* v_a
 set_va!(wa, (vel_app, 0.0))  # Second parameter is yaw rate
 
 # Step 4: Initialize solvers for both LLT and VSM methods
@@ -81,7 +81,7 @@ plot_polars(
     ["LLT", "VSM"],
     angle_range=angle_range,
     angle_type="angle_of_attack",
-    Umag=Umag,
+    v_a=v_a,
     title="Rectangular Wing Polars"
 )
 nothing

@@ -112,7 +112,7 @@ function solve(solver::Solver, wing_aero::WingAerodynamics, gamma_distribution=n
 
     @debug "Initial gamma_new: $gamma_initial"
     # Run main iteration loop
-    converged, gamma_new, alpha_array, Umag_array = gamma_loop(
+    converged, gamma_new, alpha_array, v_a_array = gamma_loop(
         solver,
         wing_aero,
         gamma_initial,
@@ -130,7 +130,7 @@ function solve(solver::Solver, wing_aero::WingAerodynamics, gamma_distribution=n
     # Try again with reduced relaxation factor if not converged
     if !converged && relaxation_factor > 1e-3
         @warn "Running again with half the relaxation_factor = $(relaxation_factor/2)"
-        converged, gamma_new, alpha_array, Umag_array = gamma_loop(
+        converged, gamma_new, alpha_array, v_a_array = gamma_loop(
             solver,
             wing_aero,
             gamma_initial,
@@ -156,7 +156,7 @@ function solve(solver::Solver, wing_aero::WingAerodynamics, gamma_distribution=n
         solver.core_radius_fraction,
         solver.mu,
         alpha_array,
-        Umag_array,
+        v_a_array,
         chord_array,
         x_airf_array,
         y_airf_array,
@@ -196,7 +196,7 @@ function gamma_loop(
 )
     converged = false
     alpha_array = wing_aero.alpha_array
-    Umag_array = wing_aero.Umag_array
+    v_a_array = wing_aero.v_a_array
 
     iters = 0
     for i in 1:solver.max_iterations
@@ -218,11 +218,11 @@ function gamma_loop(
         v_tangential_array = vec(sum(y_airf_array .* relative_velocity_array, dims=2))
         alpha_array .= atan.(v_normal_array, v_tangential_array)
         
-        Umag_array .= norm.(relative_velocity_crossz)
-        Umagw_array = norm.(Uinfcrossz_array)
+        v_a_array .= norm.(relative_velocity_crossz)
+        v_aw_array = norm.(Uinfcrossz_array)
         
         cl_array = [calculate_cl(panel, alpha) for (panel, alpha) in zip(panels, alpha_array)]
-        gamma_new .= 0.5 .* Umag_array.^2 ./ Umagw_array .* cl_array .* chord_array
+        gamma_new .= 0.5 .* v_a_array.^2 ./ v_aw_array .* cl_array .* chord_array
 
         # Apply damping if needed
         if solver.is_with_artificial_damping
@@ -257,7 +257,7 @@ function gamma_loop(
         @warn "NO convergence after $(solver.max_iterations) iterations"
     end
 
-    return converged, gamma_new, alpha_array, Umag_array
+    return converged, gamma_new, alpha_array, v_a_array
 end
 
 """

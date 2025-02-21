@@ -477,7 +477,7 @@ Generate polar data for aerodynamic analysis over a range of angles.
 - `angle_of_attack`: Initial angle of attack in radians
 - `side_slip`: Initial side slip angle in radians
 - `yaw_rate`: Yaw rate
-- `Umag`: Magnitude of velocity
+- `v_a`: Magnitude of velocity
 
 # Returns
 - Tuple of polar data array and Reynolds number
@@ -490,7 +490,7 @@ function generate_polar_data(
     angle_of_attack=0.0,
     side_slip=0.0,
     yaw_rate=0.0,
-    Umag=10.0
+    v_a=10.0
 )
     n_panels = length(wing_aero.panels)
     n_angles = length(angle_range)
@@ -529,7 +529,7 @@ function generate_polar_data(
                 cos(α) * cos(β),
                 sin(β),
                 sin(α)
-            ] * Umag
+            ] * v_a
         )
 
         # Solve and store results
@@ -566,7 +566,7 @@ end
 """
     plot_polars(solver_list, wing_aero_list, label_list;
     literature_path_list=String[], angle_range=range(0, 20, 2), angle_type="angle_of_attack", angle_of_attack=0.0,
-    side_slip=0.0, yaw_rate=0.0, Umag=10.0, title="polar", data_type=".pdf", save_path=nothing, 
+    side_slip=0.0, yaw_rate=0.0, v_a=10.0, title="polar", data_type=".pdf", save_path=nothing, 
     is_save=true,
     is_show=true)
 
@@ -593,7 +593,7 @@ function plot_polars(
     angle_of_attack=0.0,
     side_slip=0.0,
     yaw_rate=0.0,
-    Umag=10.0,
+    v_a=10.0,
     title="polar",
     data_type=".pdf",
     save_path=nothing,
@@ -617,7 +617,7 @@ function plot_polars(
             angle_of_attack=angle_of_attack,
             side_slip=side_slip,
             yaw_rate=yaw_rate,
-            Umag=Umag
+            v_a=v_a
         )
         push!(polar_data_list, polar_data)
         # Update label with Reynolds number

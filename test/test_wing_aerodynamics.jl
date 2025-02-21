@@ -16,10 +16,10 @@ include("utils.jl")
     N = 40
     max_chord = 1.0
     span = 15.709  # AR = 20
-    Umag = 20.0
+    v_a = 20.0
     AR = span^2 / (π * span * max_chord / 4)
     aoa = deg2rad(5)
-    Uinf = [cos(aoa), 0.0, sin(aoa)] .* Umag
+    Uinf = [cos(aoa), 0.0, sin(aoa)] .* v_a
     model = "VSM"
 
     # Setup wing geometry
@@ -118,9 +118,9 @@ end
     @debug "N: $N"
     @debug "size(coord): $(size(coord))"
 
-    Umag = 20.0
+    v_a = 20.0
     aoa = 5.7106 * π / 180
-    Uinf = [cos(aoa), 0.0, sin(aoa)] .* Umag
+    Uinf = [cos(aoa), 0.0, sin(aoa)] .* v_a
 
     # Create wing geometry
     core_radius_fraction = 1e-20
@@ -215,9 +215,9 @@ end
         span = 17.0
         AR = span^2 / (π * span * max_chord / 4)
         @debug "AR: $AR"
-        Umag = 20.0
+        v_a = 20.0
         aoa = 5.7106 * π / 180
-        Uinf = [cos(aoa), 0.0, sin(aoa)] .* Umag
+        Uinf = [cos(aoa), 0.0, sin(aoa)] .* v_a
     
         coord = if wing_type == "rectangular"
             twist = range(-0.5, 0.5, length=N)

@@ -74,10 +74,10 @@ function output_results(Fmag, aero_coeffs, ringvec, Uinf, controlpoints, Atot)
         SFtot += SideF[i] * norm(ringvec[i]["r0"])
     end
 
-    Umag = norm(Uinf)
-    CL = Ltot / (0.5 * Umag^2 * Atot * rho)
-    CD = Dtot / (0.5 * Umag^2 * Atot * rho)
-    CS = SFtot / (0.5 * Umag^2 * Atot * rho)
+    v_a = norm(Uinf)
+    CL = Ltot / (0.5 * v_a^2 * Atot * rho)
+    CD = Dtot / (0.5 * v_a^2 * Atot * rho)
+    CS = SFtot / (0.5 * v_a^2 * Atot * rho)
 
     return F_rel, F_gl, Ltot, Dtot, CL, CD, CS
 end
