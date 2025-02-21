@@ -76,7 +76,7 @@ Three kinds of input data is needed:
   - how many panels  
     --> two sections make a panel.
 
-There is no input file yet, the input has to be defined in the code.
+Apart from the wing geometry there is no input file yet, the input has to be defined in the code.
 
 ### Example for defining the required input:
 ```julia
@@ -110,6 +110,7 @@ wa = WingAerodynamics([wing])
 vel_app = [cos(alpha), 0.0, sin(alpha)] .* Umag
 set_va!(wa, (vel_app, 0.0))  # Second parameter is yaw rate
 ```
+It is possible to import the wing geometry using an `.obj` file as shown in the example `ram_air_kite.jl`.
 
 Surfplan files can be converted to an input for `VortexStepMethod.jl` using the [SurfplanAdapter](https://github.com/jellepoland/SurfplanAdapter).
 
