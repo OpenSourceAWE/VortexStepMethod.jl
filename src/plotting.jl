@@ -5,7 +5,7 @@
 Set the default style for plots using LaTeX.
 
 # Arguments:
-- `titel_size: size of the plot title in points (default: 16)
+- `titel_size`: size of the plot title in points (default: 16)
 """
 function set_plot_style(titel_size=16)
     rcParams = plt.PyDict(plt.matplotlib."rcParams")
@@ -112,12 +112,15 @@ function plot_line_segment!(ax, segment, color, label; width=3)
 end
 
 """
-    set_axes_equal!(ax)
+    set_axes_equal!(ax; zoom=1.8)
 
 Set 3D plot axes to equal scale.
 
 # Arguments
 - ax: 3D plot axis
+
+# Keyword arguments
+zoom: zoom factor (default: 1.8)
 """
 function set_axes_equal!(ax; zoom=1.8)
     x_lims = ax.get_xlim3d() ./ zoom
