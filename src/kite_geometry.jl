@@ -36,7 +36,6 @@ function find_circle_center_and_radius(vertices)
             end
         end
     end
-    @show v_min
 
     # Find vertex furthest in -y, -z direction
     max_score = -Inf
@@ -99,11 +98,11 @@ function create_interpolations(vertices, circle_center_z, radius, gamma_tip)
         areas[j] = last_area + area
     end
 
-    te_interp = linear_interpolation(gamma_range, max_xs)
-    le_interp = linear_interpolation(gamma_range, min_xs)
-    area_interp = linear_interpolation(gamma_range, areas)
+    te_interp = linear_interpolation(gamma_range, max_xs, extrapolation_bc=Line())
+    le_interp = linear_interpolation(gamma_range, min_xs, extrapolation_bc=Line())
+    area_interp = linear_interpolation(gamma_range, areas, extrapolation_bc=Line())
     
-    return (le_interp, te_interp, area_interp, gamma_range, max_xs, min_xs)
+    return (le_interp, te_interp, area_interp)
 end
 
 # Calculate center of mass for a triangular surface mesh
@@ -205,60 +204,70 @@ mutable struct KiteWing <: AbstractWing
     te_interp::Function
     area_interp::Function
 
-    function KiteWing(obj_path, foil_path=nothing; n_sections=20, crease_frac=0.75, wind_vel=10., mass=1.0, n_panels=54, spanwise_panel_distribution="linear", spanwise_direction=[0.0, 1.0, 0.0])
+    function KiteWing(obj_path, dat_path; alpha=0.0, n_sections=20, crease_frac=0.75, wind_vel=10., mass=1.0, n_panels=54, spanwise_panel_distribution="linear", spanwise_direction=[0.0, 1.0, 0.0])
         !isapprox(spanwise_direction, [0.0, 1.0, 0.0]) && @error "Spanwise direction has to be [0.0, 1.0, 0.0]"
-        if !isfile(obj_path)
-            error("OBJ file not found: $obj_path")
-        end
-        vertices, faces = read_faces(obj_path)
-        center_of_mass = calculate_com(vertices, faces)
-        inertia_tensor = calculate_inertia_tensor(vertices, faces, mass, center_of_mass)
         
-        circle_center_z, radius, gamma_tip = find_circle_center_and_radius(vertices)
-        le_interp_, te_interp_, area_interp_, gammas, max_xs, min_xs = create_interpolations(vertices, circle_center_z, radius, gamma_tip)
-        le_interp = (γ) -> le_interp_(γ)
-        te_interp = (γ) -> te_interp_(γ)
-        area_interp = (γ) -> area_interp_(γ)
+        # Load or create polars
+        (!endswith(dat_path, ".dat")) && (dat_path *= ".dat")
+        (!isfile(dat_path)) && error("DAT file not found: $dat_path")
+        polar_path = dat_path[1:end-4] * "_polar.bin"
+        
+        (!endswith(obj_path, ".obj")) && (obj_path *= ".obj")
+        (!isfile(obj_path)) && error("OBJ file not found: $obj_path")
+        info_path = obj_path[1:end-4] * "_info.bin"
 
-        sections = Section[]
-        if !endswith(foil_path, ".dat")
-            foil_path *= ".dat"
-        end
-        polar_path = foil_file[1:end-4] * "_polar.bin"
-        if !isnothing(foil_path) && !ispath(polar_path)
+        if !ispath(polar_path) || !ispath(info_path)
+            @info "Reading $obj_path"
+            vertices, faces = read_faces(obj_path)
+            center_of_mass = calculate_com(vertices, faces)
+            inertia_tensor = calculate_inertia_tensor(vertices, faces, mass, center_of_mass)
+    
+            circle_center_z, radius, gamma_tip = find_circle_center_and_radius(vertices)
+            le_interp_, te_interp_, area_interp_= create_interpolations(vertices, circle_center_z, radius, gamma_tip)
+            le_interp = (γ) -> le_interp_(γ)
+            te_interp = (γ) -> te_interp_(γ)
+            area_interp = (γ) -> area_interp_(γ)
+            @info "Writing $info_path"
+            serialize(info_path, (center_of_mass, inertia_tensor, circle_center_z, radius, gamma_tip, 
+                le_interp, te_interp, area_interp))
+
             width = 2gamma_tip * radius
-            (cl_interp, cd_interp, cm_interp) = 
-                distributed_create_polars(foil_path, polar_path, wind_vel, area_interp(gamma_tip), width, crease_frac)
-        elseif !isnothing(foil_path) && ispath(polar_path)
-            (cl_interp, cd_interp, cm_interp) = deserialize(polar_path)
+            area = area_interp(gamma_tip)
+            @eval Main begin
+                foil_path, polar_path, v_wind, area, width, x_turn =
+                    $dat_path, $polar_path, $wind_vel, $gamma_tip, $width, $crease_frac
+                include("../scripts/polars.jl")
+            end
         end
+
+        @info "Loding polars and kite info from $polar_path and $info_path"
+        (cl_interp, cd_interp, cm_interp) = deserialize(polar_path)
+        (center_of_mass, inertia_tensor, circle_center_z, radius, gamma_tip, 
+            le_interp, te_interp, area_interp) = deserialize(info_path)
+        
+        @show le_interp
+
+        # Create sections
+        sections = Section[]
+
         for gamma in range(-gamma_tip, gamma_tip, n_sections)
-            add_section!(wing, gamma, ("interpolations", (cl_interp, cd_interp, cm_interp)))
+            aero_input = ("interpolations", (cl_interp, cd_interp, cm_interp))
+            LE_point = [0.0, 0.0, circle_center_z] .+ [le_interp(gamma), sin(gamma) * radius, cos(gamma) * radius]
+            if !isapprox(alpha, 0.0)
+                local_y_vec = [0.0, sin(-gamma), cos(gamma)] × [1.0, 0.0, 0.0]
+                TE_point = LE_point .+ rotate_v_around_k([te_interp(gamma) - le_interp(gamma), 0.0, 0.0], local_y_vec, alpha)
+            else
+                TE_point = LE_point .+ [te_interp(gamma) - le_interp(gamma), 0.0, 0.0]
+            end
+            push!(sections, Section(LE_point, TE_point, aero_input))
         end
+
         new(
             n_panels, spanwise_panel_distribution, spanwise_direction, sections,
             mass, center_of_mass, circle_center_z, gamma_tip, inertia_tensor, radius,
             le_interp, te_interp, area_interp
         )
     end
-end
-
-"""
-    add_section!(wing::KiteWing, LE_point::PosVector, 
-                TE_point::PosVector, aero_input::Vector{Any})
-
-Add a new section to the wing.
-"""
-function add_section!(wing::KiteWing, gamma, aero_input; α=0.0)
-    LE_point = [0.0, 0.0, wing.circle_center_z] .+ [wing.le_interp(gamma), sin(gamma) * wing.radius, cos(gamma) * wing.radius]
-    if !isapprox(α, 0.0)
-        local_y_vec = [0.0, sin(-gamma), cos(gamma)] × [1.0, 0.0, 0.0]
-        TE_point = LE_point .+ rotate_v_around_k([wing.te_interp(gamma) - wing.le_interp(gamma), 0.0, 0.0], local_y_vec, α)
-    else
-        TE_point = LE_point .+ [wing.te_interp(gamma) - wing.le_interp(gamma), 0.0, 0.0]
-    end
-    push!(wing.sections, Section(LE_point, TE_point, aero_input))
-    nothing
 end
 
 function rotate_v_around_k(v, k, θ)
