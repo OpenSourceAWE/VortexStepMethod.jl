@@ -276,14 +276,14 @@ Plot spanwise distributions of aerodynamic properties.
 - `title`: Plot title (default: "spanwise_distribution")
 - `data_type`: File extension for saving (default: ".pdf")
 - `save_path`: Path to save plots
-- `is_save`: Whether to save plots (default: true)
+- `is_save`: Whether to save plots (default: false)
 - `is_show`: Whether to display plots (default: true)
 """
 function plot_distribution(y_coordinates_list, results_list, label_list;
                          title="spanwise_distribution",
                          data_type=".pdf",
                          save_path=nothing,
-                         is_save=true,
+                         is_save=false,
                          is_show=true)
     
     length(results_list) == length(label_list) || throw(ArgumentError(
@@ -416,10 +416,10 @@ function plot_distribution(y_coordinates_list, results_list, label_list;
 
     fig.tight_layout() 
 
-    # # Save and show plot
-    # if is_save
-    #     save_plot(fig, save_path, title, data_type=data_type)
-    # end
+    # Save and show plot
+    if is_save
+        save_plot(fig, save_path, title, data_type=data_type)
+    end
     
     if is_show
         show_plot(fig)
