@@ -1,8 +1,11 @@
 
 """
-    set_plot_style()
+    set_plot_style(titel_size=16)
 
 Set the default style for plots using LaTeX.
+
+# Arguments:
+- `titel_size: size of the plot title in points (default: 16)
 """
 function set_plot_style(titel_size=16)
     rcParams = plt.PyDict(plt.matplotlib."rcParams")
@@ -113,6 +116,9 @@ end
     set_axes_equal!(ax)
 
 Set 3D plot axes to equal scale.
+
+# Arguments
+- ax: 3D plot axis
 """
 function set_axes_equal!(ax; zoom=1.8)
     x_lims = ax.get_xlim3d() ./ zoom
@@ -135,11 +141,18 @@ function set_axes_equal!(ax; zoom=1.8)
 end
 
 """
-    create_geometry_plot(wing_aero, title, view_elevation, view_azimuth)
+    create_geometry_plot(wing_aero::WingAerodynamics, title, view_elevation, view_azimuth; zoom=1.8)
 
 Create a 3D plot of wing geometry including panels and filaments.
+
+# Arguments
+- wing_aero: struct of type WingAerodynamics
+- title: plot title
+- view_elevation: initial view elevation angle [°]
+- view_azimuth: initial view azimuth angle [°]
+- zoom: zoom factor (default: 1.8)
 """
-function create_geometry_plot(wing_aero, title, view_elevation, view_azimuth; zoom=1.8)
+function create_geometry_plot(wing_aero::WingAerodynamics, title, view_elevation, view_azimuth; zoom=1.8)
     set_plot_style(28)
 
     panels = wing_aero.panels
@@ -223,11 +236,27 @@ function create_geometry_plot(wing_aero, title, view_elevation, view_azimuth; zo
 end
 
 """
-    plot_geometry(wing_aero, title; kwargs...)
+    plot_geometry(wing_aero::WingAerodynamics, title; 
+                  data_type=".pdf", save_path=nothing, 
+                  is_save=false, is_show=false, 
+                  view_elevation=15, view_azimuth=-120)
 
 Plot wing geometry from different viewpoints and optionally save/show plots.
+
+# Arguments:
+- wing_aero: struct of type WingAerodynamics
+- title: plot title
+
+# Keyword arguments:
+- data_type: string with the file type postfix (default: ".pdf")
+- save_path: path for saving the graphic (default: `nothing``)- is_save
+- is_save: boolean value, indicates if the graphic shall be saved (default: `false`)
+- is_show: boolean value, indicates if the graphic shall be displayed (default: `false`)
+- view_elevation: initial view elevation angle (default: 15) [°]
+- view_azimuth: initial view azimuth angle (default: -120) [°]
+
 """
-function plot_geometry(wing_aero, title; 
+function plot_geometry(wing_aero::WingAerodynamics, title; 
                       data_type=".pdf",
                       save_path=nothing,
                       is_save=false,
@@ -273,6 +302,8 @@ Plot spanwise distributions of aerodynamic properties.
 - `y_coordinates_list`: List of spanwise coordinates
 - `results_list`: List of result dictionaries
 - `label_list`: List of labels for different results
+
+# Keyword arguments
 - `title`: Plot title (default: "spanwise_distribution")
 - `data_type`: File extension for saving (default: ".pdf")
 - `save_path`: Path to save plots
@@ -437,6 +468,8 @@ Generate polar data for aerodynamic analysis over a range of angles.
 - `solver`: Aerodynamic solver object
 - `wing_aero`: Wing aerodynamics object
 - `angle_range`: Range of angles to analyze
+
+# Keyword arguments
 - `angle_type`: Type of angle variation ("angle_of_attack" or "side_slip")
 - `angle_of_attack`: Initial angle of attack in radians
 - `side_slip`: Initial side slip angle in radians
@@ -536,6 +569,8 @@ Plot polar data comparing different solvers and configurations.
 - `solver_list`: List of aerodynamic solvers
 - `wing_aero_list`: List of wing aerodynamics objects
 - `label_list`: List of labels for each configuration
+
+# Keyword arguments
 - `literature_path_list`: Optional paths to literature data files
 - `angle_range`: Range of angles to analyze
 - Additional keyword arguments for plot customization
