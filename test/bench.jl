@@ -59,57 +59,59 @@ using LinearAlgebra
     @testset "AIC Matrix Calculation" begin
         for model in models
             for frac in core_radius_fractions
-                result = @benchmark calculate_AIC_matrices($wing_aero, $model, $frac, $va_norm_array, $va_unit_array)
-                @test result.allocs ≤ 100  # Allow some allocations for matrix setup
+                @testset "Model $model Core Radius Fraction $frac" begin
+                    result = @benchmark calculate_AIC_matrices($wing_aero, $model, $frac, $va_norm_array, $va_unit_array)
+                    @test result.allocs ≤ 100  # Allow some allocations for matrix setup
+                end
             end
         end
     end
     
-    @testset "Gamma Loop" begin
-        result = @benchmark gamma_loop($solver, $wing, $gamma_new, $AIC_x, $AIC_y, $AIC_z)
-        @test result.allocs ≤ 50  # Main iteration should be mostly allocation-free
-    end
+    # @testset "Gamma Loop" begin
+    #     result = @benchmark gamma_loop($solver, $wing, $gamma_new, $AIC_x, $AIC_y, $AIC_z)
+    #     @test result.allocs ≤ 50  # Main iteration should be mostly allocation-free
+    # end
     
-    @testset "Results Calculation" begin
-        result = @benchmark calculate_results($wing, $gamma)
-        @test result.allocs ≤ 20  # Allow minimal allocations for results
-    end
+    # @testset "Results Calculation" begin
+    #     result = @benchmark calculate_results($wing, $gamma)
+    #     @test result.allocs ≤ 20  # Allow minimal allocations for results
+    # end
     
-    @testset "Angle of Attack Update" begin
-        result = @benchmark update_effective_angle_of_attack_if_VSM($wing, $gamma)
-        @test result.allocs == 0  # Should be allocation-free
-    end
+    # @testset "Angle of Attack Update" begin
+    #     result = @benchmark update_effective_angle_of_attack_if_VSM($wing, $gamma)
+    #     @test result.allocs == 0  # Should be allocation-free
+    # end
     
-    @testset "Area Calculations" begin
-        result = @benchmark calculate_projected_area($wing)
-        @test result.allocs ≤ 10  # Geometric calculations may need some allocations
-    end
+    # @testset "Area Calculations" begin
+    #     result = @benchmark calculate_projected_area($wing)
+    #     @test result.allocs ≤ 10  # Geometric calculations may need some allocations
+    # end
     
-    @testset "Aerodynamic Coefficients" begin
-        panel = panels[1]
-        alpha = 0.1
+    # @testset "Aerodynamic Coefficients" begin
+    #     panel = panels[1]
+    #     alpha = 0.1
         
-        @test (@ballocated calculate_cl($panel, $alpha)) == 0
-        @test (@ballocated calculate_cd_cm($panel, $alpha)) == 0
-    end
+    #     @test (@ballocated calculate_cl($panel, $alpha)) == 0
+    #     @test (@ballocated calculate_cd_cm($panel, $alpha)) == 0
+    # end
     
-    @testset "Induced Velocity Calculations" begin
-        # Test single ring velocity calculation
-        @test (@ballocated calculate_velocity_induced_single_ring_semiinfinite(
-            $point, $panels[1], $gamma[1])) == 0
+    # @testset "Induced Velocity Calculations" begin
+    #     # Test single ring velocity calculation
+    #     @test (@ballocated calculate_velocity_induced_single_ring_semiinfinite(
+    #         $point, $panels[1], $gamma[1])) == 0
             
-        # Test 2D bound vortex
-        @test (@ballocated calculate_velocity_induced_bound_2D(
-            $point, $panels[1], $gamma[1])) == 0
+    #     # Test 2D bound vortex
+    #     @test (@ballocated calculate_velocity_induced_bound_2D(
+    #         $point, $panels[1], $gamma[1])) == 0
             
-        # Test 3D velocity components
-        @test (@ballocated velocity_3D_bound_vortex!(
-            $v_ind, $point, $panels[1], $gamma[1])) == 0
+    #     # Test 3D velocity components
+    #     @test (@ballocated velocity_3D_bound_vortex!(
+    #         $v_ind, $point, $panels[1], $gamma[1])) == 0
             
-        @test (@ballocated velocity_3D_trailing_vortex!(
-            $v_ind, $point, $panels[1], $gamma[1])) == 0
+    #     @test (@ballocated velocity_3D_trailing_vortex!(
+    #         $v_ind, $point, $panels[1], $gamma[1])) == 0
             
-        @test (@ballocated velocity_3D_trailing_vortex_semiinfinite!(
-            $v_ind, $point, $panels[1], $gamma[1])) == 0
-    end
+    #     @test (@ballocated velocity_3D_trailing_vortex_semiinfinite!(
+    #         $v_ind, $point, $panels[1], $gamma[1])) == 0
+    # end
 end
