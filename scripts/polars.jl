@@ -4,6 +4,9 @@ using Xfoil
 using ControlPlots
 using Logging
 
+const SPEED_OF_SOUND = 343
+const KINEMATIC_VISCOSITY = 1.460e-5
+
 @info "Creating polars. This can take several minutes."
 tic()
 
@@ -166,9 +169,8 @@ try
     end
     
     kite_speed = v_wind
-    speed_of_sound = 343
     chord_length = area / width
-    local reynolds_number = kite_speed * chord_length / 1.460e-5 # wikipedia
+    local reynolds_number = kite_speed * chord_length / KINEMATIC_VISCOSITY # https://en.wikipedia.org/wiki/Reynolds_number
 
     # Read airfoil coordinates from a file.
     local x, y = open(foil_path, "r") do f
@@ -199,7 +201,7 @@ try
 
     @sync @distributed for j in eachindex(d_trailing_edge_angles)
         cl_matrix[:, j], cd_matrix[:, j], cm_matrix[:, j] = run_solve_alpha(alphas, d_trailing_edge_angles[j], 
-                        reynolds_number, x, y, lower, upper, kite_speed, speed_of_sound, x_turn)
+                        reynolds_number, x, y, lower, upper, kite_speed, SPEED_OF_SOUND, x_turn)
     end
     display(cl_matrix)
     
