@@ -258,7 +258,7 @@ function calculate_AIC_matrices!(wa::WingAerodynamics, model,
             
             # Subtract 2D induced velocity for VSM
             if icp == jring && model == "VSM"
-                calculate_velocity_induced_bound_2D!(U_2D, wa.panels[jring], ep, work_vectors)
+                calculate_velocity_induced_bound_2D!(U_2D, wa.panels[jring], ep, wa.work_vectors)
                 AIC[:, icp, jring] .-= U_2D
             end
         end

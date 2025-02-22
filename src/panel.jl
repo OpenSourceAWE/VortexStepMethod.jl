@@ -402,15 +402,15 @@ Calculate the velocity induced by a vortex ring at a control point.
                 work_vectors
             )
         elseif i == 4 || i == 5  # semi-infinite trailing filaments
-            # velocity_3D_trailing_vortex_semiinfinite!(
-            #     tempvel,
-            #     filaments[i],
-            #     va_unit,
-            #     evaluation_point,
-            #     gamma,
-            #     va_norm,
-            #     work_vectors
-            # )
+            velocity_3D_trailing_vortex_semiinfinite!(
+                tempvel,
+                filaments[i],
+                va_unit,
+                evaluation_point,
+                gamma,
+                va_norm,
+                work_vectors
+            )
         else
             tempvel .= 0.0
         end
@@ -449,6 +449,6 @@ function calculate_velocity_induced_bound_2D!(
     cross3!(cross_, r0, r3)
     
     # Calculate induced velocity
-    U_2D .= (cross_ ./ sum(cross_square) ./ 2π) .* norm(r0)
+    U_2D .= -(cross_ ./ sum(cross_square) ./ 2π) .* norm(r0)
     return nothing
 end
