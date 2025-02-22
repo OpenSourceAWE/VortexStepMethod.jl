@@ -125,12 +125,16 @@ If you use this project in your research, please consider citing it.
 Citation details can be found in the [CITATION.cff](https://github.com/Albatross-Kite-Transport/VortexStepMethod.jl/blob/main/CITATION.cff) file included in this repository.
 
 ## License
-This project is licensed under the MIT License - see the [LICENSE](https://github.com/Albatross-Kite-Transport/VortexStepMethod.jl/blob/main/LICENSE) file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## WAIVER
+Technische Universiteit Delft hereby disclaims all copyright interest in the package “VortexStepMethod.jl” written by the Author(s).
+
+Prof.dr. H.G.C. (Henri) Werij, Dean of Aerospace Engineering
 
 ### Copyright
 Copyright (c) 2022 Oriol Cayon
 
 Copyright (c) 2024 Oriol Cayon, Jelle Poland, TU Delft
 
-Copyright (c) 2025 Oriol Cayon, Jelle Poland, Bart van de Lint
-
+Copyright (c) 2025 Oriol Cayon, Jelle Poland, Bart van de Lint, Uwe Fechner

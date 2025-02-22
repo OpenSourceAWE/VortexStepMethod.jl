@@ -121,7 +121,7 @@ Surfplan files can be converted to an input for `VortexStepMethod.jl` using the 
 
 ## Citation
 If you use this project in your research, please consider citing it. 
-Citation details can be found in the [CITATION.cff](CITATION.cff) file included in this repository.
+Citation details can be found in the [CITATION.cff](https://github.com/Albatross-Kite-Transport/VortexStepMethod.jl/blob/main/CITATION.cff) file included in this repository.
 
 ## License
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
