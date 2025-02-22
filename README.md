@@ -56,8 +56,9 @@ In Julia, first update the packages:
 using Pkg
 Pkg.update()
 ```
-and then you display a menu with the available examples:
+and then you can display a menu with the available examples:
 ```julia
+using VortexStepMethod
 menu()
 ```
 To browse the code, it is suggested to use [VSCode](https://code.visualstudio.com/) with the Julia plugin.
