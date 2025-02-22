@@ -84,7 +84,6 @@ plot_polars(
     angle_type="angle_of_attack",
     angle_of_attack=0,
     side_slip=0,
-    yaw_rate=0,
     v_a=10,
     title="tutorial_testing_stall_model_n_panels_$(wing.n_panels)_distribution_$(wing.spanwise_panel_distribution)",
     data_type=".pdf",
