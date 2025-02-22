@@ -15,7 +15,7 @@ mutable struct WingAerodynamics
     stall_angle_list::Vector{Float64}
 
     alpha_array::Vector{Float64}
-    Umag_array::Vector{Float64}
+    v_a_array::Vector{Float64}
     work_vectors::NTuple{10,Vector{Float64}}
 
     function WingAerodynamics(
@@ -58,7 +58,7 @@ mutable struct WingAerodynamics
         stall_angle_list = calculate_stall_angle_list(panels)
 
         alpha_array = zeros(n_panels)
-        Umag_array = zeros(n_panels)    
+        v_a_array = zeros(n_panels)    
         work_vectors = ntuple(_ -> Vector{Float64}(undef, 3), 10)
         
         new(
@@ -71,7 +71,7 @@ mutable struct WingAerodynamics
             nothing,  # alpha_corrected
             stall_angle_list,
             alpha_array,
-            Umag_array,
+            v_a_array,
             work_vectors
         )
     end
@@ -377,7 +377,7 @@ end
     calculate_results(wa::WingAerodynamics, gamma_new::Vector{Float64}, 
                      density::Float64, aerodynamic_model_type::String,
                      core_radius_fraction::Float64, mu::Float64,
-                     alpha_array::Vector{Float64}, Umag_array::Vector{Float64},
+                     alpha_array::Vector{Float64}, v_a_array::Vector{Float64},
                      chord_array::Vector{Float64}, x_airf_array::Matrix{Float64},
                      y_airf_array::Matrix{Float64}, z_airf_array::Matrix{Float64},
                      va_array::Matrix{Float64}, va_norm_array::Vector{Float64},
@@ -396,7 +396,7 @@ function calculate_results(wa::WingAerodynamics,
     core_radius_fraction::Float64,
     mu::Float64,
     alpha_array::Vector{Float64},
-    Umag_array::Vector{Float64},
+    v_a_array::Vector{Float64},
     chord_array::Vector{Float64},
     x_airf_array::Matrix{Float64},
     y_airf_array::Matrix{Float64},
@@ -422,9 +422,9 @@ function calculate_results(wa::WingAerodynamics,
     end
 
     # Calculate forces
-    lift = reshape((cl_array .* 0.5 .* density .* Umag_array.^2 .* chord_array), :, 1)
-    drag = reshape((cd_array .* 0.5 .* density .* Umag_array.^2 .* chord_array), :, 1)
-    moment = reshape((cm_array .* 0.5 .* density .* Umag_array.^2 .* chord_array), :, 1)
+    lift = reshape((cl_array .* 0.5 .* density .* v_a_array.^2 .* chord_array), :, 1)
+    drag = reshape((cd_array .* 0.5 .* density .* v_a_array.^2 .* chord_array), :, 1)
+    moment = reshape((cm_array .* 0.5 .* density .* v_a_array.^2 .* chord_array), :, 1)
 
     # Calculate alpha corrections based on model type
     alpha_corrected = if aerodynamic_model_type == "VSM"

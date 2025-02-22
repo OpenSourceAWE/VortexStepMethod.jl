@@ -112,7 +112,7 @@ function solve(solver::Solver, wing_aero::WingAerodynamics, gamma_distribution=n
 
     @debug "Initial gamma_new: $gamma_initial"
     # Run main iteration loop
-    converged, gamma_new, alpha_array, Umag_array = gamma_loop(
+    converged, gamma_new, alpha_array, v_a_array = gamma_loop(
         solver,
         wing_aero,
         gamma_initial,
@@ -130,7 +130,7 @@ function solve(solver::Solver, wing_aero::WingAerodynamics, gamma_distribution=n
     # Try again with reduced relaxation factor if not converged
     if !converged && relaxation_factor > 1e-3
         @warn "Running again with half the relaxation_factor = $(relaxation_factor/2)"
-        converged, gamma_new, alpha_array, Umag_array = gamma_loop(
+        converged, gamma_new, alpha_array, v_a_array = gamma_loop(
             solver,
             wing_aero,
             gamma_initial,
@@ -156,7 +156,7 @@ function solve(solver::Solver, wing_aero::WingAerodynamics, gamma_distribution=n
         solver.core_radius_fraction,
         solver.mu,
         alpha_array,
-        Umag_array,
+        v_a_array,
         chord_array,
         x_airf_array,
         y_airf_array,
@@ -285,64 +285,7 @@ function gamma_loop(
         @warn "NO convergence after $(solver.max_iterations) iterations"
     end
 
-    return converged, gamma_new, alpha_array, Umag_array
-end
-
-"""
-    calculate_artificial_damping(solver::Solver, gamma::Vector{Float64}, 
-                               alpha::Vector{Float64}, stall_angle_list::Vector{Float64})
-
-Calculate artificial damping for numerical stability.
-"""
-function calculate_artificial_damping(
-    solver::Solver,
-    gamma::Vector{Float64},
-    alpha::Vector{Float64},
-    stall_angle_list::Vector{Float64}
-)
-    # Check for stall condition
-    is_stalled = false
-    if solver.aerodynamic_model_type == "LLT" || 
-       (solver.artificial_damping.k2 == 0 && solver.artificial_damping.k4 == 0)
-        return zeros(length(gamma)), is_stalled
-    end
-
-    for (ia, alpha_i) in enumerate(alpha)
-        if alpha_i > stall_angle_list[ia]
-            is_stalled = true
-            break
-        end
-    end
-
-    !is_stalled && return zeros(length(gamma)), is_stalled
-
-    # Calculate damping
-    n_gamma = length(gamma)
-    damp = zeros(n_gamma)
-
-    for ig in 1:n_gamma
-        # Handle boundary cases
-        gim2, gim1, gi, gip1, gip2 = if ig == 1
-            gamma[1], gamma[1], gamma[1], gamma[2], gamma[3]
-        elseif ig == 2
-            gamma[1], gamma[1], gamma[2], gamma[3], gamma[4]
-        elseif ig == n_gamma - 1
-            gamma[n_gamma-3], gamma[n_gamma-2], gamma[n_gamma-1], gamma[n_gamma], gamma[n_gamma]
-        elseif ig == n_gamma
-            gamma[n_gamma-2], gamma[n_gamma-1], gamma[n_gamma], gamma[n_gamma], gamma[n_gamma]
-        else
-            gamma[ig-2], gamma[ig-1], gamma[ig], gamma[ig+1], gamma[ig+2]
-        end
-
-        dif2 = (gip1 - gi) - (gi - gim1)
-        dif4 = (gip2 - 3.0 * gip1 + 3.0 * gi - gim1) - 
-               (gip1 - 3.0 * gi + 3.0 * gim1 - gim2)
-        
-        damp[ig] = solver.artificial_damping.k2 * dif2 - 
-                   solver.artificial_damping.k4 * dif4
-    end
-
-    return damp, is_stalled
+    return converged, gamma_new, alpha_array, v_a_array
 end
 
 """
