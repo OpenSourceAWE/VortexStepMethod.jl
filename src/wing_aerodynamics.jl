@@ -60,7 +60,7 @@ mutable struct WingAerodynamics
 
         alpha_array = zeros(n_panels)
         v_a_array = zeros(n_panels)    
-        work_vectors = ntuple(_ -> Vector{Float64}(undef, 3), 10)
+        work_vectors = ntuple(_ -> zeros(MVec3), 10)
         AIC = zeros(3, n_panels, n_panels)
 
         new(
@@ -230,7 +230,7 @@ function calculate_AIC_matrices!(wa::WingAerodynamics, model,
     
     # Initialize AIC matrices
     AIC = @views wa.AIC
-    velocity_induced, tempvel, va_unit = zeros(MVec3), zeros(MVec3), zeros(MVec3)
+    velocity_induced, tempvel, va_unit, U_2D = zeros(MVec3), zeros(MVec3), zeros(MVec3), zeros(MVec3)
     
     # Calculate influence coefficients
     for icp in 1:wa.n_panels
@@ -239,14 +239,15 @@ function calculate_AIC_matrices!(wa::WingAerodynamics, model,
             velocity_induced .= 0.0
             tempvel .= 0.0
             va_unit .= @views va_unit_array[jring, :]
-            wa.panels[jring]
+            filaments = wa.panels[jring].filaments
+            va_norm = va_norm_array[jring]
             calculate_velocity_induced_single_ring_semiinfinite!(
                 velocity_induced,
                 tempvel,
-                wa.panels[jring],
+                filaments,
                 ep,
                 evaluation_point_on_bound,
-                va_norm_array[jring],
+                va_norm,
                 va_unit,
                 1.0,
                 core_radius_fraction,
@@ -257,7 +258,7 @@ function calculate_AIC_matrices!(wa::WingAerodynamics, model,
             
             # Subtract 2D induced velocity for VSM
             if icp == jring && model == "VSM"
-                U_2D = calculate_velocity_induced_bound_2D(wa.panels[jring], ep)
+                calculate_velocity_induced_bound_2D!(U_2D, wa.panels[jring], ep, work_vectors)
                 AIC[:, icp, jring] .-= U_2D
             end
         end

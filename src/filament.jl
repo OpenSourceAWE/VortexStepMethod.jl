@@ -92,7 +92,7 @@ Calculate induced velocity by a trailing vortex filament.
 Reference: Rick Damiani et al. "A vortex step method for nonlinear airfoil polar data 
 as implemented in KiteAeroDyn".
 """
-function velocity_3D_trailing_vortex!(
+@inline function velocity_3D_trailing_vortex!(
     vel,
     filament::BoundFilament,
     XVP,
