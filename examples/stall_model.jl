@@ -1,4 +1,3 @@
-using Revise
 using VortexStepMethod
 using CSV
 using DataFrames
@@ -47,7 +46,7 @@ VSM_with_stall_correction = Solver(
 )
 
 # Setting velocity conditions
-Umag = 15.0
+v_a = 15.0
 aoa = 17.0
 side_slip = 0.0
 yaw_rate = 0.0
@@ -56,7 +55,7 @@ vel_app = [
     cos(aoa_rad) * cos(side_slip),
     sin(side_slip),
     sin(aoa_rad)
-] * Umag
+] * v_a
 wing_aero_CAD_19ribs.va = vel_app
 
 # # Plotting geometry
@@ -82,7 +81,7 @@ plot_distribution(
     [CAD_y_coordinates, CAD_y_coordinates],
     [results, results_with_stall],
     ["VSM", "VSM with stall correction"];
-    title="CAD_spanwise_distributions_alpha_$(round(aoa, digits=1))_beta_$(round(side_slip, digits=1))_yaw_$(round(yaw_rate, digits=1))_Umag_$(round(Umag, digits=1))",
+    title="CAD_spanwise_distributions_alpha_$(round(aoa, digits=1))_beta_$(round(side_slip, digits=1))_yaw_$(round(yaw_rate, digits=1))_v_a_$(round(v_a, digits=1))",
     data_type=".pdf",
     save_path=joinpath(save_folder, "spanwise_distributions"),
     is_save=false,
@@ -113,7 +112,7 @@ plot_polars(
     angle_of_attack=0,
     side_slip=0,
     yaw_rate=0,
-    Umag=10,
+    v_a=10,
     title="tutorial_testing_stall_model_n_panels_$(n_panels)_distribution_$(spanwise_panel_distribution)",
     data_type=".pdf",
     save_path=joinpath(save_folder, "polars"),
