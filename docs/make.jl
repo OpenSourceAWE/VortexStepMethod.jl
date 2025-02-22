@@ -18,6 +18,7 @@ makedocs(;
     pages=[
         "Home" => "index.md",
         "Exported Functions" => "functions.md",
+        "Exported Types" => "types.md",
     ],
 )
 

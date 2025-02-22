@@ -44,7 +44,7 @@ Represents a wing composed of multiple sections with aerodynamic properties.
 # Distribution types
 - "linear": Linear distribution
 - "cosine": Cosine distribution
-- "cosine_van_Garrel": van Garrel cosine distribution
+- "`cosine_van_Garrel`": van Garrel cosine distribution
 - "split_provided": Split provided sections
 - "unchanged": Keep original sections
 """
