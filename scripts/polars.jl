@@ -204,42 +204,6 @@ try
                         reynolds_number, x, y, lower, upper, kite_speed, SPEED_OF_SOUND, x_turn)
     end
     display(cl_matrix)
-    
-    function replace_nan!(matrix)
-        rows, cols = size(matrix)
-        distance = max(rows, cols)
-        for i in 1:rows
-            for j in 1:cols
-                if isnan(matrix[i, j])
-                    neighbors = []
-                    for d in 1:distance
-                        found = false
-                        if i-d >= 1 && !isnan(matrix[i-d, j]);
-                            push!(neighbors, matrix[i-d, j])
-                            found = true
-                        end
-                        if i+d <= rows && !isnan(matrix[i+d, j])
-                            push!(neighbors, matrix[i+d, j])
-                            found = true
-                        end
-                        if j-d >= 1 && !isnan(matrix[i, j-d])
-                            push!(neighbors, matrix[i, j-d])
-                            found = true
-                        end
-                        if j+d <= cols && !isnan(matrix[i, j+d])
-                            push!(neighbors, matrix[i, j+d])
-                            found = true
-                        end
-                        if found; break; end
-                    end
-                    if !isempty(neighbors)
-                        matrix[i, j] = sum(neighbors) / length(neighbors)
-                    end
-                end
-            end
-        end
-        return nothing
-    end
 
     function plot_values(alphas, d_trailing_edge_angles, matrix, interp, name)
         fig = plt.figure()
@@ -264,10 +228,6 @@ try
         plt.grid(true)
         plt.show()
     end
-    
-    replace_nan!(cl_matrix)
-    replace_nan!(cd_matrix)
-    replace_nan!(cm_matrix)
     
     cl_interp = extrapolate(scale(interpolate(cl_matrix, BSpline(Linear())), alphas, d_trailing_edge_angles), NaN)
     cd_interp = extrapolate(scale(interpolate(cd_matrix, BSpline(Linear())), alphas, d_trailing_edge_angles), NaN)
