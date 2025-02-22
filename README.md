@@ -56,9 +56,9 @@ In Julia, first update the packages:
 using Pkg
 Pkg.update()
 ```
-and then you can execute the first example:
+and then you display a menu with the available examples:
 ```julia
-include("examples/rectangular_wing.jl")
+menu()
 ```
 To browse the code, it is suggested to use [VSCode](https://code.visualstudio.com/) with the Julia plugin.
 
