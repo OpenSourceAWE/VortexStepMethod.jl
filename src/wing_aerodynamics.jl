@@ -3,11 +3,22 @@
     WingAerodynamics
 
 Main structure for calculating aerodynamic properties of wings.
+
+# Fields
+- panels::Vector{Panel}: Vector of Panel structs
+- n_panels::Int64: number of panels
+- wings::Vector{AbstractWing}: a vector of wings; but why more than one?
+- `_va`::Union{Nothing, Vector{Float64}, Tuple{Vector{Float64}, Float64}}: A vector of the apparent wind speed,  
+                                                      or a tuple of the v_a vector and yaw rate (rad/s).
+- ` gamma_distribution`::Union{Nothing, Vector{Float64}}: unclear, please defined
+- `alpha_uncorrected`::Union{Nothing, Vector{Float64}}: unclear, please define
+- `alpha_corrected`::Union{Nothing, Vector{Float64}}: unclear, please define
+- `stall_angle_list`::Vector{Float64}: unclear, please define
 """
 mutable struct WingAerodynamics
     panels::Vector{Panel}
-    n_panels::Int
-    wings::Vector{AbstractWing}
+    n_panels::Int64             # TODO: Why is this needed? Just use length(panels)
+    wings::Vector{AbstractWing} # TODO: Why not a concrete type? And why a vector?
     _va::Union{Nothing, Vector{Float64}, Tuple{Vector{Float64}, Float64}}
     gamma_distribution::Union{Nothing, Vector{Float64}}
     alpha_uncorrected::Union{Nothing, Vector{Float64}}
@@ -96,6 +107,16 @@ end
     PanelProperties
 
 Structure to hold calculated panel properties.
+
+# Fields
+- `aero_centers`::Vector{PosVector}
+- `control_points`::Vector{PosVector}
+- `bound_points_1`::Vector{PosVector}
+- `bound_points_2`::Vector{PosVector}
+- `x_airf`::Vector{Vector{Float64}}: unclear, please define
+- `y_airf`::Vector{Vector{Float64}}: unclear, please define
+- `z_airf`::Vector{Vector{Float64}}: unclear, please define
+
 """
 struct PanelProperties
     aero_centers::Vector{PosVector}
