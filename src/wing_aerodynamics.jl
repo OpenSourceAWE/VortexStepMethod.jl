@@ -8,7 +8,8 @@ Main structure for calculating aerodynamic properties of wings.
 - panels::Vector{Panel}: Vector of Panel structs
 - n_panels::Int64: number of panels
 - wings::Vector{AbstractWing}: a vector of wings; but why more than one?
-- `_va`::Union{Nothing, Vector{Float64}, Tuple{Vector{Float64}, Float64}}: Why this definition for `v_a`?
+- `_va`::Union{Nothing, Vector{Float64}, Tuple{Vector{Float64}, Float64}}: A vector of the apparent wind speed,  
+                                                      or a tuple of the v_a vector and yaw rate (rad/s).
 - ` gamma_distribution`::Union{Nothing, Vector{Float64}}: unclear, please defined
 - `alpha_uncorrected`::Union{Nothing, Vector{Float64}}: unclear, please define
 - `alpha_corrected`::Union{Nothing, Vector{Float64}}: unclear, please define
