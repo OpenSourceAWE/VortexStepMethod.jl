@@ -57,8 +57,8 @@ function velocity_3D_bound_vortex!(
     elseif norm(r1Xr0) / norm(r0) == 0
         vel .= zeros(3)
     else
-        @info "inside core radius"
-        @info "distance from control point to filament: $(norm(r1Xr0) / norm(r0))"
+        @debug "inside core radius"
+        @debug "distance from control point to filament: $(norm(r1Xr0) / norm(r0))"
         
         # Project onto core radius
         cross3!(r2Xr0, r2, r0)
@@ -70,8 +70,6 @@ function velocity_3D_bound_vortex!(
 
         vel_ind_proj .= (gamma / (4π)) .* r1_projXr2_proj ./ (norm(r1_projXr2_proj)^2) .* 
                       dot(r0, r1_proj/norm(r1_proj) .- r2_proj/norm(r2_proj))
-
-        @show vel_ind_proj r1_projXr2_proj
 
         vel .= norm(r1Xr0) ./ (norm(r0) * epsilon) .* vel_ind_proj
     end

@@ -3,3 +3,4 @@ Manifest.toml
 venv
 results/TUDELFT_V3_LEI_KITE/polars/tutorial_testing_stall_model_n_panels_54_distribution_split_provided.pdf
 docs/build/
+*.bin
