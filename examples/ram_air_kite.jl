@@ -10,7 +10,7 @@ using DataFrames
 
 # Create wing geometry
 wing = KiteWing("data/ram_air_kite_body.obj", "data/ram_air_kite_foil.dat")
-wing_aero = WingAerodynamics([wing])
+wing_aero = BodyAerodynamics([wing])
 
 # Create solvers
 VSM = Solver(

@@ -38,7 +38,7 @@ CAD_wing = Wing(n_panels; spanwise_panel_distribution)
 for rib in rib_list
     add_section!(CAD_wing, rib[1], rib[2], rib[3])
 end
-wing_aero_CAD_19ribs = WingAerodynamics([CAD_wing])
+wing_aero_CAD_19ribs = BodyAerodynamics([CAD_wing])
 
 # Create solvers
 VSM = Solver(

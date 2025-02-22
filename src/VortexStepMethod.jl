@@ -16,7 +16,7 @@ using SharedArrays
 
 # Export public interface
 export Wing, Section, KiteWing
-export WingAerodynamics
+export BodyAerodynamics
 export Solver, solve
 export calculate_results, solve_circulation_distribution
 export add_section!, set_va!
@@ -57,7 +57,7 @@ include("kite_geometry.jl")
 include("filament.jl")
 include("panel.jl")
 include("wake.jl")
-include("wing_aerodynamics.jl")
+include("body_aerodynamics.jl")
 include("solver.jl")
 
 # include plotting

@@ -106,7 +106,7 @@ add_section!(wing,
     "inviscid")
 
 # Step 3: Initialize aerodynamics
-wa = WingAerodynamics([wing])
+wa = BodyAerodynamics([wing])
 
 # Set inflow conditions
 vel_app = [cos(alpha), 0.0, sin(alpha)] .* v_a

@@ -15,5 +15,5 @@ CurrentModule = VortexStepMethod
     BoundFilament
     Panel
     PanelProperties
-    WingAerodynamics
+    BodyAerodynamics
 ```

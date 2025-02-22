@@ -55,11 +55,11 @@ struct Solver
 end
 
 """
-    solve(solver::Solver, wing_aero::WingAerodynamics, gamma_distribution=nothing)
+    solve(solver::Solver, wing_aero::BodyAerodynamics, gamma_distribution=nothing)
 
 Main solving routine for the aerodynamic model.
 """
-function solve(solver::Solver, wing_aero::WingAerodynamics, gamma_distribution=nothing)
+function solve(solver::Solver, wing_aero::BodyAerodynamics, gamma_distribution=nothing)
     isnothing(wing_aero.panels[1].va) && throw(ArgumentError("Inflow conditions are not set, use set_va!(wing_aero, va)"))
     
     # Initialize variables
@@ -181,7 +181,7 @@ Main iteration loop for calculating circulation distribution.
 """
 function gamma_loop(
     solver::Solver,
-    wing_aero::WingAerodynamics,
+    wing_aero::BodyAerodynamics,
     gamma_new::Vector{Float64},
     AIC_x::Matrix{Float64},
     AIC_y::Matrix{Float64},

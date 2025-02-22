@@ -143,12 +143,12 @@ function set_axes_equal!(ax; zoom=1.8)
 end
 
 """
-    create_geometry_plot(wing_aero::WingAerodynamics, title, view_elevation, view_azimuth; zoom=1.8)
+    create_geometry_plot(wing_aero::BodyAerodynamics, title, view_elevation, view_azimuth; zoom=1.8)
 
 Create a 3D plot of wing geometry including panels and filaments.
 
 # Arguments
-- wing_aero: struct of type WingAerodynamics
+- wing_aero: struct of type BodyAerodynamics
 - title: plot title
 - view_elevation: initial view elevation angle [°]
 - view_azimuth: initial view azimuth angle [°]
@@ -156,7 +156,7 @@ Create a 3D plot of wing geometry including panels and filaments.
 # Keyword arguments
 - zoom: zoom factor (default: 1.8)
 """
-function create_geometry_plot(wing_aero::WingAerodynamics, title, view_elevation, view_azimuth; 
+function create_geometry_plot(wing_aero::BodyAerodynamics, title, view_elevation, view_azimuth; 
                               zoom=1.8)
     set_plot_style(28)
 
@@ -241,7 +241,7 @@ function create_geometry_plot(wing_aero::WingAerodynamics, title, view_elevation
 end
 
 """
-    plot_geometry(wing_aero::WingAerodynamics, title; 
+    plot_geometry(wing_aero::BodyAerodynamics, title; 
                   data_type=".pdf", save_path=nothing, 
                   is_save=false, is_show=false, 
                   view_elevation=15, view_azimuth=-120)
@@ -249,7 +249,7 @@ end
 Plot wing geometry from different viewpoints and optionally save/show plots.
 
 # Arguments:
-- `wing_aero`: struct of type WingAerodynamics
+- `wing_aero`: struct of type BodyAerodynamics
 - title: plot title
 
 # Keyword arguments:
@@ -261,7 +261,7 @@ Plot wing geometry from different viewpoints and optionally save/show plots.
 - `view_azimuth`: initial view azimuth angle (default: -120) [°]
 
 """
-function plot_geometry(wing_aero::WingAerodynamics, title;
+function plot_geometry(wing_aero::BodyAerodynamics, title;
     data_type=".pdf",
     save_path=nothing,
     is_save=false,
@@ -467,7 +467,7 @@ function plot_distribution(y_coordinates_list, results_list, label_list;
 end
 
 """
-    generate_polar_data(solver, wing_aero::WingAerodynamics, angle_range;     
+    generate_polar_data(solver, wing_aero::BodyAerodynamics, angle_range;     
                         angle_type="angle_of_attack", angle_of_attack=0.0,
                         side_slip=0.0, v_a=10.0)
 
@@ -489,7 +489,7 @@ Generate polar data for aerodynamic analysis over a range of angles.
 """
 function generate_polar_data(
     solver,
-    wing_aero::WingAerodynamics,
+    wing_aero::BodyAerodynamics,
     angle_range;
     angle_type="angle_of_attack",
     angle_of_attack=0.0,

@@ -1,13 +1,13 @@
 
 """
-    WingAerodynamics
+    BodyAerodynamics
 
-Main structure for calculating aerodynamic properties of wings.
+Main structure for calculating aerodynamic properties of bodies.
 
 # Fields
 - panels::Vector{Panel}: Vector of Panel structs
 - n_panels::Int64: number of panels
-- wings::Vector{AbstractWing}: a vector of wings; but why more than one?
+- wings::Vector{AbstractWing}: a vector of wings; a body can have multiple wings
 - `_va`::Union{Nothing, Vector{Float64}, Tuple{Vector{Float64}, Float64}}: A vector of the apparent wind speed,  
                                                       or a tuple of the v_a vector and yaw rate (rad/s).
 - ` gamma_distribution`::Union{Nothing, Vector{Float64}}: unclear, please defined
@@ -15,7 +15,7 @@ Main structure for calculating aerodynamic properties of wings.
 - `alpha_corrected`::Union{Nothing, Vector{Float64}}: unclear, please define
 - `stall_angle_list`::Vector{Float64}: unclear, please define
 """
-mutable struct WingAerodynamics
+mutable struct BodyAerodynamics
     panels::Vector{Panel}
     n_panels::Int64             # TODO: Why is this needed? Just use length(panels)
     wings::Vector{AbstractWing} # TODO: Why not a concrete type? And why a vector?
@@ -29,7 +29,7 @@ mutable struct WingAerodynamics
     v_a_array::Vector{Float64}
     work_vectors::NTuple{10,Vector{Float64}}
 
-    function WingAerodynamics(
+    function BodyAerodynamics(
         wings::Vector{T};
         aerodynamic_center_location::Float64=0.25,
         control_point_location::Float64=0.75
@@ -88,14 +88,14 @@ mutable struct WingAerodynamics
     end
 end
 
-function Base.getproperty(obj::WingAerodynamics, sym::Symbol)
+function Base.getproperty(obj::BodyAerodynamics, sym::Symbol)
     if sym === :va
         return getfield(obj, :_va)
     end
     return getfield(obj, sym)
 end
 
-function Base.setproperty!(obj::WingAerodynamics, sym::Symbol, val)
+function Base.setproperty!(obj::BodyAerodynamics, sym::Symbol, val)
     if sym === :va
         set_va!(obj, val)
     else
@@ -227,7 +227,7 @@ function calculate_panel_properties(section_list::Vector{Section}, n_panels::Int
 end
 
 """
-    calculate_AIC_matrices(wa::WingAerodynamics, model::String, 
+    calculate_AIC_matrices(wa::BodyAerodynamics, model::String, 
                          core_radius_fraction::Float64,
                          va_norm_array::Vector{Float64}, 
                          va_unit_array::Matrix{Float64})
@@ -237,7 +237,7 @@ Calculate Aerodynamic Influence Coefficient matrices.
 Returns:
     Tuple of (AIC_x, AIC_y, AIC_z) matrices
 """
-function calculate_AIC_matrices(wa::WingAerodynamics, model::String,
+function calculate_AIC_matrices(wa::BodyAerodynamics, model::String,
                               core_radius_fraction::Float64,
                               va_norm_array::Vector{Float64}, 
                               va_unit_array::Matrix{Float64})
@@ -279,14 +279,14 @@ function calculate_AIC_matrices(wa::WingAerodynamics, model::String,
 end
 
 """
-    calculate_circulation_distribution_elliptical_wing(wa::WingAerodynamics, gamma_0::Float64=1.0)
+    calculate_circulation_distribution_elliptical_wing(wa::BodyAerodynamics, gamma_0::Float64=1.0)
 
 Calculate circulation distribution for an elliptical wing.
 
 Returns:
     Vector{Float64}: Circulation distribution along the wing
 """
-function calculate_circulation_distribution_elliptical_wing(wa::WingAerodynamics, gamma_0::Float64=1.0)
+function calculate_circulation_distribution_elliptical_wing(wa::BodyAerodynamics, gamma_0::Float64=1.0)
     length(wa.wings) == 1 || throw(ArgumentError("Multiple wings not yet implemented"))
     
     wing_span = wa.wings[1].span
@@ -350,7 +350,7 @@ function calculate_stall_angle_list(panels::Vector{Panel};
 end
 
 """
-    update_effective_angle_of_attack_if_VSM(wa::WingAerodynamics, gamma::Vector{Float64},
+    update_effective_angle_of_attack_if_VSM(wa::BodyAerodynamics, gamma::Vector{Float64},
                                           core_radius_fraction::Float64,
                                           x_airf_array::Matrix{Float64},
                                           y_airf_array::Matrix{Float64},
@@ -363,7 +363,7 @@ Update angle of attack at aerodynamic center for VSM method.
 Returns:
     Vector{Float64}: Updated angles of attack
 """
-function update_effective_angle_of_attack_if_VSM(wa::WingAerodynamics, 
+function update_effective_angle_of_attack_if_VSM(wa::BodyAerodynamics, 
     gamma::Vector{Float64},
     core_radius_fraction::Float64,
     x_airf_array::Matrix{Float64},
@@ -395,7 +395,7 @@ function update_effective_angle_of_attack_if_VSM(wa::WingAerodynamics,
 end
 
 """
-    calculate_results(wa::WingAerodynamics, gamma_new::Vector{Float64}, 
+    calculate_results(wa::BodyAerodynamics, gamma_new::Vector{Float64}, 
                      density::Float64, aerodynamic_model_type::String,
                      core_radius_fraction::Float64, mu::Float64,
                      alpha_array::Vector{Float64}, v_a_array::Vector{Float64},
@@ -410,7 +410,7 @@ Calculate final aerodynamic results.
 Returns:
     Dict: Results including forces, coefficients and distributions
 """
-function calculate_results(wa::WingAerodynamics,
+function calculate_results(wa::BodyAerodynamics,
     gamma_new::Vector{Float64},
     density::Float64,
     aerodynamic_model_type::String,
@@ -619,14 +619,14 @@ end
 
 
 """
-    set_va!(wa::WingAerodynamics, va::Union{Vector{Float64}, Tuple{Vector{Float64}, Float64}})
+    set_va!(wa::BodyAerodynamics, va::Union{Vector{Float64}, Tuple{Vector{Float64}, Float64}})
 
 Set velocity array and update wake filaments.
 
 # Arguments
 - `va`: Either a velocity vector or tuple of (velocity vector, yaw_rate)
 """
-function set_va!(wa::WingAerodynamics, va)
+function set_va!(wa::BodyAerodynamics, va)
     # Add length check for va_vec
     if va isa Vector{Float64} && length(va) != 3 && length(va) != wa.n_panels
         throw(ArgumentError("va must be length 3 or match number of panels"))
