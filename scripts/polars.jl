@@ -1,7 +1,6 @@
 using Distributed, Timers, Serialization, SharedArrays
 using Interpolations
 using Xfoil
-using Pkg
 using ControlPlots
 using Logging
 
@@ -91,7 +90,7 @@ try
         end
         
         function run_solve_alpha(alphas, d_trailing_edge_angle, re, x_, y_, lower, upper, kite_speed, speed_of_sound, x_turn)
-            @info "solving alpha with trailing edge angle: $d_trailing_edge_angle"
+            @info "solving alpha with trailing edge angle: $(rad2deg(d_trailing_edge_angle)) degrees"
             cls = Float64[NaN for _ in alphas]
             cds = Float64[NaN for _ in alphas]
             cms = Float64[NaN for _ in alphas]
