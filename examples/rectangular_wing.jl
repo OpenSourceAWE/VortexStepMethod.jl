@@ -2,6 +2,8 @@ using LinearAlgebra
 using ControlPlots
 using VortexStepMethod
 
+plot = false
+
 # Step 1: Define wing parameters
 n_panels = 20          # Number of panels
 span = 20.0            # Wing span [m]
@@ -53,7 +55,7 @@ println("CD = $(round(results_vsm["cd"], digits=4))")
 println("Projected area = $(round(results_vsm["projected_area"], digits=4)) m²")
 
 # Step 6: Plot geometry
-plot_geometry(
+plot && plot_geometry(
       wa,
       "Rectangular_wing_geometry";
       data_type=".pdf",
@@ -66,7 +68,7 @@ nothing
 # Step 7: Plot spanwise distributions
 y_coordinates = [panel.aerodynamic_center[2] for panel in wa.panels]
 
-plot_distribution(
+plot && plot_distribution(
     [y_coordinates, y_coordinates],
     [results_vsm, results_llt],
     ["VSM", "LLT"],
@@ -75,7 +77,7 @@ plot_distribution(
 
 # Step 8: Plot polar curves
 angle_range = range(0, 20, 20)
-plot_polars(
+plot && plot_polars(
     [llt_solver, vsm_solver],
     [wa, wa],
     ["LLT", "VSM"];

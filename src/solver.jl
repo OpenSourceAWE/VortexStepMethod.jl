@@ -199,8 +199,8 @@ function gamma_loop(
     converged = false
     n_panels = wing_aero.n_panels
     alpha_array = wing_aero.alpha_array
-    Umag_array = wing_aero.Umag_array
-    Umagw_array = similar(Umag_array)
+    v_a_array = wing_aero.v_a_array
+    Umagw_array = similar(v_a_array)
 
     gamma = copy(gamma_new)
     abs_gamma_new = copy(gamma_new)
@@ -242,14 +242,14 @@ function gamma_loop(
         alpha_array .= atan.(v_normal_array, v_tangential_array)
 
         for i in 1:n_panels
-            @views Umag_array[i] = norm(relative_velocity_crossz[i, :])
+            @views v_a_array[i] = norm(relative_velocity_crossz[i, :])
             @views Umagw_array[i] = norm(Uinfcrossz_array[i, :])
         end
         
         for (i, (panel, alpha)) in enumerate(zip(panels, alpha_array))
             cl_array[i] = calculate_cl(panel, alpha)
         end
-        gamma_new .= 0.5 .* Umag_array.^2 ./ Umagw_array .* cl_array .* chord_array
+        gamma_new .= 0.5 .* v_a_array.^2 ./ Umagw_array .* cl_array .* chord_array
 
         # Apply damping if needed
         if solver.is_with_artificial_damping
