@@ -16,7 +16,8 @@ mutable struct WingAerodynamics
 
     alpha_array::Vector{Float64}
     v_a_array::Vector{Float64}
-    work_vectors::NTuple{10,Vector{Float64}}
+    work_vectors::NTuple{10,MVec3}
+    AIC::Array{Float64, 3}
 
     function WingAerodynamics(
         wings::Vector{T};
@@ -60,7 +61,8 @@ mutable struct WingAerodynamics
         alpha_array = zeros(n_panels)
         v_a_array = zeros(n_panels)    
         work_vectors = ntuple(_ -> Vector{Float64}(undef, 3), 10)
-        
+        AIC = zeros(3, n_panels, n_panels)
+
         new(
             panels,
             n_panels,
@@ -72,7 +74,8 @@ mutable struct WingAerodynamics
             stall_angle_list,
             alpha_array,
             v_a_array,
-            work_vectors
+            work_vectors,
+            AIC
         )
     end
 end
@@ -206,7 +209,7 @@ function calculate_panel_properties(section_list::Vector{Section}, n_panels::Int
 end
 
 """
-    calculate_AIC_matrices(wa::WingAerodynamics, model::String, 
+    calculate_AIC_matrices!(wa::WingAerodynamics, model::String, 
                          core_radius_fraction::Float64,
                          va_norm_array::Vector{Float64}, 
                          va_unit_array::Matrix{Float64})
@@ -216,35 +219,41 @@ Calculate Aerodynamic Influence Coefficient matrices.
 Returns:
     Tuple of (AIC_x, AIC_y, AIC_z) matrices
 """
-function calculate_AIC_matrices(wa::WingAerodynamics, model::String,
-                              core_radius_fraction::Float64,
-                              va_norm_array::Vector{Float64}, 
-                              va_unit_array::Matrix{Float64})
+function calculate_AIC_matrices!(wa::WingAerodynamics, model,
+                              core_radius_fraction,
+                              va_norm_array, 
+                              va_unit_array)
     model in ["VSM", "LLT"] || throw(ArgumentError("Model must be VSM or LLT"))
-    
     # Determine evaluation point based on model
     evaluation_point = model == "VSM" ? :control_point : :aerodynamic_center
     evaluation_point_on_bound = model == "LLT"
     
     # Initialize AIC matrices
-    AIC = zeros(3, wa.n_panels, wa.n_panels)
+    AIC = @views wa.AIC
+    velocity_induced, tempvel, va_unit = zeros(MVec3), zeros(MVec3), zeros(MVec3)
     
     # Calculate influence coefficients
     for icp in 1:wa.n_panels
         ep = getproperty(wa.panels[icp], evaluation_point)
         for jring in 1:wa.n_panels
-            velocity_induced = calculate_velocity_induced_single_ring_semiinfinite(
+            velocity_induced .= 0.0
+            tempvel .= 0.0
+            va_unit .= @views va_unit_array[jring, :]
+            wa.panels[jring]
+            calculate_velocity_induced_single_ring_semiinfinite!(
+                velocity_induced,
+                tempvel,
                 wa.panels[jring],
                 ep,
                 evaluation_point_on_bound,
                 va_norm_array[jring],
-                va_unit_array[jring, :],
+                va_unit,
                 1.0,
                 core_radius_fraction,
                 wa.work_vectors
             )
             
-            AIC[:, icp, jring] = velocity_induced
+            AIC[:, icp, jring] .= velocity_induced
             
             # Subtract 2D induced velocity for VSM
             if icp == jring && model == "VSM"
@@ -253,8 +262,7 @@ function calculate_AIC_matrices(wa::WingAerodynamics, model::String,
             end
         end
     end
-    
-    return AIC[1, :, :], AIC[2, :, :], AIC[3, :, :]
+    return nothing
 end
 
 """
@@ -352,9 +360,10 @@ function update_effective_angle_of_attack_if_VSM(wa::WingAerodynamics,
     va_unit_array::Matrix{Float64})
 
     # Calculate AIC matrices at aerodynamic center using LLT method
-    AIC_x, AIC_y, AIC_z = calculate_AIC_matrices(
+    calculate_AIC_matrices!(
         wa, "LLT", core_radius_fraction, va_norm_array, va_unit_array
     )
+    AIC_x, AIC_y, AIC_z = @views wa.AIC[1, :, :], wa.AIC[2, :, :], wa.AIC[3, :, :]
 
     # Calculate induced velocities
     induced_velocity = [

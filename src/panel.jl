@@ -338,7 +338,9 @@ function calculate_filaments_for_plotting(panel::Panel)
 end
 
 """
-    calculate_velocity_induced_single_ring_semiinfinite(
+    calculate_velocity_induced_single_ring_semiinfinite!(
+        velind::Matrix{Float64},
+        tempvel::Vector{Float64},
         panel::Panel,
         evaluation_point::Vector{Float64},
         evaluation_point_on_bound::Bool,
@@ -359,26 +361,25 @@ Calculate the velocity induced by a vortex ring at a control point.
 - `core_radius_fraction`: Vortex core radius as fraction of panel width
 
 # Returns
-- `Vector{Float64}`: Induced velocity vector
+- nothing
 """
-function calculate_velocity_induced_single_ring_semiinfinite(
+function calculate_velocity_induced_single_ring_semiinfinite!(
+    velind,
+    tempvel,
     panel::Panel,
-    evaluation_point::PosVector,
-    evaluation_point_on_bound::Bool,
-    va_norm::Float64,
-    va_unit::VelVector,
-    gamma::Float64,
-    core_radius_fraction::Float64,
-    work_vectors::NTuple{10,Vector{Float64}}
+    evaluation_point,
+    evaluation_point_on_bound,
+    va_norm,
+    va_unit,
+    gamma,
+    core_radius_fraction,
+    work_vectors
 )
-    velind = zeros(Float64, 3)
-    tempvel = zeros(3)
-
     # Process each filament
     for (i, filament) in enumerate(panel.filaments)
         if i == 1  # bound filament
             if evaluation_point_on_bound
-                tempvel .= zeros(Float64, 3)
+                tempvel .= 0.0
             else
                 velocity_3D_bound_vortex!(
                     tempvel,
@@ -413,8 +414,7 @@ function calculate_velocity_induced_single_ring_semiinfinite(
         end
         velind .+= tempvel
     end
-
-    return velind
+    return nothing
 end
 
 """

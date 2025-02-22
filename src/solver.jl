@@ -89,7 +89,7 @@ function solve(solver::Solver, wing_aero::WingAerodynamics, gamma_distribution=n
     va_unit_array = va_array ./ va_norm_array
 
     # Calculate AIC matrices
-    AIC_x, AIC_y, AIC_z = calculate_AIC_matrices(
+    calculate_AIC_matrices!(
         wing_aero,
         solver.aerodynamic_model_type,
         solver.core_radius_fraction,
@@ -116,9 +116,6 @@ function solve(solver::Solver, wing_aero::WingAerodynamics, gamma_distribution=n
         solver,
         wing_aero,
         gamma_initial,
-        AIC_x,
-        AIC_y,
-        AIC_z,
         va_array,
         chord_array,
         x_airf_array,
@@ -134,9 +131,6 @@ function solve(solver::Solver, wing_aero::WingAerodynamics, gamma_distribution=n
             solver,
             wing_aero,
             gamma_initial,
-            AIC_x,
-            AIC_y,
-            AIC_z,
             va_array,
             chord_array,
             x_airf_array,
@@ -185,9 +179,6 @@ function gamma_loop(
     solver::Solver,
     wing_aero::WingAerodynamics,
     gamma_new::Vector{Float64},
-    AIC_x::Matrix{Float64},
-    AIC_y::Matrix{Float64},
-    AIC_z::Matrix{Float64},
     va_array::Matrix{Float64},
     chord_array::Vector{Float64},
     x_airf_array::Matrix{Float64},
@@ -204,7 +195,7 @@ function gamma_loop(
 
     gamma = copy(gamma_new)
     abs_gamma_new = copy(gamma_new)
-    induced_velocity_all = zeros(size(AIC_x, 1), 3)
+    induced_velocity_all = zeros(n_panels, 3)
     relative_velocity_array = similar(va_array)
     relative_velocity_crossz = similar(relative_velocity_array)
     Uinfcrossz_array = similar(va_array)
@@ -212,6 +203,8 @@ function gamma_loop(
     damp = zeros(length(gamma))
     v_normal_array = zeros(n_panels)
     v_tangential_array = zeros(n_panels)
+
+    AIC_x, AIC_y, AIC_z = @views wing_aero.AIC[1, :, :], wing_aero.AIC[2, :, :], wing_aero.AIC[3, :, :]
     
     iters = 0
     for i in 1:solver.max_iterations

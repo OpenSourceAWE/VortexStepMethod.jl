@@ -1,6 +1,6 @@
 using BenchmarkTools
 using VortexStepMethod
-using VortexStepMethod: calculate_AIC_matrices, gamma_loop, calculate_results,
+using VortexStepMethod: calculate_AIC_matrices!, gamma_loop, calculate_results,
                        update_effective_angle_of_attack_if_VSM, calculate_projected_area,
                        calculate_cl, calculate_cd_cm,
                        calculate_velocity_induced_single_ring_semiinfinite,
@@ -60,7 +60,7 @@ using LinearAlgebra
         for model in models
             for frac in core_radius_fractions
                 @testset "Model $model Core Radius Fraction $frac" begin
-                    result = @benchmark calculate_AIC_matrices($wing_aero, $model, $frac, $va_norm_array, $va_unit_array)
+                    result = @benchmark calculate_AIC_matrices!($wing_aero, $model, $frac, $va_norm_array, $va_unit_array)
                     @test result.allocs ≤ 100  # Allow some allocations for matrix setup
                 end
             end
