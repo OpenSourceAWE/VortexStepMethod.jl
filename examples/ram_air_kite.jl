@@ -4,7 +4,7 @@ using DataFrames
 using LinearAlgebra
 
 # Create wing geometry
-wing = KiteWing("data/HL5_ram_air_kite_body.obj", "data/HL5_ram_air_kite_foil.dat")
+wing = KiteWing("data/ram_air_kite_body.obj", "data/ram_air_kite_foil.dat")
 wing_aero = WingAerodynamics([wing])
 
 # Create solvers
