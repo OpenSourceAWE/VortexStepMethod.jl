@@ -22,7 +22,7 @@ try
 
     alphas = -deg2rad(5):deg2rad(1.0):deg2rad(20)
     d_trailing_edge_angles = -deg2rad(5):deg2rad(1.0):deg2rad(20)
-    
+
     cl_matrix = SharedArray{Float64}((length(alphas), length(d_trailing_edge_angles)))
     cd_matrix = SharedArray{Float64}((length(alphas), length(d_trailing_edge_angles)))
     cm_matrix = SharedArray{Float64}((length(alphas), length(d_trailing_edge_angles)))
@@ -283,7 +283,6 @@ try
     plot_values(alphas, d_trailing_edge_angles, cl_matrix, cl_interp, "Cl")
     plot_values(alphas, d_trailing_edge_angles, cd_matrix, cd_interp, "Cd")
     plot_values(alphas, d_trailing_edge_angles, cm_matrix, cm_interp, "Cm")
-    display(plot(alphas, cd_interp.(alphas, 0.0)))
     
     @info "Relative trailing_edge height: $(upper - lower)"
     @info "Reynolds number for flying speed of $kite_speed is $reynolds_number"

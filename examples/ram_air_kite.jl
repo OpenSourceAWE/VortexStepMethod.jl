@@ -44,14 +44,14 @@ plot_geometry(
 
 # Solving and plotting distributions
 @time results = solve(VSM, wing_aero)
-@time results_with_stall = solve(VSM_with_stall_correction, wing_aero)
+@time results = solve(VSM, wing_aero)
 
 CAD_y_coordinates = [panel.aerodynamic_center[2] for panel in wing_aero.panels]
 
 plot_distribution(
-    [CAD_y_coordinates, CAD_y_coordinates],
-    [results, results_with_stall],
-    ["VSM", "VSM with stall correction"];
+    [CAD_y_coordinates],
+    [results],
+    ["VSM"];
     title="CAD_spanwise_distributions_alpha_$(round(aoa, digits=1))_beta_$(round(side_slip, digits=1))_yaw_$(round(yaw_rate, digits=1))_v_a_$(round(v_a, digits=1))",
     data_type=".pdf",
     is_save=false,
@@ -59,18 +59,17 @@ plot_distribution(
 )
 
 plot_polars(
-    [VSM, VSM_with_stall_correction],
-    [wing_aero, wing_aero],
+    [VSM],
+    [wing_aero],
     [
-        "VSM CAD 19ribs",
-        "VSM CAD 19ribs , with stall correction",
+        "VSM from Ram Air Kite OBJ and DAT file",
     ];
-    angle_range=range(0, 45, length=25),
+    angle_range=range(0, 20, length=20),
     angle_type="angle_of_attack",
     angle_of_attack=0,
     side_slip=0,
     v_a=10,
-    title="tutorial_testing_stall_model_n_panels_$(wing.n_panels)_distribution_$(wing.spanwise_panel_distribution)",
+    title="ram_kite_panels_$(wing.n_panels)_distribution_$(wing.spanwise_panel_distribution)",
     data_type=".pdf",
     is_save=false,
     is_show=true
