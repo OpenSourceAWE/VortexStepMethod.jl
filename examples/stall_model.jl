@@ -1,7 +1,12 @@
 using VortexStepMethod
+using LinearAlgebra
+
+using Pkg
+if ! ("CSV" ∈ keys(Pkg.project().dependencies))
+    using TestEnv; TestEnv.activate()
+end
 using CSV
 using DataFrames
-using LinearAlgebra
 
 # Find root directory
 root_dir = dirname(@__DIR__)
