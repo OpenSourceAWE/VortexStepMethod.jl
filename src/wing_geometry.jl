@@ -239,9 +239,9 @@ function calculate_new_aero_input(aero_input,
         cl_left, cd_left, cm_left = aero_input[section_index][2]
         cl_right, cd_right, cm_right = aero_input[section_index + 1][2]
 
-        CL_interp = (α, β) -> left_weight * cl_left(α, β) + right_weight * cl_right(α, β)
-        CD_interp = (α, β) -> left_weight * cd_left(α, β) + right_weight * cd_right(α, β)
-        CM_interp = (α, β) -> left_weight * cm_left(α, β) + right_weight * cm_right(α, β)
+        CL_interp = (α, β) -> left_weight * cl_left[α, β] + right_weight * cl_right[α, β]
+        CD_interp = (α, β) -> left_weight * cd_left[α, β] + right_weight * cd_right[α, β]
+        CM_interp = (α, β) -> left_weight * cm_left[α, β] + right_weight * cm_right[α, β]
 
         return ("interpolations", (CL_interp, CD_interp, CM_interp))
         
@@ -346,7 +346,7 @@ function refine_mesh_for_linear_cosine_distribution(
         avg_direction = avg_direction ./ max(norm(avg_direction), 1e-12)
 
         # Interpolate length
-        left_lengthcalculate_new_aero_input = norm(left_chord)
+        left_length = norm(left_chord)
         right_length = norm(right_chord)
         avg_length = left_weight * left_length + right_weight * right_length
 

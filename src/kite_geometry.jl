@@ -200,9 +200,9 @@ mutable struct KiteWing <: AbstractWing
     gamma_tip::Float64
     inertia_tensor::Matrix{Float64}
     radius::Float64
-    le_interp::Function
-    te_interp::Function
-    area_interp::Function
+    le_interp::Extrapolation
+    te_interp::Extrapolation
+    area_interp::Extrapolation
 
     function KiteWing(obj_path, dat_path; alpha=0.0, n_sections=20, crease_frac=0.75, wind_vel=10., mass=1.0, n_panels=54, spanwise_panel_distribution="linear", spanwise_direction=[0.0, 1.0, 0.0])
         !isapprox(spanwise_direction, [0.0, 1.0, 0.0]) && @error "Spanwise direction has to be [0.0, 1.0, 0.0]"
@@ -223,10 +223,7 @@ mutable struct KiteWing <: AbstractWing
             inertia_tensor = calculate_inertia_tensor(vertices, faces, mass, center_of_mass)
     
             circle_center_z, radius, gamma_tip = find_circle_center_and_radius(vertices)
-            le_interp_, te_interp_, area_interp_= create_interpolations(vertices, circle_center_z, radius, gamma_tip)
-            le_interp = (γ) -> le_interp_(γ)
-            te_interp = (γ) -> te_interp_(γ)
-            area_interp = (γ) -> area_interp_(γ)
+            le_interp, te_interp, area_interp = create_interpolations(vertices, circle_center_z, radius, gamma_tip)
             @info "Writing $info_path"
             serialize(info_path, (center_of_mass, inertia_tensor, circle_center_z, radius, gamma_tip, 
                 le_interp, te_interp, area_interp))
@@ -242,14 +239,12 @@ mutable struct KiteWing <: AbstractWing
 
         @info "Loding polars and kite info from $polar_path and $info_path"
         (cl_interp, cd_interp, cm_interp) = deserialize(polar_path)
+    
         (center_of_mass, inertia_tensor, circle_center_z, radius, gamma_tip, 
             le_interp, te_interp, area_interp) = deserialize(info_path)
         
-        @show le_interp
-
         # Create sections
         sections = Section[]
-
         for gamma in range(-gamma_tip, gamma_tip, n_sections)
             aero_input = ("interpolations", (cl_interp, cd_interp, cm_interp))
             LE_point = [0.0, 0.0, circle_center_z] .+ [le_interp(gamma), sin(gamma) * radius, cos(gamma) * radius]

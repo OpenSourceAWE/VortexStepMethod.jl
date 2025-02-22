@@ -95,9 +95,9 @@ mutable struct Panel{P}
         elseif aero_model == "interpolations"
             cl_left, cd_left, cm_left = section_1.aero_input[2]
             cl_right, cd_right, cm_right = section_2.aero_input[2]
-            cl_interp = 0.5cl_left + 0.5cl_right
-            cd_interp = 0.5cd_left + 0.5cd_right
-            cm_interp = 0.5cm_left + 0.5cm_right
+            cl_interp = (α, β) -> 0.5cl_left(α, β) + 0.5cl_right(α, β)
+            cd_interp = (α, β) -> 0.5cd_left(α, β) + 0.5cd_right(α, β)
+            cm_interp = (α, β) -> 0.5cm_left(α, β) + 0.5cm_right(α, β)
             polar_data = (cl_interp, cd_interp, cm_interp)
         elseif aero_model != "inviscid"
             throw(ArgumentError("Unsupported aero model: $aero_model"))

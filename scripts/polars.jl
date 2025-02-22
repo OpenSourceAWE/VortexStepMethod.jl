@@ -21,9 +21,9 @@ try
 
     @eval @everywhere using VortexStepMethod, Xfoil, Statistics, SharedArrays
 
-    alphas = -5:1.0:30
+    alphas = -deg2rad(5):deg2rad(1.0):deg2rad(30)
     # alphas = -1.0:1.0:1.0
-    d_trailing_edge_angles = -10:1.0:50
+    d_trailing_edge_angles = -deg2rad(10):deg2rad(1.0):deg2rad(50)
     # d_trailing_edge_angles = -1.0:1.0:1.0
     cl_matrix = SharedArray{Float64}((length(alphas), length(d_trailing_edge_angles)))
     cd_matrix = SharedArray{Float64}((length(alphas), length(d_trailing_edge_angles)))
@@ -31,13 +31,12 @@ try
 
     @everywhere begin
         function turn_trailing_edge!(angle, x, y, lower_turn, upper_turn, x_turn)
-            theta = deg2rad(angle)
             turn_distance = upper_turn - lower_turn
             smooth_idx = []
             rm_idx = []
         
-            sign = theta > 0 ? 1 : -1
-            y_turn = theta > 0 ? upper_turn : lower_turn
+            sign = angle > 0 ? 1 : -1
+            y_turn = angle > 0 ? upper_turn : lower_turn
             for i in eachindex(x)
                 if x_turn - turn_distance < x[i] < x_turn + turn_distance && sign * y[i] > 0
                     append!(smooth_idx, i)
@@ -47,11 +46,11 @@ try
                 if x[i] > x_turn
                     x_rel = x[i] - x_turn
                     y_rel = y[i] - y_turn
-                    x[i] = x_turn + x_rel * cos(theta) + y_rel * sin(theta)
-                    y[i] = y_turn - x_rel * sin(theta) + y_rel * cos(theta)
-                    if theta > 0 && x[i] < x_turn - turn_distance/2 && y[i] > lower_turn
+                    x[i] = x_turn + x_rel * cos(angle) + y_rel * sin(angle)
+                    y[i] = y_turn - x_rel * sin(angle) + y_rel * cos(angle)
+                    if angle > 0 && x[i] < x_turn - turn_distance/2 && y[i] > lower_turn
                         append!(rm_idx, i)
-                    elseif theta < 0 && x[i] < x_turn - turn_distance/2 && y[i] < upper_turn
+                    elseif angle < 0 && x[i] < x_turn - turn_distance/2 && y[i] < upper_turn
                         append!(rm_idx, i)
                     end
                 end
@@ -74,14 +73,13 @@ try
             turn_trailing_edge!(d_trailing_edge_angle, x, y, lower, upper, x_turn)
             Xfoil.set_coordinates(x, y)
             x, y = Xfoil.pane(npan=140)
-            @info "d_trailing_edge_angle: $d_trailing_edge_angle"
             reinit = true
             for (alpha, alpha_idx) in zip(alphas, alpha_idxs)
                 converged = false
                 cl = 0.0
                 cd = 0.0
                 # Solve for the given angle of attack
-                cl, cd, _, cm, converged = Xfoil.solve_alpha(alpha, re; iter=50, reinit=reinit, mach=kite_speed/speed_of_sound, xtrip=(0.05, 0.05))
+                cl, cd, _, cm, converged = Xfoil.solve_alpha(rad2deg(alpha), re; iter=50, reinit=reinit, mach=kite_speed/speed_of_sound, xtrip=(0.05, 0.05))
                 reinit = false
                 if converged
                     cls[alpha_idx] = cl
@@ -93,7 +91,7 @@ try
         end
         
         function run_solve_alpha(alphas, d_trailing_edge_angle, re, x_, y_, lower, upper, kite_speed, speed_of_sound, x_turn)
-            @info "solving alpha"
+            @info "solving alpha with trailing edge angle: $d_trailing_edge_angle"
             cls = Float64[NaN for _ in alphas]
             cds = Float64[NaN for _ in alphas]
             cms = Float64[NaN for _ in alphas]
@@ -256,13 +254,9 @@ try
     replace_nan!(cd_matrix)
     replace_nan!(cm_matrix)
     
-    cl_interp_ = extrapolate(scale(interpolate(cl_matrix, BSpline(Linear())), alphas, d_trailing_edge_angles), NaN)
-    cd_interp_ = extrapolate(scale(interpolate(cd_matrix, BSpline(Linear())), alphas, d_trailing_edge_angles), NaN)
-    cm_interp_ = extrapolate(scale(interpolate(cm_matrix, BSpline(Linear())), alphas, d_trailing_edge_angles), NaN)
-    
-    cl_interp = (α, β) -> cl_interp_(α, β)
-    cd_interp = (α, β) -> cd_interp_(α, β)
-    cm_interp = (α, β) -> cm_interp_(α, β)
+    cl_interp = extrapolate(scale(interpolate(cl_matrix, BSpline(Linear())), alphas, d_trailing_edge_angles), NaN)
+    cd_interp = extrapolate(scale(interpolate(cd_matrix, BSpline(Linear())), alphas, d_trailing_edge_angles), NaN)
+    cm_interp = extrapolate(scale(interpolate(cm_matrix, BSpline(Linear())), alphas, d_trailing_edge_angles), NaN)
     
     @info "Relative trailing_edge height: $upper - $lower"
     @info "Reynolds number for flying speed of $kite_speed is $reynolds_number"

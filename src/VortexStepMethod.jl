@@ -10,7 +10,7 @@ using ControlPlots
 using Measures
 using LaTeXStrings
 using NonlinearSolve
-using Interpolations: linear_interpolation, Line
+using Interpolations: linear_interpolation, Line, Extrapolation
 using Serialization
 using Distributed
 using SharedArrays
