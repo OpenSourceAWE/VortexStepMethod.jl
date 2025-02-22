@@ -2,7 +2,7 @@
 
 Flowchart that describes how this software works:
 
-<p align="center"><img src="https://raw.githubusercontent.com/Albatross-Kite-Transport/VortexStepMethod.jl/refs/heads/main/docs/src/Flowchart.png" width="500" /></p>
+<p align="center"><img src="https://github.com/Albatross-Kite-Transport/VortexStepMethod.jl/blob/main/docs/Flowchart.png?raw=true" width="500" /></p>
 
 ### References:
 
