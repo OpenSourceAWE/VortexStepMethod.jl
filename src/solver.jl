@@ -55,17 +55,17 @@ struct Solver
 end
 
 """
-    solve(solver::Solver, wing_aero::BodyAerodynamics, gamma_distribution=nothing)
+    solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=nothing)
 
 Main solving routine for the aerodynamic model.
 """
-function solve(solver::Solver, wing_aero::BodyAerodynamics, gamma_distribution=nothing)
-    isnothing(wing_aero.panels[1].va) && throw(ArgumentError("Inflow conditions are not set, use set_va!(wing_aero, va)"))
+function solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=nothing)
+    isnothing(body_aero.panels[1].va) && throw(ArgumentError("Inflow conditions are not set, use set_va!(body_aero, va)"))
     
     # Initialize variables
-    panels = wing_aero.panels
+    panels = body_aero.panels
     n_panels = length(panels)
-    alpha_array = wing_aero.alpha_array
+    alpha_array = body_aero.alpha_array
     relaxation_factor = solver.relaxation_factor
     
     # Preallocate arrays
@@ -90,7 +90,7 @@ function solve(solver::Solver, wing_aero::BodyAerodynamics, gamma_distribution=n
 
     # Calculate AIC matrices
     AIC_x, AIC_y, AIC_z = calculate_AIC_matrices(
-        wing_aero,
+        body_aero,
         solver.aerodynamic_model_type,
         solver.core_radius_fraction,
         va_norm_array,
@@ -100,7 +100,7 @@ function solve(solver::Solver, wing_aero::BodyAerodynamics, gamma_distribution=n
     # Initialize gamma distribution
     gamma_initial = if isnothing(gamma_distribution)
         if solver.type_initial_gamma_distribution == "elliptic"
-            calculate_circulation_distribution_elliptical_wing(wing_aero)
+            calculate_circulation_distribution_elliptical_wing(body_aero)
         else
             zeros(n_panels)
         end
@@ -114,7 +114,7 @@ function solve(solver::Solver, wing_aero::BodyAerodynamics, gamma_distribution=n
     # Run main iteration loop
     converged, gamma_new, alpha_array, v_a_array = gamma_loop(
         solver,
-        wing_aero,
+        body_aero,
         gamma_initial,
         AIC_x,
         AIC_y,
@@ -132,7 +132,7 @@ function solve(solver::Solver, wing_aero::BodyAerodynamics, gamma_distribution=n
         @warn "Running again with half the relaxation_factor = $(relaxation_factor/2)"
         converged, gamma_new, alpha_array, v_a_array = gamma_loop(
             solver,
-            wing_aero,
+            body_aero,
             gamma_initial,
             AIC_x,
             AIC_y,
@@ -149,7 +149,7 @@ function solve(solver::Solver, wing_aero::BodyAerodynamics, gamma_distribution=n
 
     # Calculate final results
     results = calculate_results(
-        wing_aero,
+        body_aero,
         gamma_new,
         solver.density,
         solver.aerodynamic_model_type,
@@ -181,7 +181,7 @@ Main iteration loop for calculating circulation distribution.
 """
 function gamma_loop(
     solver::Solver,
-    wing_aero::BodyAerodynamics,
+    body_aero::BodyAerodynamics,
     gamma_new::Vector{Float64},
     AIC_x::Matrix{Float64},
     AIC_y::Matrix{Float64},
@@ -195,8 +195,8 @@ function gamma_loop(
     relaxation_factor::Float64
 )
     converged = false
-    alpha_array = wing_aero.alpha_array
-    v_a_array = wing_aero.v_a_array
+    alpha_array = body_aero.alpha_array
+    v_a_array = body_aero.v_a_array
 
     iters = 0
     for i in 1:solver.max_iterations

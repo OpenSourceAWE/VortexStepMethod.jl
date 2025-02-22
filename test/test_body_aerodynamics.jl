@@ -38,27 +38,27 @@ include("utils.jl")
         )
     end
     
-    wing_aero = BodyAerodynamics([wing])
-    set_va!(wing_aero, (Uinf, 0.0))
+    body_aero = BodyAerodynamics([wing])
+    set_va!(body_aero, (Uinf, 0.0))
 
     # Run analysis
     solver_object = Solver(
         aerodynamic_model_type=model, 
         core_radius_fraction=core_radius_fraction
     )
-    results_NEW = solve(solver_object, wing_aero)
+    results_NEW = solve(solver_object, body_aero)
 
     @test results_NEW isa Dict
 
     # Calculate forces using uncorrected alpha
     alpha = results_NEW["alpha_uncorrected"]
     dyn_visc = 0.5 * density * norm(Uinf)^2
-    n_panels = length(wing_aero.panels)
+    n_panels = length(body_aero.panels)
     lift = zeros(n_panels)
     drag = zeros(n_panels)
     moment = zeros(n_panels)
     
-    for (i, panel) in enumerate(wing_aero.panels)
+    for (i, panel) in enumerate(body_aero.panels)
         lift[i] = dyn_visc * calculate_cl(panel, alpha[i]) * panel.chord
         cd_cm = calculate_cd_cm(panel, alpha[i])
         drag[i] = dyn_visc * cd_cm[1] * panel.chord
@@ -70,15 +70,15 @@ include("utils.jl")
     # Calculate coefficients using corrected alpha
     alpha = results_NEW["alpha_at_ac"]
     aero_coeffs = hcat(
-        [alpha[i] for (i, panel) in enumerate(wing_aero.panels)],
-        [calculate_cl(panel, alpha[i]) for (i, panel) in enumerate(wing_aero.panels)],
-        [calculate_cd_cm(panel, alpha[i])[1] for (i, panel) in enumerate(wing_aero.panels)],
-        [calculate_cd_cm(panel, alpha[i])[2] for (i, panel) in enumerate(wing_aero.panels)]
+        [alpha[i] for (i, panel) in enumerate(body_aero.panels)],
+        [calculate_cl(panel, alpha[i]) for (i, panel) in enumerate(body_aero.panels)],
+        [calculate_cd_cm(panel, alpha[i])[1] for (i, panel) in enumerate(body_aero.panels)],
+        [calculate_cd_cm(panel, alpha[i])[2] for (i, panel) in enumerate(body_aero.panels)]
     )
     
-    ringvec = [Dict("r0" => panel.width * panel.z_airf) for panel in wing_aero.panels]
+    ringvec = [Dict("r0" => panel.width * panel.z_airf) for panel in body_aero.panels]
     controlpoints = [Dict("tangential" => panel.y_airf, "normal" => panel.x_airf) 
-                    for panel in wing_aero.panels]
+                    for panel in body_aero.panels]
     Atot = calculate_projected_area(wing)
 
     F_rel_ref, F_gl_ref, Ltot_ref, Dtot_ref, CL_ref, CD_ref, CS_ref = 
@@ -100,8 +100,8 @@ include("utils.jl")
     @test isapprox(results_NEW["drag"], Dtot_ref, rtol=1e-4)
 
     # Check array shapes
-    @test length(results_NEW["cl_distribution"]) == length(wing_aero.panels)
-    @test length(results_NEW["cd_distribution"]) == length(wing_aero.panels)
+    @test length(results_NEW["cl_distribution"]) == length(body_aero.panels)
+    @test length(results_NEW["cd_distribution"]) == length(body_aero.panels)
 end
 
 @testset "Induction Matrix Creation" begin
@@ -135,8 +135,8 @@ end
         )
     end
     
-    wing_aero = BodyAerodynamics([wing])
-    set_va!(wing_aero, (Uinf, 0.0))
+    body_aero = BodyAerodynamics([wing])
+    set_va!(body_aero, (Uinf, 0.0))
 
     # Calculate reference matrices using thesis functions
     controlpoints, rings, bladepanels, ringvec, coord_L = 
@@ -160,7 +160,7 @@ end
         va_norm_array = fill(norm(Uinf), length(coord))
         va_unit_array = repeat(reshape(Uinf ./ norm(Uinf), 1, 3), length(coord))
         AIC_x, AIC_y, AIC_z = calculate_AIC_matrices(
-            wing_aero,
+            body_aero,
             "LLT",
             core_radius_fraction,
             va_norm_array,
@@ -194,7 +194,7 @@ end
         va_norm_array = fill(norm(Uinf), length(coord))
         va_unit_array = repeat(reshape(Uinf ./ norm(Uinf), 1, 3), length(coord))
         AIC_x, AIC_y, AIC_z = calculate_AIC_matrices(
-            wing_aero,
+            body_aero,
             "VSM",
             core_radius_fraction,
             va_norm_array,
@@ -250,17 +250,17 @@ end
                 "inviscid"
             )
         end
-        wing_aero = BodyAerodynamics([wing])
-        set_va!(wing_aero, (Uinf, 0.0))
+        body_aero = BodyAerodynamics([wing])
+        set_va!(body_aero, (Uinf, 0.0))
         
-        return wing_aero, coord, Uinf, model
+        return body_aero, coord, Uinf, model
     end
 
     for model in ["VSM", "LLT"]
         @debug "model: $model"
         for wing_type in ["rectangular", "curved", "elliptical"]
             @debug "wing_type: $wing_type"
-            wing_aero, coord, Uinf, model = create_geometry(
+            body_aero, coord, Uinf, model = create_geometry(
                 model=model, wing_type=wing_type
             )
             
@@ -270,11 +270,11 @@ end
                 coord, Uinf, div(size(coord,1), 2), "5fil", model
             )
 
-            for i in 1:length(wing_aero.panels)
+            for i in 1:length(body_aero.panels)
                 @debug "i: $i"
                 # Handle control points
-                index_reversed = length(wing_aero.panels) - i + 1
-                panel = wing_aero.panels[index_reversed]
+                index_reversed = length(body_aero.panels) - i + 1
+                panel = body_aero.panels[index_reversed]
                 
                 evaluation_point = if model == "VSM"
                     panel.control_point
