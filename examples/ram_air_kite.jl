@@ -5,10 +5,6 @@ using LinearAlgebra
 
 # Create wing geometry
 wing = KiteWing("data/HL5_ram_air_kite_body.obj", "data/HL5_ram_air_kite_foil.dat")
-
-# for gamma in range(wing.gamma_tip - wing.gamma_tip/10, -wing.gamma_tip + wing.gamma_tip/10, 20)
-#     add_section!(wing, gamma, ("dat_file", "data/centre_line_with_profile.dat"))
-# end
 wing_aero = WingAerodynamics([wing])
 
 # Create solvers
