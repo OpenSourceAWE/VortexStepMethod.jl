@@ -12,21 +12,17 @@ Represents a wing section with leading edge, trailing edge, and aerodynamic prop
     - `("polar_data", [alpha_column,CL_column,CD_column,CM_column])`: Polar data aerodynamics
     - `("lei_airfoil_breukels", [d_tube,camber])`: LEI airfoil with Breukels parameters
 """
-struct Section
+struct Section{T}
     LE_point::Vector{Float64}
     TE_point::Vector{Float64}
-    aero_input::Union{String, Tuple{String, Vector{Float64}}, Tuple{String, Matrix{Float64}}}
+    aero_input::T
     
     function Section(
             LE_point::Vector{Float64}, 
             TE_point::Vector{Float64}, 
-            aero_input::Union{String, Tuple{String, Vector{Float64}}, Tuple{String, Matrix{Float64}}})
-        new(LE_point, TE_point, aero_input)
-    end
-    
-    # Default constructor
-    function Section()
-        new(zeros(3), zeros(3), "")
+            aero_input::T
+            ) where T
+        new{T}(LE_point, TE_point, aero_input)
     end
 end
 
@@ -238,6 +234,16 @@ function calculate_new_aero_input(aero_input,
         CM_interp = CM_left_common .* left_weight .+ CM_right_common .* right_weight
         
         return ("polar_data", hcat(alpha_common, CD_interp, CL_interp, CM_interp))
+
+    elseif model_type == "interpolations"
+        cl_left, cd_left, cm_left = aero_input[section_index][2]
+        cl_right, cd_right, cm_right = aero_input[section_index + 1][2]
+
+        CL_interp = (α, β) -> left_weight * cl_left[α, β] + right_weight * cl_right[α, β]
+        CD_interp = (α, β) -> left_weight * cd_left[α, β] + right_weight * cd_right[α, β]
+        CM_interp = (α, β) -> left_weight * cm_left[α, β] + right_weight * cm_right[α, β]
+
+        return ("interpolations", (CL_interp, CD_interp, CM_interp))
         
     elseif model_type == "lei_airfoil_breukels"
         tube_diameter_left = aero_input[section_index][2][1]
