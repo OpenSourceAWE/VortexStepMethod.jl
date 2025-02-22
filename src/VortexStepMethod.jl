@@ -12,7 +12,6 @@ using LaTeXStrings
 using NonlinearSolve
 using Interpolations: linear_interpolation, Line, Extrapolation
 using Serialization
-using Distributed
 using SharedArrays
 
 # Export public interface
