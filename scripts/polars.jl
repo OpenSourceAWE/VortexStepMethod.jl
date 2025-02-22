@@ -269,10 +269,10 @@ try
     replace_nan!(cd_matrix)
     replace_nan!(cm_matrix)
     
-    cl_interp = extrapolate(scale(interpolate(cl_matrix, BSpline(Linear())), alphas, d_trailing_edge_angles), Line())
-    cd_interp = extrapolate(scale(interpolate(cd_matrix, BSpline(Linear())), alphas, d_trailing_edge_angles), Line())
-    cm_interp = extrapolate(scale(interpolate(cm_matrix, BSpline(Linear())), alphas, d_trailing_edge_angles), Line())
-
+    cl_interp = extrapolate(scale(interpolate(cl_matrix, BSpline(Linear())), alphas, d_trailing_edge_angles), NaN)
+    cd_interp = extrapolate(scale(interpolate(cd_matrix, BSpline(Linear())), alphas, d_trailing_edge_angles), NaN)
+    cm_interp = extrapolate(scale(interpolate(cm_matrix, BSpline(Linear())), alphas, d_trailing_edge_angles), NaN)
+    
     plot_values(alphas, d_trailing_edge_angles, cl_matrix, cl_interp, "Cl")
     plot_values(alphas, d_trailing_edge_angles, cd_matrix, cd_interp, "Cd")
     plot_values(alphas, d_trailing_edge_angles, cm_matrix, cm_interp, "Cm")
