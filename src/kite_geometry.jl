@@ -220,6 +220,7 @@ mutable struct KiteWing <: AbstractWing
             @info "Reading $obj_path"
             vertices, faces = read_faces(obj_path)
             center_of_mass = calculate_com(vertices, faces)
+            !(abs(center_of_mass[2]) < 0.01) && @error "Center of mass $center_of_mass has to lie on x-axis."
             inertia_tensor = calculate_inertia_tensor(vertices, faces, mass, center_of_mass)
     
             circle_center_z, radius, gamma_tip = find_circle_center_and_radius(vertices)

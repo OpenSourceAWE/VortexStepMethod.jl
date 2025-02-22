@@ -5,6 +5,7 @@ using ControlPlots
 using Logging
 
 @info "Creating polars. This can take several minutes."
+tic()
 
 procs = addprocs()
 
@@ -128,14 +129,6 @@ try
         return lower_trailing_edge, upper_trailing_edge
     end
 
-    function remove_nothing(matrix)
-        # Identify rows and columns containing `nothing`
-        rows_to_keep = [all(!isnothing, matrix[i, :]) for i in 1:size(matrix)[1]]
-        cols_to_keep = [all(!isnothing, matrix[:, j]) for j in 1:size(matrix)[2]]
-
-        return matrix[rows_to_keep, cols_to_keep]
-    end
-
     function replace_nan!(matrix)
         rows, cols = size(matrix)
         distance = max(rows, cols)
@@ -208,9 +201,7 @@ try
         cl_matrix[:, j], cd_matrix[:, j], cm_matrix[:, j] = run_solve_alpha(alphas, d_trailing_edge_angles[j], 
                         reynolds_number, x, y, lower, upper, kite_speed, speed_of_sound, x_turn)
     end
-    @info "cl_matrix" begin
-        display(cl_matrix)
-    end
+    display(cl_matrix)
     
     function replace_nan!(matrix)
         rows, cols = size(matrix)
@@ -276,9 +267,9 @@ try
     replace_nan!(cd_matrix)
     replace_nan!(cm_matrix)
     
-    cl_interp = extrapolate(scale(interpolate(cl_matrix, BSpline(Linear())), alphas, d_trailing_edge_angles), NaN)
-    cd_interp = extrapolate(scale(interpolate(cd_matrix, BSpline(Linear())), alphas, d_trailing_edge_angles), NaN)
-    cm_interp = extrapolate(scale(interpolate(cm_matrix, BSpline(Linear())), alphas, d_trailing_edge_angles), NaN)
+    cl_interp = extrapolate(scale(interpolate(cl_matrix, BSpline(Linear())), alphas, d_trailing_edge_angles), Line())
+    cd_interp = extrapolate(scale(interpolate(cd_matrix, BSpline(Linear())), alphas, d_trailing_edge_angles), Line())
+    cm_interp = extrapolate(scale(interpolate(cm_matrix, BSpline(Linear())), alphas, d_trailing_edge_angles), Line())
 
     plot_values(alphas, d_trailing_edge_angles, cl_matrix, cl_interp, "Cl")
     plot_values(alphas, d_trailing_edge_angles, cd_matrix, cd_interp, "Cd")
@@ -287,9 +278,8 @@ try
     @info "Relative trailing_edge height: $(upper - lower)"
     @info "Reynolds number for flying speed of $kite_speed is $reynolds_number"
     
-    toc()
     serialize(polar_path, (cl_interp, cd_interp, cm_interp))
-
+    
 catch e
     @info "Removing processes"
     rmprocs(procs)
@@ -299,3 +289,4 @@ finally
     rmprocs(procs)
 end    
 
+toc()
