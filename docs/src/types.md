@@ -8,8 +8,12 @@ CurrentModule = VortexStepMethod
    VelVector
 ```
 
-## Wing Geometry
+## Wing Geometry, Panel and Aerodynamics
 ```@docs
     Section
     Wing
+    BoundFilament
+    Panel
+    PanelProperties
+    WingAerodynamics
 ```

@@ -6,21 +6,21 @@ using LinearAlgebra
 Represents a panel in a vortex step method simulation.
 
 # Fields
-- `TE_point_1::Vector{Float64}`: First trailing edge point
-- `LE_point_1::Vector{Float64}`: First leading edge point
-- `TE_point_2::Vector{Float64}`: Second trailing edge point
-- `LE_point_2::Vector{Float64}`: Second leading edge point
+- `TE_point_1::MVec3`: First trailing edge point
+- `LE_point_1::MVec3`: First leading edge point
+- `TE_point_2::Vector{MVec3}`: Second trailing edge point
+- `LE_point_2::Vector{MVec3}`: Second leading edge point
 - `chord::Float64`: Panel chord length
 - `va::Union{Nothing,Vector{Float64}}`: Panel velocity
 - `corner_points::Matrix{Float64}`: Panel corner points
 - `panel_aero_model::String`: Aerodynamic model type
 - `aerodynamic_center::Vector{Float64}`: Panel aerodynamic center
-- `control_point::Vector{Float64}`: Panel control point
-- `bound_point_1::Vector{Float64}`: First bound point
-- `bound_point_2::Vector{Float64}`: Second bound point
-- `x_airf::Vector{Float64}`: Unit vector perpendicular to chord line
-- `y_airf::Vector{Float64}`: Unit vector parallel to chord line
-- `z_airf::Vector{Float64}`: Unit vector in spanwise direction
+- `control_point::Vector{MVec3}`: Panel control point
+- `bound_point_1::Vector{MVec3}`: First bound point
+- `bound_point_2::Vector{MVec3}`: Second bound point
+- `x_airf::MVec3`: Unit vector perpendicular to chord line
+- `y_airf::MVec3`: Unit vector parallel to chord line
+- `z_airf::MVec3`: Unit vector in spanwise direction
 - `width::Float64`: Panel width
 - `filaments::Vector{BoundFilament}`: Panel filaments
 """
