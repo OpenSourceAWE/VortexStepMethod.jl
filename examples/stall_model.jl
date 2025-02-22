@@ -107,7 +107,7 @@ plot_polars(
         "CFD_Lebesque Rey 30e5"
     ];
     literature_path_list=[path_cfd_lebesque],
-    angle_range=range(0, 25, length=25),
+    angle_range=range(0, 20, length=20),
     angle_type="angle_of_attack",
     angle_of_attack=0,
     side_slip=0,
