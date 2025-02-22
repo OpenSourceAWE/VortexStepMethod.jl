@@ -21,9 +21,9 @@ try
 
     @eval @everywhere using VortexStepMethod, Xfoil, Statistics, SharedArrays
 
-    alphas = -deg2rad(5):deg2rad(1.0):deg2rad(30)
+    alphas = -deg2rad(5):deg2rad(1.0):deg2rad(50)
     # alphas = -1.0:1.0:1.0
-    d_trailing_edge_angles = -deg2rad(10):deg2rad(1.0):deg2rad(50)
+    d_trailing_edge_angles = -deg2rad(5):deg2rad(1.0):deg2rad(50)
     # d_trailing_edge_angles = -1.0:1.0:1.0
     cl_matrix = SharedArray{Float64}((length(alphas), length(d_trailing_edge_angles)))
     cd_matrix = SharedArray{Float64}((length(alphas), length(d_trailing_edge_angles)))

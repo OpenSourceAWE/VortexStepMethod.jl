@@ -65,7 +65,7 @@ plot_polars(
         "VSM CAD 19ribs",
         "VSM CAD 19ribs , with stall correction",
     ];
-    angle_range=range(0, 25, length=25),
+    angle_range=range(0, 45, length=25),
     angle_type="angle_of_attack",
     angle_of_attack=0,
     side_slip=0,
