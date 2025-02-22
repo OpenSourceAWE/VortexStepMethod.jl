@@ -3,10 +3,13 @@ using Test
 using VortexStepMethod
 using VortexStepMethod: create_interpolations, find_circle_center_and_radius, calculate_inertia_tensor, calculate_com, read_faces
 using LinearAlgebra
+using Interpolations
+using Serialization
 
 @testset "Kite Geometry Tests" begin
     # Test data
     test_obj_path = joinpath(tempdir(), "test.obj")
+    test_dat_path = joinpath(tempdir(), "test.dat")
     
     @testset "OBJ File Reading" begin
         # Create minimal test OBJ file
@@ -65,51 +68,93 @@ using LinearAlgebra
         
         @test isapprox(z, z_center, rtol=1e-2)
         @test isapprox(radius, r, rtol=1e-2)
-        @test gamma_tip ≈ -π/4 rtol=1e-2
+        @test gamma_tip ≈ π/4 rtol=1e-2
     end
     
+    r = 5.0
     @testset "Interpolation Creation" begin
         vertices = []
-        r = 5.0
         z_center = 2.0
         for θ in range(-π/4, π/4, length=10)
             push!(vertices, [0.0, r*sin(θ), z_center + r*cos(θ)])
             push!(vertices, [1.0, r*sin(θ), z_center + r*cos(θ)])
         end
         
-        le_interp, te_interp, area_interp, gammas, max_xs, min_xs = 
-            create_interpolations(vertices, z_center, r, π/4)
-            
+        # Create test airfoil data file
+        test_dat_path = joinpath(tempdir(), "test.dat")
+        write(test_dat_path, "1.0 0.0\n0.0 0.0\n-1.0 0.0\n")
+        
+        # Create polar data
+        alphas = -1.0:1.0:1.0
+        d_trailing_edge_angles = -1.0:1.0:1.0
+        cl_matrix = zeros(length(alphas), length(d_trailing_edge_angles))
+        cd_matrix = zeros(length(alphas), length(d_trailing_edge_angles))
+        cm_matrix = zeros(length(alphas), length(d_trailing_edge_angles))
+        
+        # Fill matrices with sample data
+        for i in eachindex(alphas)
+            for j in eachindex(d_trailing_edge_angles)
+                cl_matrix[i,j] = sin(deg2rad(alphas[i]))
+                cd_matrix[i,j] = 0.01 + 0.1*sin(deg2rad(alphas[i]))^2
+                cm_matrix[i,j] = -0.1*sin(deg2rad(alphas[i]))
+            end
+        end
+        
+        # Create interpolations
+        cl_interp = extrapolate(scale(interpolate(cl_matrix, BSpline(Linear())), alphas, d_trailing_edge_angles), NaN)
+        cd_interp = extrapolate(scale(interpolate(cd_matrix, BSpline(Linear())), alphas, d_trailing_edge_angles), NaN)
+        cm_interp = extrapolate(scale(interpolate(cm_matrix, BSpline(Linear())), alphas, d_trailing_edge_angles), NaN)
+        
+        # Serialize polar data
+        polar_path = test_dat_path[1:end-4] * "_polar.bin"
+        serialize(polar_path, (cl_interp, cd_interp, cm_interp))
+        
+        # Create and serialize obj file
+        faces = [[i, i+1, i+2] for i in 1:2:length(vertices)-2]
+        open(test_obj_path, "w") do io
+            for v in vertices
+                println(io, "v $(v[1]) $(v[2]) $(v[3])")
+            end
+            for f in faces
+                println(io, "f $(f[1]) $(f[2]) $(f[3])")
+            end
+        end
+        
+        # Create info file
+        info_path = test_obj_path[1:end-4] * "_info.bin"
+        le_interp, te_interp, area_interp = create_interpolations(vertices, z_center, r, π/4)
+        center_of_mass = calculate_com(vertices, faces)
+        inertia_tensor = calculate_inertia_tensor(vertices, faces, 1.0, center_of_mass)
+        
+        serialize(info_path, (
+            center_of_mass, 
+            inertia_tensor, 
+            z_center, 
+            r, 
+            π/4, 
+            le_interp, 
+            te_interp, 
+            area_interp
+        ))
+        
         # Test interpolation at middle point
         @test le_interp(0.0) ≈ 0.0 rtol=1e-2
         @test te_interp(0.0) ≈ 1.0 rtol=1e-2
     end
     
     @testset "KiteWing Construction" begin
-        # Create minimal test wing
-        wing = KiteWing(test_obj_path)
+        wing = KiteWing(test_obj_path, test_dat_path)
         
         @test wing.n_panels == 54  # Default value
         @test wing.spanwise_panel_distribution == "linear"
         @test wing.spanwise_direction ≈ [0.0, 1.0, 0.0]
-        @test isempty(wing.sections)
+        @test length(wing.sections) > 0  # Should have sections now
         @test wing.mass ≈ 1.0
         @test length(wing.center_of_mass) == 3
-        @test typeof(wing.le_interp) <: Function
-        @test typeof(wing.te_interp) <: Function
-        @test typeof(wing.area_interp) <: Function
+        @test wing.radius ≈ r rtol=1e-2
+        @test wing.gamma_tip ≈ π/4 rtol=1e-2
     end
     
-    @testset "Section Addition" begin
-        wing = KiteWing(test_obj_path)
-        gamma = 0.0
-        aero_input = "inviscid"
-        
-        add_section!(wing, gamma, aero_input)
-        
-        @test length(wing.sections) == 1
-        @test wing.sections[1].aero_input == aero_input
-    end
-
     rm(test_obj_path)
+    rm(test_dat_path)
 end

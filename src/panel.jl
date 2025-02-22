@@ -13,7 +13,7 @@ Represents a panel in a vortex step method simulation.
 - `chord::Float64`: Panel chord length
 - `va::Union{Nothing,Vector{Float64}}`: Panel velocity
 - `corner_points::Matrix{Float64}`: Panel corner points
-- `panel_aero_model::String`: Aerodynamic model type
+- `aero_model::String`: Aerodynamic model type
 - `aerodynamic_center::Vector{Float64}`: Panel aerodynamic center
 - `control_point::Vector{Float64}`: Panel control point
 - `bound_point_1::Vector{Float64}`: First bound point
@@ -24,7 +24,7 @@ Represents a panel in a vortex step method simulation.
 - `width::Float64`: Panel width
 - `filaments::Vector{BoundFilament}`: Panel filaments
 """
-mutable struct Panel
+mutable struct Panel{P}
     TE_point_1::MVec3
     LE_point_1::MVec3
     TE_point_2::MVec3
@@ -32,11 +32,11 @@ mutable struct Panel
     chord::Float64
     va::Union{Nothing,Vector{Float64}}
     corner_points::Matrix{Float64}
-    panel_aero_model::String
+    aero_model::String
     cl_coefficients::Union{Nothing,Vector{Float64}}
     cd_coefficients::Union{Nothing,Vector{Float64}}
     cm_coefficients::Union{Nothing,Vector{Float64}}
-    panel_polar_data::Union{Nothing,Matrix{Float64}}
+    polar_data::P
     aerodynamic_center::MVec3
     control_point::MVec3
     bound_point_1::MVec3
@@ -75,7 +75,7 @@ mutable struct Panel
         if section_1.aero_input[1] != section_2.aero_input[1]
             throw(ArgumentError("Both sections must have the same aero_input"))
         end
-        panel_aero_model = isa(section_1.aero_input, String) ? section_1.aero_input : section_1.aero_input[1]
+        aero_model = isa(section_1.aero_input, String) ? section_1.aero_input : section_1.aero_input[1]
         
         # Initialize aerodynamic properties
         cl_coeffs = nothing
@@ -83,17 +83,24 @@ mutable struct Panel
         cm_coeffs = nothing
         polar_data = nothing
         
-        if panel_aero_model == "lei_airfoil_breukels"
+        if aero_model == "lei_airfoil_breukels"
             cl_coeffs, cd_coeffs, cm_coeffs = compute_lei_coefficients(section_1, section_2)
-        elseif panel_aero_model == "polar_data"
+        elseif aero_model == "polar_data"
             aero_1 = section_1.aero_input[2]
             aero_2 = section_2.aero_input[2]
             if size(aero_1) != size(aero_2)
                 throw(ArgumentError("Polar data must have same shape"))
             end
             polar_data = (aero_1 + aero_2) / 2
-        elseif panel_aero_model != "inviscid"
-            throw(ArgumentError("Unsupported aero model: $panel_aero_model"))
+        elseif aero_model == "interpolations"
+            cl_left, cd_left, cm_left = section_1.aero_input[2]
+            cl_right, cd_right, cm_right = section_2.aero_input[2]
+            cl_interp = (α, β) -> 0.5cl_left(α, β) + 0.5cl_right(α, β)
+            cd_interp = (α, β) -> 0.5cd_left(α, β) + 0.5cd_right(α, β)
+            cm_interp = (α, β) -> 0.5cm_left(α, β) + 0.5cm_right(α, β)
+            polar_data = (cl_interp, cd_interp, cm_interp)
+        elseif aero_model != "inviscid"
+            throw(ArgumentError("Unsupported aero model: $aero_model"))
         end
         
         # Calculate width
@@ -106,9 +113,9 @@ mutable struct Panel
             BoundFilament(TE_point_2, bound_point_2)
         ]
 
-        new(
+        new{typeof(polar_data)}(
             TE_point_1, LE_point_1, TE_point_2, LE_point_2,
-            chord, nothing, corner_points, panel_aero_model,
+            chord, nothing, corner_points, aero_model,
             cl_coeffs, cd_coeffs, cm_coeffs, polar_data,
             aerodynamic_center, control_point,
             bound_point_1, bound_point_2,
@@ -237,22 +244,24 @@ Calculate lift coefficient for given angle of attack.
 - `Float64`: Lift coefficient (Cl)
 """
 function calculate_cl(panel::Panel, alpha::Float64)
-    if panel.panel_aero_model == "lei_airfoil_breukels"
+    if panel.aero_model == "lei_airfoil_breukels"
         cl = evalpoly(rad2deg(alpha), reverse(panel.cl_coefficients))
         if abs(alpha) > (π/9)
             cl = 2 * cos(alpha) * sin(alpha)^2
         end
         return cl
-    elseif panel.panel_aero_model == "inviscid"
+    elseif panel.aero_model == "inviscid"
         return 2π * alpha
-    elseif panel.panel_aero_model == "polar_data"
+    elseif panel.aero_model == "polar_data"
         return linear_interpolation(
-            panel.panel_polar_data[:,1],
-            panel.panel_polar_data[:,2];
+            panel.polar_data[:,1],
+            panel.polar_data[:,2];
             extrapolation_bc=Line()
         )(alpha)
+    elseif panel.aero_model == "interpolations"
+        return panel.polar_data[1](alpha, 0.0)
     else
-        throw(ArgumentError("Unsupported aero model: $(panel.panel_aero_model)"))
+        throw(ArgumentError("Unsupported aero model: $(panel.aero_model)"))
     end
 end
 
@@ -262,29 +271,31 @@ end
 Calculate drag and moment coefficients for given angle of attack.
 """
 function calculate_cd_cm(panel::Panel, alpha::Float64)
-    if panel.panel_aero_model == "lei_airfoil_breukels"
+    if panel.aero_model == "lei_airfoil_breukels"
         cd = evalpoly(rad2deg(alpha), reverse(panel.cd_coefficients))
         cm = evalpoly(rad2deg(alpha), reverse(panel.cm_coefficients))
         if abs(alpha) > (π/9)  # Outside ±20 degrees
             cd = 2 * sin(alpha)^3
         end
         return cd, cm
-    elseif panel.panel_aero_model == "inviscid"
+    elseif panel.aero_model == "inviscid"
         return 0.0, 0.0
-    elseif panel.panel_aero_model == "polar_data"
+    elseif panel.aero_model == "polar_data"
         cd = linear_interpolation(
-            panel.panel_polar_data[:,1],
-            panel.panel_polar_data[:,3];
+            panel.polar_data[:,1],
+            panel.polar_data[:,3];
             extrapolation_bc=Line()
         )(alpha)
         cm = linear_interpolation(
-            panel.panel_polar_data[:,1],
-            panel.panel_polar_data[:,4];
+            panel.polar_data[:,1],
+            panel.polar_data[:,4];
             extrapolation_bc=Line()
         )(alpha)
         return cd, cm
+    elseif panel.aero_model == "interpolations"
+        return panel.polar_data[2](alpha, 0.0), panel.polar_data[3](alpha, 0.0)
     else
-        throw(ArgumentError("Unsupported aero model: $(panel.panel_aero_model)"))
+        throw(ArgumentError("Unsupported aero model: $(panel.aero_model)"))
     end
 end
 
