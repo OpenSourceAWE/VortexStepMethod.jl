@@ -4,8 +4,8 @@ using Xfoil
 using ControlPlots
 using Logging
 
-const SPEED_OF_SOUND = 343
-const KINEMATIC_VISCOSITY = 1.460e-5
+const SPEED_OF_SOUND = 343 # https://en.wikipedia.org/wiki/Speed_of_sound
+const KINEMATIC_VISCOSITY = 1.460e-5 # https://en.wikipedia.org/wiki/Reynolds_number
 
 @info "Creating polars. This can take several minutes."
 tic()
