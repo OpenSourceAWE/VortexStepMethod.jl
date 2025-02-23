@@ -45,6 +45,8 @@ Velocity vector, either a `MVec3` or a `Vector` for use in function signatures.
 """
 const VelVector=Union{MVec3, Vector, SizedVector{3, Float64, Vector{Float64}}}
 
+@enum Model VSM LLT
+
 abstract type AbstractWing end
 
 function menu()
