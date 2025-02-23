@@ -630,7 +630,7 @@ function plot_polars(
         )
         push!(polar_data_list, polar_data)
         # Update label with Reynolds number
-        label_list[i] = "$(label_list[i]) Re = $(round(Int, rey*1e-5))e5"
+        label_list[i] = "$(label_list[i]) Re = $(round(Int64, rey*1e-5))e5"
     end
 
     # Load literature data if provided

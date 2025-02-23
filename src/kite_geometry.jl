@@ -14,7 +14,7 @@ function read_faces(filename)
             elseif startswith(line, "f ")
                 parts = split(line)
                 # Handle both f v1 v2 v3 and f v1/vt1/vn1 v2/vt2/vn2 v3/vt3/vn3 formats
-                indices = map(p -> parse(Int, split(p, '/')[1]), parts[2:4])
+                indices = map(p -> parse(Int64, split(p, '/')[1]), parts[2:4])
                 push!(faces, indices)
             end
         end
@@ -188,7 +188,7 @@ Represents a curved wing that inherits from Wing with additional geometric prope
 Same as Wing
 """
 mutable struct KiteWing <: AbstractWing
-    n_panels::Int
+    n_panels::Int64
     spanwise_panel_distribution::String
     spanwise_direction::Vector{Float64}
     sections::Vector{Section}

@@ -155,7 +155,7 @@ struct SemiInfiniteFilament <: Filament
     x1::Vector{Float64}         # Starting point
     direction::Vector{Float64}  # Direction vector
     vel_mag::Float64           # Velocity magnitude
-    filament_direction::Int    # Direction indicator (-1 or 1)
+    filament_direction::Int64    # Direction indicator (-1 or 1)
 end
 
 """
