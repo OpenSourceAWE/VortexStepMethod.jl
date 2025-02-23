@@ -15,7 +15,7 @@ Main structure for calculating aerodynamic properties of bodies.
 """
 mutable struct BodyAerodynamics
     panels::Vector{Panel}
-    wings::Vector{AbstractWing} # TODO: Why not a concrete type? And why a vector?
+    wings::Vector{AbstractWing} # can be a vector of Wings, or of KiteWings
     _va::Union{Nothing, Vector{Float64}, Tuple{Vector{Float64}, Float64}}
     gamma_distribution::Union{Nothing, Vector{Float64}}
     alpha_uncorrected::Union{Nothing, Vector{Float64}}
