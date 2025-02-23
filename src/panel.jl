@@ -178,7 +178,7 @@ function compute_lei_coefficients(section_1::Section, section_2::Section)
     )
 
     # Compute S values
-    S = Dict{Int,Float64}()
+    S = Dict{Int64,Float64}()
     S[9] = C[20]*t^2 + C[21]*t + C[22]
     S[10] = C[23]*t^2 + C[24]*t + C[25]
     S[11] = C[26]*t^2 + C[27]*t + C[28]
