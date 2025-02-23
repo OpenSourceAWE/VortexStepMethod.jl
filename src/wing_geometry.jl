@@ -32,7 +32,7 @@ end
 Represents a wing composed of multiple sections with aerodynamic properties.
 
 # Fields
-- `n_panels::Int`: Number of panels in aerodynamic mesh
+- `n_panels::Int64`: Number of panels in aerodynamic mesh
 - `spanwise_panel_distribution::String`: Panel distribution type
 - `spanwise_direction::Vector{Float64}`: Wing span direction vector
 - `sections::Vector{Section}`: List of wing sections
@@ -45,12 +45,12 @@ Represents a wing composed of multiple sections with aerodynamic properties.
 - "unchanged": Keep original sections
 """
 mutable struct Wing <: AbstractWing
-    n_panels::Int
+    n_panels::Int64
     spanwise_panel_distribution::String
     spanwise_direction::PosVector
     sections::Vector{Section}
     
-    function Wing(n_panels::Int;
+    function Wing(n_panels::Int64;
                  spanwise_panel_distribution::String="linear",
                  spanwise_direction::PosVector=MVec3([0.0, 1.0, 0.0]))
         new(n_panels, 
@@ -183,14 +183,14 @@ end
 
 """
     calculate_new_aero_input(aero_input::Vector{Any}, 
-                            section_index::Int,
+                            section_index::Int64,
                             left_weight::Float64,
                             right_weight::Float64)
 
 Interpolate aerodynamic input between two sections.
 """
 function calculate_new_aero_input(aero_input, 
-                                section_index::Int,
+                                section_index::Int64,
                                 left_weight::Float64,
                                 right_weight::Float64)
     
@@ -266,7 +266,7 @@ end
 """
     refine_mesh_for_linear_cosine_distribution(
         spanwise_panel_distribution::String,
-        n_sections::Int,
+        n_sections::Int64,
         LE::Matrix{Float64},
         TE::Matrix{Float64},
         aero_input::Vector{Any})
@@ -285,7 +285,7 @@ Returns:
 """
 function refine_mesh_for_linear_cosine_distribution(
     spanwise_panel_distribution::String,
-    n_sections::Int,
+    n_sections::Int64,
     LE,
     TE,
     aero_input)

@@ -129,7 +129,7 @@ struct PanelProperties
 end
 
 """
-    calculate_panel_properties(section_list::Vector{Section}, n_panels::Int,
+    calculate_panel_properties(section_list::Vector{Section}, n_panels::Int64,
                              aero_center_loc::Float64, control_point_loc::Float64)
 
 Calculate geometric properties for each panel.
@@ -137,7 +137,7 @@ Calculate geometric properties for each panel.
 Returns:
     PanelProperties containing vectors for each property
 """
-function calculate_panel_properties(section_list::Vector{Section}, n_panels::Int,
+function calculate_panel_properties(section_list::Vector{Section}, n_panels::Int64,
                                   aero_center_loc::Float64, control_point_loc::Float64)
     # Initialize arrays
     aero_centers = Vector{Float64}[]

@@ -8,7 +8,7 @@ struct Solver
     # General settings
     aerodynamic_model_type::String
     density::Float64
-    max_iterations::Int
+    max_iterations::Int64
     allowed_error::Float64
     tol_reference_error::Float64
     relaxation_factor::Float64
@@ -26,7 +26,7 @@ struct Solver
     function Solver(;
         aerodynamic_model_type::String="VSM",
         density::Float64=1.225,
-        max_iterations::Int=1500,
+        max_iterations::Int64=1500,
         allowed_error::Float64=1e-5,
         tol_reference_error::Float64=0.001,
         relaxation_factor::Float64=0.03,

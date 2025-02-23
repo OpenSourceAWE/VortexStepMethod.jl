@@ -6,7 +6,7 @@ abstract type Filament end
 
 # Constants for all filament types
 const ALPHA0 = 1.25643  # Oseen parameter
-const NU = 1.48e-5     # Kinematic viscosity of air
+const NU = 1.48e-5      # Kinematic viscosity of air
 
 """
     BoundFilament
@@ -152,10 +152,10 @@ end
 Represents a semi-infinite vortex filament.
 """
 struct SemiInfiniteFilament <: Filament
-    x1::Vector{Float64}         # Starting point
-    direction::Vector{Float64}  # Direction vector
+    x1::MVec3                  # Starting point
+    direction::MVec3           # Direction vector
     vel_mag::Float64           # Velocity magnitude
-    filament_direction::Int    # Direction indicator (-1 or 1)
+    filament_direction::Int64  # Direction indicator (-1 or 1)
 end
 
 """

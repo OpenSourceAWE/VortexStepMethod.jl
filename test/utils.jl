@@ -8,7 +8,7 @@ include("thesis_oriol_cayon.jl")
 """
 Create an array with cosine spacing, from min to max values, with n points
 """
-function cosspace(min_val::Real, max_val::Real, n_points::Int)
+function cosspace(min_val::Real, max_val::Real, n_points::Int64)
     mean_val = (max_val + min_val) / 2
     amp = (max_val - min_val) / 2
     return mean_val .+ amp .* cos.(range(π, 0, length=n_points))
@@ -22,7 +22,7 @@ Generate 3D coordinates of a rectangular wing with twist and dihedral.
 - `span::Float64`: Total wing span
 - `twist::Vector{Float64}`: Twist angles in radians
 - `beta::Vector{Float64}`: Dihedral angles in radians
-- `N::Int`: Number of spanwise panels
+- `N::Int64`: Number of spanwise panels
 - `dist::String`: Distribution type ("cos" or "lin")
 
 # Returns
@@ -61,7 +61,7 @@ Generate 3D coordinates of a curved wing.
 - `span::Float64`: Wing span
 - `theta::Float64`: Angular extent of curvature (radians)
 - `R::Float64`: Radius of curvature
-- `N::Int`: Number of spanwise panels
+- `N::Int64`: Number of spanwise panels
 - `dist::String`: Distribution type ("cos", "lin", or "cos2")
 
 # Returns
@@ -94,7 +94,7 @@ Generate 3D coordinates of an elliptical wing.
 # Arguments
 - `max_chord::Float64`: Maximum chord length
 - `span::Float64`: Wing span
-- `N::Int`: Number of spanwise panels
+- `N::Int64`: Number of spanwise panels
 - `dist::String`: Distribution type ("cos" or "lin")
 
 # Returns
