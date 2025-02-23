@@ -105,20 +105,20 @@ end
 Structure to hold calculated panel properties.
 
 # Fields
-- `aero_centers`::Vector{PosVector}
-- `control_points`::Vector{PosVector}
-- `bound_points_1`::Vector{PosVector}
-- `bound_points_2`::Vector{PosVector}
+- `aero_centers`::Vector{MVec3}
+- `control_points`::Vector{MVec3}
+- `bound_points_1`::Vector{MVec3}
+- `bound_points_2`::Vector{MVec3}
 - `x_airf`::Vector{Vector{Float64}}: unclear, please define
 - `y_airf`::Vector{Vector{Float64}}: unclear, please define
 - `z_airf`::Vector{Vector{Float64}}: unclear, please define
 
 """
 struct PanelProperties
-    aero_centers::Vector{PosVector}
-    control_points::Vector{PosVector}
-    bound_points_1::Vector{PosVector}
-    bound_points_2::Vector{PosVector}
+    aero_centers::Vector{MVec3}
+    control_points::Vector{MVec3}
+    bound_points_1::Vector{MVec3}
+    bound_points_2::Vector{MVec3}
     x_airf::Vector{Vector{Float64}}
     y_airf::Vector{Vector{Float64}}
     z_airf::Vector{Vector{Float64}}

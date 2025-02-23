@@ -5,21 +5,21 @@
 Represents a wing section with leading edge, trailing edge, and aerodynamic properties.
 
 # Fields
-- `LE_point::Vector{Float64}`: Leading edge point coordinates
-- `TE_point::Vector{Float64}`: Trailing edge point coordinates
+- `LE_point::MVec3`: Leading edge point coordinates
+- `TE_point::MVec3`: Trailing edge point coordinates
 - `aero_input::Vector{Any}`: Aerodynamic input data for the section:
     - `("inviscid")`: Inviscid aerodynamics
     - `("polar_data", [alpha_column,CL_column,CD_column,CM_column])`: Polar data aerodynamics
     - `("lei_airfoil_breukels", [d_tube,camber])`: LEI airfoil with Breukels parameters
 """
 struct Section{T}
-    LE_point::Vector{Float64}
-    TE_point::Vector{Float64}
+    LE_point::MVec3
+    TE_point::MVec3
     aero_input::T
     
     function Section(
-            LE_point::Vector{Float64}, 
-            TE_point::Vector{Float64}, 
+            LE_point::PosVector, 
+            TE_point::PosVector, 
             aero_input::T
             ) where T
         new{T}(LE_point, TE_point, aero_input)
