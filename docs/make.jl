@@ -17,7 +17,9 @@ makedocs(;
     format = Documenter.HTML(prettyurls = haskey(ENV, "CI")),
     pages=[
         "Home" => "index.md",
+        "How it works" => "explanation.md",
         "Exported Functions" => "functions.md",
+        "Exported Types" => "types.md",
     ],
 )
 

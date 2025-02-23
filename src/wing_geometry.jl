@@ -32,7 +32,7 @@ end
 Represents a wing composed of multiple sections with aerodynamic properties.
 
 # Fields
-- `n_panels::Int`: Number of panels in aerodynamic mesh
+- `n_panels::Int64`: Number of panels in aerodynamic mesh
 - `spanwise_panel_distribution::String`: Panel distribution type
 - `spanwise_direction::Vector{Float64}`: Wing span direction vector
 - `sections::Vector{Section}`: List of wing sections
@@ -40,12 +40,12 @@ Represents a wing composed of multiple sections with aerodynamic properties.
 # Distribution types
 - "linear": Linear distribution
 - "cosine": Cosine distribution
-- "cosine_van_Garrel": van Garrel cosine distribution
+- "`cosine_van_Garrel`": van Garrel cosine distribution
 - "split_provided": Split provided sections
 - "unchanged": Keep original sections
 """
 mutable struct Wing <: AbstractWing
-    n_panels::Int
+    n_panels::Int64
     spanwise_panel_distribution::String
     spanwise_direction::PosVector
     sections::Vector{Section}

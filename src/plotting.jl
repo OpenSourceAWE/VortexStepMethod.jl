@@ -143,12 +143,12 @@ function set_axes_equal!(ax; zoom=1.8)
 end
 
 """
-    create_geometry_plot(wing_aero::WingAerodynamics, title, view_elevation, view_azimuth; zoom=1.8)
+    create_geometry_plot(body_aero::BodyAerodynamics, title, view_elevation, view_azimuth; zoom=1.8)
 
 Create a 3D plot of wing geometry including panels and filaments.
 
 # Arguments
-- wing_aero: struct of type WingAerodynamics
+- body_aero: struct of type BodyAerodynamics
 - title: plot title
 - view_elevation: initial view elevation angle [°]
 - view_azimuth: initial view azimuth angle [°]
@@ -156,12 +156,12 @@ Create a 3D plot of wing geometry including panels and filaments.
 # Keyword arguments
 - zoom: zoom factor (default: 1.8)
 """
-function create_geometry_plot(wing_aero::WingAerodynamics, title, view_elevation, view_azimuth; 
+function create_geometry_plot(body_aero::BodyAerodynamics, title, view_elevation, view_azimuth; 
                               zoom=1.8)
     set_plot_style(28)
 
-    panels = wing_aero.panels
-    va = isa(wing_aero.va, Tuple) ? wing_aero.va[1] : wing_aero.va
+    panels = body_aero.panels
+    va = isa(body_aero.va, Tuple) ? body_aero.va[1] : body_aero.va
 
     # Extract geometric data
     corner_points = [panel.corner_points for panel in panels]
@@ -241,7 +241,7 @@ function create_geometry_plot(wing_aero::WingAerodynamics, title, view_elevation
 end
 
 """
-    plot_geometry(wing_aero::WingAerodynamics, title; 
+    plot_geometry(body_aero::BodyAerodynamics, title; 
                   data_type=".pdf", save_path=nothing, 
                   is_save=false, is_show=false, 
                   view_elevation=15, view_azimuth=-120)
@@ -249,7 +249,7 @@ end
 Plot wing geometry from different viewpoints and optionally save/show plots.
 
 # Arguments:
-- `wing_aero`: struct of type WingAerodynamics
+- `body_aero`: struct of type BodyAerodynamics
 - title: plot title
 
 # Keyword arguments:
@@ -261,7 +261,7 @@ Plot wing geometry from different viewpoints and optionally save/show plots.
 - `view_azimuth`: initial view azimuth angle (default: -120) [°]
 
 """
-function plot_geometry(wing_aero::WingAerodynamics, title;
+function plot_geometry(body_aero::BodyAerodynamics, title;
     data_type=".pdf",
     save_path=nothing,
     is_save=false,
@@ -272,28 +272,28 @@ function plot_geometry(wing_aero::WingAerodynamics, title;
     if is_save
         plt.ioff()
         # Angled view
-        fig = create_geometry_plot(wing_aero, "$(title)_angled_view", 15, -120)
+        fig = create_geometry_plot(body_aero, "$(title)_angled_view", 15, -120)
         save_plot(fig, save_path, "$(title)_angled_view", data_type=data_type)
 
         # Top view
-        fig = create_geometry_plot(wing_aero, "$(title)_top_view", 90, 0)
+        fig = create_geometry_plot(body_aero, "$(title)_top_view", 90, 0)
         save_plot(fig, save_path, "$(title)_top_view", data_type=data_type)
 
         # Front view
-        fig = create_geometry_plot(wing_aero, "$(title)_front_view", 0, 0)
+        fig = create_geometry_plot(body_aero, "$(title)_front_view", 0, 0)
         save_plot(fig, save_path, "$(title)_front_view", data_type=data_type)
 
         # Side view
-        fig = create_geometry_plot(wing_aero, "$(title)_side_view", 0, -90)
+        fig = create_geometry_plot(body_aero, "$(title)_side_view", 0, -90)
         save_plot(fig, save_path, "$(title)_side_view", data_type=data_type)
     end
 
     if is_show
         plt.ion()
-        fig = create_geometry_plot(wing_aero, title, view_elevation, view_azimuth)
+        fig = create_geometry_plot(body_aero, title, view_elevation, view_azimuth)
         plt.display(fig)
     else
-        fig = create_geometry_plot(wing_aero, title, view_elevation, view_azimuth)
+        fig = create_geometry_plot(body_aero, title, view_elevation, view_azimuth)
     end
     fig
 end
@@ -467,7 +467,7 @@ function plot_distribution(y_coordinates_list, results_list, label_list;
 end
 
 """
-    generate_polar_data(solver, wing_aero::WingAerodynamics, angle_range;     
+    generate_polar_data(solver, body_aero::BodyAerodynamics, angle_range;     
                         angle_type="angle_of_attack", angle_of_attack=0.0,
                         side_slip=0.0, v_a=10.0)
 
@@ -475,7 +475,7 @@ Generate polar data for aerodynamic analysis over a range of angles.
 
 # Arguments
 - `solver`: Aerodynamic solver object
-- `wing_aero`: Wing aerodynamics struct
+- `body_aero`: Wing aerodynamics struct
 - `angle_range`: Range of angles to analyze
 
 # Keyword arguments
@@ -489,14 +489,14 @@ Generate polar data for aerodynamic analysis over a range of angles.
 """
 function generate_polar_data(
     solver,
-    wing_aero::WingAerodynamics,
+    body_aero::BodyAerodynamics,
     angle_range;
     angle_type="angle_of_attack",
     angle_of_attack=0.0,
     side_slip=0.0,
     v_a=10.0
 )
-    n_panels = length(wing_aero.panels)
+    n_panels = length(body_aero.panels)
     n_angles = length(angle_range)
 
     # Initialize arrays
@@ -528,7 +528,7 @@ function generate_polar_data(
 
         # Update inflow conditions
         set_va!(
-            wing_aero,
+            body_aero,
             [
                 cos(α) * cos(β),
                 sin(β),
@@ -537,7 +537,7 @@ function generate_polar_data(
         )
 
         # Solve and store results
-        results = solve(solver, wing_aero, gamma_distribution[i, :])
+        results = solve(solver, body_aero, gamma_distribution[i, :])
 
         cl[i] = results["cl"]
         cd[i] = results["cd"]
@@ -568,7 +568,7 @@ function generate_polar_data(
 end
 
 """
-    plot_polars(solver_list, wing_aero_list, label_list;
+    plot_polars(solver_list, body_aero_list, label_list;
     literature_path_list=String[], angle_range=range(0, 20, 2), angle_type="angle_of_attack", 
     angle_of_attack=0.0, side_slip=0.0, v_a=10.0, 
     title="polar", data_type=".pdf", save_path=nothing, 
@@ -578,7 +578,7 @@ Plot polar data comparing different solvers and configurations.
 
 # Arguments
 - `solver_list`: List of aerodynamic solvers
-- `wing_aero_list`: List of wing aerodynamics objects
+- `body_aero_list`: List of wing aerodynamics objects
 - `label_list`: List of labels for each configuration
 
 # Keyword arguments
@@ -596,7 +596,7 @@ Plot polar data comparing different solvers and configurations.
 """
 function plot_polars(
     solver_list,
-    wing_aero_list,
+    body_aero_list,
     label_list;
     literature_path_list=String[],
     angle_range=range(0, 20, 2),
@@ -611,8 +611,8 @@ function plot_polars(
     is_show=true
 )
     # Validate inputs
-    total_cases = length(wing_aero_list) + length(literature_path_list)
-    if total_cases != length(label_list) || length(solver_list) != length(wing_aero_list)
+    total_cases = length(body_aero_list) + length(literature_path_list)
+    if total_cases != length(label_list) || length(solver_list) != length(body_aero_list)
         throw(ArgumentError("Mismatch in number of solvers ($(length(solver_list))), " *
                             "cases ($total_cases), and labels ($(length(label_list)))"))
     end
@@ -620,9 +620,9 @@ function plot_polars(
 
     # Generate polar data
     polar_data_list = []
-    for (i, (solver, wing_aero)) in enumerate(zip(solver_list, wing_aero_list))
+    for (i, (solver, body_aero)) in enumerate(zip(solver_list, body_aero_list))
         polar_data, rey = generate_polar_data(
-            solver, wing_aero, angle_range;
+            solver, body_aero, angle_range;
             angle_type,
             angle_of_attack,
             side_slip,
@@ -630,7 +630,7 @@ function plot_polars(
         )
         push!(polar_data_list, polar_data)
         # Update label with Reynolds number
-        label_list[i] = "$(label_list[i]) Re = $(round(Int, rey*1e-5))e5"
+        label_list[i] = "$(label_list[i]) Re = $(round(Int64, rey*1e-5))e5"
     end
 
     # Load literature data if provided

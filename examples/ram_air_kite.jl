@@ -1,11 +1,16 @@
 using VortexStepMethod
+using LinearAlgebra
+using Pkg
+
+if ! ("CSV" ∈ keys(Pkg.project().dependencies))
+    using TestEnv; TestEnv.activate()
+end
 using CSV
 using DataFrames
-using LinearAlgebra
 
 # Create wing geometry
 wing = KiteWing("data/ram_air_kite_body.obj", "data/ram_air_kite_foil.dat")
-wing_aero = WingAerodynamics([wing])
+body_aero = BodyAerodynamics([wing])
 
 # Create solvers
 VSM = Solver(
@@ -28,11 +33,11 @@ vel_app = [
     sin(side_slip),
     sin(aoa_rad)
 ] * v_a
-wing_aero.va = vel_app
+body_aero.va = vel_app
 
 # Plotting geometry
 plot_geometry(
-    wing_aero,
+    body_aero,
     "";
     data_type=".svg",
     save_path="",
@@ -43,10 +48,10 @@ plot_geometry(
 )
 
 # Solving and plotting distributions
-@time results = solve(VSM, wing_aero)
-@time results = solve(VSM, wing_aero)
+@time results = solve(VSM, body_aero)
+@time results = solve(VSM, body_aero)
 
-CAD_y_coordinates = [panel.aerodynamic_center[2] for panel in wing_aero.panels]
+CAD_y_coordinates = [panel.aerodynamic_center[2] for panel in body_aero.panels]
 
 plot_distribution(
     [CAD_y_coordinates],
@@ -60,7 +65,7 @@ plot_distribution(
 
 plot_polars(
     [VSM],
-    [wing_aero],
+    [body_aero],
     [
         "VSM from Ram Air Kite OBJ and DAT file",
     ];

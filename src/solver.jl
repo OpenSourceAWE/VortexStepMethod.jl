@@ -8,7 +8,7 @@ struct Solver
     # General settings
     aerodynamic_model_type::String
     density::Float64
-    max_iterations::Int
+    max_iterations::Int64
     allowed_error::Float64
     tol_reference_error::Float64
     relaxation_factor::Float64
@@ -26,7 +26,7 @@ struct Solver
     function Solver(;
         aerodynamic_model_type::String="VSM",
         density::Float64=1.225,
-        max_iterations::Int=1500,
+        max_iterations::Int64=1500,
         allowed_error::Float64=1e-5,
         tol_reference_error::Float64=0.001,
         relaxation_factor::Float64=0.03,
@@ -55,17 +55,17 @@ struct Solver
 end
 
 """
-    solve(solver::Solver, wing_aero::WingAerodynamics, gamma_distribution=nothing)
+    solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=nothing)
 
 Main solving routine for the aerodynamic model.
 """
-function solve(solver::Solver, wing_aero::WingAerodynamics, gamma_distribution=nothing)
-    isnothing(wing_aero.panels[1].va) && throw(ArgumentError("Inflow conditions are not set, use set_va!(wing_aero, va)"))
+function solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=nothing)
+    isnothing(body_aero.panels[1].va) && throw(ArgumentError("Inflow conditions are not set, use set_va!(body_aero, va)"))
     
     # Initialize variables
-    panels = wing_aero.panels
+    panels = body_aero.panels
     n_panels = length(panels)
-    alpha_array = wing_aero.alpha_array
+    alpha_array = body_aero.alpha_array
     relaxation_factor = solver.relaxation_factor
     
     # Preallocate arrays
@@ -90,7 +90,7 @@ function solve(solver::Solver, wing_aero::WingAerodynamics, gamma_distribution=n
 
     # Calculate AIC matrices
     calculate_AIC_matrices!(
-        wing_aero,
+        body_aero,
         solver.aerodynamic_model_type,
         solver.core_radius_fraction,
         va_norm_array,
@@ -100,7 +100,7 @@ function solve(solver::Solver, wing_aero::WingAerodynamics, gamma_distribution=n
     # Initialize gamma distribution
     gamma_initial = if isnothing(gamma_distribution)
         if solver.type_initial_gamma_distribution == "elliptic"
-            calculate_circulation_distribution_elliptical_wing(wing_aero)
+            calculate_circulation_distribution_elliptical_wing(body_aero)
         else
             zeros(n_panels)
         end
@@ -114,7 +114,7 @@ function solve(solver::Solver, wing_aero::WingAerodynamics, gamma_distribution=n
     # Run main iteration loop
     converged, gamma_new, alpha_array, v_a_array = gamma_loop(
         solver,
-        wing_aero,
+        body_aero,
         gamma_initial,
         va_array,
         chord_array,
@@ -129,7 +129,7 @@ function solve(solver::Solver, wing_aero::WingAerodynamics, gamma_distribution=n
         @warn "Running again with half the relaxation_factor = $(relaxation_factor/2)"
         converged, gamma_new, alpha_array, v_a_array = gamma_loop(
             solver,
-            wing_aero,
+            body_aero,
             gamma_initial,
             va_array,
             chord_array,
@@ -143,7 +143,7 @@ function solve(solver::Solver, wing_aero::WingAerodynamics, gamma_distribution=n
 
     # Calculate final results
     results = calculate_results(
-        wing_aero,
+        body_aero,
         gamma_new,
         solver.density,
         solver.aerodynamic_model_type,
@@ -177,7 +177,7 @@ Main iteration loop for calculating circulation distribution.
 """
 function gamma_loop(
     solver::Solver,
-    wing_aero::WingAerodynamics,
+    body_aero::BodyAerodynamics,
     gamma_new::Vector{Float64},
     va_array::Matrix{Float64},
     chord_array::Vector{Float64},
@@ -188,9 +188,9 @@ function gamma_loop(
     relaxation_factor::Float64
 )
     converged = false
-    n_panels = wing_aero.n_panels
-    alpha_array = wing_aero.alpha_array
-    v_a_array = wing_aero.v_a_array
+    n_panels = body_aero.n_panels
+    alpha_array = body_aero.alpha_array
+    v_a_array = body_aero.v_a_array
     Umagw_array = similar(v_a_array)
 
     gamma = copy(gamma_new)
@@ -204,7 +204,7 @@ function gamma_loop(
     v_normal_array = zeros(n_panels)
     v_tangential_array = zeros(n_panels)
 
-    AIC_x, AIC_y, AIC_z = wing_aero.AIC[1, :, :], wing_aero.AIC[2, :, :], wing_aero.AIC[3, :, :]
+    AIC_x, AIC_y, AIC_z = body_aero.AIC[1, :, :], body_aero.AIC[2, :, :], body_aero.AIC[3, :, :]
 
     velocity_view_x = @view induced_velocity_all[:, 1]
     velocity_view_y = @view induced_velocity_all[:, 2]

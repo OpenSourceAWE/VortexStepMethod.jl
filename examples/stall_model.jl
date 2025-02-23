@@ -1,7 +1,12 @@
 using VortexStepMethod
+using LinearAlgebra
+
+using Pkg
+if ! ("CSV" ∈ keys(Pkg.project().dependencies))
+    using TestEnv; TestEnv.activate()
+end
 using CSV
 using DataFrames
-using LinearAlgebra
 
 # Find root directory
 root_dir = dirname(@__DIR__)
@@ -33,7 +38,7 @@ CAD_wing = Wing(n_panels; spanwise_panel_distribution)
 for rib in rib_list
     add_section!(CAD_wing, rib[1], rib[2], rib[3])
 end
-wing_aero_CAD_19ribs = WingAerodynamics([CAD_wing])
+body_aero_CAD_19ribs = BodyAerodynamics([CAD_wing])
 
 # Create solvers
 VSM = Solver(
@@ -56,11 +61,11 @@ vel_app = [
     sin(side_slip),
     sin(aoa_rad)
 ] * v_a
-wing_aero_CAD_19ribs.va = vel_app
+body_aero_CAD_19ribs.va = vel_app
 
 # # Plotting geometry
 # plot_geometry(
-#     wing_aero_CAD_19ribs,
+#     body_aero_CAD_19ribs,
 #     "";
 #     data_type=".svg",
 #     save_path="",
@@ -71,11 +76,11 @@ wing_aero_CAD_19ribs.va = vel_app
 # )
 
 # Solving and plotting distributions
-results = solve(VSM, wing_aero_CAD_19ribs)
-@time results_with_stall = solve(VSM_with_stall_correction, wing_aero_CAD_19ribs)
-@time results_with_stall = solve(VSM_with_stall_correction, wing_aero_CAD_19ribs)
+results = solve(VSM, body_aero_CAD_19ribs)
+@time results_with_stall = solve(VSM_with_stall_correction, body_aero_CAD_19ribs)
+@time results_with_stall = solve(VSM_with_stall_correction, body_aero_CAD_19ribs)
 
-CAD_y_coordinates = [panel.aerodynamic_center[2] for panel in wing_aero_CAD_19ribs.panels]
+CAD_y_coordinates = [panel.aerodynamic_center[2] for panel in body_aero_CAD_19ribs.panels]
 
 plot_distribution(
     [CAD_y_coordinates, CAD_y_coordinates],
@@ -100,7 +105,7 @@ path_cfd_lebesque = joinpath(
 
 plot_polars(
     [VSM, VSM_with_stall_correction],
-    [wing_aero_CAD_19ribs, wing_aero_CAD_19ribs],
+    [body_aero_CAD_19ribs, body_aero_CAD_19ribs],
     [
         "VSM CAD 19ribs",
         "VSM CAD 19ribs , with stall correction",

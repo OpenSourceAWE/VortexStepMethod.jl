@@ -26,7 +26,7 @@ function create_wa()
         "inviscid")
 
     # Step 3: Initialize aerodynamics
-    wa = WingAerodynamics([wing])
+    wa = BodyAerodynamics([wing])
     # Set inflow conditions
     vel_app = [cos(alpha), 0.0, sin(alpha)] .* v_a
     set_va!(wa, (vel_app, 0.0))  # Second parameter is yaw rate

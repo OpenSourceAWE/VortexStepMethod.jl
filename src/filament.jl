@@ -12,12 +12,18 @@ const NU = 1.48e-5     # Kinematic viscosity of air
     BoundFilament
 
 Represents a bound vortex filament defined by two points.
+
+# Fields
+- x1::MVec3: First point
+- x2::MVec3: Second point
+- length: Filament length
+- r0::MVec3: Vector from x1 to x2
 """
 struct BoundFilament <: Filament
-    x1::Vector{Float64}    # First point
-    x2::Vector{Float64}    # Second point
-    length::Float64        # Filament length
-    r0::Vector{Float64}    # Vector from x1 to x2
+    x1::MVec3       # First point
+    x2::MVec3       # Second point
+    length::Float64 # Filament length
+    r0::MVec3       # Vector from x1 to x2
 
     function BoundFilament(x1::PosVector, x2::PosVector)
         new(x1, x2, norm(x2 - x1), x2 - x1)
@@ -149,7 +155,7 @@ struct SemiInfiniteFilament <: Filament
     x1::Vector{Float64}         # Starting point
     direction::Vector{Float64}  # Direction vector
     vel_mag::Float64           # Velocity magnitude
-    filament_direction::Int    # Direction indicator (-1 or 1)
+    filament_direction::Int64    # Direction indicator (-1 or 1)
 end
 
 """

@@ -56,9 +56,10 @@ In Julia, first update the packages:
 using Pkg
 Pkg.update()
 ```
-and then you can execute the first example:
+and then you can display a menu with the available examples:
 ```julia
-include("examples/rectangular_wing.jl")
+using VortexStepMethod
+menu()
 ```
 To browse the code, it is suggested to use [VSCode](https://code.visualstudio.com/) with the Julia plugin.
 
@@ -104,7 +105,7 @@ add_section!(wing,
     "inviscid")
 
 # Step 3: Initialize aerodynamics
-wa = WingAerodynamics([wing])
+wa = BodyAerodynamics([wing])
 
 # Set inflow conditions
 vel_app = [cos(alpha), 0.0, sin(alpha)] .* v_a
@@ -121,14 +122,19 @@ Surfplan files can be converted to an input for `VortexStepMethod.jl` using the 
 
 ## Citation
 If you use this project in your research, please consider citing it. 
-Citation details can be found in the [CITATION.cff](CITATION.cff) file included in this repository.
+Citation details can be found in the [CITATION.cff](https://github.com/Albatross-Kite-Transport/VortexStepMethod.jl/blob/main/CITATION.cff) file included in this repository.
 
 ## License
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## WAIVER
+Technische Universiteit Delft hereby disclaims all copyright interest in the package “VortexStepMethod.jl” written by the Author(s).
+
+Prof.dr. H.G.C. (Henri) Werij, Dean of Aerospace Engineering
 
 ### Copyright
 Copyright (c) 2022 Oriol Cayon
 
 Copyright (c) 2024 Oriol Cayon, Jelle Poland, TU Delft
 
-Copyright (c) 2025 Oriol Cayon, Jelle Poland, Bart van de Lint
+Copyright (c) 2025 Oriol Cayon, Jelle Poland, Bart van de Lint, Uwe Fechner

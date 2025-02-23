@@ -1,7 +1,7 @@
 using LinearAlgebra
 using Logging
 using Statistics
-using VortexStepMethod: Wing, WingAerodynamics, Solver
+using VortexStepMethod: Wing, BodyAerodynamics, Solver
 
 include("thesis_oriol_cayon.jl")
 
