@@ -364,16 +364,16 @@ Calculate the velocity induced by a vortex ring at a control point.
 - nothing
 """
 @inline function calculate_velocity_induced_single_ring_semiinfinite!(
-    velind,
-    tempvel,
-    filaments,
-    evaluation_point,
-    evaluation_point_on_bound,
-    va_norm,
-    va_unit,
-    gamma,
-    core_radius_fraction,
-    work_vectors
+    velind::MVector{3, Float64},
+    tempvel::MVector{3, Float64},
+    filaments::Vector{Union{VortexStepMethod.BoundFilament, VortexStepMethod.SemiInfiniteFilament}},
+    evaluation_point::MVector{3, Float64},
+    evaluation_point_on_bound::Bool,
+    va_norm::Float64,
+    va_unit::MVector{3, Float64},
+    gamma::Float64,
+    core_radius_fraction::Float64,
+    work_vectors::NTuple{10, MVector{3, Float64}}
 )
     velind .= 0.0
     tempvel .= 0.0

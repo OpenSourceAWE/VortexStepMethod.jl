@@ -2,6 +2,8 @@ using Revise
 using LinearAlgebra
 using ControlPlots
 using VortexStepMethod
+using StaticArrays
+using BenchmarkTools
 
 # Step 1: Define wing parameters
 n_panels = 20          # Number of panels
@@ -36,20 +38,19 @@ set_va!(wa, (vel_app, 0.0))  # Second parameter is yaw rate
 vsm_solver = Solver(aerodynamic_model_type="VSM")
 
 # Benchmark setup
-velocity_induced = zeros(3)
-tempvel = zeros(3)
+velocity_induced = @MVector zeros(3)  # StaticArraysCore.MVector{3, Float64}
+tempvel = @MVector zeros(3)          # StaticArraysCore.MVector{3, Float64}
 panel = wa.panels[1]
-ep = [0.25, 9.5, 0.0]
-evaluation_point_on_bound = true
-va_norm = 20.0
-va_unit = [0.8660254037844387, 0.0, 0.4999999999999999]
-core_radius_fraction = 1.0e-20
-gamma = 1.0
+ep = @MVector [0.25, 9.5, 0.0]      # StaticArraysCore.MVector{3, Float64}
+evaluation_point_on_bound = true     # Bool
+va_norm = 20.0                       # Float64
+va_unit = @MVector [0.8660254037844387, 0.0, 0.4999999999999999]  # StaticArraysCore.MVector{3, Float64}
+core_radius_fraction = 1.0e-20       # Float64
+gamma = 1.0                          # Float64
 
-# Create work vectors tuple
-work_vectors = ntuple(_ -> zeros(3), 10)
+# Create work vectors tuple of MVector{3, Float64}
+work_vectors = ntuple(_ -> @MVector(zeros(3)), 10)  # NTuple{10, StaticArraysCore.MVector{3, Float64}}
 
-using BenchmarkTools
 @btime VortexStepMethod.calculate_velocity_induced_single_ring_semiinfinite!(
     $velocity_induced,
     $tempvel,
@@ -63,7 +64,20 @@ using BenchmarkTools
     $work_vectors
 )
 
-U_2D = zeros(3)
+@btime VortexStepMethod.calculate_velocity_induced_single_ring_semiinfinite!(
+    velocity_induced,
+    tempvel,
+    panel.filaments,
+    ep,
+    evaluation_point_on_bound,
+    va_norm,
+    va_unit,
+    gamma,
+    core_radius_fraction,
+    work_vectors
+)
+
+U_2D = @MVector zeros(3)  # StaticArraysCore.MVector{3, Float64}
 
 @btime VortexStepMethod.calculate_velocity_induced_bound_2D!(
     $U_2D,
@@ -71,5 +85,13 @@ U_2D = zeros(3)
     $ep,
     $work_vectors
 )
+
+# model = "VSM"
+# va_norm_array = zeros(wa.n_panels)
+# va_unit_array = zeros(wa.n_panels, 3)
+# @time VortexStepMethod.calculate_AIC_matrices!(wa, model,
+#                               core_radius_fraction,
+#                               va_norm_array, 
+#                               va_unit_array)
 
 nothing

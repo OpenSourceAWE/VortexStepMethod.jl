@@ -229,15 +229,12 @@ function calculate_AIC_matrices!(wa::WingAerodynamics, model,
     evaluation_point_on_bound = model == "LLT"
     
     # Initialize AIC matrices
-    AIC = @views wa.AIC
     velocity_induced, tempvel, va_unit, U_2D = zeros(MVec3), zeros(MVec3), zeros(MVec3), zeros(MVec3)
     
     # Calculate influence coefficients
     for icp in 1:wa.n_panels
         ep = getproperty(wa.panels[icp], evaluation_point)
         for jring in 1:wa.n_panels
-            velocity_induced .= 0.0
-            tempvel .= 0.0
             va_unit .= @views va_unit_array[jring, :]
             filaments = wa.panels[jring].filaments
             va_norm = va_norm_array[jring]
@@ -253,13 +250,12 @@ function calculate_AIC_matrices!(wa::WingAerodynamics, model,
                 core_radius_fraction,
                 wa.work_vectors
             )
-            
-            AIC[:, icp, jring] .= velocity_induced
+            wa.AIC[:, icp, jring] .= velocity_induced
             
             # Subtract 2D induced velocity for VSM
             if icp == jring && model == "VSM"
                 calculate_velocity_induced_bound_2D!(U_2D, wa.panels[jring], ep, wa.work_vectors)
-                AIC[:, icp, jring] .-= U_2D
+                wa.AIC[:, icp, jring] .-= U_2D
             end
         end
     end
