@@ -194,13 +194,14 @@ end
         # Calculate new matrices
         va_norm_array = fill(norm(Uinf), length(coord))
         va_unit_array = repeat(reshape(Uinf ./ norm(Uinf), 1, 3), length(coord))
-        AIC_x, AIC_y, AIC_z = calculate_AIC_matrices(
+        calculate_AIC_matrices!(
             wing_aero,
             "VSM",
             core_radius_fraction,
             va_norm_array,
             va_unit_array
         )
+        AIC_x, AIC_y, AIC_z = wing_aero.AIC[1, :, :], wing_aero.AIC[2, :, :], wing_aero.AIC[3, :, :]
 
         # Compare matrices with higher precision for VSM
         @test isapprox(MatrixU, AIC_x, atol=1e-8)

@@ -55,7 +55,7 @@ function velocity_3D_bound_vortex!(
         vel .= (gamma / (4π)) .* r1Xr2 ./ (norm(r1Xr2)^2) .* 
             dot(r0, r1r2norm)
     elseif norm(r1Xr0) / norm(r0) == 0
-        vel .= zeros(3)
+        vel .= 0.0
     else
         @debug "inside core radius"
         @debug "distance from control point to filament: $(norm(r1Xr0) / norm(r0))"
@@ -122,7 +122,7 @@ as implemented in KiteAeroDyn".
         vel .= (gamma / (4π)) .* r1Xr2 ./ (norm(r1Xr2)^2) .* 
             dot(r0, normr1r2)
     elseif norm(r1Xr0) / norm(r0) == 0
-        vel .= zeros(3)
+        vel .= 0.0
     else
         # Project onto core radius
         r1_proj = dot(r1, r0) * r0 / (norm(r0)^2) + 
@@ -182,7 +182,7 @@ function velocity_3D_trailing_vortex_semiinfinite!(
         K = GAMMA / (4π) / norm(r1XVf)^2 * (1 + dot(r1, Vf) / norm(r1))
         vel .= K .* r1XVf
     elseif norm(r1XVf) / norm(Vf) == 0
-        vel .= zeros(3)
+        vel .= 0.0
     else
         r1_proj = dot(r1, Vf) * Vf + 
                   epsilon * (r1/norm(r1) - Vf) / norm(r1/norm(r1) - Vf)
