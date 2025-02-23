@@ -239,9 +239,21 @@ function calculate_new_aero_input(aero_input,
         cl_left, cd_left, cm_left = aero_input[section_index][2]
         cl_right, cd_right, cm_right = aero_input[section_index + 1][2]
 
-        CL_interp = (α, β) -> left_weight * cl_left[α, β] + right_weight * cl_right[α, β]
-        CD_interp = (α, β) -> left_weight * cd_left[α, β] + right_weight * cd_right[α, β]
-        CM_interp = (α, β) -> left_weight * cm_left[α, β] + right_weight * cm_right[α, β]
+        @info "Interpolation object comparison" begin
+            objects_equal = (
+                cl_left === cl_right,
+                cd_left === cd_right,
+                cm_left === cm_right
+            )
+            (; objects_equal)
+        end
+
+        CL_interp = cl_left === cl_right ? cl_left :
+            (α, β) -> left_weight * cl_left[α, β] + right_weight * cl_right[α, β]
+        CD_interp = cd_left === cd_right ? cd_left :
+            (α, β) -> left_weight * cd_left[α, β] + right_weight * cd_right[α, β]
+        CM_interp = cm_left === cm_right ? cm_left :
+            (α, β) -> left_weight * cm_left[α, β] + right_weight * cm_right[α, β]
 
         return ("interpolations", (CL_interp, CD_interp, CM_interp))
         

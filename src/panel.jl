@@ -24,7 +24,7 @@ Represents a panel in a vortex step method simulation.
 - `width::Float64`: Panel width
 - `filaments::Vector{BoundFilament}`: Panel filaments
 """
-mutable struct Panel{P}
+mutable struct Panel
     TE_point_1::MVec3
     LE_point_1::MVec3
     TE_point_2::MVec3
@@ -36,7 +36,7 @@ mutable struct Panel{P}
     cl_coefficients::Union{Nothing,Vector{Float64}}
     cd_coefficients::Union{Nothing,Vector{Float64}}
     cm_coefficients::Union{Nothing,Vector{Float64}}
-    polar_data::P
+    polar_data::Union{Nothing, Tuple{Extrapolation}}
     aerodynamic_center::MVec3
     control_point::MVec3
     bound_point_1::MVec3
@@ -92,6 +92,22 @@ mutable struct Panel{P}
                 throw(ArgumentError("Polar data must have same shape"))
             end
             polar_data = (aero_1 + aero_2) / 2
+            cl_interp = linear_interpolation(
+                polar_data[:,1],
+                polar_data[:,2];
+                extrapolation_bc=NaN
+            )
+            cd_interp = linear_interpolation(
+                polar_data[:,1],
+                polar_data[:,3];
+                extrapolation_bc=NaN
+            )
+            cm_interp = linear_interpolation(
+                polar_data[:,1],
+                polar_data[:,4];
+                extrapolation_bc=NaN
+            )
+            polar_data = (cl_interp, cd_interp, cm_interp)
         elseif aero_model == "interpolations"
             cl_left, cd_left, cm_left = section_1.aero_input[2]
             cl_right, cd_right, cm_right = section_2.aero_input[2]
@@ -113,7 +129,7 @@ mutable struct Panel{P}
             BoundFilament(TE_point_2, bound_point_2)
         ]
 
-        new{typeof(polar_data)}(
+        new(
             TE_point_1, LE_point_1, TE_point_2, LE_point_2,
             chord, nothing, corner_points, aero_model,
             cl_coeffs, cd_coeffs, cm_coeffs, polar_data,
@@ -178,7 +194,7 @@ function compute_lei_coefficients(section_1::Section, section_2::Section)
     )
 
     # Compute S values
-    S = Dict{Int,Float64}()
+    S = Dict{Int64,Float64}()
     S[9] = C[20]*t^2 + C[21]*t + C[22]
     S[10] = C[23]*t^2 + C[24]*t + C[25]
     S[11] = C[26]*t^2 + C[27]*t + C[28]
@@ -253,16 +269,16 @@ function calculate_cl(panel::Panel, alpha::Float64)
     elseif panel.aero_model == "inviscid"
         return 2π * alpha
     elseif panel.aero_model == "polar_data"
-        return linear_interpolation(
-            panel.polar_data[:,1],
-            panel.polar_data[:,2];
-            extrapolation_bc=Line()
-        )(alpha)
+        return panel.polar_data[1](alpha)
     elseif panel.aero_model == "interpolations"
         return panel.polar_data[1](alpha, 0.0)
     else
         throw(ArgumentError("Unsupported aero model: $(panel.aero_model)"))
     end
+end
+
+function calculate_cl(polar_data::Nothing, model_type::String, alpha::Float64)
+    return 2π * alpha
 end
 
 """
@@ -281,19 +297,13 @@ function calculate_cd_cm(panel::Panel, alpha::Float64)
     elseif panel.aero_model == "inviscid"
         return 0.0, 0.0
     elseif panel.aero_model == "polar_data"
-        cd = linear_interpolation(
-            panel.polar_data[:,1],
-            panel.polar_data[:,3];
-            extrapolation_bc=Line()
-        )(alpha)
-        cm = linear_interpolation(
-            panel.polar_data[:,1],
-            panel.polar_data[:,4];
-            extrapolation_bc=Line()
-        )(alpha)
+        cd = panel.polar_data[2](alpha)
+        cm = panel.polar_data[3](alpha)
         return cd, cm
     elseif panel.aero_model == "interpolations"
-        return panel.polar_data[2](alpha, 0.0), panel.polar_data[3](alpha, 0.0)
+        cd = panel.polar_data[2](alpha, 0.0)
+        cm = panel.polar_data[3](alpha, 0.0)
+        return cd, cm
     else
         throw(ArgumentError("Unsupported aero model: $(panel.aero_model)"))
     end

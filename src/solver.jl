@@ -204,17 +204,21 @@ function gamma_loop(
     v_normal_array = zeros(n_panels)
     v_tangential_array = zeros(n_panels)
 
-    AIC_x, AIC_y, AIC_z = @views wing_aero.AIC[1, :, :], wing_aero.AIC[2, :, :], wing_aero.AIC[3, :, :]
-    
+    AIC_x, AIC_y, AIC_z = wing_aero.AIC[1, :, :], wing_aero.AIC[2, :, :], wing_aero.AIC[3, :, :]
+
+    velocity_view_x = @view induced_velocity_all[:, 1]
+    velocity_view_y = @view induced_velocity_all[:, 2]
+    velocity_view_z = @view induced_velocity_all[:, 3]
+
     iters = 0
     for i in 1:solver.max_iterations
         iters += 1
         gamma .= gamma_new
         
         # Calculate induced velocities
-        mul!(view(induced_velocity_all, :, 1), AIC_x, gamma)
-        mul!(view(induced_velocity_all, :, 2), AIC_y, gamma)
-        mul!(view(induced_velocity_all, :, 3), AIC_z, gamma)
+        mul!(velocity_view_x, AIC_x, gamma)
+        mul!(velocity_view_y, AIC_y, gamma)
+        mul!(velocity_view_z, AIC_z, gamma)
         
         relative_velocity_array .= va_array .+ induced_velocity_all
         for i in 1:n_panels
@@ -240,7 +244,7 @@ function gamma_loop(
         end
         
         for (i, (panel, alpha)) in enumerate(zip(panels, alpha_array))
-            cl_array[i] = calculate_cl(panel, alpha)
+            cl_array[i] = calculate_cl(panel.polar_data, panel.aero_model, alpha)
         end
         gamma_new .= 0.5 .* v_a_array.^2 ./ Umagw_array .* cl_array .* chord_array
 

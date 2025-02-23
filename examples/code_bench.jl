@@ -86,12 +86,13 @@ U_2D = @MVector zeros(3)  # StaticArraysCore.MVector{3, Float64}
     $work_vectors
 )
 
-# model = "VSM"
-# va_norm_array = zeros(wa.n_panels)
-# va_unit_array = zeros(wa.n_panels, 3)
-# @time VortexStepMethod.calculate_AIC_matrices!(wa, model,
-#                               core_radius_fraction,
-#                               va_norm_array, 
-#                               va_unit_array)
+model = "VSM"
+va_norm_array = zeros(wa.n_panels)
+va_unit_array = zeros(wa.n_panels, 3)
+@btime VortexStepMethod.calculate_AIC_matrices!(
+    $wa, model,
+    $core_radius_fraction,
+    $va_norm_array, 
+    $va_unit_array)
 
 nothing
