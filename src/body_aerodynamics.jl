@@ -6,7 +6,7 @@ Main structure for calculating aerodynamic properties of bodies.
 # Fields
 - panels::Vector{Panel}: Vector of Panel structs
 - wings::Vector{AbstractWing}: a vector of wings; a body can have multiple wings
-- `_va`::Union{Nothing, Vector{Float64}, Tuple{Vector{Float64}, Float64}}: A vector of the apparent wind speed,  
+- `_va`::Union{Nothing, Vector{Float64}, Tuple{MVec3, Float64}}: A vector of the apparent wind speed,  
                                                       or a tuple of the v_a vector and yaw rate (rad/s).
 - `gamma_distribution`::Union{Nothing, Vector{Float64}}: unclear, please defined
 - `alpha_uncorrected`::Union{Nothing, Vector{Float64}}: unclear, please define
@@ -16,7 +16,7 @@ Main structure for calculating aerodynamic properties of bodies.
 mutable struct BodyAerodynamics
     panels::Vector{Panel}
     wings::Vector{AbstractWing} # can be a vector of Wings, or of KiteWings
-    _va::Union{Nothing, Vector{Float64}, Tuple{Vector{Float64}, Float64}}
+    _va::Union{Nothing, Vector{Float64}, Tuple{MVec3, Float64}}
     gamma_distribution::Union{Nothing, Vector{Float64}}
     alpha_uncorrected::Union{Nothing, Vector{Float64}}
     alpha_corrected::Union{Nothing, Vector{Float64}}
