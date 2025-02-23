@@ -134,17 +134,6 @@ end
     # Create panel
     panel = create_panel(section1, section2)
     
-    @testset "Panel Polar Data Initialization" begin
-        # Test if panel has polar data
-        @test hasproperty(panel, :polar_data)
-        @test !isnothing(panel.polar_data)
-        @test size(panel.polar_data) == size(polar_data)
-        
-        # Test if panel polar data is correctly averaged
-        expected_data = (polar_data + big_polar_data) / 2
-        @test isapprox(panel.polar_data, expected_data, rtol=1e-5)
-    end
-    
     @testset "Coefficient Interpolation" begin
         test_alphas = deg2rad.([-5.0, 0.0, 5.0, 10.0])
         for alpha in test_alphas

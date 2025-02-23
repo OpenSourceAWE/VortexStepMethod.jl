@@ -35,17 +35,17 @@ vel_app = [
 ] * v_a
 body_aero.va = vel_app
 
-# Plotting geometry
-plot_geometry(
-    body_aero,
-    "";
-    data_type=".svg",
-    save_path="",
-    is_save=false,
-    is_show=true,
-    view_elevation=15,
-    view_azimuth=-120
-)
+# # Plotting geometry
+# plot_geometry(
+#     body_aero,
+#     "";
+#     data_type=".svg",
+#     save_path="",
+#     is_save=false,
+#     is_show=true,
+#     view_elevation=15,
+#     view_azimuth=-120
+# )
 
 # Solving and plotting distributions
 @time results = solve(VSM, body_aero)
@@ -53,30 +53,30 @@ plot_geometry(
 
 CAD_y_coordinates = [panel.aerodynamic_center[2] for panel in body_aero.panels]
 
-plot_distribution(
-    [CAD_y_coordinates],
-    [results],
-    ["VSM"];
-    title="CAD_spanwise_distributions_alpha_$(round(aoa, digits=1))_beta_$(round(side_slip, digits=1))_yaw_$(round(yaw_rate, digits=1))_v_a_$(round(v_a, digits=1))",
-    data_type=".pdf",
-    is_save=false,
-    is_show=true
-)
+# plot_distribution(
+#     [CAD_y_coordinates],
+#     [results],
+#     ["VSM"];
+#     title="CAD_spanwise_distributions_alpha_$(round(aoa, digits=1))_beta_$(round(side_slip, digits=1))_yaw_$(round(yaw_rate, digits=1))_v_a_$(round(v_a, digits=1))",
+#     data_type=".pdf",
+#     is_save=false,
+#     is_show=true
+# )
 
-plot_polars(
-    [VSM],
-    [body_aero],
-    [
-        "VSM from Ram Air Kite OBJ and DAT file",
-    ];
-    angle_range=range(0, 20, length=20),
-    angle_type="angle_of_attack",
-    angle_of_attack=0,
-    side_slip=0,
-    v_a=10,
-    title="ram_kite_panels_$(wing.n_panels)_distribution_$(wing.spanwise_panel_distribution)",
-    data_type=".pdf",
-    is_save=false,
-    is_show=true
-)
+# plot_polars(
+#     [VSM],
+#     [body_aero],
+#     [
+#         "VSM from Ram Air Kite OBJ and DAT file",
+#     ];
+#     angle_range=range(0, 20, length=20),
+#     angle_type="angle_of_attack",
+#     angle_of_attack=0,
+#     side_slip=0,
+#     v_a=10,
+#     title="ram_kite_panels_$(wing.n_panels)_distribution_$(wing.spanwise_panel_distribution)",
+#     data_type=".pdf",
+#     is_save=false,
+#     is_show=true
+# )
 nothing

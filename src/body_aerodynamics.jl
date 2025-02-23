@@ -226,7 +226,7 @@ function calculate_panel_properties(section_list::Vector{Section}, n_panels::Int
 end
 
 """
-    calculate_AIC_matrices(body_aero::BodyAerodynamics, model::String, 
+    calculate_AIC_matrices!(body_aero::BodyAerodynamics, model::String, 
                          core_radius_fraction::Float64,
                          va_norm_array::Vector{Float64}, 
                          va_unit_array::Matrix{Float64})
@@ -236,7 +236,7 @@ Calculate Aerodynamic Influence Coefficient matrices.
 Returns:
     Tuple of (AIC_x, AIC_y, AIC_z) matrices
 """
-function calculate_AIC_matrices(body_aero::BodyAerodynamics, model::String,
+function calculate_AIC_matrices!(body_aero::BodyAerodynamics, model::String,
                               core_radius_fraction::Float64,
                               va_norm_array::Vector{Float64}, 
                               va_unit_array::Matrix{Float64})
@@ -249,9 +249,9 @@ function calculate_AIC_matrices(body_aero::BodyAerodynamics, model::String,
     velocity_induced, tempvel, va_unit, U_2D = zeros(MVec3), zeros(MVec3), zeros(MVec3), zeros(MVec3)
     
     # Calculate influence coefficients
-    for icp in 1:length(body_aero.panels)
+    for icp in eachindex(body_aero.panels)
         ep = getproperty(body_aero.panels[icp], evaluation_point)
-        for jring in 1:body_aero.n_panels
+        for jring in eachindex(body_aero.panels)
             va_unit .= @views va_unit_array[jring, :]
             filaments = body_aero.panels[jring].filaments
             va_norm = va_norm_array[jring]

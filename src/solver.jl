@@ -188,7 +188,7 @@ function gamma_loop(
     relaxation_factor::Float64
 )
     converged = false
-    n_panels = body_aero.n_panels
+    n_panels = length(body_aero.panels)
     alpha_array = body_aero.alpha_array
     v_a_array = body_aero.v_a_array
     Umagw_array = similar(v_a_array)
@@ -244,7 +244,7 @@ function gamma_loop(
         end
         
         for (i, (panel, alpha)) in enumerate(zip(panels, alpha_array))
-            cl_array[i] = calculate_cl(panel.polar_data, panel.aero_model, alpha)
+            cl_array[i] = calculate_cl(panel, alpha)
         end
         gamma_new .= 0.5 .* v_a_array.^2 ./ Umagw_array .* cl_array .* chord_array
 
