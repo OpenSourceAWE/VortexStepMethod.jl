@@ -185,7 +185,8 @@ function gamma_loop(
     y_airf_array::Matrix{Float64},
     z_airf_array::Matrix{Float64},
     panels::Vector{Panel},
-    relaxation_factor::Float64
+    relaxation_factor::Float64;
+    log::Bool = true
 )
     converged = false
     n_panels = length(body_aero.panels)
@@ -244,7 +245,20 @@ function gamma_loop(
         end
         
         for (i, (panel, alpha)) in enumerate(zip(panels, alpha_array))
-            cl_array[i] = calculate_cl(panel, alpha)
+            @time cl = if panel.aero_model === :lei_airfoil_breukels
+                cl = evalpoly(rad2deg(alpha), reverse(panel.cl_coefficients))
+                if abs(alpha) > (π/9)
+                    cl = 2 * cos(alpha) * sin(alpha)^2
+                end
+                cl
+            elseif panel.aero_model === :inviscid
+                2π * alpha
+            elseif panel.aero_model === :polar_data
+                panel.cl_interp(alpha)
+            elseif panel.aero_model === :interpolations
+                panel.cl_interp(alpha, 0.0)
+            end
+            @time cl_array[i] = calculate_cl(panel, alpha)
         end
         gamma_new .= 0.5 .* v_a_array.^2 ./ Umagw_array .* cl_array .* chord_array
 
@@ -276,9 +290,9 @@ function gamma_loop(
         end
     end
 
-    if converged
+    if log && converged
         @info "Converged after $iters iterations"
-    else
+    elseif log
         @warn "NO convergence after $(solver.max_iterations) iterations"
     end
 

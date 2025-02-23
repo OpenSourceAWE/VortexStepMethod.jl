@@ -11,9 +11,9 @@ Represents a panel in a vortex step method simulation.
 - `TE_point_2::Vector{MVec3}`: Second trailing edge point
 - `LE_point_2::Vector{MVec3}`: Second leading edge point
 - `chord::Float64`: Panel chord length
-- `va::Union{Nothing,Vector{Float64}}`: Panel velocity
+- `va::Vector{Float64}`: Panel velocity
 - `corner_points::Matrix{Float64}`: Panel corner points
-- `aero_model::String`: Aerodynamic model type
+- `aero_model::Symbol`: Aerodynamic model type
 - `aerodynamic_center::Vector{Float64}`: Panel aerodynamic center
 - `control_point::Vector{MVec3}`: Panel control point
 - `bound_point_1::Vector{MVec3}`: First bound point
@@ -30,12 +30,12 @@ mutable struct Panel
     TE_point_2::MVec3
     LE_point_2::MVec3
     chord::Float64
-    va::Union{Nothing,Vector{Float64}}
+    va::Union{Nothing,MVec3}
     corner_points::Matrix{Float64}
-    aero_model::String
-    cl_coefficients::Union{Nothing,Vector{Float64}}
-    cd_coefficients::Union{Nothing,Vector{Float64}}
-    cm_coefficients::Union{Nothing,Vector{Float64}}
+    aero_model::Symbol
+    cl_coefficients::Vector{Float64}
+    cd_coefficients::Vector{Float64}
+    cm_coefficients::Vector{Float64}
     cl_interp::Function
     cd_interp::Function
     cm_interp::Function
@@ -74,18 +74,19 @@ mutable struct Panel
         corner_points = hcat(LE_point_1, TE_point_1, TE_point_2, LE_point_2)
         
         # Validate aero model consistency
-        if section_1.aero_input[1] != section_2.aero_input[1]
+        if !(section_1.aero_input === section_2.aero_input)
             throw(ArgumentError("Both sections must have the same aero_input"))
         end
-        aero_model = isa(section_1.aero_input, String) ? section_1.aero_input : section_1.aero_input[1]
+        aero_model = isa(section_1.aero_input, Symbol) ? section_1.aero_input : section_1.aero_input[1]
+
         
         # Initialize aerodynamic properties
-        cl_coeffs, cd_coeffs, cm_coeffs = nothing, nothing, nothing
+        cl_coeffs, cd_coeffs, cm_coeffs = zeros(3), zeros(3), zeros(3)
         cl_interp, cd_interp, cm_interp = ()->nothing, ()->nothing, ()->nothing
         
-        if aero_model == "lei_airfoil_breukels"
+        if aero_model === :lei_airfoil_breukels
             cl_coeffs, cd_coeffs, cm_coeffs = compute_lei_coefficients(section_1, section_2)
-        elseif aero_model == "polar_data"
+        elseif aero_model === :polar_data
             aero_1 = section_1.aero_input[2]
             aero_2 = section_2.aero_input[2]
             if size(aero_1) != size(aero_2)
@@ -98,16 +99,16 @@ mutable struct Panel
             cl_interp = (α) -> cl_interp_(α)
             cd_interp = (α) -> cd_interp_(α)
             cm_interp = (α) -> cm_interp_(α)
-        elseif aero_model == "interpolations"
+        elseif aero_model === :interpolations
             cl_left, cd_left, cm_left = section_1.aero_input[2]
             cl_right, cd_right, cm_right = section_2.aero_input[2]
             cl_interp = cl_left === cl_right ? cl_left :
-                (α, β) -> 0.5cl_left(α, β) + 0.5cl_right(α, β)
+                (α) -> 0.5cl_left(α, 0.0) + 0.5cl_right(α, 0.0) # TODO: add trailing edge deflection
             cd_interp = cd_left === cd_right ? cd_left :
-                (α, β) -> 0.5cd_left(α, β) + 0.5cd_right(α, β)
+                (α) -> 0.5cd_left(α, 0.0) + 0.5cd_right(α, 0.0)
             cm_interp = cm_left === cm_right ? cm_left :
-                (α, β) -> 0.5cm_left(α, β) + 0.5cm_right(α, β)
-        elseif aero_model != "inviscid"
+                (α) -> 0.5cm_left(α, 0.0) + 0.5cm_right(α, 0.0)
+        elseif !(aero_model === :inviscid)
             throw(ArgumentError("Unsupported aero model: $aero_model"))
         end
         
@@ -252,35 +253,25 @@ Calculate lift coefficient for given angle of attack.
 # Returns
 - `Float64`: Lift coefficient (Cl)
 """
-function calculate_cl(panel::Panel, alpha::Float64)
-    if panel.aero_model == "lei_airfoil_breukels"
+function calculate_cl(panel::Panel, alpha::Float64)::Float64
+    cl = 0.0
+    if panel.aero_model === :lei_airfoil_breukels
         cl = evalpoly(rad2deg(alpha), reverse(panel.cl_coefficients))
         if abs(alpha) > (π/9)
             cl = 2 * cos(alpha) * sin(alpha)^2
         end
-        return cl
-    elseif panel.aero_model == "inviscid"
-        return 2π * alpha
-    elseif panel.aero_model == "polar_data"
-        return panel.cl_interp(alpha)
-    elseif panel.aero_model == "interpolations"
-        return panel.cl_interp(alpha, 0.0)
+    elseif panel.aero_model === :inviscid
+        cl = 2π * alpha
+    elseif panel.aero_model === :polar_data
+        cl = panel.cl_interp(alpha)
+    elseif panel.aero_model === :interpolations
+        cl = panel.cl_interp(alpha, 0.0)
     else
         throw(ArgumentError("Unsupported aero model: $(panel.aero_model)"))
     end
+    return cl
 end
 
-function calculate_cl(polar_data::Nothing, model_type::String, alpha::Float64)
-    return 2π * alpha
-end
-
-function calculate_cl(polar_data::Tuple{Function, Function, Function}, model_type::String, alpha::Float64)
-    if model_type == "polar_data"
-        return polar_data[1](alpha)
-    elseif model_type == "interpolations"
-        return polar_data[1](alpha, 0.0)
-    end
-end
 
 """
     calculate_cd_cm(panel::Panel, alpha::Float64)
@@ -288,20 +279,20 @@ end
 Calculate drag and moment coefficients for given angle of attack.
 """
 function calculate_cd_cm(panel::Panel, alpha::Float64)
-    if panel.aero_model == "lei_airfoil_breukels"
+    if panel.aero_model === :lei_airfoil_breukels
         cd = evalpoly(rad2deg(alpha), reverse(panel.cd_coefficients))
         cm = evalpoly(rad2deg(alpha), reverse(panel.cm_coefficients))
         if abs(alpha) > (π/9)  # Outside ±20 degrees
             cd = 2 * sin(alpha)^3
         end
         return cd, cm
-    elseif panel.aero_model == "inviscid"
+    elseif panel.aero_model === :inviscid
         return 0.0, 0.0
-    elseif panel.aero_model == "polar_data"
+    elseif panel.aero_model === :polar_data
         cd = panel.cd_interp(alpha)
         cm = panel.cm_interp(alpha)
         return cd, cm
-    elseif panel.aero_model == "interpolations"
+    elseif panel.aero_model === :interpolations
         cd = panel.cd_interp(alpha, 0.0)
         cm = panel.cm_interp(alpha, 0.0)
         return cd, cm
