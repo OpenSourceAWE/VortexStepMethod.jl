@@ -1,4 +1,3 @@
-
 """
     BodyAerodynamics
 
@@ -6,18 +5,16 @@ Main structure for calculating aerodynamic properties of bodies.
 
 # Fields
 - panels::Vector{Panel}: Vector of Panel structs
-- n_panels::Int64: number of panels
 - wings::Vector{AbstractWing}: a vector of wings; a body can have multiple wings
 - `_va`::Union{Nothing, Vector{Float64}, Tuple{Vector{Float64}, Float64}}: A vector of the apparent wind speed,  
                                                       or a tuple of the v_a vector and yaw rate (rad/s).
-- ` gamma_distribution`::Union{Nothing, Vector{Float64}}: unclear, please defined
+- `gamma_distribution`::Union{Nothing, Vector{Float64}}: unclear, please defined
 - `alpha_uncorrected`::Union{Nothing, Vector{Float64}}: unclear, please define
 - `alpha_corrected`::Union{Nothing, Vector{Float64}}: unclear, please define
 - `stall_angle_list`::Vector{Float64}: unclear, please define
 """
 mutable struct BodyAerodynamics
     panels::Vector{Panel}
-    n_panels::Int64             # TODO: Why is this needed? Just use length(panels)
     wings::Vector{AbstractWing} # TODO: Why not a concrete type? And why a vector?
     _va::Union{Nothing, Vector{Float64}, Tuple{Vector{Float64}, Float64}}
     gamma_distribution::Union{Nothing, Vector{Float64}}
@@ -74,7 +71,6 @@ mutable struct BodyAerodynamics
         
         new(
             panels,
-            n_panels,
             wings,
             nothing,  # va
             nothing,  # gamma_distribution
@@ -248,12 +244,12 @@ function calculate_AIC_matrices(wa::BodyAerodynamics, model::String,
     evaluation_point_on_bound = model == "LLT"
     
     # Initialize AIC matrices
-    AIC = zeros(3, wa.n_panels, wa.n_panels)
+    AIC = zeros(3, length(wa.panels), length(wa.panels))
     
     # Calculate influence coefficients
-    for icp in 1:wa.n_panels
+    for icp in 1:length(wa.panels)
         ep = getproperty(wa.panels[icp], evaluation_point)
-        for jring in 1:wa.n_panels
+        for jring in 1:length(wa.panels)
             velocity_induced = calculate_velocity_induced_single_ring_semiinfinite(
                 wa.panels[jring],
                 ep,
@@ -628,7 +624,7 @@ Set velocity array and update wake filaments.
 """
 function set_va!(wa::BodyAerodynamics, va)
     # Add length check for va_vec
-    if va isa Vector{Float64} && length(va) != 3 && length(va) != wa.n_panels
+    if va isa Vector{Float64} && length(va) != 3 && length(va) != length(wa.panels)
         throw(ArgumentError("va must be length 3 or match number of panels"))
     end
     # Handle input types
@@ -643,8 +639,8 @@ function set_va!(wa::BodyAerodynamics, va)
     
     # Calculate va_distribution based on input type
     va_distribution = if length(va_vec) == 3 && yaw_rate == 0.0
-        repeat(reshape(va_vec, 1, 3), wa.n_panels)
-    elseif length(va_vec) == wa.n_panels
+        repeat(reshape(va_vec, 1, 3), length(wa.panels))
+    elseif length(va_vec) == length(wa.panels)
         va_vec
     elseif yaw_rate != 0.0 && length(va_vec) == 3
         va_dist = Vector{Float64}[]
@@ -661,7 +657,7 @@ function set_va!(wa::BodyAerodynamics, va)
         end
         reduce(vcat, va_dist)
     else
-        throw(ArgumentError("Invalid va distribution: length(va)=$(length(va_vec)) ≠ n_panels=$(wa.n_panels)"))
+        throw(ArgumentError("Invalid va distribution: length(va)=$(length(va_vec)) ≠ n_panels=$(length(wa.panels))"))
     end
     
     # Update panel velocities
