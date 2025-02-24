@@ -8,6 +8,8 @@ end
 using CSV
 using DataFrames
 
+plot = true
+
 # Find root directory
 root_dir = dirname(@__DIR__)
 save_folder = joinpath(root_dir, "results", "TUDELFT_V3_LEI_KITE")
@@ -64,7 +66,7 @@ vel_app = [
 body_aero_CAD_19ribs.va = vel_app
 
 # Plotting geometry
-plot_geometry(
+plot && plot_geometry(
     body_aero_CAD_19ribs,
     "";
     data_type=".svg",
@@ -82,7 +84,7 @@ results = solve(VSM, body_aero_CAD_19ribs)
 
 CAD_y_coordinates = [panel.aerodynamic_center[2] for panel in body_aero_CAD_19ribs.panels]
 
-plot_distribution(
+plot && plot_distribution(
     [CAD_y_coordinates, CAD_y_coordinates],
     [results, results_with_stall],
     ["VSM", "VSM with stall correction"];
@@ -103,7 +105,7 @@ path_cfd_lebesque = joinpath(
     "V3_CL_CD_RANS_Lebesque_2024_Rey_300e4.csv"
 )
 
-plot_polars(
+plot && plot_polars(
     [VSM, VSM_with_stall_correction],
     [body_aero_CAD_19ribs, body_aero_CAD_19ribs],
     [
