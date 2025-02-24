@@ -55,11 +55,11 @@ struct Solver
 end
 
 """
-    solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=nothing)
+    solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=nothing; log=false)
 
 Main solving routine for the aerodynamic model.
 """
-function solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=nothing)
+function solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=nothing; log=false)
     isnothing(body_aero.panels[1].va) && throw(ArgumentError("Inflow conditions are not set, use set_va!(body_aero, va)"))
     
     # Initialize variables
@@ -122,7 +122,8 @@ function solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=n
         y_airf_array,
         z_airf_array,
         panels,
-        relaxation_factor
+        relaxation_factor;
+        log
     )
     # Try again with reduced relaxation factor if not converged
     if !converged && relaxation_factor > 1e-3
@@ -171,7 +172,7 @@ cross3(x,y) = cross(SVector{3,eltype(x)}(x), SVector{3,eltype(y)}(y))
               AIC_y::Matrix{Float64}, AIC_z::Matrix{Float64}, va_array::Matrix{Float64}, 
               chord_array::Vector{Float64}, x_airf_array::Matrix{Float64}, 
               y_airf_array::Matrix{Float64}, z_airf_array::Matrix{Float64}, 
-              panels::Vector{Panel}, relaxation_factor::Float64)
+              panels::Vector{Panel}, relaxation_factor::Float64; log=true)
 
 Main iteration loop for calculating circulation distribution.
 """
