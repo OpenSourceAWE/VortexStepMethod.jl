@@ -151,10 +151,10 @@ function calculate_panel_properties(section_list::Vector{Section}, n_panels::Int
     @debug "Shape of coordinates: $(size(coords))"
     
     for i in 1:n_panels
-        coords[2i-1, :] = section_list[i].LE_point
-        coords[2i, :] = section_list[i].TE_point
-        coords[2i+1, :] = section_list[i+1].LE_point
-        coords[2i+2, :] = section_list[i+1].TE_point
+        coords[2i-1, :] .= section_list[i].LE_point
+        coords[2i, :]   .= section_list[i].TE_point
+        coords[2i+1, :] .= section_list[i+1].LE_point
+        coords[2i+2, :] .= section_list[i+1].TE_point
     end
     
     @debug "Coordinates: $coords"
