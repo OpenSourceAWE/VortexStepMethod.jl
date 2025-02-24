@@ -43,7 +43,7 @@ results_llt = solve(llt_solver, wa)
 results_vsm = solve(vsm_solver, wa)
 @time results_vsm = solve(vsm_solver, wa)
 # time Python: 32.0ms
-# time Julia:   1.5ms
+# time Julia:   0.7ms
 
 # Print results comparison
 println("\nLifting Line Theory Results:")
@@ -63,7 +63,6 @@ plot && plot_geometry(
       is_save=false,
       is_show=true,
 )
-nothing
 
 # Step 7: Plot spanwise distributions
 y_coordinates = [panel.aerodynamic_center[2] for panel in wa.panels]
