@@ -281,7 +281,7 @@ end
                 evaluation_point = if model === :VSM
                     panel.control_point
                 else  # LLT
-                    panel.aerodynamic_center
+                    panel.aero_center
                 end
 
                 @test isapprox(evaluation_point, expected_controlpoints[i]["coordinates"], atol=1e-4)
@@ -296,7 +296,7 @@ end
                 
                 if model === :VSM
                     @test isapprox(
-                        panel.aerodynamic_center,
+                        panel.aero_center,
                         expected_controlpoints[i]["coordinates_aoa"],
                         atol=1e-4
                     )
@@ -348,7 +348,7 @@ end
                 @test isapprox(r3, exp_ringvec["r3"], atol=1e-4)
 
                 # Handle coord_L
-                @test all(isapprox.(panel.aerodynamic_center, expected_coord_L[:, i]))
+                @test all(isapprox.(panel.aero_center, expected_coord_L[:, i]))
             end
         end
     end

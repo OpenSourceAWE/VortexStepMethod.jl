@@ -63,7 +63,7 @@ plot && plot_geometry(
 )
 
 # Step 7: Plot spanwise distributions
-y_coordinates = [panel.aerodynamic_center[2] for panel in wa.panels]
+y_coordinates = [panel.aero_center[2] for panel in wa.panels]
 
 plot && plot_distribution(
     [y_coordinates, y_coordinates],

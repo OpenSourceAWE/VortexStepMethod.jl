@@ -82,7 +82,7 @@ results = solve(VSM, body_aero_CAD_19ribs)
 @time results_with_stall = solve(VSM_with_stall_correction, body_aero_CAD_19ribs)
 @time results_with_stall = solve(VSM_with_stall_correction, body_aero_CAD_19ribs)
 
-CAD_y_coordinates = [panel.aerodynamic_center[2] for panel in body_aero_CAD_19ribs.panels]
+CAD_y_coordinates = [panel.aero_center[2] for panel in body_aero_CAD_19ribs.panels]
 
 plot && plot_distribution(
     [CAD_y_coordinates, CAD_y_coordinates],

@@ -19,10 +19,10 @@ function create_panel(section1::Section, section2::Section)
     mid_LE_point = section2.LE_point .+ 0.5 .* (section1.LE_point .- section2.LE_point)
     mid_TE_point = section2.TE_point .+ 0.5 .* (section1.TE_point .- section2.TE_point)
     mid_LE_vector = mid_TE_point .- mid_LE_point
-    aerodynamic_center = bound_1 .+ 0.5 .* (bound_2 .- bound_1)
-    control_point = aerodynamic_center .+ 0.5 .* mid_LE_vector
+    aero_center = bound_1 .+ 0.5 .* (bound_2 .- bound_1)
+    control_point = aero_center .+ 0.5 .* mid_LE_vector
 
-    LLpoint = aerodynamic_center
+    LLpoint = aero_center
     VSMpoint = control_point
     x_airf = cross(VSMpoint .- LLpoint, section["p2"] .- section["p1"])
     x_airf = x_airf ./ norm(x_airf)
@@ -38,7 +38,7 @@ function create_panel(section1::Section, section2::Section)
     Panel(
         section1,
         section2,
-        aerodynamic_center,
+        aero_center,
         control_point,
         bound_1,
         bound_2,

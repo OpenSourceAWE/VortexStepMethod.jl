@@ -29,7 +29,7 @@ mutable struct BodyAerodynamics
 
     function BodyAerodynamics(
         wings::Vector{T};
-        aerodynamic_center_location::Float64=0.25,
+        aero_center_location::Float64=0.25,
         control_point_location::Float64=0.75
     ) where T <: AbstractWing
         # Initialize panels
@@ -42,7 +42,7 @@ mutable struct BodyAerodynamics
             panel_props = calculate_panel_properties(
                 section_list,
                 n_panels_per_wing,
-                aerodynamic_center_location,
+                aero_center_location,
                 control_point_location
             )
             
@@ -242,7 +242,7 @@ function calculate_AIC_matrices!(body_aero::BodyAerodynamics, model::Symbol,
                               va_unit_array::Matrix{Float64})
     model in [:VSM, :LLT] || throw(ArgumentError("Model must be VSM or LLT"))
     # Determine evaluation point based on model
-    evaluation_point = model === :VSM ? :control_point : :aerodynamic_center
+    evaluation_point = model === :VSM ? :control_point : :aero_center
     evaluation_point_on_bound = model === :LLT
     
     # Initialize AIC matrices
