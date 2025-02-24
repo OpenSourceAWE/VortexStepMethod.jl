@@ -1,16 +1,13 @@
 
 """
-    Section
+    Section{T}
 
 Represents a wing section with leading edge, trailing edge, and aerodynamic properties.
 
 # Fields
 - `LE_point::MVec3`: Leading edge point coordinates
 - `TE_point::MVec3`: Trailing edge point coordinates
-- `aero_input::Vector{Any}`: Aerodynamic input data for the section:
-    - `("inviscid")`: Inviscid aerodynamics
-    - `("polar_data", [alpha_column,CL_column,CD_column,CM_column])`: Polar data aerodynamics
-    - `("lei_airfoil_breukels", [d_tube,camber])`: LEI airfoil with Breukels parameters
+- `aero_input`::T: Aerodynamic input, one of three possible types
 """
 struct Section{T}
     LE_point::MVec3
@@ -61,8 +58,7 @@ mutable struct Wing <: AbstractWing
 end
 
 """
-    add_section!(wing::Wing, LE_point::PosVector, 
-                TE_point::PosVector, aero_input::Vector{Any})
+    add_section!(wing::Wing, LE_point::PosVector, TE_point::PosVector, aero_input)
 
 Add a new section to the wing.
 """
@@ -182,7 +178,7 @@ function interpolate_to_common_alpha(alpha_common,
 end
 
 """
-    calculate_new_aero_input(aero_input::Vector{Any}, 
+    calculate_new_aero_input(aero_input, 
                             section_index::Int,
                             left_weight::Float64,
                             right_weight::Float64)
@@ -272,7 +268,7 @@ end
         n_sections::Int,
         LE::Matrix{Float64},
         TE::Matrix{Float64},
-        aero_input::Vector{Any})
+        aero_input)
 
 Refine wing mesh using linear or cosine spacing.
 
