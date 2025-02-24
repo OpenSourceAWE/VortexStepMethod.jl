@@ -46,7 +46,7 @@ include("utils.jl")
         aerodynamic_model_type=model, 
         core_radius_fraction=core_radius_fraction
     )
-    results_NEW = solve(solver_object, body_aero)
+    results_NEW = solve(solver_object, body_aero; reference_point=[0,1,0])
 
     @test results_NEW isa Dict
 
@@ -98,6 +98,9 @@ include("utils.jl")
     @test isapprox(results_NEW["cs"], CS_ref, rtol=1e-4)
     @test isapprox(results_NEW["lift"], Ltot_ref, rtol=1e-4)
     @test isapprox(results_NEW["drag"], Dtot_ref, rtol=1e-4)
+    @test isapprox(results_NEW["Fx"], results_NEW["Mz"], rtol=1e-4) # 1 meter arm
+    @test isapprox(results_NEW["My"], 0.0, atol=1e-3)
+    @test isapprox(results_NEW["Fz"], -results_NEW["Mx"], rtol=1e-4) # 1 meter arm
 
     # Check array shapes
     @test length(results_NEW["cl_distribution"]) == length(body_aero.panels)
