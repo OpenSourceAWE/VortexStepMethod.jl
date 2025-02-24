@@ -41,6 +41,6 @@ vsm_solver = Solver(aerodynamic_model_type=:VSM)
 results_vsm = solve(vsm_solver, wa)
 @time results_vsm = solve(vsm_solver, wa)
 # time Python: 32.0 ms
-# time Julia:   0.7 ms
+# time Julia:   0.6 ms
 
 nothing
