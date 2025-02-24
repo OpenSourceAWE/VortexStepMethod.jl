@@ -37,12 +37,12 @@ end
 Calculate induced velocity by a bound vortex filament at a point in space.
 """
 function velocity_3D_bound_vortex!(
-    vel::VelVector,
+    vel,
     filament::BoundFilament,
-    XVP::PosVector,
-    gamma::Float64,
-    core_radius_fraction::Float64,
-    work_vectors::NTuple{10, Vector{Float64}}
+    XVP,
+    gamma,
+    core_radius_fraction,
+    work_vectors
 )
     r1, r2, r1Xr2, r1Xr0, r2Xr0, r1r2norm, r1_proj, r2_proj, r1_projXr2_proj, vel_ind_proj = work_vectors
     r0 = filament.r0
@@ -61,10 +61,10 @@ function velocity_3D_bound_vortex!(
         vel .= (gamma / (4π)) .* r1Xr2 ./ (norm(r1Xr2)^2) .* 
             dot(r0, r1r2norm)
     elseif norm(r1Xr0) / norm(r0) == 0
-        vel .= zeros(3)
+        vel .= 0.0
     else
-        @info "inside core radius"
-        @info "distance from control point to filament: $(norm(r1Xr0) / norm(r0))"
+        @debug "inside core radius"
+        @debug "distance from control point to filament: $(norm(r1Xr0) / norm(r0))"
         
         # Project onto core radius
         cross3!(r2Xr0, r2, r0)
@@ -98,13 +98,13 @@ Calculate induced velocity by a trailing vortex filament.
 Reference: Rick Damiani et al. "A vortex step method for nonlinear airfoil polar data 
 as implemented in KiteAeroDyn".
 """
-function velocity_3D_trailing_vortex!(
-    vel::VelVector,
+@inline function velocity_3D_trailing_vortex!(
+    vel,
     filament::BoundFilament,
-    XVP::PosVector,
-    gamma::Float64,
-    Uinf::Float64,
-    work_vectors::NTuple{10,Vector{Float64}}
+    XVP,
+    gamma,
+    Uinf,
+    work_vectors
 )
     r0, r1, r2, r_perp, r1Xr2, r1Xr0, r2Xr0, normr1r2 = work_vectors[1:8]
     r0 .= filament.x2 .- filament.x1  # Vortex filament
@@ -128,7 +128,7 @@ function velocity_3D_trailing_vortex!(
         vel .= (gamma / (4π)) .* r1Xr2 ./ (norm(r1Xr2)^2) .* 
             dot(r0, normr1r2)
     elseif norm(r1Xr0) / norm(r0) == 0
-        vel .= zeros(3)
+        vel .= 0.0
     else
         # Project onto core radius
         r1_proj = dot(r1, r0) * r0 / (norm(r0)^2) + 
@@ -166,13 +166,13 @@ end
 Calculate induced velocity by a semi-infinite trailing vortex filament.
 """
 function velocity_3D_trailing_vortex_semiinfinite!(
-    vel::VelVector,
+    vel,
     filament::SemiInfiniteFilament,
-    Vf::VelVector,
-    XVP::PosVector,
-    GAMMA::Float64,
-    Uinf::Float64,
-    work_vectors::NTuple{10,Vector{Float64}}
+    Vf,
+    XVP,
+    GAMMA,
+    Uinf,
+    work_vectors
 )
     r1, r_perp, r1XVf = work_vectors[1:3]
     GAMMA = -GAMMA * filament.filament_direction
@@ -188,7 +188,7 @@ function velocity_3D_trailing_vortex_semiinfinite!(
         K = GAMMA / (4π) / norm(r1XVf)^2 * (1 + dot(r1, Vf) / norm(r1))
         vel .= K .* r1XVf
     elseif norm(r1XVf) / norm(Vf) == 0
-        vel .= zeros(3)
+        vel .= 0.0
     else
         r1_proj = dot(r1, Vf) * Vf + 
                   epsilon * (r1/norm(r1) - Vf) / norm(r1/norm(r1) - Vf)

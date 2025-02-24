@@ -8,17 +8,19 @@ end
 using CSV
 using DataFrames
 
+plot = true
+
 # Create wing geometry
 wing = KiteWing("data/ram_air_kite_body.obj", "data/ram_air_kite_foil.dat")
 body_aero = BodyAerodynamics([wing])
 
 # Create solvers
 VSM = Solver(
-    aerodynamic_model_type="VSM",
+    aerodynamic_model_type=:VSM,
     is_with_artificial_damping=false
 )
 VSM_with_stall_correction = Solver(
-    aerodynamic_model_type="VSM",
+    aerodynamic_model_type=:VSM,
     is_with_artificial_damping=true
 )
 
@@ -36,7 +38,7 @@ vel_app = [
 body_aero.va = vel_app
 
 # Plotting geometry
-plot_geometry(
+plot && plot_geometry(
     body_aero,
     "";
     data_type=".svg",
@@ -53,7 +55,7 @@ plot_geometry(
 
 CAD_y_coordinates = [panel.aerodynamic_center[2] for panel in body_aero.panels]
 
-plot_distribution(
+plot && plot_distribution(
     [CAD_y_coordinates],
     [results],
     ["VSM"];
@@ -63,7 +65,7 @@ plot_distribution(
     is_show=true
 )
 
-plot_polars(
+plot && plot_polars(
     [VSM],
     [body_aero],
     [

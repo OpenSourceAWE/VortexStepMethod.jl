@@ -33,25 +33,25 @@ Represents a wing composed of multiple sections with aerodynamic properties.
 
 # Fields
 - `n_panels::Int64`: Number of panels in aerodynamic mesh
-- `spanwise_panel_distribution::String`: Panel distribution type
+- `spanwise_panel_distribution::Symbol`: Panel distribution type
 - `spanwise_direction::Vector{Float64}`: Wing span direction vector
 - `sections::Vector{Section}`: List of wing sections
 
 # Distribution types
-- "linear": Linear distribution
-- "cosine": Cosine distribution
-- "`cosine_van_Garrel`": van Garrel cosine distribution
-- "split_provided": Split provided sections
-- "unchanged": Keep original sections
+- :linear: Linear distribution
+- :cosine: Cosine distribution
+- :`cosine_van_Garrel`: van Garrel cosine distribution
+- :split_provided: Split provided sections
+- :unchanged: Keep original sections
 """
 mutable struct Wing <: AbstractWing
     n_panels::Int64
-    spanwise_panel_distribution::String
+    spanwise_panel_distribution::Symbol
     spanwise_direction::PosVector
     sections::Vector{Section}
     
     function Wing(n_panels::Int;
-                 spanwise_panel_distribution::String="linear",
+                 spanwise_panel_distribution::Symbol=:linear,
                  spanwise_direction::PosVector=MVec3([0.0, 1.0, 0.0]))
         new(n_panels, 
             spanwise_panel_distribution, 
@@ -125,7 +125,7 @@ function refine_aerodynamic_mesh(wing::AbstractWing)
     end
     
     # Handle special cases
-    if wing.spanwise_panel_distribution == "unchanged" || length(wing.sections) == n_sections
+    if wing.spanwise_panel_distribution === :unchanged || length(wing.sections) == n_sections
         return wing.sections
     end
     
@@ -138,9 +138,9 @@ function refine_aerodynamic_mesh(wing::AbstractWing)
     end
     
     # Handle different distribution types
-    if wing.spanwise_panel_distribution == "split_provided"
+    if wing.spanwise_panel_distribution === :split_provided
         return refine_mesh_by_splitting_provided_sections(wing)
-    elseif wing.spanwise_panel_distribution in ["linear", "cosine", "cosine_van_Garrel"]
+    elseif wing.spanwise_panel_distribution in [:linear, :cosine, :cosine_van_Garrel]
         return refine_mesh_for_linear_cosine_distribution(
             wing.spanwise_panel_distribution,
             n_sections,
@@ -194,16 +194,16 @@ function calculate_new_aero_input(aero_input,
                                 left_weight::Float64,
                                 right_weight::Float64)
     
-    if aero_input[section_index][1] != aero_input[section_index + 1][1]
+    model_type = isa(aero_input[section_index], Symbol) ? aero_input[section_index] : aero_input[section_index][1]
+    model_type_2 = isa(aero_input[section_index + 1], Symbol) ? aero_input[section_index + 1] : aero_input[section_index + 1][1]
+    if !(model_type === model_type_2)
         throw(ArgumentError("Different aero models over the span are not supported"))
     end
     
-    model_type = isa(aero_input[section_index], String) ? aero_input[section_index] : aero_input[section_index][1]
-    
-    if model_type == "inviscid"
-        return ("inviscid")
+    if model_type === :inviscid
+        return :inviscid
         
-    elseif model_type == "polar_data"
+    elseif model_type === :polar_data
         polar_left = aero_input[section_index][2]
         polar_right = aero_input[section_index + 1][2]
         
@@ -233,19 +233,22 @@ function calculate_new_aero_input(aero_input,
         CD_interp = CD_left_common .* left_weight .+ CD_right_common .* right_weight
         CM_interp = CM_left_common .* left_weight .+ CM_right_common .* right_weight
         
-        return ("polar_data", hcat(alpha_common, CD_interp, CL_interp, CM_interp))
+        return (:polar_data, hcat(alpha_common, CD_interp, CL_interp, CM_interp))
 
-    elseif model_type == "interpolations"
+    elseif model_type === :interpolations
         cl_left, cd_left, cm_left = aero_input[section_index][2]
         cl_right, cd_right, cm_right = aero_input[section_index + 1][2]
 
-        CL_interp = (α, β) -> left_weight * cl_left[α, β] + right_weight * cl_right[α, β]
-        CD_interp = (α, β) -> left_weight * cd_left[α, β] + right_weight * cd_right[α, β]
-        CM_interp = (α, β) -> left_weight * cm_left[α, β] + right_weight * cm_right[α, β]
+        cl_interp = cl_left === cl_right ? (α, β) -> cl_left[α, β] :
+            (α, β) -> left_weight * cl_left[α, β] + right_weight * cl_right[α, β]
+        cd_interp = cd_left === cd_right ? (α, β) -> cd_left[α, β] :
+            (α, β) -> left_weight * cd_left[α, β] + right_weight * cd_right[α, β]
+        cm_interp = cm_left === cm_right ? (α, β) -> cm_left[α, β] :
+            (α, β) -> left_weight * cm_left[α, β] + right_weight * cm_right[α, β]
 
-        return ("interpolations", (CL_interp, CD_interp, CM_interp))
+        return (:interpolations, (cl_interp, cd_interp, cm_interp))
         
-    elseif model_type == "lei_airfoil_breukels"
+    elseif model_type === :lei_airfoil_breukels
         tube_diameter_left = aero_input[section_index][2][1]
         tube_diameter_right = aero_input[section_index + 1][2][1]
         tube_diameter_i = tube_diameter_left * left_weight + tube_diameter_right * right_weight
@@ -257,7 +260,7 @@ function calculate_new_aero_input(aero_input,
         @debug "Interpolation weights" left_weight right_weight
         @debug "Interpolated parameters" tube_diameter_i chamber_height_i
         
-        return ("lei_airfoil_breukels", [tube_diameter_i, chamber_height_i])
+        return (:lei_airfoil_breukels, [tube_diameter_i, chamber_height_i])
     else
         throw(ArgumentError("Unsupported aero model: $(model_type)"))
     end
@@ -265,7 +268,7 @@ end
 
 """
     refine_mesh_for_linear_cosine_distribution(
-        spanwise_panel_distribution::String,
+        spanwise_panel_distribution::Symbol,
         n_sections::Int,
         LE::Matrix{Float64},
         TE::Matrix{Float64},
@@ -274,7 +277,7 @@ end
 Refine wing mesh using linear or cosine spacing.
 
 # Arguments
-- `spanwise_panel_distribution`: Distribution type ("linear", "cosine", or "cosine_van_Garrel")
+- `spanwise_panel_distribution`: Distribution type (:linear, :cosine, or :cosine_van_Garrel)
 - `n_sections`: Number of sections to generate
 - `LE`: Matrix of leading edge points
 - `TE`: Matrix of trailing edge points
@@ -284,7 +287,7 @@ Returns:
     Vector{Section}: List of refined sections
 """
 function refine_mesh_for_linear_cosine_distribution(
-    spanwise_panel_distribution::String,
+    spanwise_panel_distribution::Symbol,
     n_sections::Int,
     LE,
     TE,
@@ -299,9 +302,9 @@ function refine_mesh_for_linear_cosine_distribution(
     qc_cum_length = vcat(0, cumsum(qc_lengths))
 
     # 2. Define target lengths
-    target_lengths = if spanwise_panel_distribution == "linear"
+    target_lengths = if spanwise_panel_distribution === :linear
         range(0, qc_total_length, n_sections)
-    elseif spanwise_panel_distribution in ["cosine", "cosine_van_Garrel"]
+    elseif spanwise_panel_distribution in [:cosine, :cosine_van_Garrel]
         theta = range(0, π, n_sections)
         qc_total_length .* (1 .- cos.(theta)) ./ 2
     else
@@ -365,7 +368,7 @@ function refine_mesh_for_linear_cosine_distribution(
     end
 
     # Apply van Garrel distribution if requested
-    if spanwise_panel_distribution == "cosine_van_Garrel"
+    if spanwise_panel_distribution === :cosine_van_Garrel
         new_sections = calculate_cosine_van_Garrel(new_sections)
     end
 
@@ -490,7 +493,7 @@ function refine_mesh_by_splitting_provided_sections(wing::AbstractWing)
             
             # Generate sections for this pair
             new_splitted_sections = refine_mesh_for_linear_cosine_distribution(
-                "linear",
+                :linear,
                 num_new_sections + 2,  # +2 for endpoints
                 LE_pair,
                 TE_pair,

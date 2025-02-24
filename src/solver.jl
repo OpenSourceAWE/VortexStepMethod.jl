@@ -6,7 +6,7 @@ Main solver structure for the Vortex Step Method.
 """
 struct Solver
     # General settings
-    aerodynamic_model_type::String
+    aerodynamic_model_type::Symbol
     density::Float64
     max_iterations::Int64
     allowed_error::Float64
@@ -18,13 +18,13 @@ struct Solver
     artificial_damping::NamedTuple{(:k2, :k4), Tuple{Float64, Float64}}
     
     # Additional settings
-    type_initial_gamma_distribution::String
+    type_initial_gamma_distribution::Symbol
     core_radius_fraction::Float64
     mu::Float64
     is_only_f_and_gamma_output::Bool
 
     function Solver(;
-        aerodynamic_model_type::String   = "VSM",
+        aerodynamic_model_type::Symbol   = :VSM,
         density::Float64                 = 1.225,
         max_iterations::Int64            = 1500,
         allowed_error::Float64           = 1e-5,
@@ -32,7 +32,7 @@ struct Solver
         relaxation_factor::Float64       = 0.03,
         is_with_artificial_damping::Bool = false,
         artificial_damping::NamedTuple{(:k2, :k4), Tuple{Float64, Float64}}=(k2=0.1, k4=0.0),
-        type_initial_gamma_distribution::String="elliptic",
+        type_initial_gamma_distribution::Symbol=:elliptic,
         core_radius_fraction::Float64    = 1e-20,
         mu::Float64                      = 1.81e-5, # TODO do not use magic constants
         is_only_f_and_gamma_output::Bool = false
@@ -74,7 +74,7 @@ function solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=n
     z_airf_array = zeros(n_panels, 3)
     va_array = zeros(n_panels, 3)
     chord_array = zeros(n_panels)
-    
+
     # Fill arrays from panels
     for (i, panel) in enumerate(panels)
         x_airf_array[i, :] .= panel.x_airf
@@ -89,7 +89,7 @@ function solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=n
     va_unit_array = va_array ./ va_norm_array
 
     # Calculate AIC matrices
-    AIC_x, AIC_y, AIC_z = calculate_AIC_matrices(
+    calculate_AIC_matrices!(
         body_aero,
         solver.aerodynamic_model_type,
         solver.core_radius_fraction,
@@ -99,7 +99,7 @@ function solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=n
 
     # Initialize gamma distribution
     gamma_initial = if isnothing(gamma_distribution)
-        if solver.type_initial_gamma_distribution == "elliptic"
+        if solver.type_initial_gamma_distribution === :elliptic
             calculate_circulation_distribution_elliptical_wing(body_aero)
         else
             zeros(n_panels)
@@ -116,9 +116,6 @@ function solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=n
         solver,
         body_aero,
         gamma_initial,
-        AIC_x,
-        AIC_y,
-        AIC_z,
         va_array,
         chord_array,
         x_airf_array,
@@ -134,9 +131,6 @@ function solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=n
             solver,
             body_aero,
             gamma_initial,
-            AIC_x,
-            AIC_y,
-            AIC_z,
             va_array,
             chord_array,
             x_airf_array,
@@ -170,6 +164,8 @@ function solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=n
     return results
 end
 
+cross3(x,y) = cross(SVector{3,eltype(x)}(x), SVector{3,eltype(y)}(y))
+
 """
     gamma_loop(solver::Solver, gamma_new::Vector{Float64}, AIC_x::Matrix{Float64}, 
               AIC_y::Matrix{Float64}, AIC_z::Matrix{Float64}, va_array::Matrix{Float64}, 
@@ -183,64 +179,94 @@ function gamma_loop(
     solver::Solver,
     body_aero::BodyAerodynamics,
     gamma_new::Vector{Float64},
-    AIC_x::Matrix{Float64},
-    AIC_y::Matrix{Float64},
-    AIC_z::Matrix{Float64},
     va_array::Matrix{Float64},
     chord_array::Vector{Float64},
     x_airf_array::Matrix{Float64},
     y_airf_array::Matrix{Float64},
     z_airf_array::Matrix{Float64},
     panels::Vector{Panel},
-    relaxation_factor::Float64
+    relaxation_factor::Float64;
+    log::Bool = true
 )
     converged = false
+    n_panels = length(body_aero.panels)
     alpha_array = body_aero.alpha_array
     v_a_array = body_aero.v_a_array
+    Umagw_array = similar(v_a_array)
+
+    gamma = copy(gamma_new)
+    abs_gamma_new = copy(gamma_new)
+    induced_velocity_all = zeros(n_panels, 3)
+    relative_velocity_array = similar(va_array)
+    relative_velocity_crossz = similar(relative_velocity_array)
+    Uinfcrossz_array = similar(va_array)
+    cl_array = zeros(n_panels)
+    damp = zeros(length(gamma))
+    v_normal_array = zeros(n_panels)
+    v_tangential_array = zeros(n_panels)
+
+    AIC_x, AIC_y, AIC_z = body_aero.AIC[1, :, :], body_aero.AIC[2, :, :], body_aero.AIC[3, :, :]
+
+    velocity_view_x = @view induced_velocity_all[:, 1]
+    velocity_view_y = @view induced_velocity_all[:, 2]
+    velocity_view_z = @view induced_velocity_all[:, 3]
 
     iters = 0
     for i in 1:solver.max_iterations
         iters += 1
-        gamma = copy(gamma_new)
+        gamma .= gamma_new
         
         # Calculate induced velocities
-        induced_velocity_all = hcat(
-            AIC_x * gamma,
-            AIC_y * gamma,
-            AIC_z * gamma
-        )
+        mul!(velocity_view_x, AIC_x, gamma)
+        mul!(velocity_view_y, AIC_y, gamma)
+        mul!(velocity_view_z, AIC_z, gamma)
         
-        relative_velocity_array = va_array .+ induced_velocity_all
-        relative_velocity_crossz = cross.(eachrow(relative_velocity_array), eachrow(z_airf_array))
-        Uinfcrossz_array = cross.(eachrow(va_array), eachrow(z_airf_array))
+        relative_velocity_array .= va_array .+ induced_velocity_all
+        for i in 1:n_panels
+            relative_velocity_crossz[i, :] .= cross3(
+                view(relative_velocity_array, i, :),
+                view(z_airf_array, i, :)
+            )
+            Uinfcrossz_array[i, :] .= cross3(
+                view(va_array, i, :),
+                view(z_airf_array, i, :)
+            )
+        end
 
-        v_normal_array = vec(sum(x_airf_array .* relative_velocity_array, dims=2))
-        v_tangential_array = vec(sum(y_airf_array .* relative_velocity_array, dims=2))
+        for i in 1:n_panels
+            v_normal_array[i] = dot(view(x_airf_array, i, :), view(relative_velocity_array, i, :))
+            v_tangential_array[i] = dot(view(y_airf_array, i, :), view(relative_velocity_array, i, :))
+        end
         alpha_array .= atan.(v_normal_array, v_tangential_array)
+
+        for i in 1:n_panels
+            @views v_a_array[i] = norm(relative_velocity_crossz[i, :])
+            @views Umagw_array[i] = norm(Uinfcrossz_array[i, :])
+        end
         
-        v_a_array .= norm.(relative_velocity_crossz)
-        v_aw_array = norm.(Uinfcrossz_array)
-        
-        cl_array = [calculate_cl(panel, alpha) for (panel, alpha) in zip(panels, alpha_array)]
-        gamma_new .= 0.5 .* v_a_array.^2 ./ v_aw_array .* cl_array .* chord_array
+        for (i, (panel, alpha)) in enumerate(zip(panels, alpha_array))
+            cl_array[i] = calculate_cl(panel, alpha)
+        end
+        gamma_new .= 0.5 .* v_a_array.^2 ./ Umagw_array .* cl_array .* chord_array
 
         # Apply damping if needed
         if solver.is_with_artificial_damping
             damp, is_damping_applied = smooth_circulation(gamma, 0.1, 0.5)
             @debug "damp: $damp"
         else
-            damp = zeros(length(gamma))
+            damp .= 0.0
             is_damping_applied = false
         end
-
         # Update gamma with relaxation and damping
-        gamma_new = (1 - relaxation_factor) .* gamma + 
+        gamma_new .= (1 - relaxation_factor) .* gamma .+ 
                     relaxation_factor .* gamma_new .+ damp
 
         # Check convergence
-        reference_error = maximum(abs.(gamma_new))
+        abs_gamma_new .= abs.(gamma_new)
+        reference_error = maximum(abs_gamma_new)
         reference_error = max(reference_error, solver.tol_reference_error)
-        error = maximum(abs.(gamma_new - gamma))
+        abs_gamma_new .= abs.(gamma_new .- gamma)
+        error = maximum(abs_gamma_new)
         normalized_error = error / reference_error
 
         @debug "Iteration: $i, normalized_error: $normalized_error, is_damping_applied: $is_damping_applied"
@@ -251,9 +277,9 @@ function gamma_loop(
         end
     end
 
-    if converged
+    if log && converged
         @info "Converged after $iters iterations"
-    else
+    elseif log
         @warn "NO convergence after $(solver.max_iterations) iterations"
     end
 

@@ -24,7 +24,8 @@ mutable struct BodyAerodynamics
 
     alpha_array::Vector{Float64}
     v_a_array::Vector{Float64}
-    work_vectors::NTuple{10,Vector{Float64}}
+    work_vectors::NTuple{10,MVec3}
+    AIC::Array{Float64, 3}
 
     function BodyAerodynamics(
         wings::Vector{T};
@@ -67,8 +68,9 @@ mutable struct BodyAerodynamics
 
         alpha_array = zeros(n_panels)
         v_a_array = zeros(n_panels)    
-        work_vectors = ntuple(_ -> Vector{Float64}(undef, 3), 10)
-        
+        work_vectors = ntuple(_ -> zeros(MVec3), 10)
+        AIC = zeros(3, n_panels, n_panels)
+
         new(
             panels,
             wings,
@@ -79,7 +81,8 @@ mutable struct BodyAerodynamics
             stall_angle_list,
             alpha_array,
             v_a_array,
-            work_vectors
+            work_vectors,
+            AIC
         )
     end
 end
@@ -223,7 +226,7 @@ function calculate_panel_properties(section_list::Vector{Section}, n_panels::Int
 end
 
 """
-    calculate_AIC_matrices(wa::BodyAerodynamics, model::String, 
+    calculate_AIC_matrices!(body_aero::BodyAerodynamics, model::Symbol, 
                          core_radius_fraction::Float64,
                          va_norm_array::Vector{Float64}, 
                          va_unit_array::Matrix{Float64})
@@ -233,63 +236,65 @@ Calculate Aerodynamic Influence Coefficient matrices.
 Returns:
     Tuple of (AIC_x, AIC_y, AIC_z) matrices
 """
-function calculate_AIC_matrices(wa::BodyAerodynamics, model::String,
+function calculate_AIC_matrices!(body_aero::BodyAerodynamics, model::Symbol,
                               core_radius_fraction::Float64,
                               va_norm_array::Vector{Float64}, 
                               va_unit_array::Matrix{Float64})
-    model in ["VSM", "LLT"] || throw(ArgumentError("Model must be VSM or LLT"))
-    
+    model in [:VSM, :LLT] || throw(ArgumentError("Model must be VSM or LLT"))
     # Determine evaluation point based on model
-    evaluation_point = model == "VSM" ? :control_point : :aerodynamic_center
-    evaluation_point_on_bound = model == "LLT"
+    evaluation_point = model === :VSM ? :control_point : :aerodynamic_center
+    evaluation_point_on_bound = model === :LLT
     
     # Initialize AIC matrices
-    AIC = zeros(3, length(wa.panels), length(wa.panels))
+    velocity_induced, tempvel, va_unit, U_2D = zeros(MVec3), zeros(MVec3), zeros(MVec3), zeros(MVec3)
     
     # Calculate influence coefficients
-    for icp in 1:length(wa.panels)
-        ep = getproperty(wa.panels[icp], evaluation_point)
-        for jring in 1:length(wa.panels)
-            velocity_induced = calculate_velocity_induced_single_ring_semiinfinite(
-                wa.panels[jring],
+    for icp in eachindex(body_aero.panels)
+        ep = getproperty(body_aero.panels[icp], evaluation_point)
+        for jring in eachindex(body_aero.panels)
+            va_unit .= @views va_unit_array[jring, :]
+            filaments = body_aero.panels[jring].filaments
+            va_norm = va_norm_array[jring]
+            calculate_velocity_induced_single_ring_semiinfinite!(
+                velocity_induced,
+                tempvel,
+                filaments,
                 ep,
                 evaluation_point_on_bound,
-                va_norm_array[jring],
-                va_unit_array[jring, :],
+                va_norm,
+                va_unit,
                 1.0,
                 core_radius_fraction,
-                wa.work_vectors
+                body_aero.work_vectors
             )
-            
-            AIC[:, icp, jring] = velocity_induced
+            body_aero.AIC[:, icp, jring] .= velocity_induced
             
             # Subtract 2D induced velocity for VSM
-            if icp == jring && model == "VSM"
-                U_2D = calculate_velocity_induced_bound_2D(wa.panels[jring], ep)
-                AIC[:, icp, jring] .-= U_2D
+            if icp == jring && model === :VSM
+                calculate_velocity_induced_bound_2D!(U_2D, body_aero.panels[jring], ep, body_aero.work_vectors)
+                body_aero.AIC[:, icp, jring] .-= U_2D
             end
         end
     end
-    
-    return AIC[1, :, :], AIC[2, :, :], AIC[3, :, :]
+    return nothing
 end
 
 """
-    calculate_circulation_distribution_elliptical_wing(wa::BodyAerodynamics, gamma_0::Float64=1.0)
+    calculate_circulation_distribution_elliptical_wing(body_aero::BodyAerodynamics, gamma_0::Float64=1.0)
 
 Calculate circulation distribution for an elliptical wing.
 
 Returns:
     Vector{Float64}: Circulation distribution along the wing
 """
-function calculate_circulation_distribution_elliptical_wing(wa::BodyAerodynamics, gamma_0::Float64=1.0)
-    length(wa.wings) == 1 || throw(ArgumentError("Multiple wings not yet implemented"))
+function calculate_circulation_distribution_elliptical_wing(body_aero::BodyAerodynamics, gamma_0::Float64=1.0)
+    length(body_aero.wings) == 1 || throw(ArgumentError("Multiple wings not yet implemented"))
     
-    wing_span = wa.wings[1].span
+    wing_span = body_aero.wings[1].span
     @debug "Wing span: $wing_span"
     
     # Calculate y-coordinates of control points
-    y = [panel.control_point[2] for panel in wa.panels]
+    y = [panel.control_point[2] for panel in body_aero.panels]
     
     # Calculate elliptical distribution
     gamma_i = gamma_0 * sqrt.(1 .- (2 .* y ./ wing_span).^2)
@@ -346,7 +351,7 @@ function calculate_stall_angle_list(panels::Vector{Panel};
 end
 
 """
-    update_effective_angle_of_attack_if_VSM(wa::BodyAerodynamics, gamma::Vector{Float64},
+    update_effective_angle_of_attack_if_VSM(body_aero::BodyAerodynamics, gamma::Vector{Float64},
                                           core_radius_fraction::Float64,
                                           x_airf_array::Matrix{Float64},
                                           y_airf_array::Matrix{Float64},
@@ -359,7 +364,7 @@ Update angle of attack at aerodynamic center for VSM method.
 Returns:
     Vector{Float64}: Updated angles of attack
 """
-function update_effective_angle_of_attack_if_VSM(wa::BodyAerodynamics, 
+function update_effective_angle_of_attack_if_VSM(body_aero::BodyAerodynamics, 
     gamma::Vector{Float64},
     core_radius_fraction::Float64,
     x_airf_array::Matrix{Float64},
@@ -369,9 +374,10 @@ function update_effective_angle_of_attack_if_VSM(wa::BodyAerodynamics,
     va_unit_array::Matrix{Float64})
 
     # Calculate AIC matrices at aerodynamic center using LLT method
-    AIC_x, AIC_y, AIC_z = calculate_AIC_matrices(
-        wa, "LLT", core_radius_fraction, va_norm_array, va_unit_array
+    calculate_AIC_matrices!(
+        body_aero, :LLT, core_radius_fraction, va_norm_array, va_unit_array
     )
+    AIC_x, AIC_y, AIC_z = @views body_aero.AIC[1, :, :], body_aero.AIC[2, :, :], body_aero.AIC[3, :, :]
 
     # Calculate induced velocities
     induced_velocity = [
@@ -391,8 +397,8 @@ function update_effective_angle_of_attack_if_VSM(wa::BodyAerodynamics,
 end
 
 """
-    calculate_results(wa::BodyAerodynamics, gamma_new::Vector{Float64}, 
-                     density::Float64, aerodynamic_model_type::String,
+    calculate_results(body_aero::BodyAerodynamics, gamma_new::Vector{Float64}, 
+                     density::Float64, aerodynamic_model_type::Symbol,
                      core_radius_fraction::Float64, mu::Float64,
                      alpha_array::Vector{Float64}, v_a_array::Vector{Float64},
                      chord_array::Vector{Float64}, x_airf_array::Matrix{Float64},
@@ -406,10 +412,10 @@ Calculate final aerodynamic results.
 Returns:
     Dict: Results including forces, coefficients and distributions
 """
-function calculate_results(wa::BodyAerodynamics,
+function calculate_results(body_aero::BodyAerodynamics,
     gamma_new::Vector{Float64},
     density::Float64,
-    aerodynamic_model_type::String,
+    aerodynamic_model_type::Symbol,
     core_radius_fraction::Float64,
     mu::Float64,
     alpha_array::Vector{Float64},
@@ -444,9 +450,9 @@ function calculate_results(wa::BodyAerodynamics,
     moment = reshape((cm_array .* 0.5 .* density .* v_a_array.^2 .* chord_array), :, 1)
 
     # Calculate alpha corrections based on model type
-    alpha_corrected = if aerodynamic_model_type == "VSM"
+    alpha_corrected = if aerodynamic_model_type === :VSM
         update_effective_angle_of_attack_if_VSM(
-            wa,
+            body_aero,
             gamma_new,
             core_radius_fraction,
             x_airf_array,
@@ -455,14 +461,14 @@ function calculate_results(wa::BodyAerodynamics,
             va_norm_array,
             va_unit_array
         )
-    elseif aerodynamic_model_type == "LLT"
+    elseif aerodynamic_model_type === :LLT
         alpha_array
     else
         throw(ArgumentError("Unknown aerodynamic model type, should be LLT or VSM"))
     end
 
     # Verify va is not distributed
-    if length(wa.va) != 3
+    if length(body_aero.va) != 3
         throw(ArgumentError("calculate_results not ready for va_distributed input"))
     end
 
@@ -479,9 +485,9 @@ function calculate_results(wa::BodyAerodynamics,
     side_wing_3D_sum = 0.0
 
     # Get wing properties
-    spanwise_direction = wa.wings[1].spanwise_direction
-    va_mag = norm(wa.va)
-    va = wa.va
+    spanwise_direction = body_aero.wings[1].spanwise_direction
+    va_mag = norm(body_aero.va)
+    va = body_aero.va
     va_unit = va / va_mag
     q_inf = 0.5 * density * va_mag^2
 
@@ -535,23 +541,10 @@ function calculate_results(wa::BodyAerodynamics,
         drag_wing_3D_sum += drag_prescribed_va * panel.width  
         side_wing_3D_sum += side_prescribed_va * panel.width
 
-        # TODO make this work
-        # fx_global_3D_sum += fx_global_3D
-        # fy_global_3D_sum += fy_global_3D
-        # fz_global_3D_sum += fz_global_3D
-        
         # Store coefficients
         push!(cl_prescribed_va, lift_prescribed_va / (q_inf * panel.chord))
         push!(cd_prescribed_va, drag_prescribed_va / (q_inf * panel.chord))
         push!(cs_prescribed_va, side_prescribed_va / (q_inf * panel.chord))
-
-        # TODO translate this
-        # fx_global_3D_list.append(fx_global_3D)
-        # fy_global_3D_list.append(fy_global_3D)
-        # fz_global_3D_list.append(fz_global_3D)
-        # f_global_3D_list.append(
-        #     np.array([fx_global_3D, fy_global_3D, fz_global_3D])
-        # )
     end
 
     if is_only_f_and_gamma_output
@@ -562,8 +555,8 @@ function calculate_results(wa::BodyAerodynamics,
     end
 
     # Calculate wing geometry properties
-    projected_area = sum(wing -> calculate_projected_area(wing), wa.wings)
-    wing_span = wa.wings[1].span
+    projected_area = sum(wing -> calculate_projected_area(wing), body_aero.wings)
+    wing_span = body_aero.wings[1].span
     aspect_ratio_projected = wing_span^2 / projected_area
 
     # Calculate geometric angle of attack
@@ -615,16 +608,16 @@ end
 
 
 """
-    set_va!(wa::BodyAerodynamics, va::Union{Vector{Float64}, Tuple{Vector{Float64}, Float64}})
+    set_va!(body_aero::BodyAerodynamics, va::Union{Vector{Float64}, Tuple{Vector{Float64}, Float64}})
 
 Set velocity array and update wake filaments.
 
 # Arguments
 - `va`: Either a velocity vector or tuple of (velocity vector, yaw_rate)
 """
-function set_va!(wa::BodyAerodynamics, va)
+function set_va!(body_aero::BodyAerodynamics, va)
     # Add length check for va_vec
-    if va isa Vector{Float64} && length(va) != 3 && length(va) != length(wa.panels)
+    if va isa Vector{Float64} && length(va) != 3 && length(va) != length(body_aero.panels)
         throw(ArgumentError("va must be length 3 or match number of panels"))
     end
     # Handle input types
@@ -639,15 +632,15 @@ function set_va!(wa::BodyAerodynamics, va)
     
     # Calculate va_distribution based on input type
     va_distribution = if length(va_vec) == 3 && yaw_rate == 0.0
-        repeat(reshape(va_vec, 1, 3), length(wa.panels))
-    elseif length(va_vec) == length(wa.panels)
+        repeat(reshape(va_vec, 1, 3), length(body_aero.panels))
+    elseif length(va_vec) == length(body_aero.panels)
         va_vec
     elseif yaw_rate != 0.0 && length(va_vec) == 3
         va_dist = Vector{Float64}[]
         
-        for wing in wa.wings
+        for wing in body_aero.wings
             # Get spanwise positions
-            spanwise_positions = [panel.control_point[2] for panel in wa.panels]
+            spanwise_positions = [panel.control_point[2] for panel in body_aero.panels]
             
             # Calculate velocities for each panel
             for i in 1:wing.n_panels
@@ -657,15 +650,15 @@ function set_va!(wa::BodyAerodynamics, va)
         end
         reduce(vcat, va_dist)
     else
-        throw(ArgumentError("Invalid va distribution: length(va)=$(length(va_vec)) ≠ n_panels=$(length(wa.panels))"))
+        throw(ArgumentError("Invalid va distribution: length(va)=$(length(va_vec)) ≠ n_panels=$(length(body_aero.panels))"))
     end
     
     # Update panel velocities
-    for (i, panel) in enumerate(wa.panels)
+    for (i, panel) in enumerate(body_aero.panels)
         panel.va = va_distribution[i,:]
     end
     
     # Update wake elements
-    wa.panels = frozen_wake(va_distribution, wa.panels)
-    wa._va = va_vec
+    body_aero.panels = frozen_wake(va_distribution, body_aero.panels)
+    body_aero._va = va_vec
 end

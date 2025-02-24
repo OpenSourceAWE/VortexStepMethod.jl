@@ -13,7 +13,7 @@ Represents a panel in a vortex step method simulation.
 - `chord::Float64`: Panel chord length
 - `va::Union{Nothing, MVec3}`: Panel velocity
 - `corner_points::Matrix{Float64}`: Panel corner points
-- `aero_model::String`: Aerodynamic model type
+- `aero_model::Symbol`: Aerodynamic model type
 - `aerodynamic_center::Vector{Float64}`: Panel aerodynamic center
 - `control_point::Vector{MVec3}`: Panel control point
 - `bound_point_1::Vector{MVec3}`: First bound point
@@ -24,7 +24,7 @@ Represents a panel in a vortex step method simulation.
 - `width::Float64`: Panel width
 - `filaments::Vector{BoundFilament}`: Panel filaments
 """
-mutable struct Panel{P}
+mutable struct Panel
     TE_point_1::MVec3
     LE_point_1::MVec3
     TE_point_2::MVec3
@@ -32,11 +32,13 @@ mutable struct Panel{P}
     chord::Float64
     va::Union{Nothing, MVec3}
     corner_points::Matrix{Float64}
-    aero_model::String
-    cl_coefficients::Union{Nothing,Vector{Float64}}
-    cd_coefficients::Union{Nothing,Vector{Float64}}
-    cm_coefficients::Union{Nothing,Vector{Float64}}
-    polar_data::P
+    aero_model::Symbol
+    cl_coefficients::Vector{Float64}
+    cd_coefficients::Vector{Float64}
+    cm_coefficients::Vector{Float64}
+    cl_interp::Function
+    cd_interp::Function
+    cm_interp::Function
     aerodynamic_center::MVec3
     control_point::MVec3
     bound_point_1::MVec3
@@ -72,34 +74,41 @@ mutable struct Panel{P}
         corner_points = hcat(LE_point_1, TE_point_1, TE_point_2, LE_point_2)
         
         # Validate aero model consistency
-        if section_1.aero_input[1] != section_2.aero_input[1]
-            throw(ArgumentError("Both sections must have the same aero_input"))
+        aero_model = isa(section_1.aero_input, Symbol) ? section_1.aero_input : section_1.aero_input[1]
+        aero_model_2 = isa(section_2.aero_input, Symbol) ? section_2.aero_input : section_2.aero_input[1]
+        if !(aero_model === aero_model_2)
+            throw(ArgumentError("Both sections must have the same aero_input, not $aero_model and $aero_model_2"))
         end
-        aero_model = isa(section_1.aero_input, String) ? section_1.aero_input : section_1.aero_input[1]
         
         # Initialize aerodynamic properties
-        cl_coeffs = nothing
-        cd_coeffs = nothing
-        cm_coeffs = nothing
-        polar_data = nothing
+        cl_coeffs, cd_coeffs, cm_coeffs = zeros(3), zeros(3), zeros(3)
+        cl_interp, cd_interp, cm_interp = (α::Float64)->0.0, (α::Float64)->0.0, (α::Float64)->0.0
         
-        if aero_model == "lei_airfoil_breukels"
+        if aero_model === :lei_airfoil_breukels
             cl_coeffs, cd_coeffs, cm_coeffs = compute_lei_coefficients(section_1, section_2)
-        elseif aero_model == "polar_data"
+        elseif aero_model === :polar_data
             aero_1 = section_1.aero_input[2]
             aero_2 = section_2.aero_input[2]
             if size(aero_1) != size(aero_2)
                 throw(ArgumentError("Polar data must have same shape"))
             end
             polar_data = (aero_1 + aero_2) / 2
-        elseif aero_model == "interpolations"
+            cl_interp_ = linear_interpolation(polar_data[:,1], polar_data[:,2]; extrapolation_bc=NaN)
+            cd_interp_ = linear_interpolation(polar_data[:,1], polar_data[:,3]; extrapolation_bc=NaN)
+            cm_interp_ = linear_interpolation(polar_data[:,1], polar_data[:,4]; extrapolation_bc=NaN)
+            cl_interp = (α::Float64) -> cl_interp_(α)
+            cd_interp = (α::Float64) -> cd_interp_(α)
+            cm_interp = (α::Float64) -> cm_interp_(α)
+        elseif aero_model === :interpolations
             cl_left, cd_left, cm_left = section_1.aero_input[2]
             cl_right, cd_right, cm_right = section_2.aero_input[2]
-            cl_interp = (α, β) -> 0.5cl_left(α, β) + 0.5cl_right(α, β)
-            cd_interp = (α, β) -> 0.5cd_left(α, β) + 0.5cd_right(α, β)
-            cm_interp = (α, β) -> 0.5cm_left(α, β) + 0.5cm_right(α, β)
-            polar_data = (cl_interp, cd_interp, cm_interp)
-        elseif aero_model != "inviscid"
+            cl_interp = cl_left === cl_right ? (α::Float64) -> cl_left(α, 0.0) :
+                (α::Float64) -> 0.5cl_left(α, 0.0) + 0.5cl_right(α, 0.0) # TODO: add trailing edge deflection
+            cd_interp = cd_left === cd_right ? (α::Float64) -> cd_left(α, 0.0) :
+                (α::Float64) -> 0.5cd_left(α, 0.0) + 0.5cd_right(α, 0.0)
+            cm_interp = cm_left === cm_right ? (α::Float64) -> cm_left(α, 0.0) :
+                (α::Float64) -> 0.5cm_left(α, 0.0) + 0.5cm_right(α, 0.0)
+        elseif !(aero_model === :inviscid)
             throw(ArgumentError("Unsupported aero model: $aero_model"))
         end
         
@@ -113,10 +122,11 @@ mutable struct Panel{P}
             BoundFilament(TE_point_2, bound_point_2)
         ]
 
-        new{typeof(polar_data)}(
+        new(
             TE_point_1, LE_point_1, TE_point_2, LE_point_2,
             chord, nothing, corner_points, aero_model,
-            cl_coeffs, cd_coeffs, cm_coeffs, polar_data,
+            cl_coeffs, cd_coeffs, cm_coeffs,
+            cl_interp, cd_interp, cm_interp,
             aerodynamic_center, control_point,
             bound_point_1, bound_point_2,
             x_airf, y_airf, z_airf,
@@ -243,27 +253,23 @@ Calculate lift coefficient for given angle of attack.
 # Returns
 - `Float64`: Lift coefficient (Cl)
 """
-function calculate_cl(panel::Panel, alpha::Float64)
-    if panel.aero_model == "lei_airfoil_breukels"
+function calculate_cl(panel::Panel, alpha::Float64)::Float64
+    cl = 0.0
+    if panel.aero_model === :lei_airfoil_breukels
         cl = evalpoly(rad2deg(alpha), reverse(panel.cl_coefficients))
         if abs(alpha) > (π/9)
             cl = 2 * cos(alpha) * sin(alpha)^2
         end
-        return cl
-    elseif panel.aero_model == "inviscid"
-        return 2π * alpha
-    elseif panel.aero_model == "polar_data"
-        return linear_interpolation(
-            panel.polar_data[:,1],
-            panel.polar_data[:,2];
-            extrapolation_bc=Line()
-        )(alpha)
-    elseif panel.aero_model == "interpolations"
-        return panel.polar_data[1](alpha, 0.0)
+    elseif panel.aero_model === :inviscid
+        cl = 2π * alpha
+    elseif panel.aero_model === :polar_data || panel.aero_model === :interpolations
+        cl = panel.cl_interp(alpha)::Float64
     else
         throw(ArgumentError("Unsupported aero model: $(panel.aero_model)"))
     end
+    return cl
 end
+
 
 """
     calculate_cd_cm(panel::Panel, alpha::Float64)
@@ -271,32 +277,20 @@ end
 Calculate drag and moment coefficients for given angle of attack.
 """
 function calculate_cd_cm(panel::Panel, alpha::Float64)
-    if panel.aero_model == "lei_airfoil_breukels"
+    cd, cm = 0.0, 0.0
+    if panel.aero_model === :lei_airfoil_breukels
         cd = evalpoly(rad2deg(alpha), reverse(panel.cd_coefficients))
         cm = evalpoly(rad2deg(alpha), reverse(panel.cm_coefficients))
         if abs(alpha) > (π/9)  # Outside ±20 degrees
             cd = 2 * sin(alpha)^3
         end
-        return cd, cm
-    elseif panel.aero_model == "inviscid"
-        return 0.0, 0.0
-    elseif panel.aero_model == "polar_data"
-        cd = linear_interpolation(
-            panel.polar_data[:,1],
-            panel.polar_data[:,3];
-            extrapolation_bc=Line()
-        )(alpha)
-        cm = linear_interpolation(
-            panel.polar_data[:,1],
-            panel.polar_data[:,4];
-            extrapolation_bc=Line()
-        )(alpha)
-        return cd, cm
-    elseif panel.aero_model == "interpolations"
-        return panel.polar_data[2](alpha, 0.0), panel.polar_data[3](alpha, 0.0)
-    else
+    elseif panel.aero_model === :polar_data || panel.aero_model === :interpolations
+        cd = panel.cd_interp(alpha)::Float64
+        cm = panel.cm_interp(alpha)::Float64
+    elseif !(panel.aero_model === :inviscid)
         throw(ArgumentError("Unsupported aero model: $(panel.aero_model)"))
     end
+    return cd, cm
 end
 
 """
@@ -338,7 +332,9 @@ function calculate_filaments_for_plotting(panel::Panel)
 end
 
 """
-    calculate_velocity_induced_single_ring_semiinfinite(
+    calculate_velocity_induced_single_ring_semiinfinite!(
+        velind::Matrix{Float64},
+        tempvel::Vector{Float64},
         panel::Panel,
         evaluation_point::Vector{Float64},
         evaluation_point_on_bound::Bool,
@@ -359,49 +355,50 @@ Calculate the velocity induced by a vortex ring at a control point.
 - `core_radius_fraction`: Vortex core radius as fraction of panel width
 
 # Returns
-- `Vector{Float64}`: Induced velocity vector
+- nothing
 """
-function calculate_velocity_induced_single_ring_semiinfinite(
-    panel::Panel,
-    evaluation_point::PosVector,
+@inline function calculate_velocity_induced_single_ring_semiinfinite!(
+    velind::MVec3,
+    tempvel::MVec3,
+    filaments::Vector{Union{VortexStepMethod.BoundFilament, VortexStepMethod.SemiInfiniteFilament}},
+    evaluation_point::MVec3,
     evaluation_point_on_bound::Bool,
     va_norm::Float64,
-    va_unit::VelVector,
+    va_unit::MVec3,
     gamma::Float64,
     core_radius_fraction::Float64,
-    work_vectors::NTuple{10,Vector{Float64}}
+    work_vectors::NTuple{10, MVec3}
 )
-    velind = zeros(Float64, 3)
-    tempvel = zeros(3)
-
+    velind .= 0.0
+    tempvel .= 0.0
     # Process each filament
-    for (i, filament) in enumerate(panel.filaments)
+    @inbounds for i in eachindex(filaments)
         if i == 1  # bound filament
             if evaluation_point_on_bound
-                tempvel .= zeros(Float64, 3)
+                tempvel .= 0.0
             else
                 velocity_3D_bound_vortex!(
                     tempvel,
-                    filament,
+                    filaments[i],
                     evaluation_point,
                     gamma,
                     core_radius_fraction,
                     work_vectors
                 )
             end
-        elseif i ∈ (2, 3)  # trailing filaments
+        elseif i == 2 || i == 3  # trailing filaments
             velocity_3D_trailing_vortex!(
                 tempvel,
-                filament,
+                filaments[i],
                 evaluation_point,
                 gamma,
                 va_norm,
                 work_vectors
             )
-        elseif i ∈ (4, 5)  # semi-infinite trailing filaments
+        elseif i == 4 || i == 5  # semi-infinite trailing filaments
             velocity_3D_trailing_vortex_semiinfinite!(
                 tempvel,
-                filament,
+                filaments[i],
                 va_unit,
                 evaluation_point,
                 gamma,
@@ -409,16 +406,15 @@ function calculate_velocity_induced_single_ring_semiinfinite(
                 work_vectors
             )
         else
-            tempvel .= zeros(Float64, 3)
+            tempvel .= 0.0
         end
         velind .+= tempvel
     end
-
-    return velind
+    return nothing
 end
 
 """
-    calculate_velocity_induced_bound_2D(panel::Panel, evaluation_point::Vector{Float64})
+    calculate_velocity_induced_bound_2D!(panel::Panel, evaluation_point::Vector{Float64})
 
 Calculate velocity induced by bound vortex filaments at the control point.
 Only needed for VSM, as LLT bound and filament align, thus no induced velocity.
@@ -430,19 +426,24 @@ Only needed for VSM, as LLT bound and filament align, thus no induced velocity.
 # Returns
 - `Vector{Float64}`: Induced velocity at the control point
 """
-function calculate_velocity_induced_bound_2D(
+function calculate_velocity_induced_bound_2D!(
+    U_2D,
     panel::Panel, 
-    evaluation_point::PosVector
+    evaluation_point,
+    work_vectors
 )
+    r3, r0, cross_, cross_square = work_vectors
     # r3 perpendicular to the bound vortex
-    r3 = evaluation_point - (panel.bound_point_1 + panel.bound_point_2) / 2
+    r3 .= evaluation_point .- (panel.bound_point_1 .+ panel.bound_point_2) ./ 2
     
     # r0 is the direction of the bound vortex
-    r0 = panel.bound_point_1 - panel.bound_point_2
+    r0 .= panel.bound_point_1 .- panel.bound_point_2
     
     # Calculate cross product
-    cross_ = cross(r0, r3)
+    cross3!(cross_, r0, r3)
     
     # Calculate induced velocity
-    return (cross_ / sum(cross_.^2) / 2π) * norm(r0)
+    cross_square .= cross_.^2
+    U_2D .= (cross_ ./ sum(cross_square) ./ 2π) .* norm(r0)
+    return nothing
 end
