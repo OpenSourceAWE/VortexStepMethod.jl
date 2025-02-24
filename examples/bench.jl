@@ -40,7 +40,8 @@ vsm_solver = Solver(aerodynamic_model_type=:VSM)
 # Step 5: Solve using both methods
 results_vsm = solve(vsm_solver, wa)
 @time results_vsm = solve(vsm_solver, wa)
-# time Python: 32.0 ms
-# time Julia:   0.6 ms
+# time Python: 32.0 ms Ryzen 7950x
+# time Julia:   0.6 ms Ryzen 7950x
+#               0.8 ms laptop, performance mode, battery 
 
 nothing
