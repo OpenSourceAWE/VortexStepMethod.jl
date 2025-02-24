@@ -1,4 +1,5 @@
 using BenchmarkTools
+using StaticArrays
 using VortexStepMethod
 using VortexStepMethod: calculate_AIC_matrices!, gamma_loop, calculate_results,
                        update_effective_angle_of_attack_if_VSM, calculate_projected_area,
@@ -55,6 +56,7 @@ using LinearAlgebra
     core_radius_fractions = [0.001, 10.0]
 
     @testset "AIC Matrix Calculation" begin
+        @info "AIC Matrix Calculation"
         for model in models
             for frac in core_radius_fractions
                 @testset "Model $model Core Radius Fraction $frac" begin
@@ -67,7 +69,7 @@ using LinearAlgebra
     end
     
     @testset "Gamma Loop" begin
-        
+        @info "Gamma Loop"
         # Pre-allocate arrays
         gamma_new = zeros(n_panels)
         va_array = zeros(n_panels, 3)
@@ -245,3 +247,4 @@ using LinearAlgebra
     #     @test result.allocs == 0
     # end
 end
+

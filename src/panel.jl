@@ -262,9 +262,7 @@ function calculate_cl(panel::Panel, alpha::Float64)::Float64
         end
     elseif panel.aero_model === :inviscid
         cl = 2π * alpha
-    elseif panel.aero_model === :polar_data
-        cl = panel.cl_interp(alpha)::Float64
-    elseif panel.aero_model === :interpolations
+    elseif panel.aero_model === :polar_data || panel.aero_model === :interpolations
         cl = panel.cl_interp(alpha)::Float64
     else
         throw(ArgumentError("Unsupported aero model: $(panel.aero_model)"))
@@ -279,26 +277,20 @@ end
 Calculate drag and moment coefficients for given angle of attack.
 """
 function calculate_cd_cm(panel::Panel, alpha::Float64)
+    cd, cm = 0.0, 0.0
     if panel.aero_model === :lei_airfoil_breukels
         cd = evalpoly(rad2deg(alpha), reverse(panel.cd_coefficients))
         cm = evalpoly(rad2deg(alpha), reverse(panel.cm_coefficients))
         if abs(alpha) > (π/9)  # Outside ±20 degrees
             cd = 2 * sin(alpha)^3
         end
-        return cd, cm
-    elseif panel.aero_model === :inviscid
-        return 0.0, 0.0
-    elseif panel.aero_model === :polar_data
-        cd = panel.cd_interp(alpha)
-        cm = panel.cm_interp(alpha)
-        return cd, cm
-    elseif panel.aero_model === :interpolations
-        cd = panel.cd_interp(alpha, 0.0)
-        cm = panel.cm_interp(alpha, 0.0)
-        return cd, cm
-    else
+    elseif panel.aero_model === :polar_data || panel.aero_model === :interpolations
+        cd = panel.cd_interp(alpha)::Float64
+        cm = panel.cm_interp(alpha)::Float64
+    elseif !(panel.aero_model === :inviscid)
         throw(ArgumentError("Unsupported aero model: $(panel.aero_model)"))
     end
+    return cd, cm
 end
 
 """

@@ -15,7 +15,7 @@ mkpath(save_folder)
 
 # Defining discretisation
 n_panels = 54
-spanwise_panel_distribution = "split_provided"
+spanwise_panel_distribution = :split_provided
 
 # Load rib data from CSV
 csv_file_path = joinpath(
@@ -30,7 +30,7 @@ rib_list = []
 for row in eachrow(df)
     LE = [row.LE_x, row.LE_y, row.LE_z]
     TE = [row.TE_x, row.TE_y, row.TE_z]
-    push!(rib_list, (LE, TE, ("lei_airfoil_breukels", [row.d_tube, row.camber])))
+    push!(rib_list, (LE, TE, (:lei_airfoil_breukels, [row.d_tube, row.camber])))
 end
 
 # Create wing geometry
@@ -42,11 +42,11 @@ body_aero_CAD_19ribs = BodyAerodynamics([CAD_wing])
 
 # Create solvers
 VSM = Solver(
-    aerodynamic_model_type="VSM",
+    aerodynamic_model_type=:VSM,
     is_with_artificial_damping=false
 )
 VSM_with_stall_correction = Solver(
-    aerodynamic_model_type="VSM",
+    aerodynamic_model_type=:VSM,
     is_with_artificial_damping=true
 )
 
@@ -63,17 +63,17 @@ vel_app = [
 ] * v_a
 body_aero_CAD_19ribs.va = vel_app
 
-# # Plotting geometry
-# plot_geometry(
-#     body_aero_CAD_19ribs,
-#     "";
-#     data_type=".svg",
-#     save_path="",
-#     is_save=false,
-#     is_show=true,
-#     view_elevation=15,
-#     view_azimuth=-120
-# )
+# Plotting geometry
+plot_geometry(
+    body_aero_CAD_19ribs,
+    "";
+    data_type=".svg",
+    save_path="",
+    is_save=false,
+    is_show=true,
+    view_elevation=15,
+    view_azimuth=-120
+)
 
 # Solving and plotting distributions
 results = solve(VSM, body_aero_CAD_19ribs)

@@ -2,7 +2,7 @@ using LinearAlgebra
 using ControlPlots
 using VortexStepMethod
 
-plot = false
+plot = true
 
 # Step 1: Define wing parameters
 n_panels = 20          # Number of panels
