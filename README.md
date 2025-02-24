@@ -18,6 +18,10 @@ if you haven't already. On Linux, make sure that Python3, Matplotlib and LaTeX a
 sudo apt install python3-matplotlib
 sudo apt install texlive-full texlive-fonts-extra cm-super
 ```
+Furthermore, the package `TestEnv` must be installed globally:
+```
+julia -e 'using Pkg; Pkg.add("TestEnv")'
+```
 
 Before installing this software it is suggested to create a new project, for example like this:
 ```bash
