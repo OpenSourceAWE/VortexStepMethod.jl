@@ -13,7 +13,6 @@ using NonlinearSolve
 using Interpolations: linear_interpolation, Line, Extrapolation
 using Serialization
 using SharedArrays
-using BenchmarkTools
 
 # Export public interface
 export Wing, Section, KiteWing
