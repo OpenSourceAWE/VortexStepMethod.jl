@@ -152,9 +152,9 @@ end
 Represents a semi-infinite vortex filament.
 """
 struct SemiInfiniteFilament <: Filament
-    x1::Vector{Float64}         # Starting point
-    direction::Vector{Float64}  # Direction vector
-    vel_mag::Float64           # Velocity magnitude
+    x1::MVec3                    # Starting point
+    direction::MVec3             # Direction vector
+    vel_mag::Float64             # Velocity magnitude
     filament_direction::Int64    # Direction indicator (-1 or 1)
 end
 

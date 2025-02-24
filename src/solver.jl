@@ -24,18 +24,18 @@ struct Solver
     is_only_f_and_gamma_output::Bool
 
     function Solver(;
-        aerodynamic_model_type::Symbol=:VSM,
-        density::Float64=1.225,
-        max_iterations::Int64=1500,
-        allowed_error::Float64=1e-5,
-        tol_reference_error::Float64=0.001,
-        relaxation_factor::Float64=0.03,
-        is_with_artificial_damping::Bool=false,
+        aerodynamic_model_type::Symbol   = :VSM,
+        density::Float64                 = 1.225,
+        max_iterations::Int64            = 1500,
+        allowed_error::Float64           = 1e-5,
+        tol_reference_error::Float64     = 0.001,
+        relaxation_factor::Float64       = 0.03,
+        is_with_artificial_damping::Bool = false,
         artificial_damping::NamedTuple{(:k2, :k4), Tuple{Float64, Float64}}=(k2=0.1, k4=0.0),
         type_initial_gamma_distribution::Symbol=:elliptic,
-        core_radius_fraction::Float64=1e-20,
-        mu::Float64=1.81e-5,
-        is_only_f_and_gamma_output::Bool=false
+        core_radius_fraction::Float64    = 1e-20,
+        mu::Float64                      = 1.81e-5, # TODO do not use magic constants
+        is_only_f_and_gamma_output::Bool = false
     )
         new(
             aerodynamic_model_type,

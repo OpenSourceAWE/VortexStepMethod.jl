@@ -11,7 +11,7 @@ Represents a panel in a vortex step method simulation.
 - `TE_point_2::Vector{MVec3}`: Second trailing edge point
 - `LE_point_2::Vector{MVec3}`: Second leading edge point
 - `chord::Float64`: Panel chord length
-- `va::Vector{Float64}`: Panel velocity
+- `va::Union{Nothing, MVec3}`: Panel velocity
 - `corner_points::Matrix{Float64}`: Panel corner points
 - `aero_model::Symbol`: Aerodynamic model type
 - `aerodynamic_center::Vector{Float64}`: Panel aerodynamic center
@@ -30,7 +30,7 @@ mutable struct Panel
     TE_point_2::MVec3
     LE_point_2::MVec3
     chord::Float64
-    va::Union{Nothing,MVec3}
+    va::Union{Nothing, MVec3}
     corner_points::Matrix{Float64}
     aero_model::Symbol
     cl_coefficients::Vector{Float64}
