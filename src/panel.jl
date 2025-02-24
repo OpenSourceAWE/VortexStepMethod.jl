@@ -420,13 +420,10 @@ Calculate velocity induced by bound vortex filaments at the control point.
 Only needed for VSM, as LLT bound and filament align, thus no induced velocity.
 
 # Arguments
-- U_2D: unclear
+- U_2D: resulting 2D velocity vector
 - `panel::Panel`: Panel object
 - `evaluation_point`: Point where induced velocity is evaluated
 - work_vectors: unclear
-
-# Returns
-- `Vector{Float64}`: Induced velocity at the control point
 """
 function calculate_velocity_induced_bound_2D!(
     U_2D,
