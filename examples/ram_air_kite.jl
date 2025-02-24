@@ -50,7 +50,7 @@ plot && plot_geometry(
 )
 
 # Solving and plotting distributions
-@time results = solve(VSM, body_aero)
+results = solve(VSM, body_aero)
 @time results = solve(VSM, body_aero)
 
 CAD_y_coordinates = [panel.aerodynamic_center[2] for panel in body_aero.panels]
