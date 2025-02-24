@@ -140,7 +140,7 @@ end
 
     # Calculate reference matrices using thesis functions
     controlpoints, rings, bladepanels, ringvec, coord_L = 
-        create_geometry_general(coord, Uinf, N, "5fil", "LLT")
+        create_geometry_general(coord, Uinf, N, "5fil", :LLT)
     
     # Test LLT matrices
     @testset "LLT Matrices" begin
@@ -153,7 +153,7 @@ end
             zeros(N-1),
             nothing,  # data_airf not needed
             nothing,  # conv_crit not needed
-            "LLT"
+            :LLT
         )
 
         # Calculate new matrices
@@ -161,7 +161,7 @@ end
         va_unit_array = repeat(reshape(Uinf ./ norm(Uinf), 1, 3), length(coord))
         calculate_AIC_matrices!(
             body_aero,
-            "LLT",
+            :LLT,
             core_radius_fraction,
             va_norm_array,
             va_unit_array
@@ -178,7 +178,7 @@ end
     @testset "VSM Matrices" begin
         # Calculate reference matrices for VSM
         controlpoints, rings, bladepanels, ringvec, coord_L = 
-            create_geometry_general(coord, Uinf, N, "5fil", "VSM")
+            create_geometry_general(coord, Uinf, N, "5fil", :VSM)
         
         MatrixU, MatrixV, MatrixW = thesis_induction_matrix_creation(
             deepcopy(ringvec),
@@ -188,7 +188,7 @@ end
             zeros(N-1),
             nothing,
             nothing,
-            "VSM"
+            :VSM
         )
 
         # Calculate new matrices
@@ -196,7 +196,7 @@ end
         va_unit_array = repeat(reshape(Uinf ./ norm(Uinf), 1, 3), length(coord))
         calculate_AIC_matrices!(
             body_aero,
-            "VSM",
+            :VSM,
             core_radius_fraction,
             va_norm_array,
             va_unit_array
@@ -212,7 +212,7 @@ end
 
 
 @testset "Wing Geometry Creation" begin
-    function create_geometry(; model="VSM", wing_type=:rectangular, plotting=false, N=40)
+    function create_geometry(; model=:VSM, wing_type=:rectangular, plotting=false, N=40)
         max_chord = 1.0
         span = 17.0
         AR = span^2 / (π * span * max_chord / 4)
@@ -221,7 +221,7 @@ end
         aoa = 5.7106 * π / 180
         Uinf = [cos(aoa), 0.0, sin(aoa)] .* v_a
     
-        coord = if wing_type == :rectangular
+        coord = if wing_type === :rectangular
             twist = range(-0.5, 0.5, length=N)
             beta = range(-2, 2, length=N)
             generate_coordinates_rect_wing(
@@ -232,11 +232,11 @@ end
                 N,
                 "lin"
             )
-        elseif wing_type == :curved
+        elseif wing_type === :curved
             generate_coordinates_curved_wing(
                 max_chord, span, π/4, 5, N, "cos"
             )
-        elseif wing_type == :elliptical
+        elseif wing_type === :elliptical
             generate_coordinates_el_wing(max_chord, span, N, "cos")
         else
             error("Invalid wing type")
@@ -258,7 +258,7 @@ end
         return body_aero, coord, Uinf, model
     end
 
-    for model in ["VSM", "LLT"]
+    for model in [:VSM, :LLT]
         @debug "model: $model"
         for wing_type in [:rectangular, :curved, :elliptical]
             @debug "wing_type: $wing_type"
@@ -278,7 +278,7 @@ end
                 index_reversed = length(body_aero.panels) - i + 1
                 panel = body_aero.panels[index_reversed]
                 
-                evaluation_point = if model == "VSM"
+                evaluation_point = if model === :VSM
                     panel.control_point
                 else  # LLT
                     panel.aerodynamic_center
@@ -294,7 +294,7 @@ end
                     atol=1e-4
                 )
                 
-                if model == "VSM"
+                if model === :VSM
                     @test isapprox(
                         panel.aerodynamic_center,
                         expected_controlpoints[i]["coordinates_aoa"],

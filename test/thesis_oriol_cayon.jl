@@ -205,7 +205,7 @@ function create_geometry_general(coordinates, Uinf, N, ring_geo, model)
         normal = x_airf
         tangential = y_airf
         
-        if model == "VSM"
+        if model === :VSM
             cp = Dict(
                 "coordinates" => VSMpoint,
                 "chord" => chord,
@@ -215,7 +215,7 @@ function create_geometry_general(coordinates, Uinf, N, ring_geo, model)
                 "coordinates_aoa" => LLpoint
             )
             push!(controlpoints, cp)
-        elseif model == "LLT"
+        elseif model === :LLT
             cp = Dict(
                 "coordinates" => LLpoint,
                 "chord" => chord,
@@ -320,7 +320,7 @@ function thesis_induction_matrix_creation(ringvec, controlpoints, rings, Uinf, G
     airf_coord = [controlpoints[icp]["airf_coord"] for icp in 1:N]
 
     for icp in 1:N
-        if model == "VSM"
+        if model === :VSM
             # Velocity induced by infinite bound vortex with Gamma = 1
             U_2D[icp,:] = velocity_induced_bound_2D(ringvec[icp])
         end
@@ -347,7 +347,7 @@ function thesis_induction_matrix_creation(ringvec, controlpoints, rings, Uinf, G
 
             # Different from old thesis code as this was considered wrong
             if icp == jring
-                if model == "VSM"
+                if model === :VSM
                     MatrixU[icp,jring] -= U_2D[icp,1]
                     MatrixV[icp,jring] -= U_2D[icp,2]
                     MatrixW[icp,jring] -= U_2D[icp,3]
@@ -501,7 +501,7 @@ function velocity_induced_single_ring_semiinfinite(ring, controlpoint, model, Ui
                 XV1, Vf, XVP, -GAMMA, Uinf
             )
         elseif filament["id"] == "bound"
-            if model == "VSM"
+            if model === :VSM
                 XV2 = filament["x2"]
                 tempvel = velocity_3D_bound_vortex(XV1, XV2, XVP, GAMMA)
             else

@@ -375,7 +375,7 @@ function update_effective_angle_of_attack_if_VSM(body_aero::BodyAerodynamics,
 
     # Calculate AIC matrices at aerodynamic center using LLT method
     calculate_AIC_matrices!(
-        body_aero, "LLT", core_radius_fraction, va_norm_array, va_unit_array
+        body_aero, :LLT, core_radius_fraction, va_norm_array, va_unit_array
     )
     AIC_x, AIC_y, AIC_z = @views body_aero.AIC[1, :, :], body_aero.AIC[2, :, :], body_aero.AIC[3, :, :]
 
@@ -450,7 +450,7 @@ function calculate_results(body_aero::BodyAerodynamics,
     moment = reshape((cm_array .* 0.5 .* density .* v_a_array.^2 .* chord_array), :, 1)
 
     # Calculate alpha corrections based on model type
-    alpha_corrected = if aerodynamic_model_type == "VSM"
+    alpha_corrected = if aerodynamic_model_type === :VSM
         update_effective_angle_of_attack_if_VSM(
             body_aero,
             gamma_new,
@@ -461,7 +461,7 @@ function calculate_results(body_aero::BodyAerodynamics,
             va_norm_array,
             va_unit_array
         )
-    elseif aerodynamic_model_type == "LLT"
+    elseif aerodynamic_model_type === :LLT
         alpha_array
     else
         throw(ArgumentError("Unknown aerodynamic model type, should be LLT or VSM"))
@@ -541,23 +541,10 @@ function calculate_results(body_aero::BodyAerodynamics,
         drag_wing_3D_sum += drag_prescribed_va * panel.width  
         side_wing_3D_sum += side_prescribed_va * panel.width
 
-        # TODO make this work
-        # fx_global_3D_sum += fx_global_3D
-        # fy_global_3D_sum += fy_global_3D
-        # fz_global_3D_sum += fz_global_3D
-        
         # Store coefficients
         push!(cl_prescribed_va, lift_prescribed_va / (q_inf * panel.chord))
         push!(cd_prescribed_va, drag_prescribed_va / (q_inf * panel.chord))
         push!(cs_prescribed_va, side_prescribed_va / (q_inf * panel.chord))
-
-        # TODO translate this
-        # fx_global_3D_list.append(fx_global_3D)
-        # fy_global_3D_list.append(fy_global_3D)
-        # fz_global_3D_list.append(fz_global_3D)
-        # f_global_3D_list.append(
-        #     np.array([fx_global_3D, fy_global_3D, fz_global_3D])
-        # )
     end
 
     if is_only_f_and_gamma_output

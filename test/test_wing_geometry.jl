@@ -14,14 +14,14 @@ Points are compared with approximate equality to handle floating point differenc
 function ==(a::Section, b::Section)
     return (isapprox(a.LE_point, b.LE_point; rtol=1e-5, atol=1e-5) &&
             isapprox(a.TE_point, b.TE_point; rtol=1e-5, atol=1e-5) &&
-            a.aero_input == b.aero_input)
+            a.aero_input === b.aero_input)
 end
 
 @testset "Wing Geometry Tests" begin
     @testset "Wing initialization" begin
         example_wing = Wing(10; spanwise_panel_distribution=:linear)
         @test example_wing.n_panels == 10
-        @test example_wing.spanwise_panel_distribution == :linear
+        @test example_wing.spanwise_panel_distribution === :linear
         @test example_wing.spanwise_direction ≈ [0.0, 1.0, 0.0]
         @test length(example_wing.sections) == 0
     end
@@ -34,7 +34,7 @@ end
         section = example_wing.sections[1]
         @test section.LE_point ≈ [0.0, 0.0, 0.0]
         @test section.TE_point ≈ [-1.0, 0.0, 0.0]
-        @test section.aero_input == :inviscid
+        @test section.aero_input === :inviscid
     end
 
     @testset "Robustness left to right" begin
@@ -234,7 +234,7 @@ end
             @test isapprox(section.TE_point, expected_TE; rtol=1e-4)
 
             aero_input = section.aero_input
-            @test aero_input[1] == :lei_airfoil_breukels
+            @test aero_input[1] === :lei_airfoil_breukels
             @test isapprox(aero_input[2][1], expected_tube_diameter[i])
             @test isapprox(aero_input[2][2], expected_chamber_height[i])
         end
@@ -262,7 +262,7 @@ end
         @test 1.0 < new_sections[5].LE_point[2] < 2.0
 
         for section in new_sections
-            @test section.aero_input == :inviscid
+            @test section.aero_input === :inviscid
         end
     end
 end

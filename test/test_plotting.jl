@@ -76,7 +76,7 @@ plt.ioff()
         fig = plot_distribution(
             [y_coordinates, y_coordinates],
             [results_vsm, results_llt],
-            [:VSM, :LLT],
+            ["VSM", "LLT"],
             title="Spanwise Distributions"
         )
         @test fig isa plt.PyPlot.Figure
@@ -87,7 +87,7 @@ plt.ioff()
         fig = plot_polars(
             [llt_solver, vsm_solver],
             [wa, wa],
-            [:LLT, :VSM],
+            ["VSM", "LLT"],
             angle_range=angle_range,
             angle_type="angle_of_attack",
             v_a=v_a,
