@@ -67,8 +67,8 @@ Add a new section to the wing.
 - TE_point::PosVector: position of the point on the side of the leading edge
 - aero_input: Can be:
   - :inviscid
-  - :lei_airfoil_breukels
-  - (:interpolations, (cl_interp, cd_interp, cm_interp))
+  - :`lei_airfoil_breukels`
+  - (:interpolations, (`cl_interp`, `cd_interp`, `cm_interp`))
 """
 function add_section!(wing::Wing, LE_point::Vector{Float64}, 
                      TE_point::Vector{Float64}, aero_input)
