@@ -38,51 +38,9 @@ llt_solver = Solver(aerodynamic_model_type=:LLT)
 vsm_solver = Solver(aerodynamic_model_type=:VSM)
 
 # Step 5: Solve using both methods
-results_llt = solve(llt_solver, wa)
-@time results_llt = solve(llt_solver, wa)
 results_vsm = solve(vsm_solver, wa)
 @time results_vsm = solve(vsm_solver, wa)
-# time Python: 32.0ms
-# time Julia:   0.7ms
+# time Python: 32.0 ms
+# time Julia:   0.7 ms
 
-# Print results comparison
-println("\nLifting Line Theory Results:")
-println("CL = $(round(results_llt["cl"], digits=4))")
-println("CD = $(round(results_llt["cd"], digits=4))")
-println("\nVortex Step Method Results:")
-println("CL = $(round(results_vsm["cl"], digits=4))")
-println("CD = $(round(results_vsm["cd"], digits=4))")
-println("Projected area = $(round(results_vsm["projected_area"], digits=4)) m²")
-
-# Step 6: Plot geometry
-plot && plot_geometry(
-      wa,
-      "Rectangular_wing_geometry";
-      data_type=".pdf",
-      save_path=".",
-      is_save=false,
-      is_show=true,
-)
-
-# Step 7: Plot spanwise distributions
-y_coordinates = [panel.aerodynamic_center[2] for panel in wa.panels]
-
-plot && plot_distribution(
-    [y_coordinates, y_coordinates],
-    [results_vsm, results_llt],
-    ["VSM", "LLT"],
-    title="Spanwise Distributions"
-)
-
-# Step 8: Plot polar curves
-angle_range = range(0, 20, 20)
-plot && plot_polars(
-    [llt_solver, vsm_solver],
-    [wa, wa],
-    ["LLT", "VSM"];
-    angle_range,
-    angle_type="angle_of_attack",
-    v_a,
-    title="Rectangular Wing Polars"
-)
 nothing
