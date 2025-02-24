@@ -35,7 +35,7 @@ vel_app = [cos(alpha), 0.0, sin(alpha)] .* v_a
 set_va!(body_aero, (vel_app, 0.0))  # Second parameter is yaw rate
 
 # Step 4: Initialize solvers for both LLT and VSM methods
-vsm_solver = Solver(aerodynamic_model_type="VSM")
+vsm_solver = Solver(aerodynamic_model_type=:VSM)
 
 # Benchmark setup
 velocity_induced = @MVector zeros(3)  # StaticArraysCore.MVector{3, Float64}
@@ -51,50 +51,50 @@ gamma = 1.0                          # Float64
 # Create work vectors tuple of MVector{3, Float64}
 work_vectors = ntuple(_ -> @MVector(zeros(3)), 10)  # NTuple{10, StaticArraysCore.MVector{3, Float64}}
 
-# @btime VortexStepMethod.calculate_velocity_induced_single_ring_semiinfinite!(
-#     $velocity_induced,
-#     $tempvel,
-#     $panel.filaments,
-#     $ep,
-#     $evaluation_point_on_bound,
-#     $va_norm,
-#     $va_unit,
-#     $gamma,
-#     $core_radius_fraction,
-#     $work_vectors
-# )
+@btime VortexStepMethod.calculate_velocity_induced_single_ring_semiinfinite!(
+    $velocity_induced,
+    $tempvel,
+    $panel.filaments,
+    $ep,
+    $evaluation_point_on_bound,
+    $va_norm,
+    $va_unit,
+    $gamma,
+    $core_radius_fraction,
+    $work_vectors
+)
 
-# @btime VortexStepMethod.calculate_velocity_induced_single_ring_semiinfinite!(
-#     velocity_induced,
-#     tempvel,
-#     panel.filaments,
-#     ep,
-#     evaluation_point_on_bound,
-#     va_norm,
-#     va_unit,
-#     gamma,
-#     core_radius_fraction,
-#     work_vectors
-# )
+@btime VortexStepMethod.calculate_velocity_induced_single_ring_semiinfinite!(
+    velocity_induced,
+    tempvel,
+    panel.filaments,
+    ep,
+    evaluation_point_on_bound,
+    va_norm,
+    va_unit,
+    gamma,
+    core_radius_fraction,
+    work_vectors
+)
 
-# U_2D = @MVector zeros(3)  # StaticArraysCore.MVector{3, Float64}
+U_2D = @MVector zeros(3)  # StaticArraysCore.MVector{3, Float64}
 
-# @btime VortexStepMethod.calculate_velocity_induced_bound_2D!(
-#     $U_2D,
-#     $panel, 
-#     $ep,
-#     $work_vectors
-# )
+@btime VortexStepMethod.calculate_velocity_induced_bound_2D!(
+    $U_2D,
+    $panel, 
+    $ep,
+    $work_vectors
+)
 
-# model = "VSM"
-# n_panels = length(body_aero.panels)
-# va_norm_array = zeros(n_panels)
-# va_unit_array = zeros(n_panels, 3)
-# @btime VortexStepMethod.calculate_AIC_matrices!(
-#     $body_aero, model,
-#     $core_radius_fraction,
-#     $va_norm_array, 
-#     $va_unit_array)
+model = :VSM
+n_panels = length(body_aero.panels)
+va_norm_array = zeros(n_panels)
+va_unit_array = zeros(n_panels, 3)
+@btime VortexStepMethod.calculate_AIC_matrices!(
+    $body_aero, model,
+    $core_radius_fraction,
+    $va_norm_array, 
+    $va_unit_array)
 
 n_panels = length(body_aero.panels)
 gamma_new = zeros(n_panels)
@@ -114,32 +114,18 @@ for (i, panel) in enumerate(body_aero.panels)
     z_airf_array[i, :] .= panel.z_airf
 end
 
-# # Benchmark gamma_loop
-# @btime VortexStepMethod.gamma_loop(
-#     $vsm_solver,
-#     $body_aero,
-#     $gamma_new,
-#     $va_array,
-#     $chord_array,
-#     $x_airf_array,
-#     $y_airf_array,
-#     $z_airf_array,
-#     $body_aero.panels,
-#     $relaxation_factor;
-#     log = false
-# )
 # Benchmark gamma_loop
-@time VortexStepMethod.gamma_loop(
-    vsm_solver,
-    body_aero,
-    gamma_new,
-    va_array,
-    chord_array,
-    x_airf_array,
-    y_airf_array,
-    z_airf_array,
-    body_aero.panels,
-    relaxation_factor;
+@btime VortexStepMethod.gamma_loop(
+    $vsm_solver,
+    $body_aero,
+    $gamma_new,
+    $va_array,
+    $chord_array,
+    $x_airf_array,
+    $y_airf_array,
+    $z_airf_array,
+    $body_aero.panels,
+    $relaxation_factor;
     log = false
 )
 
