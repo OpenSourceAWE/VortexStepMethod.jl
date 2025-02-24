@@ -38,11 +38,11 @@ Represents a wing composed of multiple sections with aerodynamic properties.
 - `sections::Vector{Section}`: List of wing sections
 
 # Distribution types
-- "linear": Linear distribution
-- "cosine": Cosine distribution
-- "`cosine_van_Garrel`": van Garrel cosine distribution
-- "split_provided": Split provided sections
-- "unchanged": Keep original sections
+- :linear: Linear distribution
+- :cosine: Cosine distribution
+- :`cosine_van_Garrel`: van Garrel cosine distribution
+- :split_provided: Split provided sections
+- :unchanged: Keep original sections
 """
 mutable struct Wing <: AbstractWing
     n_panels::Int64
@@ -194,11 +194,11 @@ function calculate_new_aero_input(aero_input,
                                 left_weight::Float64,
                                 right_weight::Float64)
     
-    if !(aero_input[section_index] === aero_input[section_index + 1])
+    model_type = isa(aero_input[section_index], Symbol) ? aero_input[section_index] : aero_input[section_index][1]
+    model_type_2 = isa(aero_input[section_index + 1], Symbol) ? aero_input[section_index + 1] : aero_input[section_index + 1][1]
+    if !(model_type === model_type_2)
         throw(ArgumentError("Different aero models over the span are not supported"))
     end
-    
-    model_type = isa(aero_input[section_index], Symbol) ? aero_input[section_index] : aero_input[section_index][1]
     
     if model_type === :inviscid
         return :inviscid
@@ -493,7 +493,7 @@ function refine_mesh_by_splitting_provided_sections(wing::AbstractWing)
             
             # Generate sections for this pair
             new_splitted_sections = refine_mesh_for_linear_cosine_distribution(
-                "linear",
+                :linear,
                 num_new_sections + 2,  # +2 for endpoints
                 LE_pair,
                 TE_pair,

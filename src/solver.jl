@@ -6,7 +6,7 @@ Main solver structure for the Vortex Step Method.
 """
 struct Solver
     # General settings
-    aerodynamic_model_type::String
+    aerodynamic_model_type::Symbol
     density::Float64
     max_iterations::Int64
     allowed_error::Float64
@@ -18,13 +18,13 @@ struct Solver
     artificial_damping::NamedTuple{(:k2, :k4), Tuple{Float64, Float64}}
     
     # Additional settings
-    type_initial_gamma_distribution::String
+    type_initial_gamma_distribution::Symbol
     core_radius_fraction::Float64
     mu::Float64
     is_only_f_and_gamma_output::Bool
 
     function Solver(;
-        aerodynamic_model_type::String="VSM",
+        aerodynamic_model_type::Symbol=:VSM,
         density::Float64=1.225,
         max_iterations::Int64=1500,
         allowed_error::Float64=1e-5,
@@ -32,7 +32,7 @@ struct Solver
         relaxation_factor::Float64=0.03,
         is_with_artificial_damping::Bool=false,
         artificial_damping::NamedTuple{(:k2, :k4), Tuple{Float64, Float64}}=(k2=0.1, k4=0.0),
-        type_initial_gamma_distribution::String="elliptic",
+        type_initial_gamma_distribution::Symbol=:elliptic,
         core_radius_fraction::Float64=1e-20,
         mu::Float64=1.81e-5,
         is_only_f_and_gamma_output::Bool=false
@@ -99,7 +99,7 @@ function solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=n
 
     # Initialize gamma distribution
     gamma_initial = if isnothing(gamma_distribution)
-        if solver.type_initial_gamma_distribution == "elliptic"
+        if solver.type_initial_gamma_distribution === :elliptic
             calculate_circulation_distribution_elliptical_wing(body_aero)
         else
             zeros(n_panels)
@@ -245,20 +245,7 @@ function gamma_loop(
         end
         
         for (i, (panel, alpha)) in enumerate(zip(panels, alpha_array))
-            @time cl = if panel.aero_model === :lei_airfoil_breukels
-                cl = evalpoly(rad2deg(alpha), reverse(panel.cl_coefficients))
-                if abs(alpha) > (π/9)
-                    cl = 2 * cos(alpha) * sin(alpha)^2
-                end
-                cl
-            elseif panel.aero_model === :inviscid
-                2π * alpha
-            elseif panel.aero_model === :polar_data
-                panel.cl_interp(alpha)
-            elseif panel.aero_model === :interpolations
-                panel.cl_interp(alpha, 0.0)
-            end
-            @time cl_array[i] = calculate_cl(panel, alpha)
+            cl_array[i] = calculate_cl(panel, alpha)
         end
         gamma_new .= 0.5 .* v_a_array.^2 ./ Umagw_array .* cl_array .* chord_array
 

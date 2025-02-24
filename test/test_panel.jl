@@ -50,8 +50,8 @@ end
 
 @testset "Panel Tests" begin
     @testset "Basic Panel Properties" begin
-        section1 = Section([0.0, 0.0, 0.0], [1.0, 0.0, 0.0], "inviscid")
-        section2 = Section([0.0, 10.0, 0.0], [1.0, 10.0, 0.0], "inviscid")
+        section1 = Section([0.0, 0.0, 0.0], [1.0, 0.0, 0.0], :inviscid)
+        section2 = Section([0.0, 10.0, 0.0], [1.0, 10.0, 0.0], :inviscid)
         panel = create_panel(section1, section2)    
 
         # Test panel initialization
@@ -80,8 +80,8 @@ end
     end
 
     @testset "Panel Reference Frame" begin
-        section1 = Section([0.0, 0.0, 0.0], [1.0, 0.0, 0.0], "inviscid")
-        section2 = Section([0.0, 10.0, 0.0], [1.0, 10.0, 0.0], "inviscid")
+        section1 = Section([0.0, 0.0, 0.0], [1.0, 0.0, 0.0], :inviscid)
+        section2 = Section([0.0, 10.0, 0.0], [1.0, 10.0, 0.0], :inviscid)
         panel = create_panel(section1, section2)
 
         # Test reference frame vectors
@@ -91,8 +91,8 @@ end
     end
 
     @testset "Velocity Calculations" begin
-        section1 = Section([0.0, 0.0, 0.0], [1.0, 0.0, 0.0], "inviscid")
-        section2 = Section([0.0, 10.0, 0.0], [1.0, 10.0, 0.0], "inviscid")
+        section1 = Section([0.0, 0.0, 0.0], [1.0, 0.0, 0.0], :inviscid)
+        section2 = Section([0.0, 10.0, 0.0], [1.0, 10.0, 0.0], :inviscid)
         panel = create_panel(section1, section2)
 
         # Test relative velocity calculations
@@ -128,8 +128,8 @@ end
     end
     
     # Create two sections with slightly different polar data
-    section1 = Section([0.0, 0.0, 0.0], [1.0, 0.0, 0.0], ("polar_data", polar_data))
-    section2 = Section([0.0, 10.0, 0.0], [1.0, 10.0, 0.0], ("polar_data", big_polar_data))
+    section1 = Section([0.0, 0.0, 0.0], [1.0, 0.0, 0.0], (:polar_data, polar_data))
+    section2 = Section([0.0, 10.0, 0.0], [1.0, 10.0, 0.0], (:polar_data, big_polar_data))
     
     # Create panel
     panel = create_panel(section1, section2)

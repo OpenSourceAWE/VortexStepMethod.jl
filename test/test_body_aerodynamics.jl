@@ -20,21 +20,21 @@ include("utils.jl")
     AR = span^2 / (π * span * max_chord / 4)
     aoa = deg2rad(5)
     Uinf = [cos(aoa), 0.0, sin(aoa)] .* v_a
-    model = "VSM"
+    model = :VSM
 
     # Setup wing geometry
     dist = "cos"
     core_radius_fraction = 1e-20
     coord = generate_coordinates_el_wing(max_chord, span, N, dist)
     coord_left_to_right = flip_created_coord_in_pairs(deepcopy(coord))
-    wing = Wing(N; spanwise_panel_distribution="unchanged")
+    wing = Wing(N; spanwise_panel_distribution=:unchanged)
     for idx in 1:2:length(coord_left_to_right[:, 1])
         @debug "coord_left_to_right[$idx] = $(coord_left_to_right[idx,:])"
         add_section!(
             wing,
             coord_left_to_right[idx,:],
             coord_left_to_right[idx+1,:],
-            "inviscid"
+            :inviscid
         )
     end
     
@@ -125,13 +125,13 @@ end
     # Create wing geometry
     core_radius_fraction = 1e-20
     coord_left_to_right = flip_created_coord_in_pairs(deepcopy(coord))
-    wing = Wing(n_panels; spanwise_panel_distribution="unchanged")
+    wing = Wing(n_panels; spanwise_panel_distribution=:unchanged)
     for idx in 1:2:size(coord_left_to_right, 1)
         add_section!(
             wing,
             coord_left_to_right[idx,:],
             coord_left_to_right[idx+1,:],
-            "inviscid"
+            :inviscid
         )
     end
     
@@ -212,7 +212,7 @@ end
 
 
 @testset "Wing Geometry Creation" begin
-    function create_geometry(; model="VSM", wing_type="rectangular", plotting=false, N=40)
+    function create_geometry(; model="VSM", wing_type=:rectangular, plotting=false, N=40)
         max_chord = 1.0
         span = 17.0
         AR = span^2 / (π * span * max_chord / 4)
@@ -221,7 +221,7 @@ end
         aoa = 5.7106 * π / 180
         Uinf = [cos(aoa), 0.0, sin(aoa)] .* v_a
     
-        coord = if wing_type == "rectangular"
+        coord = if wing_type == :rectangular
             twist = range(-0.5, 0.5, length=N)
             beta = range(-2, 2, length=N)
             generate_coordinates_rect_wing(
@@ -232,24 +232,24 @@ end
                 N,
                 "lin"
             )
-        elseif wing_type == "curved"
+        elseif wing_type == :curved
             generate_coordinates_curved_wing(
                 max_chord, span, π/4, 5, N, "cos"
             )
-        elseif wing_type == "elliptical"
+        elseif wing_type == :elliptical
             generate_coordinates_el_wing(max_chord, span, N, "cos")
         else
             error("Invalid wing type")
         end
     
         coord_left_to_right = flip_created_coord_in_pairs(deepcopy(coord))
-        wing = Wing(N; spanwise_panel_distribution="unchanged")
+        wing = Wing(N; spanwise_panel_distribution=:unchanged)
         for i in 1:2:size(coord_left_to_right, 1)
             add_section!(
                 wing,
                 coord_left_to_right[i,:],
                 coord_left_to_right[i+1,:],
-                "inviscid"
+                :inviscid
             )
         end
         body_aero = BodyAerodynamics([wing])
@@ -260,7 +260,7 @@ end
 
     for model in ["VSM", "LLT"]
         @debug "model: $model"
-        for wing_type in ["rectangular", "curved", "elliptical"]
+        for wing_type in [:rectangular, :curved, :elliptical]
             @debug "wing_type: $wing_type"
             body_aero, coord, Uinf, model = create_geometry(
                 model=model, wing_type=wing_type

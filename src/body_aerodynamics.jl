@@ -226,7 +226,7 @@ function calculate_panel_properties(section_list::Vector{Section}, n_panels::Int
 end
 
 """
-    calculate_AIC_matrices!(body_aero::BodyAerodynamics, model::String, 
+    calculate_AIC_matrices!(body_aero::BodyAerodynamics, model::Symbol, 
                          core_radius_fraction::Float64,
                          va_norm_array::Vector{Float64}, 
                          va_unit_array::Matrix{Float64})
@@ -236,14 +236,14 @@ Calculate Aerodynamic Influence Coefficient matrices.
 Returns:
     Tuple of (AIC_x, AIC_y, AIC_z) matrices
 """
-function calculate_AIC_matrices!(body_aero::BodyAerodynamics, model::String,
+function calculate_AIC_matrices!(body_aero::BodyAerodynamics, model::Symbol,
                               core_radius_fraction::Float64,
                               va_norm_array::Vector{Float64}, 
                               va_unit_array::Matrix{Float64})
-    model in ["VSM", "LLT"] || throw(ArgumentError("Model must be VSM or LLT"))
+    model in [:VSM, :LLT] || throw(ArgumentError("Model must be VSM or LLT"))
     # Determine evaluation point based on model
-    evaluation_point = model == "VSM" ? :control_point : :aerodynamic_center
-    evaluation_point_on_bound = model == "LLT"
+    evaluation_point = model === :VSM ? :control_point : :aerodynamic_center
+    evaluation_point_on_bound = model === :LLT
     
     # Initialize AIC matrices
     velocity_induced, tempvel, va_unit, U_2D = zeros(MVec3), zeros(MVec3), zeros(MVec3), zeros(MVec3)
@@ -270,7 +270,7 @@ function calculate_AIC_matrices!(body_aero::BodyAerodynamics, model::String,
             body_aero.AIC[:, icp, jring] .= velocity_induced
             
             # Subtract 2D induced velocity for VSM
-            if icp == jring && model == "VSM"
+            if icp == jring && model === :VSM
                 calculate_velocity_induced_bound_2D!(U_2D, body_aero.panels[jring], ep, body_aero.work_vectors)
                 body_aero.AIC[:, icp, jring] .-= U_2D
             end
@@ -398,7 +398,7 @@ end
 
 """
     calculate_results(body_aero::BodyAerodynamics, gamma_new::Vector{Float64}, 
-                     density::Float64, aerodynamic_model_type::String,
+                     density::Float64, aerodynamic_model_type::Symbol,
                      core_radius_fraction::Float64, mu::Float64,
                      alpha_array::Vector{Float64}, v_a_array::Vector{Float64},
                      chord_array::Vector{Float64}, x_airf_array::Matrix{Float64},
@@ -415,7 +415,7 @@ Returns:
 function calculate_results(body_aero::BodyAerodynamics,
     gamma_new::Vector{Float64},
     density::Float64,
-    aerodynamic_model_type::String,
+    aerodynamic_model_type::Symbol,
     core_radius_fraction::Float64,
     mu::Float64,
     alpha_array::Vector{Float64},

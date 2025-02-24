@@ -74,15 +74,15 @@ mutable struct Panel
         corner_points = hcat(LE_point_1, TE_point_1, TE_point_2, LE_point_2)
         
         # Validate aero model consistency
-        if !(section_1.aero_input === section_2.aero_input)
-            throw(ArgumentError("Both sections must have the same aero_input"))
-        end
         aero_model = isa(section_1.aero_input, Symbol) ? section_1.aero_input : section_1.aero_input[1]
-
+        aero_model_2 = isa(section_2.aero_input, Symbol) ? section_2.aero_input : section_2.aero_input[1]
+        if !(aero_model === aero_model_2)
+            throw(ArgumentError("Both sections must have the same aero_input, not $aero_model and $aero_model_2"))
+        end
         
         # Initialize aerodynamic properties
         cl_coeffs, cd_coeffs, cm_coeffs = zeros(3), zeros(3), zeros(3)
-        cl_interp, cd_interp, cm_interp = ()->nothing, ()->nothing, ()->nothing
+        cl_interp, cd_interp, cm_interp = (α::Float64)->0.0, (α::Float64)->0.0, (α::Float64)->0.0
         
         if aero_model === :lei_airfoil_breukels
             cl_coeffs, cd_coeffs, cm_coeffs = compute_lei_coefficients(section_1, section_2)
@@ -96,18 +96,18 @@ mutable struct Panel
             cl_interp_ = linear_interpolation(polar_data[:,1], polar_data[:,2]; extrapolation_bc=NaN)
             cd_interp_ = linear_interpolation(polar_data[:,1], polar_data[:,3]; extrapolation_bc=NaN)
             cm_interp_ = linear_interpolation(polar_data[:,1], polar_data[:,4]; extrapolation_bc=NaN)
-            cl_interp = (α) -> cl_interp_(α)
-            cd_interp = (α) -> cd_interp_(α)
-            cm_interp = (α) -> cm_interp_(α)
+            cl_interp = (α::Float64) -> cl_interp_(α)
+            cd_interp = (α::Float64) -> cd_interp_(α)
+            cm_interp = (α::Float64) -> cm_interp_(α)
         elseif aero_model === :interpolations
             cl_left, cd_left, cm_left = section_1.aero_input[2]
             cl_right, cd_right, cm_right = section_2.aero_input[2]
-            cl_interp = cl_left === cl_right ? cl_left :
-                (α) -> 0.5cl_left(α, 0.0) + 0.5cl_right(α, 0.0) # TODO: add trailing edge deflection
-            cd_interp = cd_left === cd_right ? cd_left :
-                (α) -> 0.5cd_left(α, 0.0) + 0.5cd_right(α, 0.0)
-            cm_interp = cm_left === cm_right ? cm_left :
-                (α) -> 0.5cm_left(α, 0.0) + 0.5cm_right(α, 0.0)
+            cl_interp = cl_left === cl_right ? (α::Float64) -> cl_left(α, 0.0) :
+                (α::Float64) -> 0.5cl_left(α, 0.0) + 0.5cl_right(α, 0.0) # TODO: add trailing edge deflection
+            cd_interp = cd_left === cd_right ? (α::Float64) -> cd_left(α, 0.0) :
+                (α::Float64) -> 0.5cd_left(α, 0.0) + 0.5cd_right(α, 0.0)
+            cm_interp = cm_left === cm_right ? (α::Float64) -> cm_left(α, 0.0) :
+                (α::Float64) -> 0.5cm_left(α, 0.0) + 0.5cm_right(α, 0.0)
         elseif !(aero_model === :inviscid)
             throw(ArgumentError("Unsupported aero model: $aero_model"))
         end
@@ -263,9 +263,9 @@ function calculate_cl(panel::Panel, alpha::Float64)::Float64
     elseif panel.aero_model === :inviscid
         cl = 2π * alpha
     elseif panel.aero_model === :polar_data
-        cl = panel.cl_interp(alpha)
+        cl = panel.cl_interp(alpha)::Float64
     elseif panel.aero_model === :interpolations
-        cl = panel.cl_interp(alpha, 0.0)
+        cl = panel.cl_interp(alpha)::Float64
     else
         throw(ArgumentError("Unsupported aero model: $(panel.aero_model)"))
     end
