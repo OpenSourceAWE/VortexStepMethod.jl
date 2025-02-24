@@ -112,19 +112,18 @@ Structure to hold calculated panel properties.
 - `control_points`::Vector{MVec3}
 - `bound_points_1`::Vector{MVec3}
 - `bound_points_2`::Vector{MVec3}
-- `x_airf`::Vector{Vector{Float64}}: unclear, please define
-- `y_airf`::Vector{Vector{Float64}}: unclear, please define
-- `z_airf`::Vector{Vector{Float64}}: unclear, please define
-
+- `x_airf`::Vector{MVec3}: Vector of unit vectors perpendicular to chord line
+- `y_airf`::Vector{MVec3}: Vector of unit vectors parallel to chord line
+- `z_airf`::Vector{MVec3}: Vector of unit vectors in spanwise direction
 """
 struct PanelProperties
     aero_centers::Vector{MVec3}
     control_points::Vector{MVec3}
     bound_points_1::Vector{MVec3}
     bound_points_2::Vector{MVec3}
-    x_airf::Vector{Vector{Float64}}
-    y_airf::Vector{Vector{Float64}}
-    z_airf::Vector{Vector{Float64}}
+    x_airf::Vector{MVec3}
+    y_airf::Vector{MVec3}
+    z_airf::Vector{MVec3}
 end
 
 """
@@ -139,23 +138,23 @@ Returns:
 function calculate_panel_properties(section_list::Vector{Section}, n_panels::Int,
                                   aero_center_loc::Float64, control_point_loc::Float64)
     # Initialize arrays
-    aero_centers = Vector{Float64}[]
-    control_points = Vector{Float64}[]
-    bound_points_1 = Vector{Float64}[]
-    bound_points_2 = Vector{Float64}[]
-    x_airf = Vector{Float64}[]
-    y_airf = Vector{Float64}[]
-    z_airf = Vector{Float64}[]
+    aero_centers = MVec3[]
+    control_points = MVec3[]
+    bound_points_1 = MVec3[]
+    bound_points_2 = MVec3[]
+    x_airf = MVec3[]
+    y_airf = MVec3[]
+    z_airf = MVec3[]
     
     # Define coordinates matrix
     coords = zeros(2 * (n_panels + 1), 3)
     @debug "Shape of coordinates: $(size(coords))"
     
     for i in 1:n_panels
-        coords[2i-1, :] = section_list[i].LE_point
-        coords[2i, :] = section_list[i].TE_point
-        coords[2i+1, :] = section_list[i+1].LE_point
-        coords[2i+2, :] = section_list[i+1].TE_point
+        coords[2i-1, :] .= section_list[i].LE_point
+        coords[2i, :]   .= section_list[i].TE_point
+        coords[2i+1, :] .= section_list[i+1].LE_point
+        coords[2i+2, :] .= section_list[i+1].TE_point
     end
     
     @debug "Coordinates: $coords"

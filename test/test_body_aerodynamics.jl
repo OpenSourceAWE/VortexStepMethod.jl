@@ -1,12 +1,8 @@
-# using VortexStepMethod: Wing, BodyAerodynamics, BoundFilament, SemiInfiniteFilament, add_section!, set_va!, solve, calculate_cl
 using VortexStepMethod
 using VortexStepMethod: calculate_cl, calculate_cd_cm, calculate_projected_area, calculate_AIC_matrices!
 using LinearAlgebra
 using Test
 using Logging
-
-# ENV["JULIA_DEBUG"] = "all"
-# global_logger(ConsoleLogger(stderr, Logging.Debug))
 
 include("utils.jl")
 

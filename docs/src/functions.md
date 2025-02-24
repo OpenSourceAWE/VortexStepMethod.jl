@@ -1,6 +1,11 @@
 ```@meta
 CurrentModule = VortexStepMethod
 ```
+## Functions for creating the geometry
+```@docs
+add_section!
+```
+
 ## Main Plotting Functions
 ```@docs
 plot_geometry
