@@ -3,7 +3,7 @@ CurrentModule = VortexStepMethod
 ```
 ## Basic Vectors
 ```@docs
-   MVec3
+   SVec3
    PosVector
    VelVector
 ```

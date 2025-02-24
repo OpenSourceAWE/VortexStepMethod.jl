@@ -25,25 +25,25 @@ export plot_wing, plot_circulation_distribution, plot_geometry, plot_distributio
 export show_plot, save_plot, menu
 
 """
-   const MVec3    = MVector{3, Float64}
+   const SVec3    = MVector{3, Float64}
 
 Basic 3-dimensional vector, stack allocated, mutable.
 """
-const MVec3    = MVector{3, Float64}
+const SVec3    = MVector{3, Float64}
 
 """
-   const PosVector=Union{MVec3, Vector}
+   const PosVector=Union{SVec3, Vector}
 
-Position vector, either a `MVec3` or a `Vector` for use in function signatures.
+Position vector, either a `SVec3` or a `Vector` for use in function signatures.
 """
-const PosVector=Union{MVec3, Vector, SizedVector{3, Float64, Vector{Float64}}}
+const PosVector=Union{SVec3, Vector, SizedVector{3, Float64, Vector{Float64}}}
 
 """
-   const VelVector=Union{MVec3, Vector}
+   const VelVector=Union{SVec3, Vector}
 
-Velocity vector, either a `MVec3` or a `Vector` for use in function signatures.
+Velocity vector, either a `SVec3` or a `Vector` for use in function signatures.
 """
-const VelVector=Union{MVec3, Vector, SizedVector{3, Float64, Vector{Float64}}}
+const VelVector=Union{SVec3, Vector, SizedVector{3, Float64, Vector{Float64}}}
 
 @enum Model VSM LLT
 

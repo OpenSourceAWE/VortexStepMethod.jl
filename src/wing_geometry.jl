@@ -5,16 +5,16 @@
 Represents a wing section with leading edge, trailing edge, and aerodynamic properties.
 
 # Fields
-- `LE_point::MVec3`: Leading edge point coordinates
-- `TE_point::MVec3`: Trailing edge point coordinates
+- `LE_point::SVec3`: Leading edge point coordinates
+- `TE_point::SVec3`: Trailing edge point coordinates
 - `aero_input::Vector{Any}`: Aerodynamic input data for the section:
     - `("inviscid")`: Inviscid aerodynamics
     - `("polar_data", [alpha_column,CL_column,CD_column,CM_column])`: Polar data aerodynamics
     - `("lei_airfoil_breukels", [d_tube,camber])`: LEI airfoil with Breukels parameters
 """
 struct Section{T}
-    LE_point::MVec3
-    TE_point::MVec3
+    LE_point::SVec3
+    TE_point::SVec3
     aero_input::T
     
     function Section(
@@ -52,7 +52,7 @@ mutable struct Wing <: AbstractWing
     
     function Wing(n_panels::Int;
                  spanwise_panel_distribution::String="linear",
-                 spanwise_direction::PosVector=MVec3([0.0, 1.0, 0.0]))
+                 spanwise_direction::PosVector=SVec3([0.0, 1.0, 0.0]))
         new(n_panels, 
             spanwise_panel_distribution, 
             spanwise_direction, 

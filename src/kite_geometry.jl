@@ -177,7 +177,7 @@ Represents a curved wing that inherits from Wing with additional geometric prope
 - All fields from Wing:
   - `n_panels::Int`: Number of panels in aerodynamic mesh
   - `spanwise_panel_distribution::String`: Panel distribution type
-  - `spanwise_direction::MVec3`: Wing span direction vector
+  - `spanwise_direction::SVec3`: Wing span direction vector
   - `sections::Vector{Section}`: List of wing sections
 - Additional fields:
   - `center_of_mass::Vector{Float64}`: Center of mass coordinates
@@ -190,7 +190,7 @@ Same as Wing
 mutable struct KiteWing <: AbstractWing
     n_panels::Int64
     spanwise_panel_distribution::String
-    spanwise_direction::MVec3
+    spanwise_direction::SVec3
     sections::Vector{Section}
     
     # Additional fields for KiteWing

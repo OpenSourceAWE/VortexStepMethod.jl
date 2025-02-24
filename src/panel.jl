@@ -6,44 +6,44 @@ using LinearAlgebra
 Represents a panel in a vortex step method simulation.
 
 # Fields
-- `TE_point_1::MVec3`: First trailing edge point
-- `LE_point_1::MVec3`: First leading edge point
-- `TE_point_2::Vector{MVec3}`: Second trailing edge point
-- `LE_point_2::Vector{MVec3}`: Second leading edge point
+- `TE_point_1::SVec3`: First trailing edge point
+- `LE_point_1::SVec3`: First leading edge point
+- `TE_point_2::Vector{SVec3}`: Second trailing edge point
+- `LE_point_2::Vector{SVec3}`: Second leading edge point
 - `chord::Float64`: Panel chord length
-- `va::Union{Nothing, MVec3}`: Panel velocity
+- `va::Union{Nothing, SVec3}`: Panel velocity
 - `corner_points::Matrix{Float64}`: Panel corner points
 - `aero_model::String`: Aerodynamic model type
 - `aerodynamic_center::Vector{Float64}`: Panel aerodynamic center
-- `control_point::Vector{MVec3}`: Panel control point
-- `bound_point_1::Vector{MVec3}`: First bound point
-- `bound_point_2::Vector{MVec3}`: Second bound point
-- `x_airf::MVec3`: Unit vector perpendicular to chord line
-- `y_airf::MVec3`: Unit vector parallel to chord line
-- `z_airf::MVec3`: Unit vector in spanwise direction
+- `control_point::Vector{SVec3}`: Panel control point
+- `bound_point_1::Vector{SVec3}`: First bound point
+- `bound_point_2::Vector{SVec3}`: Second bound point
+- `x_airf::SVec3`: Unit vector perpendicular to chord line
+- `y_airf::SVec3`: Unit vector parallel to chord line
+- `z_airf::SVec3`: Unit vector in spanwise direction
 - `width::Float64`: Panel width
 - `filaments::Vector{BoundFilament}`: Panel filaments
 """
 mutable struct Panel{P}
-    TE_point_1::MVec3
-    LE_point_1::MVec3
-    TE_point_2::MVec3
-    LE_point_2::MVec3
+    TE_point_1::SVec3
+    LE_point_1::SVec3
+    TE_point_2::SVec3
+    LE_point_2::SVec3
     chord::Float64
-    va::Union{Nothing, MVec3}
+    va::Union{Nothing, SVec3}
     corner_points::Matrix{Float64}
     aero_model::String
     cl_coefficients::Union{Nothing,Vector{Float64}}
     cd_coefficients::Union{Nothing,Vector{Float64}}
     cm_coefficients::Union{Nothing,Vector{Float64}}
     polar_data::P
-    aerodynamic_center::MVec3
-    control_point::MVec3
-    bound_point_1::MVec3
-    bound_point_2::MVec3
-    x_airf::MVec3
-    y_airf::MVec3
-    z_airf::MVec3
+    aerodynamic_center::SVec3
+    control_point::SVec3
+    bound_point_1::SVec3
+    bound_point_2::SVec3
+    x_airf::SVec3
+    y_airf::SVec3
+    z_airf::SVec3
     width::Float64
     filaments::Vector{Union{BoundFilament, SemiInfiniteFilament}}
 
