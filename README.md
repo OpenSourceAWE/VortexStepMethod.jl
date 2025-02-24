@@ -1,7 +1,7 @@
 [![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://Albatross-Kite-Transport.github.io/VortexStepMethod.jl/dev) [![Build Status](https://github.com/Albatross-Kite-Transport/VortexStepMethod.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/Albatross-Kite-Transport/VortexStepMethod.jl/actions/workflows/CI.yml?query=branch%3Amain) [![Coverage](https://codecov.io/gh/Albatross-Kite-Transport/VortexStepMethod.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/Albatross-Kite-Transport/VortexStepMethod.jl)
 
 
-# Simulation of a 3D airfoil using the Vortex Step Method
+# Simulation of a 3D wing using the Vortex Step Method
 
 The Vortex Step Method (VSM) is an enhanced lifting line method that improves upon the classic approach by solving the circulation system at the three-quarter chord position, among the most important details. This adjustment allows for more accurate calculations of lift and drag forces, particularly addressing the shortcomings in induced drag prediction. 
 VSM is further refined by coupling it with 2D viscous airfoil polars, making it well-suited for complex geometries, 
