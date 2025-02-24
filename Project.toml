@@ -4,7 +4,6 @@ authors = ["1-Bart-1 <bart@vandelint.net>"]
 version = "0.1.2"
 
 [deps]
-BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 Colors = "5ae59095-9a9b-59fe-a467-6f913c188581"
 ControlPlots = "23c2ee80-7a9e-4350-b264-8e670f12517c"
 DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
@@ -40,6 +39,7 @@ Distributed = "8ba89e20-285c-5b6f-9357-94700520ee1b"
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 Xfoil = "19641d66-a62d-11e8-2441-8f57a969a9c4"
+BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 
 [targets]
-test = ["Test", "DataFrames", "CSV", "Distributed", "Documenter", "Xfoil"]
+test = ["Test", "DataFrames", "CSV", "Distributed", "Documenter", "Xfoil", "BenchmarkTools"]
