@@ -138,13 +138,13 @@ Returns:
 function calculate_panel_properties(section_list::Vector{Section}, n_panels::Int,
                                   aero_center_loc::Float64, control_point_loc::Float64)
     # Initialize arrays
-    aero_centers = Vector{Float64}[]
-    control_points = Vector{Float64}[]
-    bound_points_1 = Vector{Float64}[]
-    bound_points_2 = Vector{Float64}[]
-    x_airf = Vector{Float64}[]
-    y_airf = Vector{Float64}[]
-    z_airf = Vector{Float64}[]
+    aero_centers = MVec3[]
+    control_points = MVec3[]
+    bound_points_1 = MVec3[]
+    bound_points_2 = MVec3[]
+    x_airf = MVec3[]
+    y_airf = MVec3[]
+    z_airf = MVec3[]
     
     # Define coordinates matrix
     coords = zeros(2 * (n_panels + 1), 3)
