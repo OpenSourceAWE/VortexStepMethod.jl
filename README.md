@@ -71,11 +71,11 @@ To browse the code, it is suggested to use [VSCode](https://code.visualstudio.co
 Three kinds of input data is needed:
 
 - The wing geometry, defined by section:
-  - rec wing two section, two point + polars
+  - rec wing two section, two point in CAD reference frame + polars (three different options to provide them)
   - kite: model of polars included, n sections to define
 
-- The airflow:
-  - v_app vector
+- The airflow and turn rate:
+  - v_app vector and omega vector in Kite Body (KB) reference frame
 
 - The configuration:
   - how many panels  
