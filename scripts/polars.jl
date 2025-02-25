@@ -1,4 +1,4 @@
-using Distributed, Timers, Serialization, SharedArrays
+using Distributed, Timers, Serialization, SharedArrays, StaticArrays
 using Interpolations
 using Xfoil
 using ControlPlots
@@ -204,6 +204,10 @@ try
         cl_matrix[:, j], cd_matrix[:, j], cm_matrix[:, j] = run_solve_alpha(alphas, d_trailing_edge_angles[j], 
                         reynolds_number, x, y, lower, upper, kite_speed, SPEED_OF_SOUND, x_turn)
     end
+    cl_matrix = SMatrix{size(cl_matrix)...}(cl_matrix)
+    cd_matrix = SMatrix{size(cd_matrix)...}(cd_matrix)
+    cm_matrix = SMatrix{size(cm_matrix)...}(cm_matrix)
+
     display(cl_matrix)
 
     function plot_values(alphas, d_trailing_edge_angles, matrix, interp, name)
@@ -213,7 +217,8 @@ try
         X_data = collect(d_trailing_edge_angles) .+ zeros(length(alphas))'
         Y_data = collect(alphas)' .+ zeros(length(d_trailing_edge_angles))
     
-        interp_matrix = similar(matrix)
+        matrix = Matrix{Float64}(matrix)
+        interp_matrix = zeros(size(matrix)...)
         int_alphas, int_d_trailing_edge_angles = alphas .+ deg2rad(0.5), d_trailing_edge_angles .+ deg2rad(0.5)
         interp_matrix .= [interp(alpha, d_trailing_edge_angle) for alpha in int_alphas, d_trailing_edge_angle in int_d_trailing_edge_angles]
         X_int = collect(int_d_trailing_edge_angles) .+ zeros(length(int_alphas))'
@@ -241,7 +246,7 @@ try
     @info "Relative trailing_edge height: $(upper - lower)"
     @info "Reynolds number for flying speed of $kite_speed is $reynolds_number"
     
-    serialize(polar_path, (cl_interp, cd_interp, cm_interp))
+    serialize(polar_path, (alphas, d_trailing_edge_angles, cl_matrix, cd_matrix, cm_matrix))
     
 catch e
     @info "Removing processes"

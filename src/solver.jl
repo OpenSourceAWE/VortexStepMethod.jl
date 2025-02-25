@@ -127,7 +127,7 @@ function solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=n
     )
     # Try again with reduced relaxation factor if not converged
     if !converged && relaxation_factor > 1e-3
-        @warn "Running again with half the relaxation_factor = $(relaxation_factor/2)"
+        log && @warn "Running again with half the relaxation_factor = $(relaxation_factor/2)"
         converged, gamma_new, alpha_array, v_a_array = gamma_loop(
             solver,
             body_aero,
@@ -138,7 +138,8 @@ function solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=n
             y_airf_array,
             z_airf_array,
             panels,
-            relaxation_factor/2
+            relaxation_factor/2;
+            log
         )
     end
 

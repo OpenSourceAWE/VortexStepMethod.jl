@@ -9,7 +9,7 @@ end
 using CSV
 using DataFrames
 
-plot = true
+plot = false
 
 # Create wing geometry
 wing = KiteWing("data/ram_air_kite_body.obj", "data/ram_air_kite_foil.dat")
