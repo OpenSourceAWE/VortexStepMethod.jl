@@ -98,7 +98,7 @@ end
 
 function Base.setproperty!(obj::BodyAerodynamics, sym::Symbol, val)
     if sym === :va || sym === :omega
-        @error "Use set_va! to set the apparent velocity."
+        set_va!(obj, val)
     else
         setfield!(obj, sym, val)
     end
