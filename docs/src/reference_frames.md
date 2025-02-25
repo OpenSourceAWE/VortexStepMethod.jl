@@ -24,6 +24,7 @@ This is a body-fixed reference frame.
 The origin of the kite reference frame can be defined by the user by calling the function `init_kp(origin::MVec3)` where the origin must be defined in the `CAD` reference frame.
 
 ## Input and output
+- when running a simulation, the orientation of the kite must be provided on each time step
 - the apparent wind speed vector `v_a` is defined in the **KP** reference frame
 - the resulting forces are defined in the **KP** reference frame
 - the **CL**, **CD**, **CS** and the resulting moments and moment coefficients are defined in the **KP** reference frame
