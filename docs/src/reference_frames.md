@@ -15,7 +15,7 @@ It can have any origin (with respect to the kite), but usually either the center
 - X is defined chord wise, from LE to TE, positive.
 - Z is defined as positive upwards.
 
-### Kite reference frame (KB)
+### Kite Body reference frame (KB)
 This is a body-fixed reference frame.
 - Y defined spanwise, looking at the kite from the front (so seeing the LE first) the front left is positive.
 - X is defined chord wise, from LE to TE, positive.
