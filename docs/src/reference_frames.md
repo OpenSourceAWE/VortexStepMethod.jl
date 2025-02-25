@@ -23,6 +23,8 @@ This is a body-fixed reference frame.
 
 The origin of the kite reference frame can be defined by the user by calling the function `init_kp(origin::MVec3)` where the origin must be defined in the `CAD` reference frame.
 
+This reference frame is different from the kite reference frame **K** used in `KiteModels.jl` and `KiteUtils.jl`.
+
 ## The turn rates
 The turn rates $\mathrm{omega} = [\mathrm{omega_x}, \mathrm{omega_y} ,\mathrm{omega_z}]$ are defined in the **KP** reference frame. The unit of the components is $\mathrm{rad}~\mathrm{s^{-1}}$.
 
