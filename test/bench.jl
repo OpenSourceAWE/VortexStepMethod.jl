@@ -119,6 +119,7 @@ using LinearAlgebra
         va_array = zeros(n_panels, 3)
         va_norm_array = zeros(n_panels)
         va_unit_array = zeros(n_panels, 3)
+        reference_point = zeros(3)
         
         # Fill arrays with data
         for (i, panel) in enumerate(body_aero.panels)
@@ -133,6 +134,7 @@ using LinearAlgebra
         result = @benchmark calculate_results(
             $body_aero,
             $gamma,
+            $reference_point,
             $density,
             :VSM,
             1e-20,
