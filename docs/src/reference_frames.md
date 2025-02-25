@@ -11,5 +11,18 @@ Reference frames are needed for following purposes:
 A geometric model is always created using the CAD reference frame.
 It can have any origin (with respect to the kite), but usually either the center of gravity of the body or the bridle point/ Kite Control Unit is used. 
 
-### Kite reference frame (K)
+- Y defined spanwise, looking at the kite from the front (so seeing the LE first) the front left is positive.
+- X is defined chord wise, from LE to TE, positive.
+- Z is defined as positive upwards.
+
+### Kite reference frame (KP)
 This is a body-fixed reference frame.
+- Y defined spanwise, looking at the kite from the front (so seeing the LE first) the front left is positive.
+- X is defined chord wise, from LE to TE, positive.
+- Z is defined as the cross product of Y and X
+The origin of the kite reference frame can be defined by the user by calling the function `init_kp(origin::MVec3)` where the origin must be defined in the `CAD` reference frame.
+
+## Input and output
+- the apparent wind speed vector `v_a` is defined in the **KP** reference frame
+- the resulting forces are defined in the **KP** reference frame
+- the **CL**, **CD**, **CS** and the resulting moments and moment coefficients are defined in the **KP** reference frame
