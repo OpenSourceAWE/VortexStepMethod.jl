@@ -20,6 +20,7 @@ This is a body-fixed reference frame.
 - Y defined spanwise, looking at the kite from the front (so seeing the LE first) the front left is positive.
 - X is defined chord wise, from LE to TE, positive.
 - Z is defined as the cross product of Y and X
+
 The origin of the kite reference frame can be defined by the user by calling the function `init_kp(origin::MVec3)` where the origin must be defined in the `CAD` reference frame.
 
 ## Input and output
