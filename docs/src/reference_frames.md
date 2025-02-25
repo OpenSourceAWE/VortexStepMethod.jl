@@ -23,6 +23,9 @@ This is a body-fixed reference frame.
 
 The origin of the kite reference frame can be defined by the user by calling the function `init_kp(origin::MVec3)` where the origin must be defined in the `CAD` reference frame.
 
+## The orientation of the kite
+For the orientation, either a quaternion or roll, pitch and yaw angles are used. The orientation is defined with respect to the NED (North, East, Down) reference frame.
+
 ## Input and output
 - when running a simulation, the orientation of the kite must be provided on each time step
 - the apparent wind speed vector `v_a` is defined in the **KP** reference frame
