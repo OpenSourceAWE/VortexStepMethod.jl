@@ -24,7 +24,7 @@ This is a body-fixed reference frame.
 The origin of the kite reference frame can be defined by the user by calling the function `init_kp(origin::MVec3)` where the origin must be defined in the `CAD` reference frame.
 
 ## The turn rates
-The turn rates $\mathrm{omega} = [\mathrm{omega_x}, \mathrm{omega_y} ,\mathrm{omega_z}]$ are defined in the **KP** reference frame. The unit of the components is $rad/s$-
+The turn rates $\mathrm{omega} = [\mathrm{omega_x}, \mathrm{omega_y} ,\mathrm{omega_z}]$ are defined in the **KP** reference frame. The unit of the components is $rad/s$.
 
 ## Input and output
 - when running a simulation, the turnrate of the kite must be provided on each time step
