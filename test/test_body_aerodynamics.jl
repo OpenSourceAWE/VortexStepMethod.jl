@@ -35,7 +35,7 @@ include("utils.jl")
     end
     
     body_aero = BodyAerodynamics([wing])
-    set_va!(body_aero, (Uinf, 0.0))
+    set_va!(body_aero, Uinf)
 
     # Run analysis
     solver_object = Solver(
@@ -132,7 +132,7 @@ end
     end
     
     body_aero = BodyAerodynamics([wing])
-    set_va!(body_aero, (Uinf, 0.0))
+    set_va!(body_aero, Uinf)
 
     # Calculate reference matrices using thesis functions
     controlpoints, rings, bladepanels, ringvec, coord_L = 
@@ -249,7 +249,7 @@ end
             )
         end
         body_aero = BodyAerodynamics([wing])
-        set_va!(body_aero, (Uinf, 0.0))
+        set_va!(body_aero, Uinf)
         
         return body_aero, coord, Uinf, model
     end
