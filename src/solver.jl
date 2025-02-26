@@ -57,7 +57,7 @@ end
 """
     solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=nothing; log=false)
 
-Main solving routine for the aerodynamic model.
+Main solving routine for the aerodynamic model. Reference point is in the kite body (KB) frame.
 """
 function solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=nothing; log=false, reference_point=zeros(MVec3))
     isnothing(body_aero.panels[1].va) && throw(ArgumentError("Inflow conditions are not set, use set_va!(body_aero, va)"))
