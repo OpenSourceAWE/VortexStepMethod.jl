@@ -114,7 +114,7 @@ wa = BodyAerodynamics([wing])
 
 # Set inflow conditions
 vel_app = [cos(alpha), 0.0, sin(alpha)] .* v_a
-set_va!(wa, (vel_app, 0.0))  # Second parameter is yaw rate
+set_va!(wa, vel_app)
 ```
 It is possible to import the wing geometry using an `.obj` file as shown in the example `ram_air_kite.jl`.
 
