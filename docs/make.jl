@@ -20,6 +20,7 @@ makedocs(;
         "How it works" => "explanation.md",
         "Exported Functions" => "functions.md",
         "Exported Types" => "types.md",
+        "Reference Frames" => "reference_frames.md"
     ],
 )
 
