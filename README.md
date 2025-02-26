@@ -71,11 +71,12 @@ To browse the code, it is suggested to use [VSCode](https://code.visualstudio.co
 Three kinds of input data is needed:
 
 - The wing geometry, defined by section:
-  - rec wing two section, two point + polars
-  - kite: model of polars included, n sections to define
+  - for the rectangualar wing two sections, two points in CAD reference frame + polars  
+    (three different options to provide them) per section
+  - kite wing: model of polars included, n sections to define
 
-- The airflow:
-  - v_app vector
+- The airflow and turn rate:
+  - `v_app` vector and `omega` (turn rate) vector in Kite Body (KB) reference frame
 
 - The configuration:
   - how many panels  
@@ -90,7 +91,7 @@ Apart from the wing geometry there is no input file yet, the input has to be def
 n_panels = 20          # Number of panels
 span = 20.0            # Wing span [m]
 chord = 1.0            # Chord length [m]
-v_a = 20.0            # Magnitude of inflow velocity [m/s]
+v_a = 20.0             # Magnitude of inflow velocity [m/s]
 density = 1.225        # Air density [kg/m³]
 alpha_deg = 30.0       # Angle of attack [degrees]
 alpha = deg2rad(alpha_deg)
