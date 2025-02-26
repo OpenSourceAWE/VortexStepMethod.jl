@@ -56,16 +56,15 @@ end
 
 Add a new section to the wing.
 
-See also: [Wing](@ref), [PosVector](@ref)
-
 # Arguments:
-- LE_point::PosVector: position of the point on the side of the leading edge
-- TE_point::PosVector: position of the point on the side of the leading edge
+- wing::Wing: The [Wing](@ref) to which a section shall be added
+- LE_point::PosVector: [PosVector](@ref) of the point on the side of the leading edge
+- TE_point::PosVector: [PosVector](@ref) of the point on the side of the trailing edge
 - aero_input: Can be:
   - :inviscid
   - :`lei_airfoil_breukels`
-  - (:polar_data, (`alpha_range`, `cl_vector`, `cd_vector`, `cm_vector`))
-  - (:polar_data, (`alpha_range`, `beta_range`, `cl_matrix`, `cd_matrix`, `cm_matrix`))
+  - (:`polar_data`, (`alpha_range`, `cl_vector`, `cd_vector`, `cm_vector`))
+  - (:`polar_data`, (`alpha_range`, `beta_range`, `cl_matrix`, `cd_matrix`, `cm_matrix`))
 """
 function add_section!(wing::Wing, LE_point::Vector{Float64}, 
                      TE_point::Vector{Float64}, aero_input)

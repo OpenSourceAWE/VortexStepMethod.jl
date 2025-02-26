@@ -642,13 +642,13 @@ end
 
 
 """
-    set_va!(body_aero::BodyAerodynamics, va, omega=zeros(3))
+    set_va!(body_aero::BodyAerodynamics, va, omega=zeros(MVec3))
 
 Set velocity array and update wake filaments.
 
 # Arguments
 - body_aero::BodyAerodynamics: The [BodyAerodynamics](@ref) struct to modify
-- `va`: Either a velocity vector or a list of velocity vectors
+- `va`: Either a velocity vector or a vector of velocity vectors per panel 
 - `omega`: Turn rate around x y and z axis
 """
 function set_va!(body_aero::BodyAerodynamics, va, omega=zeros(MVec3))
