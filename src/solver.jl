@@ -26,7 +26,7 @@ Main solver structure for the Vortex Step Method.
 """
 struct Solver
     # General settings
-    aerodynamic_model_type::Symbol
+    aerodynamic_model_type::Model
     density::Float64
     max_iterations::Int64
     allowed_error::Float64
@@ -44,7 +44,7 @@ struct Solver
     is_only_f_and_gamma_output::Bool
 
     function Solver(;
-        aerodynamic_model_type::Symbol   = :VSM,
+        aerodynamic_model_type::Model    = VSM,
         density::Float64                 = 1.225,
         max_iterations::Int64            = 1500,
         allowed_error::Float64           = 1e-5,

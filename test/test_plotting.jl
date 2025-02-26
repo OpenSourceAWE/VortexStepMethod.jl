@@ -63,8 +63,8 @@ plt.ioff()
         rm("/tmp/Rectangular_wing_geometry_top_view.pdf")
 
         # Step 5: Initialize the solvers
-        vsm_solver = Solver(aerodynamic_model_type=:VSM)
-        llt_solver = Solver(aerodynamic_model_type=:LLT)
+        vsm_solver = Solver(aerodynamic_model_type=VSM)
+        llt_solver = Solver(aerodynamic_model_type=LLT)
 
         # Step 6: Solve the VSM and LLT
         results_vsm = solve(vsm_solver, wa)
