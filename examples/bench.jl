@@ -55,7 +55,7 @@ wing = KiteWing("data/ram_air_kite_body.obj", "data/ram_air_kite_foil.dat")
 body_aero = BodyAerodynamics([wing])
 
 # Create solvers
-VSM_solver = Solver(
+vsm_solver = Solver(
     aerodynamic_model_type=VSM,
     is_with_artificial_damping=false
 )
@@ -74,8 +74,8 @@ vel_app = [
 set_va!(body_aero, vel_app)
 
 # Solving and plotting distributions
-results = solve(VSM_solver, body_aero)
+results = solve(vsm_solver, body_aero)
 println("RAM-air kite:")
-@time results = solve(VSM_solver, body_aero)
+@time results = solve(vsm_solver, body_aero)
 
 nothing
