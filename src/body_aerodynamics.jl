@@ -29,7 +29,7 @@ mutable struct BodyAerodynamics
 
     function BodyAerodynamics(
         wings::Vector{T};
-        aerodynamic_center_location::Float64=0.25,
+        aero_center_location::Float64=0.25,
         control_point_location::Float64=0.75
     ) where T <: AbstractWing
         # Initialize panels
@@ -42,7 +42,7 @@ mutable struct BodyAerodynamics
             panel_props = calculate_panel_properties(
                 section_list,
                 n_panels_per_wing,
-                aerodynamic_center_location,
+                aero_center_location,
                 control_point_location
             )
             
@@ -241,7 +241,7 @@ function calculate_AIC_matrices!(body_aero::BodyAerodynamics, model::Symbol,
                               va_unit_array::Matrix{Float64})
     model in [:VSM, :LLT] || throw(ArgumentError("Model must be VSM or LLT"))
     # Determine evaluation point based on model
-    evaluation_point = model === :VSM ? :control_point : :aerodynamic_center
+    evaluation_point = model === :VSM ? :control_point : :aero_center
     evaluation_point_on_bound = model === :LLT
     
     # Initialize AIC matrices
@@ -406,13 +406,15 @@ end
                      va_unit_array::Matrix{Float64}, panels::Vector{Panel},
                      is_only_f_and_gamma_output::Bool)
 
-Calculate final aerodynamic results.
+Calculate final aerodynamic results. Reference point is in the kite body (KB) frame.
 
 Returns:
     Dict: Results including forces, coefficients and distributions
 """
-function calculate_results(body_aero::BodyAerodynamics,
+function calculate_results(
+    body_aero::BodyAerodynamics,
     gamma_new::Vector{Float64},
+    reference_point::AbstractVector,
     density::Float64,
     aerodynamic_model_type::Symbol,
     core_radius_fraction::Float64,
@@ -427,7 +429,8 @@ function calculate_results(body_aero::BodyAerodynamics,
     va_norm_array::Vector{Float64},
     va_unit_array::Matrix{Float64},
     panels::Vector{Panel},
-    is_only_f_and_gamma_output::Bool)
+    is_only_f_and_gamma_output::Bool,
+)
 
     # Initialize arrays
     n_panels = length(panels)
@@ -475,7 +478,8 @@ function calculate_results(body_aero::BodyAerodynamics,
     cl_prescribed_va = Float64[]
     cd_prescribed_va = Float64[]
     cs_prescribed_va = Float64[]
-    f_global_3D = zeros(3, n_panels)
+    f_body_3D = zeros(3, n_panels)
+    m_body_3D = zeros(3, n_panels)
     area_all_panels = 0.0
     
     # Initialize force sums
@@ -492,6 +496,7 @@ function calculate_results(body_aero::BodyAerodynamics,
 
     # Main calculation loop
     for (i, panel) in enumerate(panels)
+        ### Lift and Drag ###
         # Panel geometry
         z_airf_span = panel.z_airf
         y_airf_chord = panel.y_airf
@@ -528,8 +533,8 @@ function calculate_results(body_aero::BodyAerodynamics,
         side_prescribed_va = dot(lift_induced_va, spanwise_direction) + 
                            dot(drag_induced_va, spanwise_direction)
 
-        # Global forces
-        f_global_3D[:,i] .= [
+        # Body frame forces
+        f_body_3D[:,i] .= [
             dot(ftotal_induced_va, [1.0, 0.0, 0.0]),
             dot(ftotal_induced_va, [0.0, 1.0, 0.0]),
             dot(ftotal_induced_va, [0.0, 0.0, 1.0])
@@ -544,11 +549,32 @@ function calculate_results(body_aero::BodyAerodynamics,
         push!(cl_prescribed_va, lift_prescribed_va / (q_inf * panel.chord))
         push!(cd_prescribed_va, drag_prescribed_va / (q_inf * panel.chord))
         push!(cs_prescribed_va, side_prescribed_va / (q_inf * panel.chord))
+
+        ### Moment ###
+        # (1) Panel aerodynamic center in body frame:
+        panel_ac_body = panel.aero_center  # 3D [x, y, z]
+
+        # (2) Convert local (2D) pitching moment to a 3D vector in body coords.
+        #     Use the axis around which the moment is defined,
+        #     which is the z-axis pointing "spanwise"
+        moment_axis_body = panel.z_airf
+
+        # Scale by panel width if your 'moment[i]' is 2D moment-per-unit-span:
+        M_local_3D = moment[i] * moment_axis_body * panel.width
+
+        # Vector from panel AC to the chosen reference point:
+        r_vector = panel_ac_body - reference_point  # e.g. CG, wing root, etc.
+
+        # Cross product to shift the force from panel AC to ref. point:
+        M_shift = cross(r_vector, f_body_3D[:,i])
+
+        # Total panel moment about the reference point:
+        m_body_3D[:,i] = M_local_3D + M_shift
     end
 
     if is_only_f_and_gamma_output
         return Dict{String,Any}(
-            "F_distribution" => f_global_3D,
+            "F_distribution" => f_body_3D,
             "gamma_distribution" => gamma_new
         )
     end
@@ -570,22 +596,28 @@ function calculate_results(body_aero::BodyAerodynamics,
 
     # Create results dictionary
     results = Dict{String,Any}(
-        "Fx" => sum(f_global_3D[1,:]),
-        "Fy" => sum(f_global_3D[1,:]),
-        "Fz" => sum(f_global_3D[1,:]),
+        "Fx" => sum(f_body_3D[1,:]),
+        "Fy" => sum(f_body_3D[2,:]),
+        "Fz" => sum(f_body_3D[3,:]),
+        "Mx" => sum(m_body_3D[1,:]),
+        "My" => sum(m_body_3D[2,:]),
+        "Mz" => sum(m_body_3D[3,:]),
         "lift" => lift_wing_3D_sum,
         "drag" => drag_wing_3D_sum,
         "side" => side_wing_3D_sum,
         "cl" => lift_wing_3D_sum / (q_inf * projected_area),
         "cd" => drag_wing_3D_sum / (q_inf * projected_area),
         "cs" => side_wing_3D_sum / (q_inf * projected_area),
+        "cmx" => sum(m_body_3D[1,:]) / (q_inf * projected_area * max_chord),
+        "cmy" => sum(m_body_3D[2,:]) / (q_inf * projected_area * max_chord),
+        "cmz" => sum(m_body_3D[3,:]) / (q_inf * projected_area * max_chord),
         "cl_distribution" => cl_prescribed_va,
         "cd_distribution" => cd_prescribed_va,
         "cs_distribution" => cs_prescribed_va,
-        "F_distribution" => f_global_3D,
-        "cfx" => (sum(f_global_3D[1,:]) / (q_inf * projected_area)),
-        "cfy" => (sum(f_global_3D[2,:]) / (q_inf * projected_area)),
-        "cfz" => (sum(f_global_3D[3,:]) / (q_inf * projected_area)),
+        "F_distribution" => f_body_3D,
+        "cfx" => (sum(f_body_3D[1,:]) / (q_inf * projected_area)),
+        "cfy" => (sum(f_body_3D[2,:]) / (q_inf * projected_area)),
+        "cfz" => (sum(f_body_3D[3,:]) / (q_inf * projected_area)),
         "alpha_at_ac" => alpha_corrected,
         "alpha_uncorrected" => alpha_array,
         "alpha_geometric" => alpha_geometric,

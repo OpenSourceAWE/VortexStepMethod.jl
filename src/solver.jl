@@ -3,6 +3,26 @@
     Solver
 
 Main solver structure for the Vortex Step Method.
+
+# Attributes
+
+## General settings
+- `aerodynamic_model_type`::Symbol
+- density::Float64
+- `max_iterations`::Int64
+- `allowed_error`::Float64
+- `tol_reference_error`::Float64
+- `relaxation_factor`::Float64
+
+## Damping settings
+- `is_with_artificial_damping`::Bool
+- `artificial_damping`::NamedTuple{(:k2, :k4), Tuple{Float64, Float64}}
+
+## Additional settings
+- `type_initial_gamma_distribution`::Symbol
+- `core_radius_fraction`::Float64
+- mu::Float64
+- `is_only_f_and_gamma_output`::Bool
 """
 struct Solver
     # General settings
@@ -57,9 +77,9 @@ end
 """
     solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=nothing; log=false)
 
-Main solving routine for the aerodynamic model.
+Main solving routine for the aerodynamic model. Reference point is in the kite body (KB) frame.
 """
-function solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=nothing; log=false)
+function solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=nothing; log=false, reference_point=zeros(MVec3))
     isnothing(body_aero.panels[1].va) && throw(ArgumentError("Inflow conditions are not set, use set_va!(body_aero, va)"))
     
     # Initialize variables
@@ -147,6 +167,7 @@ function solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=n
     results = calculate_results(
         body_aero,
         gamma_new,
+        reference_point,
         solver.density,
         solver.aerodynamic_model_type,
         solver.core_radius_fraction,

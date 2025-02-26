@@ -139,6 +139,7 @@ using LinearAlgebra
         va_array = zeros(n_panels, 3)
         va_norm_array = zeros(n_panels)
         va_unit_array = zeros(n_panels, 3)
+        reference_point = zeros(3)
         
 
         # # Fill arrays with data
@@ -155,6 +156,7 @@ using LinearAlgebra
         result = @benchmark calculate_results(
             $body_aero,
             $gamma,
+            $reference_point,
             $density,
             :VSM,
             1e-20,
@@ -182,7 +184,7 @@ using LinearAlgebra
     #         $alpha_array,
     #         $body_aero,
     #         $gamma
-    #     )
+    #     ) samples = 1 evals = 1
     #     @test result.allocs == 0
     # end
     
@@ -191,7 +193,7 @@ using LinearAlgebra
     #     result = @benchmark calculate_projected_area(
     #         $area,
     #         $body_aero
-    #     )
+    #     ) samples = 1 evals = 1
     #     @test result.allocs == 0
     # end
     
@@ -199,11 +201,11 @@ using LinearAlgebra
     #     panel = body_aero.panels[1]
     #     alpha = 0.1
         
-    #     result = @benchmark calculate_cl($panel, $alpha)
+    #     result = @benchmark calculate_cl($panel, $alpha) samples = 1 evals = 1
     #     @test result.allocs == 0
         
     #     cd_cm = @MVector zeros(2)
-    #     result = @benchmark calculate_cd_cm($cd_cm, $panel, $alpha)
+    #     result = @benchmark calculate_cd_cm($cd_cm, $panel, $alpha) samples = 1 evals = 1
     #     @test result.allocs == 0
     # end
     
@@ -224,7 +226,7 @@ using LinearAlgebra
     #         1.0,
     #         1e-20,
     #         $work_vectors
-    #     )
+    #     ) samples = 1 evals = 1
     #     @test result.allocs == 0
         
     #     # Test 2D bound vortex
@@ -233,7 +235,7 @@ using LinearAlgebra
     #         $panel,
     #         $point,
     #         $work_vectors
-    #     )
+    #     ) samples = 1 evals = 1
     #     @test result.allocs == 0
         
     #     # Test 3D velocity components
@@ -244,7 +246,7 @@ using LinearAlgebra
     #         1.0,
     #         1e-20,
     #         $work_vectors
-    #     )
+    #     ) samples = 1 evals = 1
     #     @test result.allocs == 0
         
     #     result = @benchmark velocity_3D_trailing_vortex!(
@@ -254,7 +256,7 @@ using LinearAlgebra
     #         1.0,
     #         20.0,
     #         $work_vectors
-    #     )
+    #     ) samples = 1 evals = 1
     #     @test result.allocs == 0
         
     #     result = @benchmark velocity_3D_trailing_vortex_semiinfinite!(
@@ -265,7 +267,7 @@ using LinearAlgebra
     #         20.0,
     #         $(work_vectors[2]),
     #         $work_vectors
-    #     )
+    #     ) samples = 1 evals = 1
     #     @test result.allocs == 0
     # end
 end

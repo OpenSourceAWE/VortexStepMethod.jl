@@ -6,6 +6,11 @@ CurrentModule = VortexStepMethod
 add_section!
 ```
 
+## Functions for setting the inflow conditions
+```@docs
+set_va!
+```
+
 ## Main Plotting Functions
 ```@docs
 plot_geometry

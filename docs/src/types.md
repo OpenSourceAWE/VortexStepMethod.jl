@@ -17,3 +17,8 @@ CurrentModule = VortexStepMethod
     PanelProperties
     BodyAerodynamics
 ```
+
+## The Solver
+```@docs
+Solver
+```

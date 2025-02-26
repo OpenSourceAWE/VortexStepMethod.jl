@@ -71,7 +71,7 @@ plt.ioff()
         results_llt = solve(llt_solver, wa)
 
         # Step 7: Plot spanwise distributions
-        y_coordinates = [panel.aerodynamic_center[2] for panel in wa.panels]
+        y_coordinates = [panel.aero_center[2] for panel in wa.panels]
 
         fig = plot_distribution(
             [y_coordinates, y_coordinates],

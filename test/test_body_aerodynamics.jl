@@ -42,7 +42,7 @@ include("utils.jl")
         aerodynamic_model_type=model, 
         core_radius_fraction=core_radius_fraction
     )
-    results_NEW = solve(solver_object, body_aero)
+    results_NEW = solve(solver_object, body_aero; reference_point=[0,1,0])
 
     @test results_NEW isa Dict
 
@@ -94,6 +94,9 @@ include("utils.jl")
     @test isapprox(results_NEW["cs"], CS_ref, rtol=1e-4)
     @test isapprox(results_NEW["lift"], Ltot_ref, rtol=1e-4)
     @test isapprox(results_NEW["drag"], Dtot_ref, rtol=1e-4)
+    @test isapprox(results_NEW["Fx"], results_NEW["Mz"], rtol=1e-4) # 1 meter arm
+    @test isapprox(results_NEW["My"], 0.0, atol=1e-3)
+    @test isapprox(results_NEW["Fz"], -results_NEW["Mx"], rtol=1e-4) # 1 meter arm
 
     # Check array shapes
     @test length(results_NEW["cl_distribution"]) == length(body_aero.panels)
@@ -277,7 +280,7 @@ end
                 evaluation_point = if model === :VSM
                     panel.control_point
                 else  # LLT
-                    panel.aerodynamic_center
+                    panel.aero_center
                 end
 
                 @test isapprox(evaluation_point, expected_controlpoints[i]["coordinates"], atol=1e-4)
@@ -292,7 +295,7 @@ end
                 
                 if model === :VSM
                     @test isapprox(
-                        panel.aerodynamic_center,
+                        panel.aero_center,
                         expected_controlpoints[i]["coordinates_aoa"],
                         atol=1e-4
                     )
@@ -344,7 +347,7 @@ end
                 @test isapprox(r3, exp_ringvec["r3"], atol=1e-4)
 
                 # Handle coord_L
-                @test all(isapprox.(panel.aerodynamic_center, expected_coord_L[:, i]))
+                @test all(isapprox.(panel.aero_center, expected_coord_L[:, i]))
             end
         end
     end
