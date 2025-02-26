@@ -150,7 +150,7 @@ using LinearAlgebra
         #     z_airf_array[i, :] .= panel.z_airf
         #     va_array[i, :] .= panel.va
         # end
-        set_va!(body_aero, (vel_app, 0.0))  # Second parameter is yaw rate
+        set_va!(body_aero, vel_app)
         results = @MVector zeros(3)
         
         result = @benchmark calculate_results(
