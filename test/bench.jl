@@ -95,13 +95,13 @@ using LinearAlgebra
 
         for model in models
             for aero_model in [:inviscid, (:polar_data, (alphas, cls, cds, cms))]
-                wing = Wing(n_panels, spanwise_panel_distribution=:linear)
+                wing = Wing(n_panels, spanwise_panel_distribution=LINEAR)
                 add_section!(wing, 
-                    [0.0, span/2, 0.0],   # Left tip LE 
+                    [0.0, span/2, 0.0],    # Left tip LE 
                     [chord, span/2, 0.0],  # Left tip TE
                     aero_model)
                 add_section!(wing, 
-                    [0.0, -span/2, 0.0],  # Right tip LE
+                    [0.0, -span/2, 0.0],   # Right tip LE
                     [chord, -span/2, 0.0], # Right tip TE
                     aero_model)
                 body_aero = BodyAerodynamics([wing])
