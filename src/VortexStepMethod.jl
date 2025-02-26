@@ -54,11 +54,11 @@ const VelVector=Union{MVec3, Vector, SizedVector{3, Float64, Vector{Float64}}}
 Enumeration of the implemented model types.
 
 # Elements
-- LINEAR             # Linear distribution
-- COSINE             # Cosine distribution
-- COSINE_VAN_GARREL  # van Garrel cosine distribution
-- SPLIT_PROVIDED     # Split provided sections
-- UNCHANGED          # Keep original sections
+- LINEAR               # Linear distribution
+- COSINE               # Cosine distribution
+- `COSINE_VAN_GARREL`  # van Garrel cosine distribution
+- `SPLIT_PROVIDED`     # Split provided sections
+- UNCHANGED            # Keep original sections
 """
 @enum PanelDistribution begin
    LINEAR             # Linear distribution
