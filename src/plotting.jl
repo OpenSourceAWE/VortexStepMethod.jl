@@ -584,7 +584,7 @@ Plot polar data comparing different solvers and configurations.
 # Keyword arguments
 - `literature_path_list`: Optional paths to literature data files
 - `angle_range`: Range of angles to analyze [°]
-- `angle_type`: "angle_of_attack" or "side_slip"; (default: `angle_of_attack`) 
+- `angle_type`: "`angle_of_attack`" or "`side_slip`"; (default: `angle_of_attack`) 
 - `angle_of_attack:` AoA to be used for plotting the polars (default: 0.0) [rad]
 - `side_slip`: side slip angle (default: 0.0) [rad]
 - v_a: norm of apparent wind speed (default: 10.0) [m/s]
