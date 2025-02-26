@@ -19,6 +19,10 @@ if you haven't already. On Linux, make sure that Python3, Matplotlib and LaTeX a
 sudo apt install python3-matplotlib
 sudo apt install texlive-full texlive-fonts-extra cm-super
 ```
+Furthermore, the package `TestEnv` must be installed globally:
+```
+julia -e 'using Pkg; Pkg.add("TestEnv")'
+```
 
 Before installing this software it is suggested to create a new project, for example like this:
 ```bash
@@ -68,11 +72,12 @@ To browse the code, it is suggested to use [VSCode](https://code.visualstudio.co
 Three kinds of input data is needed:
 
 - The wing geometry, defined by section:
-  - rec wing two section, two point + polars
-  - kite: model of polars included, n sections to define
+  - for the rectangualar wing two sections, two points in CAD reference frame + polars  
+    (three different options to provide them) per section
+  - kite wing: model of polars included, n sections to define
 
-- The airflow:
-  - v_app vector
+- The airflow and turn rate:
+  - `v_app` vector and `omega` (turn rate) vector in Kite Body (KB) reference frame
 
 - The configuration:
   - how many panels  
@@ -87,7 +92,7 @@ Apart from the wing geometry there is no input file yet, the input has to be def
 n_panels = 20          # Number of panels
 span = 20.0            # Wing span [m]
 chord = 1.0            # Chord length [m]
-v_a = 20.0            # Magnitude of inflow velocity [m/s]
+v_a = 20.0             # Magnitude of inflow velocity [m/s]
 density = 1.225        # Air density [kg/m³]
 alpha_deg = 30.0       # Angle of attack [degrees]
 alpha = deg2rad(alpha_deg)
@@ -99,11 +104,11 @@ wing = Wing(n_panels, spanwise_panel_distribution="linear")
 add_section!(wing, 
     [0.0, span/2, 0.0],    # Left tip LE 
     [chord, span/2, 0.0],  # Left tip TE
-    "inviscid")
+    :inviscid)
 add_section!(wing, 
     [0.0, -span/2, 0.0],   # Right tip LE
     [chord, -span/2, 0.0], # Right tip TE
-    "inviscid")
+    :inviscid)
 
 # Step 3: Initialize aerodynamics
 wa = BodyAerodynamics([wing])
