@@ -3,7 +3,7 @@ using LinearAlgebra
 """
     Panel
 
-Represents a panel in a vortex step method simulation.
+Represents a panel in a vortex step method simulation. All points and vectors are in the kite body (KB) frame.
 
 # Fields
 - `TE_point_1::MVec3`: First trailing edge point
