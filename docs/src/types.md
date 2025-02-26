@@ -1,6 +1,11 @@
 ```@meta
 CurrentModule = VortexStepMethod
 ```
+## Enumerations
+```@docs
+PanelDistribution
+```
+
 ## Basic Vectors
 ```@docs
    MVec3
