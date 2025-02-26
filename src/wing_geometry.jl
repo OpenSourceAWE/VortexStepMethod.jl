@@ -24,6 +24,18 @@ struct Section{T}
 end
 
 """
+    update_section!(wing::Wing, LE_point::PosVector, TE_point::PosVector)
+
+Update the section leading edge and trailing edge positions.
+"""
+function update_section!(section::Section, LE_point::AbstractVector, TE_point::AbstractVector)
+    size(LE_point) != (3,) && throw(ArgumentError("LE_point has wrong size"))
+    size(TE_point) != (3,) && throw(ArgumentError("TE_point has wrong size"))
+    section.LE_point .= LE_point
+    return nothing
+end
+
+"""
     Wing
 
 Represents a wing composed of multiple sections with aerodynamic properties.
@@ -70,6 +82,7 @@ See also: [Wing](@ref), [PosVector](@ref)
 function add_section!(wing::Wing, LE_point::Vector{Float64}, 
                      TE_point::Vector{Float64}, aero_input)
     push!(wing.sections, Section(LE_point, TE_point, aero_input))
+    return nothing
 end
 
 """
@@ -129,6 +142,8 @@ function refine_aerodynamic_mesh(wing::AbstractWing)
     if wing.spanwise_panel_distribution == UNCHANGED || length(wing.sections) == n_sections
         return wing.sections
     end
+
+    @info "Refining aerodynamic mesh from $(length(wing.sections)) sections to $n_sections sections."
     
     # Handle two-section case
     if n_sections == 2
