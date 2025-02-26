@@ -32,7 +32,7 @@ Represents a wing composed of multiple sections with aerodynamic properties.
 - `n_panels::Int64`: Number of panels in aerodynamic mesh
 - `spanwise_panel_distribution`::PanelDistribution: [PanelDistribution](@ref)
 - `spanwise_direction::Vector{Float64}`: Wing span direction vector
-- `sections::Vector{Section}`: List of wing sections
+- `sections::Vector{Section}`: List of wing sections, see: [Section](@ref)
 
 """
 mutable struct Wing <: AbstractWing

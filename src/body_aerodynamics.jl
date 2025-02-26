@@ -4,9 +4,9 @@
 Main structure for calculating aerodynamic properties of bodies.
 
 # Fields
-- panels::Vector{Panel}: Vector of Panel structs
+- panels::Vector{Panel}: Vector of [Panel](@ref) structs
 - wings::Vector{AbstractWing}: a vector of wings; a body can have multiple wings
-- `va`::Union{Nothing, MVec3}: A vector of the apparent wind speed
+- `va`::Union{Nothing, MVec3}: A vector of the apparent wind speed, see: [MVec3](@ref)
 - `omega`::Union{Nothing, MVec3}: A vector of the turn rate around the kite body axes
 - `gamma_distribution`::Union{Nothing, Vector{Float64}}: unclear, please defined
 - `alpha_uncorrected`::Union{Nothing, Vector{Float64}}: unclear, please define
@@ -647,6 +647,7 @@ end
 Set velocity array and update wake filaments.
 
 # Arguments
+- body_aero::BodyAerodynamics: The [BodyAerodynamics](@ref) struct to modify
 - `va`: Either a velocity vector or a list of velocity vectors
 - `omega`: Turn rate around x y and z axis
 """
