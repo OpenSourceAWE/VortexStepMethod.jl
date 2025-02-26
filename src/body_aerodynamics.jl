@@ -227,24 +227,25 @@ function calculate_panel_properties(section_list::Vector{Section}, n_panels::Int
 end
 
 """
-    calculate_AIC_matrices!(body_aero::BodyAerodynamics, model::Symbol, 
+    calculate_AIC_matrices!(body_aero::BodyAerodynamics, model::Model, 
                          core_radius_fraction::Float64,
                          va_norm_array::Vector{Float64}, 
                          va_unit_array::Matrix{Float64})
 
 Calculate Aerodynamic Influence Coefficient matrices.
 
+See also: [BodyAerodynamics](@ref), [Model](@ref)
+
 Returns:
-    Tuple of (AIC_x, AIC_y, AIC_z) matrices
+    Tuple of (`AIC_x`, `AIC_y`, `AIC_z`) matrices
 """
-function calculate_AIC_matrices!(body_aero::BodyAerodynamics, model::Symbol,
+function calculate_AIC_matrices!(body_aero::BodyAerodynamics, model::Model,
                               core_radius_fraction::Float64,
                               va_norm_array::Vector{Float64}, 
                               va_unit_array::Matrix{Float64})
-    model in [:VSM, :LLT] || throw(ArgumentError("Model must be VSM or LLT"))
     # Determine evaluation point based on model
-    evaluation_point = model === :VSM ? :control_point : :aero_center
-    evaluation_point_on_bound = model === :LLT
+    evaluation_point = model === VSM ? :control_point : :aero_center
+    evaluation_point_on_bound = model === LLT
     
     # Initialize AIC matrices
     velocity_induced, tempvel, va_unit, U_2D = zeros(MVec3), zeros(MVec3), zeros(MVec3), zeros(MVec3)
@@ -271,7 +272,7 @@ function calculate_AIC_matrices!(body_aero::BodyAerodynamics, model::Symbol,
             body_aero.AIC[:, icp, jring] .= velocity_induced
             
             # Subtract 2D induced velocity for VSM
-            if icp == jring && model === :VSM
+            if icp == jring && model === VSM
                 calculate_velocity_induced_bound_2D!(U_2D, body_aero.panels[jring], ep, body_aero.work_vectors)
                 body_aero.AIC[:, icp, jring] .-= U_2D
             end
@@ -376,7 +377,7 @@ function update_effective_angle_of_attack_if_VSM(body_aero::BodyAerodynamics,
 
     # Calculate AIC matrices at aerodynamic center using LLT method
     calculate_AIC_matrices!(
-        body_aero, :LLT, core_radius_fraction, va_norm_array, va_unit_array
+        body_aero, LLT, core_radius_fraction, va_norm_array, va_unit_array
     )
     AIC_x, AIC_y, AIC_z = @views body_aero.AIC[1, :, :], body_aero.AIC[2, :, :], body_aero.AIC[3, :, :]
 
@@ -399,7 +400,7 @@ end
 
 """
     calculate_results(body_aero::BodyAerodynamics, gamma_new::Vector{Float64}, 
-                     density::Float64, aerodynamic_model_type::Symbol,
+                     density::Float64, aerodynamic_model_type::Model,
                      core_radius_fraction::Float64, mu::Float64,
                      alpha_array::Vector{Float64}, v_a_array::Vector{Float64},
                      chord_array::Vector{Float64}, x_airf_array::Matrix{Float64},
@@ -418,7 +419,7 @@ function calculate_results(
     gamma_new::Vector{Float64},
     reference_point::AbstractVector,
     density::Float64,
-    aerodynamic_model_type::Symbol,
+    aerodynamic_model_type::Model,
     core_radius_fraction::Float64,
     mu::Float64,
     alpha_array::Vector{Float64},
@@ -454,7 +455,7 @@ function calculate_results(
     moment = reshape((cm_array .* 0.5 .* density .* v_a_array.^2 .* chord_array), :, 1)
 
     # Calculate alpha corrections based on model type
-    alpha_corrected = if aerodynamic_model_type === :VSM
+    alpha_corrected = if aerodynamic_model_type === VSM
         update_effective_angle_of_attack_if_VSM(
             body_aero,
             gamma_new,
@@ -465,7 +466,7 @@ function calculate_results(
             va_norm_array,
             va_unit_array
         )
-    elseif aerodynamic_model_type === :LLT
+    elseif aerodynamic_model_type === LLT
         alpha_array
     else
         throw(ArgumentError("Unknown aerodynamic model type, should be LLT or VSM"))

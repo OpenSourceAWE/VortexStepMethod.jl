@@ -62,6 +62,8 @@ end
 
 Add a new section to the wing.
 
+See also: [Wing](@ref), [PosVector](@ref)
+
 # Arguments:
 - LE_point::PosVector: position of the point on the side of the leading edge
 - TE_point::PosVector: position of the point on the side of the leading edge

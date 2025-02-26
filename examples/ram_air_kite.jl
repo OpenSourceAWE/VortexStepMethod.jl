@@ -17,7 +17,7 @@ body_aero = BodyAerodynamics([wing])
 
 # Create solvers
 VSM = Solver(
-    aerodynamic_model_type=:VSM,
+    aerodynamic_model_type=VSM,
     is_with_artificial_damping=false
 )
 

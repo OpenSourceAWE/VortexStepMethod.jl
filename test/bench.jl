@@ -52,7 +52,7 @@ using LinearAlgebra
     va_norm_array = ones(n_panels)
     va_unit_array = ones(n_panels, 3)
     
-    models = [:VSM, :LLT]
+    models = [VSM, LLT]
     core_radius_fractions = [0.001, 10.0]
 
     @testset "AIC Matrix Calculation" begin
@@ -158,7 +158,7 @@ using LinearAlgebra
             $gamma,
             $reference_point,
             $density,
-            :VSM,
+            VSM,
             1e-20,
             0.0,
             $alpha_array,
