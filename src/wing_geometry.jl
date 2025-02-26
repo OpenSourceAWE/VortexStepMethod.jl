@@ -30,25 +30,19 @@ Represents a wing composed of multiple sections with aerodynamic properties.
 
 # Fields
 - `n_panels::Int64`: Number of panels in aerodynamic mesh
-- `spanwise_panel_distribution::Symbol`: Panel distribution type
+- `spanwise_panel_distribution`::PanelDistribution: [PanelDistribution](@ref)
 - `spanwise_direction::Vector{Float64}`: Wing span direction vector
 - `sections::Vector{Section}`: List of wing sections
 
-# Distribution types
-- :linear: Linear distribution
-- :cosine: Cosine distribution
-- :`cosine_van_Garrel`: van Garrel cosine distribution
-- :split_provided: Split provided sections
-- :unchanged: Keep original sections
 """
 mutable struct Wing <: AbstractWing
     n_panels::Int64
-    spanwise_panel_distribution::Symbol
+    spanwise_panel_distribution::PanelDistribution
     spanwise_direction::PosVector
     sections::Vector{Section}
     
     function Wing(n_panels::Int;
-                 spanwise_panel_distribution::Symbol=:linear,
+                 spanwise_panel_distribution::PanelDistribution=LINEAR,
                  spanwise_direction::PosVector=MVec3([0.0, 1.0, 0.0]))
         new(n_panels, 
             spanwise_panel_distribution, 
@@ -129,7 +123,7 @@ function refine_aerodynamic_mesh(wing::AbstractWing)
     end
     
     # Handle special cases
-    if wing.spanwise_panel_distribution === :unchanged || length(wing.sections) == n_sections
+    if wing.spanwise_panel_distribution == UNCHANGED || length(wing.sections) == n_sections
         return wing.sections
     end
     
@@ -142,9 +136,9 @@ function refine_aerodynamic_mesh(wing::AbstractWing)
     end
     
     # Handle different distribution types
-    if wing.spanwise_panel_distribution === :split_provided
+    if wing.spanwise_panel_distribution == SPLIT_PROVIDED
         return refine_mesh_by_splitting_provided_sections(wing)
-    elseif wing.spanwise_panel_distribution in [:linear, :cosine, :cosine_van_Garrel]
+    elseif wing.spanwise_panel_distribution in (LINEAR, COSINE, COSINE_VAN_GARREL)
         return refine_mesh_for_linear_cosine_distribution(
             wing.spanwise_panel_distribution,
             n_sections,
@@ -272,7 +266,7 @@ end
 
 """
     refine_mesh_for_linear_cosine_distribution(
-        spanwise_panel_distribution::Symbol,
+        spanwise_panel_distribution::PanelDistribution,
         n_sections::Int,
         LE::Matrix{Float64},
         TE::Matrix{Float64},
@@ -281,7 +275,7 @@ end
 Refine wing mesh using linear or cosine spacing.
 
 # Arguments
-- `spanwise_panel_distribution`: Distribution type (:linear, :cosine, or :cosine_van_Garrel)
+- `spanwise_panel_distribution`: [PanelDistribution](@ref)
 - `n_sections`: Number of sections to generate
 - `LE`: Matrix of leading edge points
 - `TE`: Matrix of trailing edge points
@@ -291,7 +285,7 @@ Returns:
     Vector{Section}: List of refined sections
 """
 function refine_mesh_for_linear_cosine_distribution(
-    spanwise_panel_distribution::Symbol,
+    spanwise_panel_distribution::PanelDistribution,
     n_sections::Int,
     LE,
     TE,
@@ -306,9 +300,9 @@ function refine_mesh_for_linear_cosine_distribution(
     qc_cum_length = vcat(0, cumsum(qc_lengths))
 
     # 2. Define target lengths
-    target_lengths = if spanwise_panel_distribution === :linear
+    target_lengths = if spanwise_panel_distribution == LINEAR
         range(0, qc_total_length, n_sections)
-    elseif spanwise_panel_distribution in [:cosine, :cosine_van_Garrel]
+    elseif spanwise_panel_distribution in (COSINE, COSINE_VAN_GARREL)
         theta = range(0, π, n_sections)
         qc_total_length .* (1 .- cos.(theta)) ./ 2
     else
@@ -497,7 +491,7 @@ function refine_mesh_by_splitting_provided_sections(wing::AbstractWing)
             
             # Generate sections for this pair
             new_splitted_sections = refine_mesh_for_linear_cosine_distribution(
-                :linear,
+                LINEAR,
                 num_new_sections + 2,  # +2 for endpoints
                 LE_pair,
                 TE_pair,

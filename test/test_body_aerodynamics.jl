@@ -23,7 +23,7 @@ include("utils.jl")
     core_radius_fraction = 1e-20
     coord = generate_coordinates_el_wing(max_chord, span, N, dist)
     coord_left_to_right = flip_created_coord_in_pairs(deepcopy(coord))
-    wing = Wing(N; spanwise_panel_distribution=:unchanged)
+    wing = Wing(N; spanwise_panel_distribution=UNCHANGED)
     for idx in 1:2:length(coord_left_to_right[:, 1])
         @debug "coord_left_to_right[$idx] = $(coord_left_to_right[idx,:])"
         add_section!(
@@ -124,7 +124,7 @@ end
     # Create wing geometry
     core_radius_fraction = 1e-20
     coord_left_to_right = flip_created_coord_in_pairs(deepcopy(coord))
-    wing = Wing(n_panels; spanwise_panel_distribution=:unchanged)
+    wing = Wing(n_panels; spanwise_panel_distribution=UNCHANGED)
     for idx in 1:2:size(coord_left_to_right, 1)
         add_section!(
             wing,
@@ -242,7 +242,7 @@ end
         end
     
         coord_left_to_right = flip_created_coord_in_pairs(deepcopy(coord))
-        wing = Wing(N; spanwise_panel_distribution=:unchanged)
+        wing = Wing(N; spanwise_panel_distribution=UNCHANGED)
         for i in 1:2:size(coord_left_to_right, 1)
             add_section!(
                 wing,
