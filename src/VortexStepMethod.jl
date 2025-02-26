@@ -25,6 +25,7 @@ export calculate_span, calculate_projected_area
 export plot_wing, plot_circulation_distribution, plot_geometry, plot_distribution, plot_polars
 export show_plot, save_plot, menu
 export Model, VSM, LLT
+export AeroModel, LEI_AIRFOIL_BREUKELS, POLAR_DATA, INVISCID
 export PanelDistribution, LINEAR, COSINE, COSINE_VAN_GARREL, SPLIT_PROVIDED, UNCHANGED
 
 """
@@ -60,13 +61,13 @@ Enumeration of the implemented model types.
 @enum Model VSM LLT
 
 """
-   AeroModel `VSLEI_AIRFOIL_BREUKELSM` `POLAR_DATA` `INVISCID`
+   AeroModel `LEI_AIRFOIL_BREUKELS` `POLAR_DATA` `INVISCID`
 
 Enumeration of the implemented aerodynamic models.
 
 # Elements
-- LEI_AIRFOIL_BREUKELS: Polynom approximation for leading edge inflatable kites
-- POLAR_DATA: Polar data (lookup tables with interpolation)
+- `LEI_AIRFOIL_BREUKELS`: Polynom approximation for leading edge inflatable kites
+- `POLAR_DATA`: Polar data (lookup tables with interpolation)
 - INVISCID
 """
 @enum AeroModel begin
@@ -78,7 +79,7 @@ end
 """
    PanelDistribution `LINEAR` `COSINE` `COSINE_VAN_GARREL` `SPLIT_PROVIDED` `UNCHANGED`
 
-Enumeration of the implemented model types.
+Enumeration of the implemented panel distributions.
 
 # Elements
 - LINEAR               # Linear distribution

@@ -176,7 +176,7 @@ Represents a curved wing that inherits from Wing with additional geometric prope
 # Fields
 - All fields from Wing:
   - `n_panels::Int`: Number of panels in aerodynamic mesh
-  - `spanwise_panel_distribution`::PanelDistribution
+  - `spanwise_panel_distribution`::PanelDistribution: see: [PanelDistribution](@ref)
   - `spanwise_direction::MVec3`: Wing span direction vector
   - `sections::Vector{Section}`: List of wing sections
 - Additional fields:
@@ -249,7 +249,7 @@ mutable struct KiteWing <: AbstractWing
         # Create sections
         sections = Section[]
         for gamma in range(-gamma_tip, gamma_tip, n_sections)
-            aero_input = (:polar_data, (alpha_range, beta_range, cl_matrix, cd_matrix, cm_matrix))
+            aero_input = (POLAR_DATA, (alpha_range, beta_range, cl_matrix, cd_matrix, cm_matrix))
             LE_point = [0.0, 0.0, circle_center_z] .+ [le_interp(gamma), sin(gamma) * radius, cos(gamma) * radius]
             if !isapprox(alpha, 0.0)
                 local_y_vec = [0.0, sin(-gamma), cos(gamma)] × [1.0, 0.0, 0.0]
