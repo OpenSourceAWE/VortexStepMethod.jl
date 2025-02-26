@@ -36,7 +36,7 @@ using LinearAlgebra
     body_aero = BodyAerodynamics([wing])
 
     vel_app = [cos(alpha), 0.0, sin(alpha)] .* v_a
-    set_va!(body_aero, (vel_app, 0.0))  # Second parameter is yaw rate
+    set_va!(body_aero, vel_app)
 
     # Initialize solvers for both LLT and VSM methods
     solver = Solver()
