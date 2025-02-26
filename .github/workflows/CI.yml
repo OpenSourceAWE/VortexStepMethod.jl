@@ -38,7 +38,7 @@ jobs:
         run: if [ "$RUNNER_OS" = "Linux" ]; then sudo apt-get install -y python3-matplotlib; fi
         shell: bash
       - name: Install LaTeX
-        run: if [ "$RUNNER_OS" = "Linux" ]; then sudo apt-get -qq install texlive-full cm-super; fi
+        run: if [ "$RUNNER_OS" = "Linux" ]; then sudo apt-get -qq install texlive-full; fi
         shell: bash
       - uses: actions/checkout@v4
       - uses: julia-actions/setup-julia@v2
