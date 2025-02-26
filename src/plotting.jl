@@ -166,7 +166,7 @@ function create_geometry_plot(body_aero::BodyAerodynamics, title, view_elevation
     # Extract geometric data
     corner_points = [panel.corner_points for panel in panels]
     control_points = [panel.control_point for panel in panels]
-    aerodynamic_centers = [panel.aerodynamic_center for panel in panels]
+    aero_centers = [panel.aero_center for panel in panels]
 
     # Create plot
     fig = plt.figure(figsize=(14, 14))
@@ -196,7 +196,7 @@ function create_geometry_plot(body_aero::BodyAerodynamics, title, view_elevation
         # Plot control points and aerodynamic centers
         ax.scatter([control_points[i][1]], [control_points[i][2]], [control_points[i][3]],
             color=:green, label=i == 1 ? "Control Points" : "")
-        ax.scatter([aerodynamic_centers[i][1]], [aerodynamic_centers[i][2]], [aerodynamic_centers[i][3]],
+        ax.scatter([aero_centers[i][1]], [aero_centers[i][2]], [aero_centers[i][3]],
             color=:blue, label=i == 1 ? "Aerodynamic Centers" : "")
 
         # Plot filaments

@@ -54,7 +54,7 @@ plot && plot_geometry(
 results = solve(VSM, body_aero)
 @time results = solve(VSM, body_aero)
 
-CAD_y_coordinates = [panel.aerodynamic_center[2] for panel in body_aero.panels]
+body_y_coordinates = [panel.aero_center[2] for panel in body_aero.panels]
 
 plot && plot_distribution(
     [CAD_y_coordinates],

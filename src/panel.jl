@@ -3,7 +3,7 @@ using LinearAlgebra
 """
     Panel
 
-Represents a panel in a vortex step method simulation.
+Represents a panel in a vortex step method simulation. All points and vectors are in the kite body (KB) frame.
 
 # Fields
 - `TE_point_1::MVec3`: First trailing edge point
@@ -14,7 +14,7 @@ Represents a panel in a vortex step method simulation.
 - `va::Union{Nothing, MVec3}`: Panel velocity
 - `corner_points::Matrix{Float64}`: Panel corner points
 - `aero_model::Symbol`: Aerodynamic model type
-- `aerodynamic_center::Vector{Float64}`: Panel aerodynamic center
+- `aero_center::Vector{Float64}`: Panel aerodynamic center
 - `control_point::Vector{MVec3}`: Panel control point
 - `bound_point_1::Vector{MVec3}`: First bound point
 - `bound_point_2::Vector{MVec3}`: Second bound point
@@ -39,7 +39,7 @@ mutable struct Panel
     cl_interp::Function
     cd_interp::Function
     cm_interp::Function
-    aerodynamic_center::MVec3
+    aero_center::MVec3
     control_point::MVec3
     bound_point_1::MVec3
     bound_point_2::MVec3
@@ -52,7 +52,7 @@ mutable struct Panel
     function Panel(
         section_1::Section,
         section_2::Section,
-        aerodynamic_center::PosVector,
+        aero_center::PosVector,
         control_point::PosVector,
         bound_point_1::PosVector,
         bound_point_2::PosVector,
@@ -127,7 +127,7 @@ mutable struct Panel
             chord, nothing, corner_points, aero_model,
             cl_coeffs, cd_coeffs, cm_coeffs,
             cl_interp, cd_interp, cm_interp,
-            aerodynamic_center, control_point,
+            aero_center, control_point,
             bound_point_1, bound_point_2,
             x_airf, y_airf, z_airf,
             width, filaments
