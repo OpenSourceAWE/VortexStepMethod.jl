@@ -43,7 +43,7 @@ mutable struct Panel
     cl_interp::Union{Nothing, I1, I2}
     cd_interp::Union{Nothing, I1, I2}
     cm_interp::Union{Nothing, I1, I2}
-    aerodynamic_center::MVec3
+    aero_center::MVec3
     control_point::MVec3
     bound_point_1::MVec3
     bound_point_2::MVec3
