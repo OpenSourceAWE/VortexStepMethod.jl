@@ -200,7 +200,7 @@ function gamma_loop(
     induced_velocity_all = zeros(n_panels, 3)
     relative_velocity_array = similar(va_array)
     relative_velocity_crossz = similar(relative_velocity_array)
-    Uinfcrossz_array = similar(va_array)
+    v_acrossz_array = similar(va_array)
     cl_array = zeros(n_panels)
     damp = zeros(length(gamma))
     v_normal_array = zeros(n_panels)
@@ -228,7 +228,7 @@ function gamma_loop(
                 view(relative_velocity_array, i, :),
                 view(z_airf_array, i, :)
             )
-            Uinfcrossz_array[i, :] .= cross3(
+            v_acrossz_array[i, :] .= cross3(
                 view(va_array, i, :),
                 view(z_airf_array, i, :)
             )
@@ -242,7 +242,7 @@ function gamma_loop(
 
         for i in 1:n_panels
             @views v_a_array[i] = norm(relative_velocity_crossz[i, :])
-            @views Umagw_array[i] = norm(Uinfcrossz_array[i, :])
+            @views Umagw_array[i] = norm(v_acrossz_array[i, :])
         end
         
         for (i, (panel, alpha)) in enumerate(zip(panels, alpha_array))

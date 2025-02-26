@@ -15,7 +15,7 @@ include("utils.jl")
     v_a = 20.0
     AR = span^2 / (π * span * max_chord / 4)
     aoa = deg2rad(5)
-    Uinf = [cos(aoa), 0.0, sin(aoa)] .* v_a
+    v_a = [cos(aoa), 0.0, sin(aoa)] .* v_a
     model = :VSM
 
     # Setup wing geometry
@@ -35,7 +35,7 @@ include("utils.jl")
     end
     
     body_aero = BodyAerodynamics([wing])
-    set_va!(body_aero, Uinf)
+    set_va!(body_aero, v_a)
 
     # Run analysis
     solver_object = Solver(
@@ -48,7 +48,7 @@ include("utils.jl")
 
     # Calculate forces using uncorrected alpha
     alpha = results_NEW["alpha_uncorrected"]
-    dyn_visc = 0.5 * density * norm(Uinf)^2
+    dyn_visc = 0.5 * density * norm(v_a)^2
     n_panels = length(body_aero.panels)
     lift = zeros(n_panels)
     drag = zeros(n_panels)
@@ -78,7 +78,7 @@ include("utils.jl")
     Atot = calculate_projected_area(wing)
 
     F_rel_ref, F_gl_ref, Ltot_ref, Dtot_ref, CL_ref, CD_ref, CS_ref = 
-        output_results(Fmag, aero_coeffs, ringvec, Uinf, controlpoints, Atot)
+        output_results(Fmag, aero_coeffs, ringvec, v_a, controlpoints, Atot)
 
     # Compare results
     @info "Comparing results"
@@ -116,7 +116,7 @@ end
 
     v_a = 20.0
     aoa = 5.7106 * π / 180
-    Uinf = [cos(aoa), 0.0, sin(aoa)] .* v_a
+    v_a = [cos(aoa), 0.0, sin(aoa)] .* v_a
 
     # Create wing geometry
     core_radius_fraction = 1e-20
@@ -132,11 +132,11 @@ end
     end
     
     body_aero = BodyAerodynamics([wing])
-    set_va!(body_aero, Uinf)
+    set_va!(body_aero, v_a)
 
     # Calculate reference matrices using thesis functions
     controlpoints, rings, bladepanels, ringvec, coord_L = 
-        create_geometry_general(coord, Uinf, N, "5fil", :LLT)
+        create_geometry_general(coord, v_a, N, "5fil", :LLT)
     
     # Test LLT matrices
     @testset "LLT Matrices" begin
@@ -145,7 +145,7 @@ end
             deepcopy(ringvec),
             deepcopy(controlpoints),
             deepcopy(rings),
-            deepcopy(Uinf),
+            deepcopy(v_a),
             zeros(N-1),
             nothing,  # data_airf not needed
             nothing,  # conv_crit not needed
@@ -153,8 +153,8 @@ end
         )
 
         # Calculate new matrices
-        va_norm_array = fill(norm(Uinf), length(coord))
-        va_unit_array = repeat(reshape(Uinf ./ norm(Uinf), 1, 3), length(coord))
+        va_norm_array = fill(norm(v_a), length(coord))
+        va_unit_array = repeat(reshape(v_a ./ norm(v_a), 1, 3), length(coord))
         calculate_AIC_matrices!(
             body_aero,
             :LLT,
@@ -174,13 +174,13 @@ end
     @testset "VSM Matrices" begin
         # Calculate reference matrices for VSM
         controlpoints, rings, bladepanels, ringvec, coord_L = 
-            create_geometry_general(coord, Uinf, N, "5fil", :VSM)
+            create_geometry_general(coord, v_a, N, "5fil", :VSM)
         
         MatrixU, MatrixV, MatrixW = thesis_induction_matrix_creation(
             deepcopy(ringvec),
             deepcopy(controlpoints),
             deepcopy(rings),
-            deepcopy(Uinf),
+            deepcopy(v_a),
             zeros(N-1),
             nothing,
             nothing,
@@ -188,8 +188,8 @@ end
         )
 
         # Calculate new matrices
-        va_norm_array = fill(norm(Uinf), length(coord))
-        va_unit_array = repeat(reshape(Uinf ./ norm(Uinf), 1, 3), length(coord))
+        va_norm_array = fill(norm(v_a), length(coord))
+        va_unit_array = repeat(reshape(v_a ./ norm(v_a), 1, 3), length(coord))
         calculate_AIC_matrices!(
             body_aero,
             :VSM,
@@ -215,7 +215,7 @@ end
         @debug "AR: $AR"
         v_a = 20.0
         aoa = 5.7106 * π / 180
-        Uinf = [cos(aoa), 0.0, sin(aoa)] .* v_a
+        v_a = [cos(aoa), 0.0, sin(aoa)] .* v_a
     
         coord = if wing_type === :rectangular
             twist = range(-0.5, 0.5, length=N)
@@ -249,23 +249,23 @@ end
             )
         end
         body_aero = BodyAerodynamics([wing])
-        set_va!(body_aero, Uinf)
+        set_va!(body_aero, v_a)
         
-        return body_aero, coord, Uinf, model
+        return body_aero, coord, v_a, model
     end
 
     for model in [:VSM, :LLT]
         @debug "model: $model"
         for wing_type in [:rectangular, :curved, :elliptical]
             @debug "wing_type: $wing_type"
-            body_aero, coord, Uinf, model = create_geometry(
+            body_aero, coord, v_a, model = create_geometry(
                 model=model, wing_type=wing_type
             )
             
             # Generate geometry
             expected_controlpoints, expected_rings, expected_bladepanels, 
                 expected_ringvec, expected_coord_L = create_geometry_general(
-                coord, Uinf, div(size(coord,1), 2), "5fil", model
+                coord, v_a, div(size(coord,1), 2), "5fil", model
             )
 
             for i in 1:length(body_aero.panels)
