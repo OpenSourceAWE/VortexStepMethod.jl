@@ -20,11 +20,16 @@ plot_polars
 
 ## Helper Functions
 ```@docs
-set_plot_style
 save_plot
 show_plot
+```
+
+## Private Functions
+```@docs
+calculate_AIC_matrices!
 plot_line_segment!
-set_axes_equal!
 create_geometry_plot
 generate_polar_data
+set_axes_equal!
+set_plot_style
 ```
