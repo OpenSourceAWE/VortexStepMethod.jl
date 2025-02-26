@@ -47,7 +47,7 @@ struct Solver
         aerodynamic_model_type::Model    = VSM,
         density::Float64                 = 1.225,
         max_iterations::Int64            = 1500,
-        allowed_error::Float64           = 1e-5,
+        allowed_error::Float64           = 1e-5, # rel_err
         tol_reference_error::Float64     = 0.001,
         relaxation_factor::Float64       = 0.03,
         is_with_artificial_damping::Bool = false,

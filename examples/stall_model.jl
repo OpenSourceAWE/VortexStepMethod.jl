@@ -17,7 +17,7 @@ mkpath(save_folder)
 
 # Defining discretisation
 n_panels = 54
-spanwise_panel_distribution = :split_provided
+spanwise_panel_distribution = SPLIT_PROVIDED
 
 # Load rib data from CSV
 csv_file_path = joinpath(

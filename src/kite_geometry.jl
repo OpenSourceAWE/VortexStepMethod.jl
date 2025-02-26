@@ -176,7 +176,7 @@ Represents a curved wing that inherits from Wing with additional geometric prope
 # Fields
 - All fields from Wing:
   - `n_panels::Int`: Number of panels in aerodynamic mesh
-  - `spanwise_panel_distribution::Symbol`: Panel distribution type
+  - `spanwise_panel_distribution`::PanelDistribution
   - `spanwise_direction::MVec3`: Wing span direction vector
   - `sections::Vector{Section}`: List of wing sections
 - Additional fields:
@@ -189,7 +189,7 @@ Same as Wing
 """
 mutable struct KiteWing <: AbstractWing
     n_panels::Int64
-    spanwise_panel_distribution::Symbol
+    spanwise_panel_distribution::PanelDistribution
     spanwise_direction::MVec3
     sections::Vector{Section}
     
@@ -205,7 +205,7 @@ mutable struct KiteWing <: AbstractWing
     area_interp::Extrapolation
 
     function KiteWing(obj_path, dat_path; alpha=0.0, n_sections=20, crease_frac=0.75, wind_vel=10., mass=1.0, 
-        n_panels=54, spanwise_panel_distribution=:linear, spanwise_direction=[0.0, 1.0, 0.0])
+        n_panels=54, spanwise_panel_distribution=LINEAR, spanwise_direction=[0.0, 1.0, 0.0])
         
         !isapprox(spanwise_direction, [0.0, 1.0, 0.0]) && @error "Spanwise direction has to be [0.0, 1.0, 0.0]"
         

@@ -14,7 +14,7 @@ alpha_deg = 30.0       # Angle of attack [degrees]
 alpha = deg2rad(alpha_deg)
 
 # Step 2: Create wing geometry with linear panel distribution
-wing = Wing(n_panels, spanwise_panel_distribution=:linear)
+wing = Wing(n_panels, spanwise_panel_distribution=LINEAR)
 
 # Add wing sections - defining only tip sections with inviscid airfoil model
 add_section!(wing, 

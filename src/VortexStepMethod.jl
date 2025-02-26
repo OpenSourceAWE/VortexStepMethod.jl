@@ -25,6 +25,7 @@ export calculate_span, calculate_projected_area
 export plot_wing, plot_circulation_distribution, plot_geometry, plot_distribution, plot_polars
 export show_plot, save_plot, menu
 export Model, VSM, LLT
+export PanelDistribution, LINEAR, COSINE, COSINE_VAN_GARREL, SPLIT_PROVIDED, UNCHANGED
 
 """
    const MVec3    = MVector{3, Float64}
@@ -57,6 +58,26 @@ Enumeration of the implemented model types.
 - LLT: Lifting Line Theory
 """
 @enum Model VSM LLT
+
+"""
+   PanelDistribution `LINEAR` `COSINE` `COSINE_VAN_GARREL` `SPLIT_PROVIDED` `UNCHANGED`
+
+Enumeration of the implemented model types.
+
+# Elements
+- LINEAR               # Linear distribution
+- COSINE               # Cosine distribution
+- `COSINE_VAN_GARREL`  # van Garrel cosine distribution
+- `SPLIT_PROVIDED`     # Split provided sections
+- UNCHANGED            # Keep original sections
+"""
+@enum PanelDistribution begin
+   LINEAR             # Linear distribution
+   COSINE             # Cosine distribution
+   COSINE_VAN_GARREL  # van Garrel cosine distribution
+   SPLIT_PROVIDED     # Split provided sections
+   UNCHANGED          # Keep original sections
+end
 
 abstract type AbstractWing end
 

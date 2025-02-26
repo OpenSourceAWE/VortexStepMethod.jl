@@ -23,7 +23,7 @@ using LinearAlgebra
     alpha_deg = 30.0       # Angle of attack [degrees]
     alpha = deg2rad(alpha_deg)
     
-    wing = Wing(n_panels, spanwise_panel_distribution=:linear)
+    wing = Wing(n_panels, spanwise_panel_distribution=LINEAR)
     add_section!(wing, 
         [0.0, span/2, 0.0],   # Left tip LE 
         [chord, span/2, 0.0],  # Left tip TE

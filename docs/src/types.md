@@ -4,6 +4,7 @@ CurrentModule = VortexStepMethod
 ## Enumerations
 ```@docs
 Model
+PanelDistribution
 ```
 
 ## Basic Vectors
