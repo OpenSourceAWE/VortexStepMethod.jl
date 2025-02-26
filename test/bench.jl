@@ -36,7 +36,7 @@ using LinearAlgebra
     body_aero = BodyAerodynamics([wing])
 
     vel_app = [cos(alpha), 0.0, sin(alpha)] .* v_a
-    set_va!(body_aero, (vel_app, 0.0))  # Second parameter is yaw rate
+    set_va!(body_aero, vel_app)
 
     # Initialize solvers for both LLT and VSM methods
     solver = Solver()
@@ -52,7 +52,7 @@ using LinearAlgebra
     va_norm_array = ones(n_panels)
     va_unit_array = ones(n_panels, 3)
     
-    models = [:VSM, :LLT]
+    models = [VSM, LLT]
     core_radius_fractions = [0.001, 10.0]
 
     @testset "AIC Matrix Calculation" begin
@@ -86,25 +86,45 @@ using LinearAlgebra
             y_airf_array[i, :] .= panel.y_airf
             z_airf_array[i, :] .= panel.z_airf
         end
+
+        n_angles = 5
+        alphas = range(-deg2rad(10), deg2rad(10), n_angles)
+        cls = [2π * α for α in alphas]
+        cds = [0.01 + 0.05 * α^2 for α in alphas]
+        cms = [-0.1 * α for α in alphas]
+
         for model in models
-            solver = Solver(
-                aerodynamic_model_type=model
-            )
-            result = @benchmark gamma_loop(
-                $solver,
-                $body_aero,
-                $gamma_new,
-                $va_array,
-                $chord_array,
-                $x_airf_array,
-                $y_airf_array,
-                $z_airf_array,
-                $body_aero.panels,
-                0.5;
-                log = false
-            ) samples = 1 evals = 1
-            @test result.allocs ≤ 100
-            @info "Model: $model \t Allocations: $(result.allocs) Memory: $(result.memory)"
+            for aero_model in [:inviscid, (:polar_data, (alphas, cls, cds, cms))]
+                wing = Wing(n_panels, spanwise_panel_distribution=:linear)
+                add_section!(wing, 
+                    [0.0, span/2, 0.0],   # Left tip LE 
+                    [chord, span/2, 0.0],  # Left tip TE
+                    aero_model)
+                add_section!(wing, 
+                    [0.0, -span/2, 0.0],  # Right tip LE
+                    [chord, -span/2, 0.0], # Right tip TE
+                    aero_model)
+                body_aero = BodyAerodynamics([wing])
+
+                solver = Solver(
+                    aerodynamic_model_type=model
+                )
+                result = @benchmark gamma_loop(
+                    $solver,
+                    $body_aero,
+                    $gamma_new,
+                    $va_array,
+                    $chord_array,
+                    $x_airf_array,
+                    $y_airf_array,
+                    $z_airf_array,
+                    $body_aero.panels,
+                    0.5;
+                    log = false
+                ) samples = 1 evals = 1
+                @test result.allocs ≤ 100
+                @info "Model: $model \t Aero_model: $aero_model \t Allocations: $(result.allocs) Memory: $(result.memory)"
+            end
         end
     end
     
@@ -121,22 +141,24 @@ using LinearAlgebra
         va_unit_array = zeros(n_panels, 3)
         reference_point = zeros(3)
         
-        # Fill arrays with data
-        for (i, panel) in enumerate(body_aero.panels)
-            chord_array[i] = panel.chord
-            x_airf_array[i, :] .= panel.x_airf
-            y_airf_array[i, :] .= panel.y_airf
-            z_airf_array[i, :] .= panel.z_airf
-            va_array[i, :] .= panel.va
-        end
-        
+
+        # # Fill arrays with data
+        # for (i, panel) in enumerate(body_aero.panels)
+        #     chord_array[i] = panel.chord
+        #     x_airf_array[i, :] .= panel.x_airf
+        #     y_airf_array[i, :] .= panel.y_airf
+        #     z_airf_array[i, :] .= panel.z_airf
+        #     va_array[i, :] .= panel.va
+        # end
+        set_va!(body_aero, vel_app)
         results = @MVector zeros(3)
+        
         result = @benchmark calculate_results(
             $body_aero,
             $gamma,
             $reference_point,
             $density,
-            :VSM,
+            VSM,
             1e-20,
             0.0,
             $alpha_array,

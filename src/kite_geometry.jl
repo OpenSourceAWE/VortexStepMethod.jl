@@ -241,7 +241,7 @@ mutable struct KiteWing <: AbstractWing
         end
 
         @info "Loding polars and kite info from $polar_path and $info_path"
-        (cl_interp, cd_interp, cm_interp) = deserialize(polar_path)
+        (alpha_range, beta_range, cl_matrix::Matrix, cd_matrix::Matrix, cm_matrix::Matrix) = deserialize(polar_path)
     
         (center_of_mass, inertia_tensor, circle_center_z, radius, gamma_tip, 
             le_interp, te_interp, area_interp) = deserialize(info_path)
@@ -249,7 +249,7 @@ mutable struct KiteWing <: AbstractWing
         # Create sections
         sections = Section[]
         for gamma in range(-gamma_tip, gamma_tip, n_sections)
-            aero_input = (:interpolations, (cl_interp, cd_interp, cm_interp))
+            aero_input = (:polar_data, (alpha_range, beta_range, cl_matrix, cd_matrix, cm_matrix))
             LE_point = [0.0, 0.0, circle_center_z] .+ [le_interp(gamma), sin(gamma) * radius, cos(gamma) * radius]
             if !isapprox(alpha, 0.0)
                 local_y_vec = [0.0, sin(-gamma), cos(gamma)] × [1.0, 0.0, 0.0]

@@ -44,11 +44,11 @@ body_aero_CAD_19ribs = BodyAerodynamics([CAD_wing])
 
 # Create solvers
 VSM = Solver(
-    aerodynamic_model_type=:VSM,
+    aerodynamic_model_type=VSM,
     is_with_artificial_damping=false
 )
 VSM_with_stall_correction = Solver(
-    aerodynamic_model_type=:VSM,
+    aerodynamic_model_type=VSM,
     is_with_artificial_damping=true
 )
 
@@ -63,7 +63,7 @@ vel_app = [
     sin(side_slip),
     sin(aoa_rad)
 ] * v_a
-body_aero_CAD_19ribs.va = vel_app
+set_va!(body_aero_CAD_19ribs, vel_app)
 
 # Plotting geometry
 plot && plot_geometry(

@@ -29,7 +29,7 @@ function create_wa()
     wa = BodyAerodynamics([wing])
     # Set inflow conditions
     vel_app = [cos(alpha), 0.0, sin(alpha)] .* v_a
-    set_va!(wa, (vel_app, 0.0))  # Second parameter is yaw rate
+    set_va!(wa, vel_app)
     wa
 end
 
@@ -63,8 +63,8 @@ plt.ioff()
         rm("/tmp/Rectangular_wing_geometry_top_view.pdf")
 
         # Step 5: Initialize the solvers
-        vsm_solver = Solver(aerodynamic_model_type=:VSM)
-        llt_solver = Solver(aerodynamic_model_type=:LLT)
+        vsm_solver = Solver(aerodynamic_model_type=VSM)
+        llt_solver = Solver(aerodynamic_model_type=LLT)
 
         # Step 6: Solve the VSM and LLT
         results_vsm = solve(vsm_solver, wa)

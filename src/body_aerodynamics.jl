@@ -6,8 +6,8 @@ Main structure for calculating aerodynamic properties of bodies.
 # Fields
 - panels::Vector{Panel}: Vector of Panel structs
 - wings::Vector{AbstractWing}: a vector of wings; a body can have multiple wings
-- `_va`::Union{Nothing, Vector{Float64}, Tuple{MVec3, Float64}}: A vector of the apparent wind speed,  
-                                                      or a tuple of the v_a vector and yaw rate (rad/s).
+- `va`::Union{Nothing, MVec3}: A vector of the apparent wind speed
+- `omega`::Union{Nothing, MVec3}: A vector of the turn rate around the kite body axes
 - `gamma_distribution`::Union{Nothing, Vector{Float64}}: unclear, please defined
 - `alpha_uncorrected`::Union{Nothing, Vector{Float64}}: unclear, please define
 - `alpha_corrected`::Union{Nothing, Vector{Float64}}: unclear, please define
@@ -16,7 +16,8 @@ Main structure for calculating aerodynamic properties of bodies.
 mutable struct BodyAerodynamics
     panels::Vector{Panel}
     wings::Vector{AbstractWing} # can be a vector of Wings, or of KiteWings
-    _va::Union{Nothing, Vector{Float64}, Tuple{MVec3, Float64}}
+    _va::Union{Nothing, Vector{Float64}}
+    omega::Union{Nothing, MVec3}
     gamma_distribution::Union{Nothing, Vector{Float64}}
     alpha_uncorrected::Union{Nothing, Vector{Float64}}
     alpha_corrected::Union{Nothing, Vector{Float64}}
@@ -75,6 +76,7 @@ mutable struct BodyAerodynamics
             panels,
             wings,
             nothing,  # va
+            nothing,  # omega
             nothing,  # gamma_distribution
             nothing,  # alpha_uncorrected
             nothing,  # alpha_corrected
@@ -95,7 +97,7 @@ function Base.getproperty(obj::BodyAerodynamics, sym::Symbol)
 end
 
 function Base.setproperty!(obj::BodyAerodynamics, sym::Symbol, val)
-    if sym === :va
+    if sym === :va || sym === :omega
         set_va!(obj, val)
     else
         setfield!(obj, sym, val)
@@ -225,24 +227,25 @@ function calculate_panel_properties(section_list::Vector{Section}, n_panels::Int
 end
 
 """
-    calculate_AIC_matrices!(body_aero::BodyAerodynamics, model::Symbol, 
+    calculate_AIC_matrices!(body_aero::BodyAerodynamics, model::Model, 
                          core_radius_fraction::Float64,
                          va_norm_array::Vector{Float64}, 
                          va_unit_array::Matrix{Float64})
 
 Calculate Aerodynamic Influence Coefficient matrices.
 
+See also: [BodyAerodynamics](@ref), [Model](@ref)
+
 Returns:
-    Tuple of (AIC_x, AIC_y, AIC_z) matrices
+    Tuple of (`AIC_x`, `AIC_y`, `AIC_z`) matrices
 """
-function calculate_AIC_matrices!(body_aero::BodyAerodynamics, model::Symbol,
+function calculate_AIC_matrices!(body_aero::BodyAerodynamics, model::Model,
                               core_radius_fraction::Float64,
                               va_norm_array::Vector{Float64}, 
                               va_unit_array::Matrix{Float64})
-    model in [:VSM, :LLT] || throw(ArgumentError("Model must be VSM or LLT"))
     # Determine evaluation point based on model
-    evaluation_point = model === :VSM ? :control_point : :aero_center
-    evaluation_point_on_bound = model === :LLT
+    evaluation_point = model === VSM ? :control_point : :aero_center
+    evaluation_point_on_bound = model === LLT
     
     # Initialize AIC matrices
     velocity_induced, tempvel, va_unit, U_2D = zeros(MVec3), zeros(MVec3), zeros(MVec3), zeros(MVec3)
@@ -269,7 +272,7 @@ function calculate_AIC_matrices!(body_aero::BodyAerodynamics, model::Symbol,
             body_aero.AIC[:, icp, jring] .= velocity_induced
             
             # Subtract 2D induced velocity for VSM
-            if icp == jring && model === :VSM
+            if icp == jring && model === VSM
                 calculate_velocity_induced_bound_2D!(U_2D, body_aero.panels[jring], ep, body_aero.work_vectors)
                 body_aero.AIC[:, icp, jring] .-= U_2D
             end
@@ -374,7 +377,7 @@ function update_effective_angle_of_attack_if_VSM(body_aero::BodyAerodynamics,
 
     # Calculate AIC matrices at aerodynamic center using LLT method
     calculate_AIC_matrices!(
-        body_aero, :LLT, core_radius_fraction, va_norm_array, va_unit_array
+        body_aero, LLT, core_radius_fraction, va_norm_array, va_unit_array
     )
     AIC_x, AIC_y, AIC_z = @views body_aero.AIC[1, :, :], body_aero.AIC[2, :, :], body_aero.AIC[3, :, :]
 
@@ -397,7 +400,7 @@ end
 
 """
     calculate_results(body_aero::BodyAerodynamics, gamma_new::Vector{Float64}, 
-                     density::Float64, aerodynamic_model_type::Symbol,
+                     density::Float64, aerodynamic_model_type::Model,
                      core_radius_fraction::Float64, mu::Float64,
                      alpha_array::Vector{Float64}, v_a_array::Vector{Float64},
                      chord_array::Vector{Float64}, x_airf_array::Matrix{Float64},
@@ -416,7 +419,7 @@ function calculate_results(
     gamma_new::Vector{Float64},
     reference_point::AbstractVector,
     density::Float64,
-    aerodynamic_model_type::Symbol,
+    aerodynamic_model_type::Model,
     core_radius_fraction::Float64,
     mu::Float64,
     alpha_array::Vector{Float64},
@@ -452,7 +455,7 @@ function calculate_results(
     moment = reshape((cm_array .* 0.5 .* density .* v_a_array.^2 .* chord_array), :, 1)
 
     # Calculate alpha corrections based on model type
-    alpha_corrected = if aerodynamic_model_type === :VSM
+    alpha_corrected = if aerodynamic_model_type === VSM
         update_effective_angle_of_attack_if_VSM(
             body_aero,
             gamma_new,
@@ -463,7 +466,7 @@ function calculate_results(
             va_norm_array,
             va_unit_array
         )
-    elseif aerodynamic_model_type === :LLT
+    elseif aerodynamic_model_type === LLT
         alpha_array
     else
         throw(ArgumentError("Unknown aerodynamic model type, should be LLT or VSM"))
@@ -639,49 +642,43 @@ end
 
 
 """
-    set_va!(body_aero::BodyAerodynamics, va::Union{Vector{Float64}, Tuple{Vector{Float64}, Float64}})
+    set_va!(body_aero::BodyAerodynamics, va, omega=zeros(3))
 
 Set velocity array and update wake filaments.
 
 # Arguments
-- `va`: Either a velocity vector or tuple of (velocity vector, yaw_rate)
+- `va`: Either a velocity vector or a list of velocity vectors
+- `omega`: Turn rate around x y and z axis
 """
-function set_va!(body_aero::BodyAerodynamics, va)
-    # Add length check for va_vec
+function set_va!(body_aero::BodyAerodynamics, va, omega=zeros(MVec3))
+    omega = MVec3(omega)
+
+    # Add length check for va
     if va isa Vector{Float64} && length(va) != 3 && length(va) != length(body_aero.panels)
         throw(ArgumentError("va must be length 3 or match number of panels"))
     end
-    # Handle input types
-    va_vec, yaw_rate = if va isa Tuple && length(va) == 2
-        va
-    else
-        (va, 0.0)
-    end
-    
-    # Validate input
-    va_vec = convert(Vector{Float64}, va_vec)
     
     # Calculate va_distribution based on input type
-    va_distribution = if length(va_vec) == 3 && yaw_rate == 0.0
-        repeat(reshape(va_vec, 1, 3), length(body_aero.panels))
-    elseif length(va_vec) == length(body_aero.panels)
-        va_vec
-    elseif yaw_rate != 0.0 && length(va_vec) == 3
-        va_dist = Vector{Float64}[]
+    va_distribution = if length(va) == 3 && all(omega .== 0.0)
+        repeat(reshape(va, 1, 3), length(body_aero.panels))
+    elseif length(va) == length(body_aero.panels)
+        va
+    elseif !all(omega .== 0.0) && length(va) == 3
+        va_dist = zeros(length(body_aero.panels), 3)
         
         for wing in body_aero.wings
             # Get spanwise positions
-            spanwise_positions = [panel.control_point[2] for panel in body_aero.panels]
+            spanwise_positions = [panel.control_point for panel in body_aero.panels]
             
             # Calculate velocities for each panel
             for i in 1:wing.n_panels
-                yaw_rate_apparent_velocity = [-yaw_rate * spanwise_positions[i], 0.0, 0.0]
-                push!(va_dist, yaw_rate_apparent_velocity + va_vec)
+                omega_va = -omega × spanwise_positions[i]
+                va_dist[i, :] .= omega_va .+ va
             end
         end
-        reduce(vcat, va_dist)
+        va_dist
     else
-        throw(ArgumentError("Invalid va distribution: length(va)=$(length(va_vec)) ≠ n_panels=$(length(body_aero.panels))"))
+        throw(ArgumentError("Invalid va distribution: length(va)=$(length(va)) ≠ n_panels=$(length(body_aero.panels))"))
     end
     
     # Update panel velocities
@@ -691,5 +688,6 @@ function set_va!(body_aero::BodyAerodynamics, va)
     
     # Update wake elements
     body_aero.panels = frozen_wake(va_distribution, body_aero.panels)
-    body_aero._va = va_vec
+    body_aero._va = va
+    return nothing
 end

@@ -26,7 +26,7 @@ Main solver structure for the Vortex Step Method.
 """
 struct Solver
     # General settings
-    aerodynamic_model_type::Symbol
+    aerodynamic_model_type::Model
     density::Float64
     max_iterations::Int64
     allowed_error::Float64
@@ -44,7 +44,7 @@ struct Solver
     is_only_f_and_gamma_output::Bool
 
     function Solver(;
-        aerodynamic_model_type::Symbol   = :VSM,
+        aerodynamic_model_type::Model    = VSM,
         density::Float64                 = 1.225,
         max_iterations::Int64            = 1500,
         allowed_error::Float64           = 1e-5, # rel_err
@@ -147,7 +147,7 @@ function solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=n
     )
     # Try again with reduced relaxation factor if not converged
     if !converged && relaxation_factor > 1e-3
-        @warn "Running again with half the relaxation_factor = $(relaxation_factor/2)"
+        log && @warn "Running again with half the relaxation_factor = $(relaxation_factor/2)"
         converged, gamma_new, alpha_array, v_a_array = gamma_loop(
             solver,
             body_aero,
@@ -158,7 +158,8 @@ function solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=n
             y_airf_array,
             z_airf_array,
             panels,
-            relaxation_factor/2
+            relaxation_factor/2;
+            log
         )
     end
 
@@ -221,7 +222,7 @@ function gamma_loop(
     induced_velocity_all = zeros(n_panels, 3)
     relative_velocity_array = similar(va_array)
     relative_velocity_crossz = similar(relative_velocity_array)
-    Uinfcrossz_array = similar(va_array)
+    v_acrossz_array = similar(va_array)
     cl_array = zeros(n_panels)
     damp = zeros(length(gamma))
     v_normal_array = zeros(n_panels)
@@ -249,7 +250,7 @@ function gamma_loop(
                 view(relative_velocity_array, i, :),
                 view(z_airf_array, i, :)
             )
-            Uinfcrossz_array[i, :] .= cross3(
+            v_acrossz_array[i, :] .= cross3(
                 view(va_array, i, :),
                 view(z_airf_array, i, :)
             )
@@ -263,7 +264,7 @@ function gamma_loop(
 
         for i in 1:n_panels
             @views v_a_array[i] = norm(relative_velocity_crossz[i, :])
-            @views Umagw_array[i] = norm(Uinfcrossz_array[i, :])
+            @views Umagw_array[i] = norm(v_acrossz_array[i, :])
         end
         
         for (i, (panel, alpha)) in enumerate(zip(panels, alpha_array))
