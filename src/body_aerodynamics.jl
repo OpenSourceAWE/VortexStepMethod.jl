@@ -225,15 +225,17 @@ function calculate_panel_properties(section_list::Vector{Section}, n_panels::Int
 end
 
 """
-    calculate_AIC_matrices!(body_aero::BodyAerodynamics, model::[Model](@ref), 
+    calculate_AIC_matrices!(body_aero::BodyAerodynamics, model::Model, 
                          core_radius_fraction::Float64,
                          va_norm_array::Vector{Float64}, 
                          va_unit_array::Matrix{Float64})
 
 Calculate Aerodynamic Influence Coefficient matrices.
 
+See also: [BodyAerodynamics](@ref), [Model](@ref)
+
 Returns:
-    Tuple of (AIC_x, AIC_y, AIC_z) matrices
+    Tuple of (`AIC_x`, `AIC_y`, `AIC_z`) matrices
 """
 function calculate_AIC_matrices!(body_aero::BodyAerodynamics, model::Model,
                               core_radius_fraction::Float64,
