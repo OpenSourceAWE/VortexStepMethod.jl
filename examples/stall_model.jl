@@ -63,7 +63,7 @@ vel_app = [
     sin(side_slip),
     sin(aoa_rad)
 ] * v_a
-body_aero_CAD_19ribs.va = vel_app
+set_va!(body_aero_CAD_19ribs, vel_app)
 
 # Plotting geometry
 plot && plot_geometry(

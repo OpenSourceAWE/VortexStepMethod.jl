@@ -31,7 +31,7 @@ wa = BodyAerodynamics([wing])
 
 # Set inflow conditions
 vel_app = [cos(alpha), 0.0, sin(alpha)] .* v_a
-set_va!(wa, (vel_app, 0.0))  # Second parameter is yaw rate
+set_va!(wa, vel_app, [0, 0, 0.1])
 
 # Step 4: Initialize solvers for both LLT and VSM methods
 llt_solver = Solver(aerodynamic_model_type=LLT)
