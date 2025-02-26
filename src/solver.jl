@@ -7,10 +7,10 @@ Main solver structure for the Vortex Step Method.
 # Attributes
 
 ## General settings
-- `aerodynamic_model_type`::Symbol
-- density::Float64
+- `aerodynamic_model_type`::Model: The model type, see: [Model](@ref)
+- density::Float64: Air density [kg/m³]
 - `max_iterations`::Int64
-- `allowed_error`::Float64
+- `allowed_error`::Float64: relative error
 - `tol_reference_error`::Float64
 - `relaxation_factor`::Float64
 

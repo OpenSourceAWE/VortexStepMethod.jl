@@ -26,7 +26,7 @@ Represents a panel in a vortex step method simulation. All points and vectors ar
 - `y_airf::MVec3`: Unit vector parallel to chord line
 - `z_airf::MVec3`: Unit vector in spanwise direction
 - `width::Float64`: Panel width
-- `filaments::Vector{BoundFilament}`: Panel filaments
+- `filaments::Vector{BoundFilament}`: Panel filaments, see: [BoundFilament](@ref)
 """
 mutable struct Panel
     TE_point_1::MVec3
