@@ -47,6 +47,14 @@ const VelVector=Union{MVec3, Vector, SizedVector{3, Float64, Vector{Float64}}}
 
 @enum Model VSM LLT
 
+@enum PanelDistribution begin
+   LINEAR             # Linear distribution
+   COSINE             # Cosine distribution
+   COSINE_VAN_GARREL  # van Garrel cosine distribution
+   SPLIT_PROVIDED     # Split provided sections
+   UNCHANGED          # Keep original sections
+end
+
 abstract type AbstractWing end
 
 function menu()
