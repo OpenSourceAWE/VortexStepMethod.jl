@@ -115,16 +115,22 @@ end
     # Generate mock polar data
     alphas = deg2rad.(-10:1:25)
     n_points = length(alphas)
-    polar_data = zeros(n_points, 4)
-    big_polar_data = zeros(n_points, 4)
+    polar_data = [zeros(n_points) for _ in 1:4]
+    big_polar_data = [zeros(n_points) for _ in 1:4]
     
     # Fill polar data with realistic values
     for (i, alpha) in enumerate(alphas)
         cd = 0.015 + 0.015 * abs(alpha/10)^1.5  # Drag increases with angle
         cl = 0.1 * alpha + 0.01 * alpha^2 * exp(-alpha/20)  # Lift with stall behavior
         cm = -0.02 * alpha  # Linear pitching moment
-        polar_data[i,:] = [alpha, cl, cd, cm]
-        big_polar_data[i,:] = [alpha, 1.1cl, 1.1cd, 1.1cm]
+        polar_data[1][i] = alpha
+        polar_data[2][i] = cl
+        polar_data[3][i] = cd
+        polar_data[4][i] = cm
+        big_polar_data[1][i] = alpha
+        big_polar_data[2][i] = 1.1cl
+        big_polar_data[3][i] = 1.1cd
+        big_polar_data[4][i] = 1.1cm
     end
     
     # Create two sections with slightly different polar data
@@ -142,9 +148,9 @@ end
             cd, cm = calculate_cd_cm(panel, alpha)
             
             # Calculate expected values through interpolation
-            expected_cl = linear_interpolation(polar_data[:,1], polar_data[:,2], extrapolation_bc=Line())(alpha)
-            expected_cd = linear_interpolation(polar_data[:,1], polar_data[:,3], extrapolation_bc=Line())(alpha)
-            expected_cm = linear_interpolation(polar_data[:,1], polar_data[:,4], extrapolation_bc=Line())(alpha)
+            expected_cl = linear_interpolation(polar_data[1], polar_data[2], extrapolation_bc=Line())(alpha)
+            expected_cd = linear_interpolation(polar_data[1], polar_data[3], extrapolation_bc=Line())(alpha)
+            expected_cm = linear_interpolation(polar_data[1], polar_data[4], extrapolation_bc=Line())(alpha)
             
             # Average with slightly different data (1.1 factor)
             expected_cl = (expected_cl + 1.1 * expected_cl) / 2

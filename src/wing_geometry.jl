@@ -68,7 +68,8 @@ Add a new section to the wing.
 - aero_input: Can be:
   - :inviscid
   - :`lei_airfoil_breukels`
-  - (:interpolations, (`cl_interp`, `cd_interp`, `cm_interp`))
+  - (:polar_data, (`alpha_range`, `cl_vector`, `cd_vector`, `cm_vector`))
+  - (:polar_data, (`alpha_range`, `beta_range`, `cl_matrix`, `cd_matrix`, `cm_matrix`))
 """
 function add_section!(wing::Wing, LE_point::Vector{Float64}, 
                      TE_point::Vector{Float64}, aero_input)
@@ -158,34 +159,6 @@ function refine_aerodynamic_mesh(wing::AbstractWing)
 end
 
 """
-    interpolate_to_common_alpha(alpha_common::Vector{Float64}, 
-                              alpha_orig::Vector{Float64},
-                              CL_orig::Vector{Float64},
-                              CD_orig::Vector{Float64},
-                              CM_orig::Vector{Float64})
-
-Interpolate aerodynamic coefficients to a common alpha range.
-"""
-function interpolate_to_common_alpha(alpha_common, 
-                                   alpha_orig,
-                                   CL_orig,
-                                   CD_orig,
-                                   CM_orig)
-
-    # Create interpolation objects
-    itp_CL = linear_interpolation(alpha_orig, CL_orig)
-    itp_CD = linear_interpolation(alpha_orig, CD_orig)
-    itp_CM = linear_interpolation(alpha_orig, CM_orig)
-    
-    # Evaluate at common alpha points
-    CL_common = itp_CL.(alpha_common)
-    CD_common = itp_CD.(alpha_common)
-    CM_common = itp_CM.(alpha_common)
-
-    return CL_common, CD_common, CM_common
-end
-
-"""
     calculate_new_aero_input(aero_input, 
                             section_index::Int,
                             left_weight::Float64,
@@ -212,46 +185,38 @@ function calculate_new_aero_input(aero_input,
         polar_right = aero_input[section_index + 1][2]
         
         # Unpack polar data
-        @views begin
-            alpha_left, CL_left, CD_left, CM_left = (
-                polar_left[:, i] for i in 1:4
-            )
-            alpha_right, CL_right, CD_right, CM_right = (
-                polar_right[:, i] for i in 1:4
-            )
+        if length(polar_left) == 4
+            alpha_left, CL_left, CD_left, CM_left = polar_left
+            alpha_right, CL_right, CD_right, CM_right = polar_right
+
+            # Create common alpha array
+            !all(isapprox.(alpha_left, alpha_right)) && @error "Make sure you use the same alpha range for all your interpolations."
+            !isa(CL_right, AbstractVector) && @error "Provide polar data in the correct format: (alpha, cl, cd, cm)"
+            
+            # Weighted interpolation
+            CL_data = CL_left .* left_weight .+ CL_right .* right_weight
+            CD_data = CD_left .* left_weight .+ CD_right .* right_weight
+            CM_data = CM_left .* left_weight .+ CM_right .* right_weight
+            
+            return (:polar_data, (alpha_left, CL_data, CD_data, CM_data))
+            
+        elseif length(polar_left) == 5
+            alpha_left, beta_left, CL_left, CD_left, CM_left = polar_left
+            alpha_right, beta_right, CL_right, CD_right, CM_right = polar_right
+            
+            # Create common alpha array
+            !all(isapprox.(alpha_left, alpha_right)) && @error "Make sure you use the same alpha range for all your interpolations."
+            !all(isapprox.(beta_left, beta_right)) && @error "Make sure you use the same alpha range for all your interpolations."
+            !isa(CL_right, AbstractMatrix) && @error "Provide polar data in the correct format: (alpha, beta, cl, cd, cm)"
+
+            # Weighted interpolation
+            CL_data = CL_left .* left_weight .+ CL_right .* right_weight
+            CD_data = CD_left .* left_weight .+ CD_right .* right_weight
+            CM_data = CM_left .* left_weight .+ CM_right .* right_weight
+            
+            return (:polar_data, (alpha_left, beta_left, CL_data, CD_data, CM_data))
         end
-        
-        # Create common alpha array
-        alpha_common = sort(unique(vcat(alpha_left, alpha_right)))
-        
-        # Interpolate both polars
-        CL_left_common, CD_left_common, CM_left_common = interpolate_to_common_alpha(
-            alpha_common, alpha_left, CL_left, CD_left, CM_left
-        )
-        CL_right_common, CD_right_common, CM_right_common = interpolate_to_common_alpha(
-            alpha_common, alpha_right, CL_right, CD_right, CM_right
-        )
-        
-        # Weighted interpolation
-        CL_interp = CL_left_common .* left_weight .+ CL_right_common .* right_weight
-        CD_interp = CD_left_common .* left_weight .+ CD_right_common .* right_weight
-        CM_interp = CM_left_common .* left_weight .+ CM_right_common .* right_weight
-        
-        return (:polar_data, hcat(alpha_common, CD_interp, CL_interp, CM_interp))
 
-    elseif model_type === :interpolations
-        cl_left, cd_left, cm_left = aero_input[section_index][2]
-        cl_right, cd_right, cm_right = aero_input[section_index + 1][2]
-
-        cl_interp = cl_left === cl_right ? (α, β) -> cl_left[α, β] :
-            (α, β) -> left_weight * cl_left[α, β] + right_weight * cl_right[α, β]
-        cd_interp = cd_left === cd_right ? (α, β) -> cd_left[α, β] :
-            (α, β) -> left_weight * cd_left[α, β] + right_weight * cd_right[α, β]
-        cm_interp = cm_left === cm_right ? (α, β) -> cm_left[α, β] :
-            (α, β) -> left_weight * cm_left[α, β] + right_weight * cm_right[α, β]
-
-        return (:interpolations, (cl_interp, cd_interp, cm_interp))
-        
     elseif model_type === :lei_airfoil_breukels
         tube_diameter_left = aero_input[section_index][2][1]
         tube_diameter_right = aero_input[section_index + 1][2][1]

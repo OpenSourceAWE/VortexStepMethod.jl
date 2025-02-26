@@ -20,10 +20,6 @@ VSM = Solver(
     aerodynamic_model_type=:VSM,
     is_with_artificial_damping=false
 )
-VSM_with_stall_correction = Solver(
-    aerodynamic_model_type=:VSM,
-    is_with_artificial_damping=true
-)
 
 # Setting velocity conditions
 v_a = 15.0
