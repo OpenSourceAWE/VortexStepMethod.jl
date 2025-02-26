@@ -3,6 +3,26 @@
     Solver
 
 Main solver structure for the Vortex Step Method.
+
+# Attributes
+
+## General settings
+- `aerodynamic_model_type`::Symbol
+- density::Float64
+- `max_iterations`::Int64
+- `allowed_error`::Float64
+- `tol_reference_error`::Float64
+- `relaxation_factor`::Float64
+
+## Damping settings
+- `is_with_artificial_damping`::Bool
+- `artificial_damping`::NamedTuple{(:k2, :k4), Tuple{Float64, Float64}}
+
+## Additional settings
+- `type_initial_gamma_distribution`::Symbol
+- `core_radius_fraction`::Float64
+- mu::Float64
+- `is_only_f_and_gamma_output`::Bool
 """
 struct Solver
     # General settings
