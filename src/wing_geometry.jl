@@ -24,14 +24,13 @@ struct Section{T}
 end
 
 """
-    update_section!(wing::Wing, LE_point::PosVector, TE_point::PosVector)
+    update_pos!(wing::Wing, LE_point::PosVector, TE_point::PosVector)
 
 Update the section leading edge and trailing edge positions.
 """
-function update_section!(section::Section, LE_point::AbstractVector, TE_point::AbstractVector)
-    size(LE_point) != (3,) && throw(ArgumentError("LE_point has wrong size"))
-    size(TE_point) != (3,) && throw(ArgumentError("TE_point has wrong size"))
+function update_pos!(section::Section, LE_point::AbstractVector, TE_point::AbstractVector)
     section.LE_point .= LE_point
+    section.TE_point .= TE_point
     return nothing
 end
 
