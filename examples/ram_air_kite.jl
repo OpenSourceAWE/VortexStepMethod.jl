@@ -9,7 +9,7 @@ end
 using CSV
 using DataFrames
 
-plot = false
+plot = true
 
 # Create wing geometry
 wing = KiteWing("data/ram_air_kite_body.obj", "data/ram_air_kite_foil.dat")
@@ -19,10 +19,6 @@ body_aero = BodyAerodynamics([wing])
 VSM = Solver(
     aerodynamic_model_type=:VSM,
     is_with_artificial_damping=false
-)
-VSM_with_stall_correction = Solver(
-    aerodynamic_model_type=:VSM,
-    is_with_artificial_damping=true
 )
 
 # Setting velocity conditions

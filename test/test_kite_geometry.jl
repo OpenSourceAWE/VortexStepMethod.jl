@@ -100,14 +100,9 @@ using Serialization
             end
         end
         
-        # Create interpolations
-        cl_interp = extrapolate(scale(interpolate(cl_matrix, BSpline(Linear())), alphas, d_trailing_edge_angles), NaN)
-        cd_interp = extrapolate(scale(interpolate(cd_matrix, BSpline(Linear())), alphas, d_trailing_edge_angles), NaN)
-        cm_interp = extrapolate(scale(interpolate(cm_matrix, BSpline(Linear())), alphas, d_trailing_edge_angles), NaN)
-        
         # Serialize polar data
         polar_path = test_dat_path[1:end-4] * "_polar.bin"
-        serialize(polar_path, (cl_interp, cd_interp, cm_interp))
+        serialize(polar_path, (alphas, d_trailing_edge_angles, cl_matrix, cd_matrix, cm_matrix))
         
         # Create and serialize obj file
         faces = [[i, i+1, i+2] for i in 1:2:length(vertices)-2]

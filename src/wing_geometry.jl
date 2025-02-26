@@ -68,7 +68,8 @@ Add a new section to the wing.
 - aero_input: Can be:
   - :inviscid
   - :`lei_airfoil_breukels`
-  - (:interpolations, (`cl_interp`, `cd_interp`, `cm_interp`))
+  - (:polar_data, (`alpha_range`, `cl_vector`, `cd_vector`, `cm_vector`))
+  - (:polar_data, (`alpha_range`, `beta_range`, `cl_matrix`, `cd_matrix`, `cm_matrix`))
 """
 function add_section!(wing::Wing, LE_point::Vector{Float64}, 
                      TE_point::Vector{Float64}, aero_input)
@@ -190,13 +191,14 @@ function calculate_new_aero_input(aero_input,
 
             # Create common alpha array
             !all(isapprox.(alpha_left, alpha_right)) && @error "Make sure you use the same alpha range for all your interpolations."
+            !isa(CL_right, AbstractVector) && @error "Provide polar data in the correct format: (alpha, cl, cd, cm)"
             
             # Weighted interpolation
             CL_data = CL_left .* left_weight .+ CL_right .* right_weight
             CD_data = CD_left .* left_weight .+ CD_right .* right_weight
             CM_data = CM_left .* left_weight .+ CM_right .* right_weight
             
-            return (:polar_data, hcat(alpha_left, CD_data, CL_data, CM_data))
+            return (:polar_data, (alpha_left, CL_data, CD_data, CM_data))
             
         elseif length(polar_left) == 5
             alpha_left, beta_left, CL_left, CD_left, CM_left = polar_left
@@ -205,6 +207,7 @@ function calculate_new_aero_input(aero_input,
             # Create common alpha array
             !all(isapprox.(alpha_left, alpha_right)) && @error "Make sure you use the same alpha range for all your interpolations."
             !all(isapprox.(beta_left, beta_right)) && @error "Make sure you use the same alpha range for all your interpolations."
+            !isa(CL_right, AbstractMatrix) && @error "Provide polar data in the correct format: (alpha, beta, cl, cd, cm)"
 
             # Weighted interpolation
             CL_data = CL_left .* left_weight .+ CL_right .* right_weight

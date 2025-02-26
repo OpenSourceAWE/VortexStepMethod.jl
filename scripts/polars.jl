@@ -204,9 +204,9 @@ try
         cl_matrix[:, j], cd_matrix[:, j], cm_matrix[:, j] = run_solve_alpha(alphas, d_trailing_edge_angles[j], 
                         reynolds_number, x, y, lower, upper, kite_speed, SPEED_OF_SOUND, x_turn)
     end
-    cl_matrix = SMatrix{size(cl_matrix)...}(cl_matrix)
-    cd_matrix = SMatrix{size(cd_matrix)...}(cd_matrix)
-    cm_matrix = SMatrix{size(cm_matrix)...}(cm_matrix)
+    cl_matrix = Matrix{Float64}(cl_matrix)
+    cd_matrix = Matrix{Float64}(cd_matrix)
+    cm_matrix = Matrix{Float64}(cm_matrix)
 
     display(cl_matrix)
 

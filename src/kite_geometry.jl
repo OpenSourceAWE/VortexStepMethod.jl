@@ -241,7 +241,7 @@ mutable struct KiteWing <: AbstractWing
         end
 
         @info "Loding polars and kite info from $polar_path and $info_path"
-        (alpha_range, beta_range, cl_matrix::SMatrix, cd_matrix::SMatrix, cm_matrix::SMatrix) = deserialize(polar_path)
+        (alpha_range, beta_range, cl_matrix::Matrix, cd_matrix::Matrix, cm_matrix::Matrix) = deserialize(polar_path)
     
         (center_of_mass, inertia_tensor, circle_center_z, radius, gamma_tip, 
             le_interp, te_interp, area_interp) = deserialize(info_path)

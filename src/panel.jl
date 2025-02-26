@@ -1,7 +1,7 @@
 using LinearAlgebra
 
-const Interp1 = Interpolations.FilledExtrapolation{Float64, 1, Interpolations.GriddedInterpolation{Float64, 1, Vector{Float64}, Interpolations.Gridded{Interpolations.Linear{Interpolations.Throw{Interpolations.OnGrid}}}, Tuple{Vector{Float64}}}, Interpolations.Gridded{Interpolations.Linear{Interpolations.Throw{Interpolations.OnGrid}}}, Float64}
-const Interp2 = Interpolations.FilledExtrapolation{Float64, 2, Interpolations.ScaledInterpolation{Float64, 2, Interpolations.BSplineInterpolation{Float64, 2, Interpolations.OffsetArrays.OffsetMatrix{Float64, Matrix{Float64}}, Interpolations.BSpline{Interpolations.Linear{Interpolations.Throw{Interpolations.OnGrid}}}, Tuple{Base.Slice{UnitRange{Int64}}, Base.Slice{UnitRange{Int64}}}}, Interpolations.BSpline{Interpolations.Linear{Interpolations.Throw{Interpolations.OnGrid}}}, Tuple{StepRangeLen{Float64, Base.TwicePrecision{Float64}, Base.TwicePrecision{Float64}, Int64}, StepRangeLen{Float64, Base.TwicePrecision{Float64}, Base.TwicePrecision{Float64}, Int64}}}, Interpolations.BSpline{Interpolations.Linear{Interpolations.Throw{Interpolations.OnGrid}}}, Float64}
+const I1 = Interpolations.FilledExtrapolation{Float64, 1, Interpolations.GriddedInterpolation{Float64, 1, Vector{Float64}, Interpolations.Gridded{Interpolations.Linear{Interpolations.Throw{Interpolations.OnGrid}}}, Tuple{Vector{Float64}}}, Interpolations.Gridded{Interpolations.Linear{Interpolations.Throw{Interpolations.OnGrid}}}, Float64}
+const I2 = Interpolations.FilledExtrapolation{Float64, 2, Interpolations.GriddedInterpolation{Float64, 2, Matrix{Float64}, Interpolations.Gridded{Interpolations.Linear{Interpolations.Throw{Interpolations.OnGrid}}}, Tuple{Vector{Float64}, Vector{Float64}}}, Interpolations.Gridded{Interpolations.Linear{Interpolations.Throw{Interpolations.OnGrid}}}, Float64}
 
 """
     Panel
@@ -39,9 +39,9 @@ mutable struct Panel
     cl_coefficients::Vector{Float64}
     cd_coefficients::Vector{Float64}
     cm_coefficients::Vector{Float64}
-    cl_interp::Union{Nothing, Interp1, Interp2}
-    cd_interp::Union{Nothing, Interp1, Interp2}
-    cm_interp::Union{Nothing, Interp1, Interp2}
+    cl_interp::Union{Nothing, I1, I2}
+    cd_interp::Union{Nothing, I1, I2}
+    cm_interp::Union{Nothing, I1, I2}
     aerodynamic_center::MVec3
     control_point::MVec3
     bound_point_1::MVec3
@@ -96,6 +96,8 @@ mutable struct Panel
             BoundFilament(TE_point_2, bound_point_2)
         ]
 
+        cl_interp, cd_interp, cm_interp = nothing, nothing, nothing
+
         if aero_model === :lei_airfoil_breukels
             cl_coeffs, cd_coeffs, cm_coeffs = compute_lei_coefficients(section_1, section_2)
 
@@ -108,30 +110,35 @@ mutable struct Panel
 
             if length(aero_1) == 4
                 !all(isapprox.(aero_1[1], aero_2[1])) && @error "Make sure you use the same alpha range for all your interpolations."
+
                 polar_data = (
-                    (aero_1[2] + aero_2[2]) / 2,
-                    (aero_1[3] + aero_2[3]) / 2,
-                    (aero_1[4] + aero_2[4]) / 2
+                    Vector{Float64}((aero_1[2] + aero_2[2]) / 2),
+                    Vector{Float64}((aero_1[3] + aero_2[3]) / 2),
+                    Vector{Float64}((aero_1[4] + aero_2[4]) / 2)
                 )
-                cl_interp = linear_interpolation(aero_1[1], polar_data[1]; extrapolation_bc=NaN)
-                cd_interp = linear_interpolation(aero_1[1], polar_data[2]; extrapolation_bc=NaN)
-                cm_interp = linear_interpolation(aero_1[1], polar_data[3]; extrapolation_bc=NaN)
+                alphas = Vector{Float64}(aero_1[1])
+
+                cl_interp = linear_interpolation(alphas, polar_data[1]; extrapolation_bc=NaN)
+                cd_interp = linear_interpolation(alphas, polar_data[2]; extrapolation_bc=NaN)
+                cm_interp = linear_interpolation(alphas, polar_data[3]; extrapolation_bc=NaN)
 
             elseif length(aero_1) == 5
                 !all(isapprox.(aero_1[1], aero_2[1])) && @error "Make sure you use the same alpha range for all your interpolations."
                 !all(isapprox.(aero_1[2], aero_2[2])) && @error "Make sure you use the same beta range for all your interpolations."
 
                 polar_data = (
-                    (aero_1[3] + aero_2[3]) / 2,
-                    (aero_1[4] + aero_2[4]) / 2,
-                    (aero_1[5] + aero_2[5]) / 2
+                    Matrix{Float64}((aero_1[3] + aero_2[3]) / 2),
+                    Matrix{Float64}((aero_1[4] + aero_2[4]) / 2),
+                    Matrix{Float64}((aero_1[5] + aero_2[5]) / 2)
                 )
-                cl_interp = linear_interpolation((aero_1[1], aero_1[2]), polar_data[1]; extrapolation_bc=NaN)
-                cd_interp = linear_interpolation((aero_1[1], aero_1[2]), polar_data[2]; extrapolation_bc=NaN)
-                cm_interp = linear_interpolation((aero_1[1], aero_1[2]), polar_data[3]; extrapolation_bc=NaN)
-                # cl_interp = extrapolate(scale(interpolate(cl_matrix, BSpline(Linear())), alphas, d_trailing_edge_angles), NaN)
-                # cd_interp = extrapolate(scale(interpolate(cl_matrix, BSpline(Linear())), alphas, d_trailing_edge_angles), NaN)
-                # cm_interp = extrapolate(scale(interpolate(cl_matrix, BSpline(Linear())), alphas, d_trailing_edge_angles), NaN)
+                alphas = Vector{Float64}(aero_1[1])
+                betas = Vector{Float64}(aero_1[2])
+
+                cl_interp = linear_interpolation((alphas, betas), polar_data[1]; extrapolation_bc=NaN)
+                cd_interp = linear_interpolation((alphas, betas), polar_data[2]; extrapolation_bc=NaN)
+                cm_interp = linear_interpolation((alphas, betas), polar_data[3]; extrapolation_bc=NaN)
+            else
+                throw(ArgumentError("Polar data in wrong format: $aero_1"))
             end
 
         elseif !(aero_model === :inviscid)
@@ -279,10 +286,12 @@ function calculate_cl(panel::Panel, alpha::Float64)::Float64
     elseif panel.aero_model === :inviscid
         cl = 2π * alpha
     elseif panel.aero_model === :polar_data
-        if isa(panel.cl_interp, Interp1)
+        if isa(panel.cl_interp, I1)
             cl = panel.cl_interp(alpha)::Float64
-        elseif isa(panel.cl_interp, Interp2)
+        elseif isa(panel.cl_interp, I2)
             cl = panel.cl_interp(alpha, 0.0)::Float64
+        else
+            throw(ArgumentError("cl_interp is $(panel.cl_interp)"))
         end
     else
         throw(ArgumentError("Unsupported aero model: $(panel.aero_model)"))
@@ -305,10 +314,10 @@ function calculate_cd_cm(panel::Panel, alpha::Float64)
             cd = 2 * sin(alpha)^3
         end
     elseif panel.aero_model === :polar_data
-        if isa(panel.cd_interp, Interp1)
+        if isa(panel.cd_interp, I1)
             cd = panel.cd_interp(alpha)::Float64
             cm = panel.cm_interp(alpha)::Float64
-        elseif isa(panel.cd_interp, Interp2)
+        elseif isa(panel.cd_interp, I2)
             cd = panel.cd_interp(alpha, 0.0)::Float64
             cm = panel.cm_interp(alpha, 0.0)::Float64
         end
