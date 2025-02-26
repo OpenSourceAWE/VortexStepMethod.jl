@@ -60,6 +60,22 @@ Enumeration of the implemented model types.
 @enum Model VSM LLT
 
 """
+   AeroModel `VSLEI_AIRFOIL_BREUKELSM` `POLAR_DATA` `INVISCID`
+
+Enumeration of the implemented aerodynamic models.
+
+# Elements
+- LEI_AIRFOIL_BREUKELS: Polynom approximation for leading edge inflatable kites
+- POLAR_DATA: Polar data (lookup tables with interpolation)
+- INVISCID
+"""
+@enum AeroModel begin
+   LEI_AIRFOIL_BREUKELS
+   POLAR_DATA
+   INVISCID
+end
+
+"""
    PanelDistribution `LINEAR` `COSINE` `COSINE_VAN_GARREL` `SPLIT_PROVIDED` `UNCHANGED`
 
 Enumeration of the implemented model types.
