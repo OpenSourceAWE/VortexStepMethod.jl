@@ -86,14 +86,14 @@ end
     velocity_3D_trailing_vortex(filament::BoundFilament, 
                               XVP::Vector{Float64}, 
                               gamma::Float64, 
-                              Uinf::Float64)
+                              v_a::Float64)
 
 Calculate induced velocity by a trailing vortex filament.
 
 # Arguments
 - `XVP`: Control point coordinates
 - `gamma`: Vortex strength
-- `Uinf`: Inflow velocity magnitude
+- `v_a`: Inflow velocity magnitude
 
 Reference: Rick Damiani et al. "A vortex step method for nonlinear airfoil polar data 
 as implemented in KiteAeroDyn".
@@ -103,7 +103,7 @@ as implemented in KiteAeroDyn".
     filament::BoundFilament,
     XVP,
     gamma,
-    Uinf,
+    v_a,
     work_vectors
 )
     r0, r1, r2, r_perp, r1Xr2, r1Xr0, r2Xr0, normr1r2 = work_vectors[1:8]
@@ -115,7 +115,7 @@ as implemented in KiteAeroDyn".
     r_perp .= dot(r1, r0) .* r0 ./ (norm(r0)^2)
     
     # Cut-off radius
-    epsilon = sqrt(4 * ALPHA0 * NU * norm(r_perp) / Uinf)
+    epsilon = sqrt(4 * ALPHA0 * NU * norm(r_perp) / v_a)
 
     cross3!(r1Xr2, r1, r2)
     cross3!(r1Xr0, r1, r0)
@@ -161,7 +161,7 @@ end
 """
     velocity_3D_trailing_vortex_semiinfinite(filament::SemiInfiniteFilament, 
                                            Vf::Vector{Float64}, XVP::Vector{Float64},
-                                           GAMMA::Float64, Uinf::Float64)
+                                           GAMMA::Float64, v_a::Float64)
 
 Calculate induced velocity by a semi-infinite trailing vortex filament.
 """
@@ -171,7 +171,7 @@ function velocity_3D_trailing_vortex_semiinfinite!(
     Vf,
     XVP,
     GAMMA,
-    Uinf,
+    v_a,
     work_vectors
 )
     r1, r_perp, r1XVf = work_vectors[1:3]
@@ -180,7 +180,7 @@ function velocity_3D_trailing_vortex_semiinfinite!(
 
     # Calculate core radius
     r_perp .= dot(r1, Vf) .* Vf
-    epsilon = sqrt(4 * ALPHA0 * NU * norm(r_perp) / Uinf)
+    epsilon = sqrt(4 * ALPHA0 * NU * norm(r_perp) / v_a)
 
     cross3!(r1XVf, r1, Vf)
 
