@@ -249,7 +249,7 @@ end
 Plot wing geometry from different viewpoints and optionally save/show plots.
 
 # Arguments:
-- `body_aero`: struct of type BodyAerodynamics
+- `body_aero`: the [BodyAerodynamics](@ref) to plot
 - title: plot title
 
 # Keyword arguments:
