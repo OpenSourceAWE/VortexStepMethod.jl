@@ -1,3 +1,5 @@
+using ControlPlots
+using VortexStepMethod
 using REPL.TerminalMenus
 
 options = ["rectangular_wing = include(\"rectangular_wing.jl\")",
