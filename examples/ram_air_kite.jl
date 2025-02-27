@@ -1,3 +1,4 @@
+using ControlPlots
 using VortexStepMethod
 using LinearAlgebra
 using Pkg

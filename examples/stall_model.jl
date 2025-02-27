@@ -1,5 +1,6 @@
-using VortexStepMethod
+using ControlPlots
 using LinearAlgebra
+using VortexStepMethod
 
 using Pkg
 if ! ("CSV" ∈ keys(Pkg.project().dependencies))
