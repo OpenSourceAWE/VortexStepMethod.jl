@@ -1,4 +1,4 @@
-module VortexStepMethodExt
+module VortexStepMethodControlPlotsExt
 using ControlPlots, LaTeXStrings, VortexStepMethod, LinearAlgebra, Statistics, DelimitedFiles
 import ControlPlots: plt
 import VortexStepMethod: calculate_filaments_for_plotting

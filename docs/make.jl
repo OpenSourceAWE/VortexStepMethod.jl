@@ -13,8 +13,8 @@ DocMeta.setdocmeta!(VortexStepMethod, :DocTestSetup, :(using VortexStepMethod); 
 makedocs(;
     modules=[VortexStepMethod,
              isdefined(Base, :get_extension) ? 
-             Base.get_extension(VortexStepMethod, :VortexStepMethodExt) :
-             VortexStepMethod.VortexStepMethodExt],
+             Base.get_extension(VortexStepMethod, :VortexStepMethodControlPlotsExt) :
+             VortexStepMethod.VortexStepMethodControlPlotsExt],
     authors="Uwe Fechner <uwe.fechner.msc@gmail.com>, Bart van de Lint <bart@vandelint.net> and contributors",
     sitename="VortexStepMethod.jl",
     checkdocs=:none,
