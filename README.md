@@ -20,7 +20,7 @@ sudo apt install texlive-full texlive-fonts-extra cm-super
 ```
 Furthermore, the packages `TestEnv` and `ControlPlots` must be installed globally:
 ```
-julia -e 'using Pkg; Pkg.add("TestEnv"); Pkg.add(ControlPlots)'
+julia -e 'using Pkg; Pkg.add("TestEnv"); Pkg.add("ControlPlots")'
 ```
 
 Before installing this software it is suggested to create a new project, for example like this:
