@@ -71,6 +71,9 @@ plot_geometry(
       is_show=true,
 )
 ```
+You should see a plot like this:
+
+![Rectangular Wing](RectangularWing.png)
 
 #### Step 6: Initialize solvers for both LLT and VSM methods
 ```julia
