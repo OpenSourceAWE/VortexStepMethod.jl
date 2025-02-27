@@ -18,9 +18,9 @@ if you haven't already. On Linux, make sure that Python3, Matplotlib and LaTeX a
 sudo apt install python3-matplotlib
 sudo apt install texlive-full texlive-fonts-extra cm-super
 ```
-Furthermore, the package `TestEnv` must be installed globally:
+Furthermore, the packages `TestEnv` and `ControlPlots` must be installed globally:
 ```
-julia -e 'using Pkg; Pkg.add("TestEnv")'
+julia -e 'using Pkg; Pkg.add("TestEnv"); Pkg.add("ControlPlots")'
 ```
 
 Before installing this software it is suggested to create a new project, for example like this:
@@ -62,8 +62,7 @@ Pkg.update()
 ```
 and then you can display a menu with the available examples:
 ```julia
-using VortexStepMethod
-menu()
+include("examples/menu.jl")
 ```
 To browse the code, it is suggested to use [VSCode](https://code.visualstudio.com/) with the Julia plugin.
 
@@ -97,17 +96,17 @@ alpha_deg = 30.0       # Angle of attack [degrees]
 alpha = deg2rad(alpha_deg)
 
 # Step 2: Create wing geometry with linear panel distribution
-wing = Wing(n_panels, spanwise_panel_distribution="linear")
+wing = Wing(n_panels, spanwise_panel_distribution=LINEAR)
 
 # Add wing sections - defining only tip sections with inviscid airfoil model
 add_section!(wing, 
     [0.0, span/2, 0.0],    # Left tip LE 
     [chord, span/2, 0.0],  # Left tip TE
-    :inviscid)
+    INVISCID)
 add_section!(wing, 
     [0.0, -span/2, 0.0],   # Right tip LE
     [chord, -span/2, 0.0], # Right tip TE
-    :inviscid)
+    INVISCID)
 
 # Step 3: Initialize aerodynamics
 wa = BodyAerodynamics([wing])

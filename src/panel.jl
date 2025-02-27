@@ -15,7 +15,7 @@ Represents a panel in a vortex step method simulation. All points and vectors ar
 - `chord::Float64`: Panel chord length
 - `va::Union{Nothing, MVec3}`: Panel velocity
 - `corner_points::Matrix{Float64}`: Panel corner points
-- `aero_model::Symbol`: Aerodynamic model type
+- `aero_model`::AeroModel: Aerodynamic model type [AeroModel](@ref)
 - `aero_center::Vector{Float64}`: Panel aerodynamic center
 - `control_point::Vector{MVec3}`: Panel control point
 - `bound_point_1::Vector{MVec3}`: First bound point
@@ -24,7 +24,7 @@ Represents a panel in a vortex step method simulation. All points and vectors ar
 - `y_airf::MVec3`: Unit vector parallel to chord line
 - `z_airf::MVec3`: Unit vector in spanwise direction
 - `width::Float64`: Panel width
-- `filaments::Vector{BoundFilament}`: Panel filaments
+- `filaments::Vector{BoundFilament}`: Panel filaments, see: [BoundFilament](@ref)
 """
 @with_kw mutable struct Panel
     TE_point_1::MVec3 = zeros(MVec3)
@@ -34,7 +34,7 @@ Represents a panel in a vortex step method simulation. All points and vectors ar
     chord::Float64 = zero(Float64)
     va::MVec3 = zeros(MVec3)
     corner_points::MMatrix{3, 4, Float64} = zeros(MMatrix{3, 4, Float64})
-    aero_model::Symbol = :inviscid
+    aero_model::AeroModel = INVISCID
     cl_coeffs::Vector{Float64} = zeros(Float64, 3)
     cd_coeffs::Vector{Float64} = zeros(Float64, 3)
     cm_coeffs::Vector{Float64} = zeros(Float64, 3)
@@ -56,7 +56,6 @@ Represents a panel in a vortex step method simulation. All points and vectors ar
         SemiInfiniteFilament(),
         SemiInfiniteFilament()
     )
-
 end
 
 function init_pos!(
@@ -108,10 +107,10 @@ function init_aero!(
         throw(ArgumentError("Both sections must have the same aero_input, not $(panel.aero_model) and $aero_model_2"))
     end
     
-    if panel.aero_model === :lei_airfoil_breukels
+    if panel.aero_model === LEI_AIRFOIL_BREUKELS
         panel.cl_coeffs, panel.cd_coeffs, panel.cm_coeffs = compute_lei_coeffs(section_1, section_2)
 
-    elseif panel.aero_model === :polar_data
+    elseif panel.aero_model === POLAR_DATA
         aero_1 = section_1.aero_input[2]
         aero_2 = section_2.aero_input[2]
         if !all(size.(aero_1) .== size.(aero_2))
@@ -296,14 +295,14 @@ Calculate lift coefficient for given angle of attack.
 """
 function calculate_cl(panel::Panel, alpha::Float64)::Float64
     cl = 0.0
-    if panel.aero_model === :lei_airfoil_breukels
+    if panel.aero_model == LEI_AIRFOIL_BREUKELS
         cl = evalpoly(rad2deg(alpha), reverse(panel.cl_coeffs))
         if abs(alpha) > (π/9)
             cl = 2 * cos(alpha) * sin(alpha)^2
         end
-    elseif panel.aero_model === :inviscid
+    elseif panel.aero_model == INVISCID
         cl = 2π * alpha
-    elseif panel.aero_model === :polar_data
+    elseif panel.aero_model == POLAR_DATA
         if isa(panel.cl_interp, I1)
             cl = panel.cl_interp(alpha)::Float64
         elseif isa(panel.cl_interp, I2)
@@ -325,13 +324,13 @@ Calculate drag and moment coefficients for given angle of attack.
 """
 function calculate_cd_cm(panel::Panel, alpha::Float64)
     cd, cm = 0.0, 0.0
-    if panel.aero_model === :lei_airfoil_breukels
+    if panel.aero_model == LEI_AIRFOIL_BREUKELS
         cd = evalpoly(rad2deg(alpha), reverse(panel.cd_coeffs))
         cm = evalpoly(rad2deg(alpha), reverse(panel.cm_coeffs))
         if abs(alpha) > (π/9)  # Outside ±20 degrees
             cd = 2 * sin(alpha)^3
         end
-    elseif panel.aero_model === :polar_data
+    elseif panel.aero_model == POLAR_DATA
         if isa(panel.cd_interp, I1)
             cd = panel.cd_interp(alpha)::Float64
             cm = panel.cm_interp(alpha)::Float64
@@ -339,7 +338,7 @@ function calculate_cd_cm(panel::Panel, alpha::Float64)
             cd = panel.cd_interp(alpha, 0.0)::Float64
             cm = panel.cm_interp(alpha, 0.0)::Float64
         end
-    elseif !(panel.aero_model === :inviscid)
+    elseif !(panel.aero_model == INVISCID)
         throw(ArgumentError("Unsupported aero model: $(panel.aero_model)"))
     end
     return cd, cm

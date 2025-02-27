@@ -7,10 +7,10 @@ Main solver structure for the Vortex Step Method.
 # Attributes
 
 ## General settings
-- `aerodynamic_model_type`::Symbol
-- density::Float64
+- `aerodynamic_model_type`::Model: The model type, see: [Model](@ref)
+- density::Float64: Air density [kg/m³]
 - `max_iterations`::Int64
-- `allowed_error`::Float64
+- `allowed_error`::Float64: relative error
 - `tol_reference_error`::Float64
 - `relaxation_factor`::Float64
 
@@ -19,7 +19,7 @@ Main solver structure for the Vortex Step Method.
 - `artificial_damping`::NamedTuple{(:k2, :k4), Tuple{Float64, Float64}}
 
 ## Additional settings
-- `type_initial_gamma_distribution`::Symbol
+- `type_initial_gamma_distribution`::InitialGammaDistribution: see: [InitialGammaDistribution](@ref)
 - `core_radius_fraction`::Float64
 - mu::Float64
 - `is_only_f_and_gamma_output`::Bool
@@ -38,7 +38,7 @@ struct Solver
     artificial_damping::NamedTuple{(:k2, :k4), Tuple{Float64, Float64}}
     
     # Additional settings
-    type_initial_gamma_distribution::Symbol
+    type_initial_gamma_distribution::InitialGammaDistribution
     core_radius_fraction::Float64
     mu::Float64
     is_only_f_and_gamma_output::Bool
@@ -52,7 +52,7 @@ struct Solver
         relaxation_factor::Float64       = 0.03,
         is_with_artificial_damping::Bool = false,
         artificial_damping::NamedTuple{(:k2, :k4), Tuple{Float64, Float64}}=(k2=0.1, k4=0.0),
-        type_initial_gamma_distribution::Symbol=:elliptic,
+        type_initial_gamma_distribution::InitialGammaDistribution=ELLIPTIC,
         core_radius_fraction::Float64    = 1e-20,
         mu::Float64                      = 1.81e-5, # TODO do not use magic constants
         is_only_f_and_gamma_output::Bool = false
