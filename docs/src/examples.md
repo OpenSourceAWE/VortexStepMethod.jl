@@ -111,6 +111,9 @@ plot_distribution(
     title="Spanwise Distributions"
 )
 ```
+You should see a plot like this:
+
+![Spanwise Distributions](SpanwiseDistributions.png)
 
 #### Step 9: Plot polar curves
 ```julia
