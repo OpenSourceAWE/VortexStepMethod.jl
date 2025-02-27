@@ -133,7 +133,7 @@ You should see a plot like this:
 ![Polars](Polars.png)
 
 ## More examples
-You can execute more examples by executing:
+You can execute more examples by typing:
 ```julia
 include("examples/menu.jl")
 ```
