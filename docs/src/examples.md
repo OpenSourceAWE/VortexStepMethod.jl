@@ -14,6 +14,8 @@ This example demonstrates the process of setting up and analyzing a wing's aerod
 8. Plotting distributions
 9. Plotting polars
 
+First, install Julia and launch the Julia REPL as explained in the section [Installation](@ref). Then, copy and paste to the Julia prompt:
+
 #### Step 1: Importing the necessary libraries:
 ```julia
 using LinearAlgebra
