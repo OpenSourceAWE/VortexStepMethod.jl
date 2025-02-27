@@ -6,7 +6,7 @@ CurrentModule = VortexStepMethod
 add_section!
 ```
 
-## Functions for setting the inflow conditions and solving
+## Setting the inflow conditions and solving
 ```@docs
 set_va!
 solve
