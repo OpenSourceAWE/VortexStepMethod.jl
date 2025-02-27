@@ -101,18 +101,18 @@ function init_aero!(
     section_2::Section,
 )
     # Validate aero model consistency
-    panel.aero_model = isa(section_1.aero_input, AeroModel) ? section_1.aero_input : section_1.aero_input[1]
-    aero_model_2 = isa(section_2.aero_input, AeroModel) ? section_2.aero_input : section_2.aero_input[1]
+    panel.aero_model = section_1.aero_model
+    aero_model_2 = section_2.aero_model
     if !(panel.aero_model === aero_model_2)
-        throw(ArgumentError("Both sections must have the same aero_input, not $(panel.aero_model) and $aero_model_2"))
+        throw(ArgumentError("Both sections must have the same aero model, not $(panel.aero_model) and $aero_model_2"))
     end
     
     if panel.aero_model === LEI_AIRFOIL_BREUKELS
         panel.cl_coeffs, panel.cd_coeffs, panel.cm_coeffs = compute_lei_coeffs(section_1, section_2)
 
     elseif panel.aero_model === POLAR_DATA
-        aero_1 = section_1.aero_input[2]
-        aero_2 = section_2.aero_input[2]
+        aero_1 = section_1.aero_data
+        aero_2 = section_2.aero_data
         if !all(size.(aero_1) .== size.(aero_2))
             throw(ArgumentError("Polar data must have same shape"))
         end
@@ -210,8 +210,8 @@ Compute lift, drag and moment coefficients for Lei airfoil using Breukels model.
 """
 function compute_lei_coeffs(section_1::Section, section_2::Section)
     # Average tube diameter and camber from both sections
-    t1, k1 = section_1.aero_input[2]
-    t2, k2 = section_2.aero_input[2]
+    t1, k1 = section_1.aero_data
+    t2, k2 = section_2.aero_data
     t = (t1 + t2) / 2
     k = (k1 + k2) / 2
 

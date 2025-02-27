@@ -14,7 +14,8 @@ Points are compared with approximate equality to handle floating point differenc
 function ==(a::Section, b::Section)
     return (isapprox(a.LE_point, b.LE_point; rtol=1e-5, atol=1e-5) &&
             isapprox(a.TE_point, b.TE_point; rtol=1e-5, atol=1e-5) &&
-            a.aero_input === b.aero_input)
+            a.aero_model === b.aero_model &&
+            all(a.aero_data .== b.aero_data))
 end
 
 @testset "Wing Geometry Tests" begin
@@ -34,7 +35,7 @@ end
         section = example_wing.sections[1]
         @test section.LE_point ≈ [0.0, 0.0, 0.0]
         @test section.TE_point ≈ [-1.0, 0.0, 0.0]
-        @test section.aero_input === INVISCID
+        @test section.aero_model === INVISCID
     end
 
     @testset "Robustness left to right" begin
@@ -233,10 +234,11 @@ end
             @test isapprox(section.LE_point, expected_LE; rtol=1e-5)
             @test isapprox(section.TE_point, expected_TE; rtol=1e-4)
 
-            aero_input = section.aero_input
-            @test aero_input[1] === LEI_AIRFOIL_BREUKELS
-            @test isapprox(aero_input[2][1], expected_tube_diameter[i])
-            @test isapprox(aero_input[2][2], expected_chamber_height[i])
+            aero_model = section.aero_model
+            aero_data = section.aero_data
+            @test aero_model === LEI_AIRFOIL_BREUKELS
+            @test isapprox(aero_data[1], expected_tube_diameter[i])
+            @test isapprox(aero_data[2], expected_chamber_height[i])
         end
     end
 
@@ -262,7 +264,7 @@ end
         @test 1.0 < new_sections[5].LE_point[2] < 2.0
 
         for section in new_sections
-            @test section.aero_input === INVISCID
+            @test section.aero_model === INVISCID
         end
     end
 end

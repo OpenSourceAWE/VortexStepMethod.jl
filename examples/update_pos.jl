@@ -16,8 +16,7 @@ bound_point_2 = zeros(MVec3)
 
 LE_point = zeros(MVec3)
 TE_point = zeros(MVec3)
-aero_input = INVISCID
-@time section = Section(LE_point, TE_point, aero_input)
+@time section = Section(LE_point, TE_point, INVISCID)
 @time update_pos!(section, LE_point, TE_point)
 
 aero_center = zeros(MVec3)
