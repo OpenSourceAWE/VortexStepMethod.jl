@@ -8,7 +8,9 @@ function create_test_filament2()
     direction = [1.0, 0.0, 0.0]
     filament_direction = 1
     vel_mag = 1.0
-    SemiInfiniteFilament(x1, direction, vel_mag, filament_direction)
+    filament = SemiInfiniteFilament()
+    init!(filament, x1, direction, vel_mag, filament_direction)
+    return filament
 end
 
 function analytical_solution(control_point, gamma, x1, direction, filament_direction, vel_mag)

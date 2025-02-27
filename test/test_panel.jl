@@ -1,4 +1,4 @@
-using VortexStepMethod: Panel, Section, calculate_relative_alpha_and_relative_velocity, calculate_cl, calculate_cd_cm
+using VortexStepMethod: Panel, Section, calculate_relative_alpha_and_relative_velocity, calculate_cl, calculate_cd_cm, init!
 using Interpolations: linear_interpolation, Line
 using LinearAlgebra
 using Test
@@ -35,7 +35,9 @@ function create_panel(section1::Section, section2::Section)
     z_airf = bound_2 .- bound_1
     z_airf = z_airf ./ norm(z_airf)
 
-    Panel(
+    panel = Panel()
+    init!(
+        panel,
         section1,
         section2,
         aero_center,
@@ -46,6 +48,7 @@ function create_panel(section1::Section, section2::Section)
         y_airf,
         z_airf
     )
+    return panel
 end
 
 @testset "Panel Tests" begin

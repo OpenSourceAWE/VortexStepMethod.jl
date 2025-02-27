@@ -49,7 +49,8 @@ mutable struct BodyAerodynamics
             
             # Create panels
             for i in 1:n_panels_per_wing
-                push!(panels, Panel(
+                panel = Panel()
+                init!(panel, 
                     section_list[i],
                     section_list[i+1],
                     panel_props.aero_centers[i],
@@ -59,7 +60,8 @@ mutable struct BodyAerodynamics
                     panel_props.x_airf[i],
                     panel_props.y_airf[i],
                     panel_props.z_airf[i]
-                ))
+                )
+                push!(panels, panel)
             end
         end
         

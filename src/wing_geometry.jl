@@ -419,7 +419,91 @@ function refine_mesh_for_linear_cosine_distribution(
 end
 
 function refine_mesh_for_linear_cosine_distribution!(
-    
+    wing::AbstractWing,
+    spanwise_panel_distribution::PanelDistribution,
+    idx,
+    n_sections::Int,
+    LE,
+    TE,
+    aero_input)
+
+    # 1. Compute quarter chord line
+    quarter_chord = LE .+ 0.25 .* (TE .- LE)
+
+    # Calculate segment lengths
+    qc_lengths = [norm(quarter_chord[i+1,:] - quarter_chord[i,:]) for i in 1:size(quarter_chord,1)-1]
+    qc_total_length = sum(qc_lengths)
+    qc_cum_length = vcat(0, cumsum(qc_lengths))
+
+    # 2. Define target lengths
+    target_lengths = if spanwise_panel_distribution == LINEAR
+        range(0, qc_total_length, n_sections)
+    elseif spanwise_panel_distribution in (COSINE, COSINE_VAN_GARREL)
+        theta = range(0, π, n_sections)
+        qc_total_length .* (1 .- cos.(theta)) ./ 2
+    else
+        throw(ArgumentError("Unsupported distribution: $spanwise_panel_distribution"))
+    end
+
+    # Initialize arrays
+    new_quarter_chord = zeros(Float64, n_sections, 3)
+    new_LE = zeros(Float64, n_sections, 3)
+    new_TE = zeros(Float64, n_sections, 3)
+    new_sections = Section[]
+
+    # 3. Calculate new points and interpolate
+    for i in 1:n_sections
+        target_length = target_lengths[i]
+
+        # Find segment index
+        section_index = searchsortedlast(qc_cum_length, target_length) 
+        section_index = clamp(section_index, 1, length(qc_cum_length)-1)
+
+        # 4. Calculate weights
+        segment_start = qc_cum_length[section_index]
+        segment_end = qc_cum_length[section_index+1]
+        t = (target_length - segment_start) / (segment_end - segment_start)
+        left_weight = 1 - t
+        right_weight = t
+
+        # 5. Calculate quarter chord point
+        new_quarter_chord[i,:] = quarter_chord[section_index,:] + 
+                                t .* (quarter_chord[section_index+1,:] - quarter_chord[section_index,:])
+
+        # 6. Calculate chord vectors
+        left_chord = TE[section_index,:] - LE[section_index,:]
+        right_chord = TE[section_index+1,:] - LE[section_index+1,:]
+
+        # Normalize chord vectors
+        left_chord_norm = left_chord ./ max(norm(left_chord), 1e-12)
+        right_chord_norm = right_chord ./ max(norm(right_chord), 1e-12)
+
+        # Interpolate direction
+        avg_direction = left_weight .* left_chord_norm .+ right_weight .* right_chord_norm
+        avg_direction = avg_direction ./ max(norm(avg_direction), 1e-12)
+
+        # Interpolate length
+        left_length = norm(left_chord)
+        right_length = norm(right_chord)
+        avg_length = left_weight * left_length + right_weight * right_length
+
+        # Final chord vector
+        avg_chord = avg_direction .* avg_length
+
+        # Calculate LE and TE points
+        new_LE[i,:] = new_quarter_chord[i,:] .- 0.25 .* avg_chord
+        new_TE[i,:] = new_quarter_chord[i,:] .+ 0.75 .* avg_chord
+
+        # Create new section
+        update_pos!(wing.sections[idx], new_LE[i,:], new_TE[i,:])
+    end
+
+    # Apply van Garrel distribution if requested
+    if spanwise_panel_distribution === :cosine_van_Garrel
+        new_sections = calculate_cosine_van_Garrel(new_sections)
+    end
+
+    return new_sections
 end
 
 

@@ -12,6 +12,7 @@ using LaTeXStrings
 using NonlinearSolve
 using Interpolations
 using Interpolations: Extrapolation
+using Parameters
 using Serialization
 using SharedArrays
 
