@@ -21,11 +21,11 @@ export Solver, solve
 export calculate_results, solve_circulation_distribution
 export add_section!, set_va!
 export calculate_span, calculate_projected_area
-export show_plot, save_plot, menu
+export menu
 export Model, VSM, LLT
 export PanelDistribution, LINEAR, COSINE, COSINE_VAN_GARREL, SPLIT_PROVIDED, UNCHANGED
 
-export plot_geometry, plot_distribution, plot_circulation_distribution, plot_geometry, plot_polars
+export plot_geometry, plot_distribution, plot_circulation_distribution, plot_geometry, plot_polars, save_plot, show_plot
 
 # the following functions are defined in ext/VortexStepMethodExt.jl
 function plot_geometry end
@@ -33,6 +33,8 @@ function plot_distribution end
 function plot_circulation_distribution end
 function plot_geometry end
 function plot_polars end
+function save_plot end
+function show_plot end
 
 """
    const MVec3    = MVector{3, Float64}

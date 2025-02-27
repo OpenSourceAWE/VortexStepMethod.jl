@@ -40,7 +40,7 @@ Save a plot to a file.
 # Keyword arguments
 - `data_type`: File extension (default: ".pdf")
 """
-function save_plot(fig, save_path, title; data_type=".pdf")
+function VortexStepMethod.save_plot(fig, save_path, title; data_type=".pdf")
     isnothing(save_path) && throw(ArgumentError("save_path should be provided"))
 
     !isdir(save_path) && mkpath(save_path)
@@ -77,7 +77,7 @@ Display a plot at specified DPI.
 # Keyword arguments
 - `dpi`: Dots per inch for the figure (default: 130)
 """
-function show_plot(fig; dpi=130)
+function VortexStepMethod.show_plot(fig; dpi=130)
     plt.display(fig)
 end
 
