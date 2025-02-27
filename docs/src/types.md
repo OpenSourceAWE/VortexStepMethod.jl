@@ -20,8 +20,6 @@ InitialGammaDistribution
 ```@docs
     Section
     Wing
-    Panel
-    PanelProperties
     BodyAerodynamics
 ```
 
