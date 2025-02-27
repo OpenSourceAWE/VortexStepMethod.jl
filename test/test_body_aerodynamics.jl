@@ -30,7 +30,7 @@ include("utils.jl")
             wing,
             coord_left_to_right[idx,:],
             coord_left_to_right[idx+1,:],
-            :inviscid
+            INVISCID
         )
     end
     
@@ -130,7 +130,7 @@ end
             wing,
             coord_left_to_right[idx,:],
             coord_left_to_right[idx+1,:],
-            :inviscid
+            INVISCID
         )
     end
     
@@ -248,7 +248,7 @@ end
                 wing,
                 coord_left_to_right[i,:],
                 coord_left_to_right[i+1,:],
-                :inviscid
+                INVISCID
             )
         end
         body_aero = BodyAerodynamics([wing])

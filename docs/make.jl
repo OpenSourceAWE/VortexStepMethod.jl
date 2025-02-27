@@ -21,6 +21,7 @@ makedocs(;
         "Exported Functions" => "functions.md",
         "Exported Types" => "types.md",
         "Private Functions" => "private_functions.md",
+        "Private Types" => "private_types.md",
         "Reference Frames" => "reference_frames.md"
     ],
 )

@@ -61,7 +61,7 @@ Add a new section to the wing.
 - LE_point::PosVector: [PosVector](@ref) of the point on the side of the leading edge
 - TE_point::PosVector: [PosVector](@ref) of the point on the side of the trailing edge
 - aero_input: Can be:
-  - :inviscid
+  - INVISCID
   - :`lei_airfoil_breukels`
   - (:`polar_data`, (`alpha_range`, `cl_vector`, `cd_vector`, `cm_vector`))
   - (:`polar_data`, (`alpha_range`, `beta_range`, `cl_matrix`, `cd_matrix`, `cm_matrix`))
@@ -166,16 +166,16 @@ function calculate_new_aero_input(aero_input,
                                 left_weight::Float64,
                                 right_weight::Float64)
     
-    model_type = isa(aero_input[section_index], Symbol) ? aero_input[section_index] : aero_input[section_index][1]
-    model_type_2 = isa(aero_input[section_index + 1], Symbol) ? aero_input[section_index + 1] : aero_input[section_index + 1][1]
+    model_type = isa(aero_input[section_index], AeroModel) ? aero_input[section_index] : aero_input[section_index][1]
+    model_type_2 = isa(aero_input[section_index + 1], AeroModel) ? aero_input[section_index + 1] : aero_input[section_index + 1][1]
     if !(model_type === model_type_2)
         throw(ArgumentError("Different aero models over the span are not supported"))
     end
     
-    if model_type === :inviscid
-        return :inviscid
+    if model_type === INVISCID
+        return INVISCID
         
-    elseif model_type === :polar_data
+    elseif model_type === POLAR_DATA
         polar_left = aero_input[section_index][2]
         polar_right = aero_input[section_index + 1][2]
         
@@ -193,7 +193,7 @@ function calculate_new_aero_input(aero_input,
             CD_data = CD_left .* left_weight .+ CD_right .* right_weight
             CM_data = CM_left .* left_weight .+ CM_right .* right_weight
             
-            return (:polar_data, (alpha_left, CL_data, CD_data, CM_data))
+            return (POLAR_DATA, (alpha_left, CL_data, CD_data, CM_data))
             
         elseif length(polar_left) == 5
             alpha_left, beta_left, CL_left, CD_left, CM_left = polar_left
@@ -209,10 +209,10 @@ function calculate_new_aero_input(aero_input,
             CD_data = CD_left .* left_weight .+ CD_right .* right_weight
             CM_data = CM_left .* left_weight .+ CM_right .* right_weight
             
-            return (:polar_data, (alpha_left, beta_left, CL_data, CD_data, CM_data))
+            return (POLAR_DATA, (alpha_left, beta_left, CL_data, CD_data, CM_data))
         end
 
-    elseif model_type === :lei_airfoil_breukels
+    elseif model_type === LEI_AIRFOIL_BREUKELS
         tube_diameter_left = aero_input[section_index][2][1]
         tube_diameter_right = aero_input[section_index + 1][2][1]
         tube_diameter_i = tube_diameter_left * left_weight + tube_diameter_right * right_weight
@@ -224,7 +224,7 @@ function calculate_new_aero_input(aero_input,
         @debug "Interpolation weights" left_weight right_weight
         @debug "Interpolated parameters" tube_diameter_i chamber_height_i
         
-        return (:lei_airfoil_breukels, [tube_diameter_i, chamber_height_i])
+        return (LEI_AIRFOIL_BREUKELS, [tube_diameter_i, chamber_height_i])
     else
         throw(ArgumentError("Unsupported aero model: $(model_type)"))
     end

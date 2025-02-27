@@ -17,7 +17,7 @@ Represents a panel in a vortex step method simulation. All points and vectors ar
 - `chord::Float64`: Panel chord length
 - `va::Union{Nothing, MVec3}`: Panel velocity
 - `corner_points::Matrix{Float64}`: Panel corner points
-- `aero_model::Symbol`: Aerodynamic model type
+- `aero_model`::AeroModel: Aerodynamic model type [AeroModel](@ref)
 - `aero_center::Vector{Float64}`: Panel aerodynamic center
 - `control_point::Vector{MVec3}`: Panel control point
 - `bound_point_1::Vector{MVec3}`: First bound point
@@ -36,7 +36,7 @@ mutable struct Panel
     chord::Float64
     va::Union{Nothing, MVec3}
     corner_points::Matrix{Float64}
-    aero_model::Symbol
+    aero_model::AeroModel
     cl_coefficients::Vector{Float64}
     cd_coefficients::Vector{Float64}
     cm_coefficients::Vector{Float64}
@@ -78,9 +78,9 @@ mutable struct Panel
         corner_points = hcat(LE_point_1, TE_point_1, TE_point_2, LE_point_2)
         
         # Validate aero model consistency
-        aero_model = isa(section_1.aero_input, Symbol) ? section_1.aero_input : section_1.aero_input[1]
-        aero_model_2 = isa(section_2.aero_input, Symbol) ? section_2.aero_input : section_2.aero_input[1]
-        if !(aero_model === aero_model_2)
+        aero_model = isa(section_1.aero_input, AeroModel) ? section_1.aero_input : section_1.aero_input[1]
+        aero_model_2 = isa(section_2.aero_input, AeroModel) ? section_2.aero_input : section_2.aero_input[1]
+        if !(aero_model == aero_model_2)
             throw(ArgumentError("Both sections must have the same aero_input, not $aero_model and $aero_model_2"))
         end
         
@@ -99,10 +99,10 @@ mutable struct Panel
 
         cl_interp, cd_interp, cm_interp = nothing, nothing, nothing
 
-        if aero_model === :lei_airfoil_breukels
+        if aero_model == LEI_AIRFOIL_BREUKELS
             cl_coeffs, cd_coeffs, cm_coeffs = compute_lei_coefficients(section_1, section_2)
 
-        elseif aero_model === :polar_data
+        elseif aero_model == POLAR_DATA
             aero_1 = section_1.aero_input[2]
             aero_2 = section_2.aero_input[2]
             if !all(size.(aero_1) .== size.(aero_2))
@@ -142,7 +142,7 @@ mutable struct Panel
                 throw(ArgumentError("Polar data in wrong format: $aero_1"))
             end
 
-        elseif !(aero_model === :inviscid)
+        elseif !(aero_model == INVISCID)
             throw(ArgumentError("Unsupported aero model: $aero_model"))
         end
 
@@ -279,14 +279,14 @@ Calculate lift coefficient for given angle of attack.
 """
 function calculate_cl(panel::Panel, alpha::Float64)::Float64
     cl = 0.0
-    if panel.aero_model === :lei_airfoil_breukels
+    if panel.aero_model == LEI_AIRFOIL_BREUKELS
         cl = evalpoly(rad2deg(alpha), reverse(panel.cl_coefficients))
         if abs(alpha) > (π/9)
             cl = 2 * cos(alpha) * sin(alpha)^2
         end
-    elseif panel.aero_model === :inviscid
+    elseif panel.aero_model == INVISCID
         cl = 2π * alpha
-    elseif panel.aero_model === :polar_data
+    elseif panel.aero_model == POLAR_DATA
         if isa(panel.cl_interp, I1)
             cl = panel.cl_interp(alpha)::Float64
         elseif isa(panel.cl_interp, I2)
@@ -308,13 +308,13 @@ Calculate drag and moment coefficients for given angle of attack.
 """
 function calculate_cd_cm(panel::Panel, alpha::Float64)
     cd, cm = 0.0, 0.0
-    if panel.aero_model === :lei_airfoil_breukels
+    if panel.aero_model == LEI_AIRFOIL_BREUKELS
         cd = evalpoly(rad2deg(alpha), reverse(panel.cd_coefficients))
         cm = evalpoly(rad2deg(alpha), reverse(panel.cm_coefficients))
         if abs(alpha) > (π/9)  # Outside ±20 degrees
             cd = 2 * sin(alpha)^3
         end
-    elseif panel.aero_model === :polar_data
+    elseif panel.aero_model == POLAR_DATA
         if isa(panel.cd_interp, I1)
             cd = panel.cd_interp(alpha)::Float64
             cm = panel.cm_interp(alpha)::Float64
@@ -322,7 +322,7 @@ function calculate_cd_cm(panel::Panel, alpha::Float64)
             cd = panel.cd_interp(alpha, 0.0)::Float64
             cm = panel.cm_interp(alpha, 0.0)::Float64
         end
-    elseif !(panel.aero_model === :inviscid)
+    elseif !(panel.aero_model == INVISCID)
         throw(ArgumentError("Unsupported aero model: $(panel.aero_model)"))
     end
     return cd, cm

@@ -25,7 +25,9 @@ export calculate_span, calculate_projected_area
 export plot_wing, plot_circulation_distribution, plot_geometry, plot_distribution, plot_polars
 export show_plot, save_plot, menu
 export Model, VSM, LLT
+export AeroModel, LEI_AIRFOIL_BREUKELS, POLAR_DATA, INVISCID
 export PanelDistribution, LINEAR, COSINE, COSINE_VAN_GARREL, SPLIT_PROVIDED, UNCHANGED
+export InitialGammaDistribution, ELLIPTIC, ZEROS
 
 """
    const MVec3    = MVector{3, Float64}
@@ -39,14 +41,14 @@ const MVec3    = MVector{3, Float64}
 
 Position vector, either a `MVec3` or a `Vector` for use in function signatures.
 """
-const PosVector=Union{MVec3, Vector, SizedVector{3, Float64, Vector{Float64}}}
+const PosVector=Union{MVec3, Vector}
 
 """
    const VelVector=Union{MVec3, Vector, SizedVector{3, Float64, Vector{Float64}}}
 
 Velocity vector, either a `MVec3` or a `Vector` for use in function signatures.
 """
-const VelVector=Union{MVec3, Vector, SizedVector{3, Float64, Vector{Float64}}}
+const VelVector=Union{MVec3, Vector}
 
 """
    Model `VSM` `LLT`
@@ -60,9 +62,25 @@ Enumeration of the implemented model types.
 @enum Model VSM LLT
 
 """
+   AeroModel `LEI_AIRFOIL_BREUKELS` `POLAR_DATA` `INVISCID`
+
+Enumeration of the implemented aerodynamic models.
+
+# Elements
+- `LEI_AIRFOIL_BREUKELS`: Polynom approximation for leading edge inflatable kites
+- `POLAR_DATA`: Polar data (lookup tables with interpolation)
+- INVISCID
+"""
+@enum AeroModel begin
+   LEI_AIRFOIL_BREUKELS
+   POLAR_DATA
+   INVISCID
+end
+
+"""
    PanelDistribution `LINEAR` `COSINE` `COSINE_VAN_GARREL` `SPLIT_PROVIDED` `UNCHANGED`
 
-Enumeration of the implemented model types.
+Enumeration of the implemented panel distributions.
 
 # Elements
 - LINEAR               # Linear distribution
@@ -78,6 +96,17 @@ Enumeration of the implemented model types.
    SPLIT_PROVIDED     # Split provided sections
    UNCHANGED          # Keep original sections
 end
+
+"""
+   InitialGammaDistribution ELLIPTIC ZEROS
+
+Enumeration of the implemented initial gamma distributions.
+
+# Elements
+- ELLIPTIC
+- ZEROS
+"""
+@enum InitialGammaDistribution ELLIPTIC ZEROS
 
 abstract type AbstractWing end
 
