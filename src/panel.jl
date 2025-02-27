@@ -101,8 +101,8 @@ function init_aero!(
     section_2::Section,
 )
     # Validate aero model consistency
-    panel.aero_model = isa(section_1.aero_input, Symbol) ? section_1.aero_input : section_1.aero_input[1]
-    aero_model_2 = isa(section_2.aero_input, Symbol) ? section_2.aero_input : section_2.aero_input[1]
+    panel.aero_model = isa(section_1.aero_input, AeroModel) ? section_1.aero_input : section_1.aero_input[1]
+    aero_model_2 = isa(section_2.aero_input, AeroModel) ? section_2.aero_input : section_2.aero_input[1]
     if !(panel.aero_model === aero_model_2)
         throw(ArgumentError("Both sections must have the same aero_input, not $(panel.aero_model) and $aero_model_2"))
     end
@@ -150,7 +150,7 @@ function init_aero!(
             throw(ArgumentError("Polar data in wrong format: $aero_1"))
         end
 
-    elseif !(panel.aero_model === :inviscid)
+    elseif !(panel.aero_model === INVISCID)
         throw(ArgumentError("Unsupported aero model: $(panel.aero_model)"))
     end
 end

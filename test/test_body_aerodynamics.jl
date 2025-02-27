@@ -137,7 +137,7 @@ end
             wing,
             coord_left_to_right[idx,:],
             coord_left_to_right[idx+1,:],
-            :inviscid
+            INVISCID
         )
     end
     
