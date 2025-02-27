@@ -62,9 +62,7 @@ Pkg.update()
 ```
 and then you can display a menu with the available examples:
 ```julia
-using ControlPlots
-using VortexStepMethod
-menu()
+include("examples/menu.jl")
 ```
 To browse the code, it is suggested to use [VSCode](https://code.visualstudio.com/) with the Julia plugin.
 
