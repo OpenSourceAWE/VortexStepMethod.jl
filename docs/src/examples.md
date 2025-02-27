@@ -147,4 +147,4 @@ Choose function to execute or `q` to quit:
    cleanup = include("cleanup.jl")
    quit
 ```
-You can select one of the examples using the <UP> and <DOWN> keys. Press <ENTER> to run the selected example.
+You can select one of the examples using the `<UP>` and `<DOWN>` keys. Press `<ENTER>` to run the selected example.
