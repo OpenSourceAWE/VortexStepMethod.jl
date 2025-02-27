@@ -253,7 +253,7 @@ mutable struct KiteWing <: AbstractWing
         # Create sections
         sections = Section[]
         for gamma in range(-gamma_tip, gamma_tip, n_sections)
-            aero_data = (alpha_range, beta_range, cl_matrix, cd_matrix, cm_matrix)
+            aero_data = (collect(alpha_range), collect(beta_range), cl_matrix, cd_matrix, cm_matrix)
             LE_point = [0.0, 0.0, circle_center_z] .+ [le_interp(gamma), sin(gamma) * radius, cos(gamma) * radius]
             if !isapprox(alpha, 0.0)
                 local_y_vec = [0.0, sin(-gamma), cos(gamma)] × [1.0, 0.0, 0.0]

@@ -7,8 +7,8 @@ Represents a wing section with leading edge, trailing edge, and aerodynamic prop
 # Fields
 - `LE_point::MVec3`: Leading edge point coordinates
 - `TE_point::MVec3`: Trailing edge point coordinates
-- `aero_model`::T: Aerodynamic model, one of three possible types
-- `aero_data`::T: Aerodynamic data
+- `aero_model`::AeroModel: Aerodynamic model, one of three possible types
+- `aero_data`::Union{Nothing, Tuple}: Aerodynamic data
 """
 struct Section
     LE_point::MVec3
@@ -16,14 +16,15 @@ struct Section
     aero_model::AeroModel
     aero_data::Union{
         Nothing,
-        Tuple{AeroModel, Vector{Float64}, Vector{Float64}, Vector{Float64}, Vector{Float64}},
-        Tuple{AeroModel, Vector{Float64}, Vector{Float64}, Matrix{Float64}, Matrix{Float64}, Matrix{Float64}}
+        NTuple{2, Float64},
+        Tuple{Vector{Float64}, Vector{Float64}, Vector{Float64}, Vector{Float64}},
+        Tuple{Vector{Float64}, Vector{Float64}, Matrix{Float64}, Matrix{Float64}, Matrix{Float64}}
     }
     function Section(
             LE_point::PosVector = zeros(MVec3), 
             TE_point::PosVector = zeros(MVec3), 
             aero_model::AeroModel = INVISCID,
-            aero_data::Union{Nothing, Tuple} = nothing
+            aero_data = nothing
             )
         new(LE_point, TE_point, aero_model, aero_data)
     end
@@ -32,8 +33,8 @@ end
 function init!(section::Section, LE_point, TE_point, aero_model=nothing, aero_data=nothing)
     section.LE_point .= LE_point
     section.TE_point .= TE_point
-    (!isnothing(aero_model)) && section.aero_model = aero_model
-    (!isnothing(aero_data)) && section.aero_data .= aero_data
+    (!isnothing(aero_model)) && (section.aero_model = aero_model)
+    (!isnothing(aero_data)) && (section.aero_data .= aero_data)
     nothing
 end
 
@@ -49,7 +50,7 @@ Represents a wing composed of multiple sections with aerodynamic properties.
 - `sections::Vector{Section}`: List of wing sections, see: [Section](@ref)
 
 """
-struct Wing <: AbstractWing
+mutable struct Wing <: AbstractWing
     n_panels::Int64
     spanwise_panel_distribution::PanelDistribution
     spanwise_direction::PosVector
@@ -209,7 +210,7 @@ function calculate_new_aero_data(aero_model,
     end
     
     if model_type === INVISCID
-        return INVISCID
+        return nothing
         
     elseif model_type === POLAR_DATA
         polar_left = aero_data[section_index]
@@ -229,7 +230,7 @@ function calculate_new_aero_data(aero_model,
             CD_data = CD_left .* left_weight .+ CD_right .* right_weight
             CM_data = CM_left .* left_weight .+ CM_right .* right_weight
             
-            return (POLAR_DATA, (alpha_left, CL_data, CD_data, CM_data))
+            return (alpha_left, CL_data, CD_data, CM_data)
             
         elseif length(polar_left) == 5
             alpha_left, beta_left, CL_left, CD_left, CM_left = polar_left
@@ -245,7 +246,7 @@ function calculate_new_aero_data(aero_model,
             CD_data = CD_left .* left_weight .+ CD_right .* right_weight
             CM_data = CM_left .* left_weight .+ CM_right .* right_weight
             
-            return (POLAR_DATA, (alpha_left, beta_left, CL_data, CD_data, CM_data))
+            return (alpha_left, beta_left, CL_data, CD_data, CM_data)
         end
 
     elseif model_type === LEI_AIRFOIL_BREUKELS
@@ -260,7 +261,7 @@ function calculate_new_aero_data(aero_model,
         @debug "Interpolation weights" left_weight right_weight
         @debug "Interpolated parameters" tube_diameter_i chamber_height_i
         
-        return (LEI_AIRFOIL_BREUKELS, [tube_diameter_i, chamber_height_i])
+        return (tube_diameter_i, chamber_height_i)
     else
         throw(ArgumentError("Unsupported aero model: $(model_type)"))
     end
@@ -364,10 +365,10 @@ function refine_mesh_for_linear_cosine_distribution(
         new_TE[i,:] = new_quarter_chord[i,:] .+ 0.75 .* avg_chord
 
         # Interpolate aero properties
-        new_aero = calculate_new_aero_data(aero_model, aero_data, section_index, left_weight, right_weight)
+        new_data = calculate_new_aero_data(aero_model, aero_data, section_index, left_weight, right_weight)
 
         # Create new section
-        push!(new_sections, Section(new_LE[i,:], new_TE[i,:], new_aero))
+        push!(new_sections, Section(new_LE[i,:], new_TE[i,:], aero_model[1], new_data))
     end
 
     # Apply van Garrel distribution if requested
@@ -460,7 +461,7 @@ function refine_mesh_for_linear_cosine_distribution!(
     end
 
     # Apply van Garrel distribution if requested
-    if spanwise_panel_distribution === :cosine_van_Garrel
+    if spanwise_panel_distribution === COSINE_VAN_GARREL
         new_sections = calculate_cosine_van_Garrel(new_sections)
     end
 

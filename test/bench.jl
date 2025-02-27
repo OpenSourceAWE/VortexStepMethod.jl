@@ -93,22 +93,24 @@ using LinearAlgebra
         end
 
         n_angles = 5
-        alphas = range(-deg2rad(10), deg2rad(10), n_angles)
+        alphas = collect(range(-deg2rad(10), deg2rad(10), n_angles))
         cls = [2π * α for α in alphas]
         cds = [0.01 + 0.05 * α^2 for α in alphas]
         cms = [-0.1 * α for α in alphas]
 
         for model in models
-            for aero_model in [INVISCID, (POLAR_DATA, (alphas, cls, cds, cms))]
+            for (aero_model, aero_data) in [(INVISCID, nothing), (POLAR_DATA, (alphas, cls, cds, cms))]
                 wing = Wing(n_panels, spanwise_panel_distribution=LINEAR)
                 add_section!(wing, 
                     [0.0, span/2, 0.0],    # Left tip LE 
                     [chord, span/2, 0.0],  # Left tip TE
-                    aero_model)
+                    aero_model,
+                    aero_data)
                 add_section!(wing, 
                     [0.0, -span/2, 0.0],   # Right tip LE
                     [chord, -span/2, 0.0], # Right tip TE
-                    aero_model)
+                    aero_model,
+                    aero_data)
                 body_aero = BodyAerodynamics([wing])
 
                 solver = Solver(

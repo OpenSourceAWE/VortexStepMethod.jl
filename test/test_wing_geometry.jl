@@ -217,9 +217,9 @@ end
         span = 20.0
 
         wing = Wing(n_panels; spanwise_panel_distribution=LINEAR)
-        add_section!(wing, [0.0, span/2, 0.0], [-1.0, span/2, 0.0], (LEI_AIRFOIL_BREUKELS, [0.0, 0.0]))
-        add_section!(wing, [0.0, 0.0, 0.0], [-1.0, 0.0, 0.0], (LEI_AIRFOIL_BREUKELS, [2.0, 0.5]))
-        add_section!(wing, [0.0, -span/2, 0.0], [-1.0, -span/2, 0.0], (LEI_AIRFOIL_BREUKELS, [4.0, 1.0]))
+        add_section!(wing, [0.0, span/2, 0.0], [-1.0, span/2, 0.0], LEI_AIRFOIL_BREUKELS, (0.0, 0.0))
+        add_section!(wing, [0.0, 0.0, 0.0], [-1.0, 0.0, 0.0], LEI_AIRFOIL_BREUKELS, (2.0, 0.5))
+        add_section!(wing, [0.0, -span/2, 0.0], [-1.0, -span/2, 0.0], LEI_AIRFOIL_BREUKELS, (4.0, 1.0))
 
         sections = refine_aerodynamic_mesh(wing)
         @test length(sections) == wing.n_panels + 1
