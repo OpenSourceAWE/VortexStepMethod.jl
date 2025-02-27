@@ -27,6 +27,7 @@ export show_plot, save_plot, menu
 export Model, VSM, LLT
 export AeroModel, LEI_AIRFOIL_BREUKELS, POLAR_DATA, INVISCID
 export PanelDistribution, LINEAR, COSINE, COSINE_VAN_GARREL, SPLIT_PROVIDED, UNCHANGED
+export InitialGammaDistribution, ELLIPTIC, ZEROS
 
 """
    const MVec3    = MVector{3, Float64}
@@ -95,6 +96,17 @@ Enumeration of the implemented panel distributions.
    SPLIT_PROVIDED     # Split provided sections
    UNCHANGED          # Keep original sections
 end
+
+"""
+   InitialGammaDistribution ELLIPTIC ZEROS
+
+Enumeration of the implemented initial gamma distributions.
+
+# Elements
+- ELLIPTIC
+- ZEROS
+"""
+@enum InitialGammaDistribution ELLIPTIC ZEROS
 
 abstract type AbstractWing end
 

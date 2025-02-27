@@ -6,6 +6,7 @@ CurrentModule = VortexStepMethod
 Model
 AeroModel
 PanelDistribution
+InitialGammaDistribution
 ```
 
 ## Basic Vectors
