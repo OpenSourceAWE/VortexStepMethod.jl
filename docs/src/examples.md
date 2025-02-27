@@ -128,3 +128,23 @@ plot_polars(
     title="Rectangular Wing Polars"
 )
 ```
+You should see a plot like this:
+
+![Polars](Polars.png)
+
+## More examples
+You can execute more examples by executing:
+```julia
+include("examples/menu.jl")
+```
+You should see the following menu:
+```
+Choose function to execute or `q` to quit: 
+ > rectangular_wing = include("rectangular_wing.jl")
+   ram_air_kite = include("ram_air_kite.jl")
+   stall_model = include("stall_model.jl")
+   bench = include("bench.jl")
+   cleanup = include("cleanup.jl")
+   quit
+```
+You can select one of the examples using the <UP> and <DOWN> keys. Press <ENTER> to run the selected example.
