@@ -192,6 +192,7 @@ mutable struct KiteWing <: AbstractWing
     spanwise_panel_distribution::PanelDistribution
     spanwise_direction::MVec3
     sections::Vector{Section}
+    refined_sections::Vector{Section}
     
     # Additional fields for KiteWing
     mass::Float64

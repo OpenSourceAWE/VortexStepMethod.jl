@@ -51,6 +51,7 @@ mutable struct Wing <: AbstractWing
     spanwise_panel_distribution::PanelDistribution
     spanwise_direction::PosVector
     sections::Vector{Section}
+    refined_sections::Vector{Section}
     
     function Wing(n_panels::Int;
                  spanwise_panel_distribution::PanelDistribution=LINEAR,
@@ -139,30 +140,93 @@ function refine_aerodynamic_mesh(wing::AbstractWing)
     
     # Handle special cases
     if wing.spanwise_panel_distribution == UNCHANGED || length(wing.sections) == n_sections
-        return wing.sections
+        wing.refined_sections = wing.sections
+        return wing.refined_sections
     end
 
     @info "Refining aerodynamic mesh from $(length(wing.sections)) sections to $n_sections sections."
     
     # Handle two-section case
     if n_sections == 2
-        return [
+        wing.refined_sections = [
             Section(LE[1,:], TE[1,:], aero_input[1]),
             Section(LE[end,:], TE[end,:], aero_input[end])
         ]
+        return wing.refined_sections
     end
     
     # Handle different distribution types
     if wing.spanwise_panel_distribution == SPLIT_PROVIDED
-        return refine_mesh_by_splitting_provided_sections(wing)
+        wing.refined_sections = refine_mesh_by_splitting_provided_sections(wing)
+        return wing.refined_sections
     elseif wing.spanwise_panel_distribution in (LINEAR, COSINE, COSINE_VAN_GARREL)
-        return refine_mesh_for_linear_cosine_distribution(
+        wing.refined_sections = refine_mesh_for_linear_cosine_distribution(
             wing.spanwise_panel_distribution,
             n_sections,
             LE,
             TE,
             aero_input
         )
+        return wing.refined_sections
+    else
+        throw(ArgumentError("Unsupported spanwise panel distribution: $(wing.spanwise_panel_distribution)"))
+    end
+end
+
+function refine_aerodynamic_mesh!(wing::AbstractWing)
+    # Sort sections from left to right
+    sort!(wing.sections, by=s -> s.LE_point[2], rev=true)
+    
+    # Calculate number of sections needed
+    n_sections = wing.n_panels + 1
+    @debug "n_panels: $(wing.n_panels)"
+    @debug "n_sections: $n_sections"
+    
+    # Extract geometry data
+    n_current = length(wing.sections)
+    LE = zeros(Float64, n_current, 3)
+    TE = zeros(Float64, n_current, 3)
+    aero_input = Vector{typeof(wing.sections[1].aero_input)}()
+    
+    for (i, section) in enumerate(wing.sections)
+        LE[i,:] = section.LE_point
+        TE[i,:] = section.TE_point
+        push!(aero_input, section.aero_input)
+    end
+    
+    # Validate input
+    if size(LE,1) != size(TE,1) || size(LE,1) != length(aero_input)
+        throw(ArgumentError("LE, TE, and aero_input must have the same length"))
+    end
+    
+    # Handle special cases
+    if wing.spanwise_panel_distribution == UNCHANGED || length(wing.sections) == n_sections
+        wing.refined_sections .= wing.sections
+        return wing.refined_sections
+    end
+
+    @info "Refining aerodynamic mesh from $(length(wing.sections)) sections to $n_sections sections."
+    
+    # Handle two-section case
+    if n_sections == 2
+        update_pos!(wing.refined_sections[1], LE[1,:], TE[1,:]),
+        update_pos!(wing.refined_sections[2], LE[1,:], TE[1,:]),
+        return wing.refined_sections
+    end
+    
+    # Handle different distribution types
+    if wing.spanwise_panel_distribution == SPLIT_PROVIDED
+        refine_mesh_by_splitting_provided_sections!(wing)
+        return wing.refined_sections
+    elseif wing.spanwise_panel_distribution in (LINEAR, COSINE, COSINE_VAN_GARREL)
+        refine_mesh_for_linear_cosine_distribution!(
+            wing.spanwise_panel_distribution,
+            n_sections,
+            LE,
+            TE,
+            aero_input
+        )
+        return wing.refined_sections
     else
         throw(ArgumentError("Unsupported spanwise panel distribution: $(wing.spanwise_panel_distribution)"))
     end
@@ -354,6 +418,11 @@ function refine_mesh_for_linear_cosine_distribution(
     return new_sections
 end
 
+function refine_mesh_for_linear_cosine_distribution!(
+    
+end
+
+
 """
     calculate_cosine_van_Garrel(sections::Vector{Section})
 
@@ -481,6 +550,78 @@ function refine_mesh_by_splitting_provided_sections(wing::AbstractWing)
             
             # Add new sections (excluding endpoints)
             append!(new_sections, new_splitted_sections[2:end-1])
+        end
+    end
+    
+    # Add final section
+    push!(new_sections, wing.sections[end])
+    
+    # Validate result
+    if length(new_sections) != wing.n_panels + 1
+        @warn "Number of panels ($(length(new_sections)-1)) differs from desired ($(wing.n_panels))"
+    end
+    
+    return new_sections
+end
+
+function refine_mesh_by_splitting_provided_sections!(wing::AbstractWing)
+    n_sections_provided = length(wing.sections)
+    n_panels_provided = n_sections_provided - 1
+    n_panels_desired = wing.n_panels
+    
+    @debug "Panel counts" n_panels_provided n_panels_desired n_sections_provided
+    
+    # Check if refinement is needed
+    if n_panels_provided == n_panels_desired
+        return wing.sections
+    end
+    
+    # Validate panel count relationship
+    if n_panels_desired % n_panels_provided != 0
+        throw(ArgumentError(
+            "Desired panels ($n_panels_desired) must be multiple of provided panels " *
+            "($n_panels_provided). Choose: $(n_panels_provided*2), $(n_panels_provided*3), ..."
+        ))
+    end
+    
+    # Calculate distribution
+    n_new_sections = wing.n_panels + 1 - n_sections_provided
+    n_section_pairs = n_sections_provided - 1
+    new_sections_per_pair, remaining = divrem(n_new_sections, n_section_pairs)
+    
+    # Extract geometry data
+    LE = [section.LE_point for section in wing.sections]
+    TE = [section.TE_point for section in wing.sections]
+    aero_input = [section.aero_input for section in wing.sections]
+    
+    # Process each section pair
+    idx = 1
+    for left_section_index in 1:n_section_pairs
+        # Add left section of pair
+        update_pos!(wing.refined_sections[idx], wing.sections[left_section_index].LE_point, wing.sections[left_section_index].TE_point)
+        idx += 1
+        
+        # Calculate new sections for this pair
+        num_new_sections = new_sections_per_pair + (left_section_index <= remaining ? 1 : 0)
+        
+        if num_new_sections > 0
+            # Prepare pair data
+            LE_pair = hcat(LE[left_section_index], LE[left_section_index + 1])'
+            TE_pair = hcat(TE[left_section_index], TE[left_section_index + 1])'
+            aero_pair = [
+                aero_input[left_section_index],
+                aero_input[left_section_index + 1]
+            ]
+            
+            # Generate sections for this pair
+            idx = refine_mesh_for_linear_cosine_distribution!(
+                idx,
+                LINEAR,
+                num_new_sections + 2,  # +2 for endpoints
+                LE_pair,
+                TE_pair,
+                aero_pair
+            )
         end
     end
     

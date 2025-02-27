@@ -107,7 +107,7 @@ end
 function update_pos!(body_aero::BodyAerodynamics, le_pos::AbstractMatrix, te_pos::AbstractMatrix)
     panels = Panel[]
     for wing in body_aero.wings
-        section_list = refine_aerodynamic_mesh(wing)
+        section_list = refine_aerodynamic_mesh!(body_aero, wing)
         n_panels_per_wing = length(section_list) - 1
         
         # Calculate panel properties
@@ -120,7 +120,6 @@ function update_pos!(body_aero::BodyAerodynamics, le_pos::AbstractMatrix, te_pos
         
         # Create panels
         for panel in body_aero.panels
-
             update_pos!(
                 panel,
                 section_list[i],
