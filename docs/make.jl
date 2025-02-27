@@ -18,6 +18,7 @@ makedocs(;
     pages=[
         "Home" => "index.md",
         "How it works" => "explanation.md",
+        "Examples" => "examples.md",
         "Exported Functions" => "functions.md",
         "Exported Types" => "types.md",
         "Private Functions" => "private_functions.md",
