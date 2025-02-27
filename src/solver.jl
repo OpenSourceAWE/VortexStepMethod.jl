@@ -75,7 +75,7 @@ struct Solver
 end
 
 """
-    solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=nothing; log=false)
+    solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=nothing; log=false, reference_point=zeros(MVec3))
 
 Main solving routine for the aerodynamic model. Reference point is in the kite body (KB) frame.
 """
