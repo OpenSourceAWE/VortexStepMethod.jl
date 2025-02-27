@@ -59,6 +59,7 @@ mutable struct Wing <: AbstractWing
         new(n_panels, 
             spanwise_panel_distribution, 
             spanwise_direction, 
+            Section[],
             Section[])
     end
 end
@@ -173,64 +174,64 @@ function refine_aerodynamic_mesh(wing::AbstractWing)
     end
 end
 
-function refine_aerodynamic_mesh!(wing::AbstractWing)
-    # Sort sections from left to right
-    sort!(wing.sections, by=s -> s.LE_point[2], rev=true)
+# function refine_aerodynamic_mesh!(wing::AbstractWing)
+#     # Sort sections from left to right
+#     sort!(wing.sections, by=s -> s.LE_point[2], rev=true)
     
-    # Calculate number of sections needed
-    n_sections = wing.n_panels + 1
-    @debug "n_panels: $(wing.n_panels)"
-    @debug "n_sections: $n_sections"
+#     # Calculate number of sections needed
+#     n_sections = wing.n_panels + 1
+#     @debug "n_panels: $(wing.n_panels)"
+#     @debug "n_sections: $n_sections"
     
-    # Extract geometry data
-    n_current = length(wing.sections)
-    LE = zeros(Float64, n_current, 3)
-    TE = zeros(Float64, n_current, 3)
-    aero_input = Vector{typeof(wing.sections[1].aero_input)}()
+#     # Extract geometry data
+#     n_current = length(wing.sections)
+#     LE = zeros(Float64, n_current, 3)
+#     TE = zeros(Float64, n_current, 3)
+#     aero_input = Vector{typeof(wing.sections[1].aero_input)}()
     
-    for (i, section) in enumerate(wing.sections)
-        LE[i,:] = section.LE_point
-        TE[i,:] = section.TE_point
-        push!(aero_input, section.aero_input)
-    end
+#     for (i, section) in enumerate(wing.sections)
+#         LE[i,:] = section.LE_point
+#         TE[i,:] = section.TE_point
+#         push!(aero_input, section.aero_input)
+#     end
     
-    # Validate input
-    if size(LE,1) != size(TE,1) || size(LE,1) != length(aero_input)
-        throw(ArgumentError("LE, TE, and aero_input must have the same length"))
-    end
+#     # Validate input
+#     if size(LE,1) != size(TE,1) || size(LE,1) != length(aero_input)
+#         throw(ArgumentError("LE, TE, and aero_input must have the same length"))
+#     end
     
-    # Handle special cases
-    if wing.spanwise_panel_distribution == UNCHANGED || length(wing.sections) == n_sections
-        wing.refined_sections .= wing.sections
-        return wing.refined_sections
-    end
+#     # Handle special cases
+#     if wing.spanwise_panel_distribution == UNCHANGED || length(wing.sections) == n_sections
+#         wing.refined_sections .= wing.sections
+#         return wing.refined_sections
+#     end
 
-    @info "Refining aerodynamic mesh from $(length(wing.sections)) sections to $n_sections sections."
+#     @info "Refining aerodynamic mesh from $(length(wing.sections)) sections to $n_sections sections."
     
-    # Handle two-section case
-    if n_sections == 2
-        update_pos!(wing.refined_sections[1], LE[1,:], TE[1,:]),
-        update_pos!(wing.refined_sections[2], LE[1,:], TE[1,:]),
-        return wing.refined_sections
-    end
+#     # Handle two-section case
+#     if n_sections == 2
+#         update_pos!(wing.refined_sections[1], LE[1,:], TE[1,:]),
+#         update_pos!(wing.refined_sections[2], LE[1,:], TE[1,:]),
+#         return wing.refined_sections
+#     end
     
-    # Handle different distribution types
-    if wing.spanwise_panel_distribution == SPLIT_PROVIDED
-        refine_mesh_by_splitting_provided_sections!(wing)
-        return wing.refined_sections
-    elseif wing.spanwise_panel_distribution in (LINEAR, COSINE, COSINE_VAN_GARREL)
-        refine_mesh_for_linear_cosine_distribution!(
-            wing.spanwise_panel_distribution,
-            n_sections,
-            LE,
-            TE,
-            aero_input
-        )
-        return wing.refined_sections
-    else
-        throw(ArgumentError("Unsupported spanwise panel distribution: $(wing.spanwise_panel_distribution)"))
-    end
-end
+#     # Handle different distribution types
+#     if wing.spanwise_panel_distribution == SPLIT_PROVIDED
+#         refine_mesh_by_splitting_provided_sections!(wing)
+#         return wing.refined_sections
+#     elseif wing.spanwise_panel_distribution in (LINEAR, COSINE, COSINE_VAN_GARREL)
+#         refine_mesh_for_linear_cosine_distribution!(
+#             wing.spanwise_panel_distribution,
+#             n_sections,
+#             LE,
+#             TE,
+#             aero_input
+#         )
+#         return wing.refined_sections
+#     else
+#         throw(ArgumentError("Unsupported spanwise panel distribution: $(wing.spanwise_panel_distribution)"))
+#     end
+# end
 
 """
     calculate_new_aero_input(aero_input, 

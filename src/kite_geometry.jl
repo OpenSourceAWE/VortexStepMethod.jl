@@ -262,7 +262,7 @@ mutable struct KiteWing <: AbstractWing
         end
 
         new(
-            n_panels, spanwise_panel_distribution, spanwise_direction, sections,
+            n_panels, spanwise_panel_distribution, spanwise_direction, sections, sections,
             mass, center_of_mass, circle_center_z, gamma_tip, inertia_tensor, radius,
             le_interp, te_interp, area_interp
         )
