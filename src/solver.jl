@@ -251,9 +251,8 @@ function gamma_loop(
     velocity_view_z = @view induced_velocity_all[:, 3]
 
     iters = 0
-    for i in 1:solver.max_iterations
+    function f!(res, gamma, p)
         iters += 1
-        gamma .= gamma_new
         
         # Calculate induced velocities
         mul!(velocity_view_x, AIC_x, gamma)
@@ -288,33 +287,13 @@ function gamma_loop(
         end
         gamma_new .= 0.5 .* v_a_array.^2 ./ Umagw_array .* cl_array .* chord_array
 
-        # Apply damping if needed
-        if solver.is_with_artificial_damping
-            damp, is_damping_applied = smooth_circulation(gamma, 0.1, 0.5)
-            @debug "damp: $damp"
-        else
-            damp .= 0.0
-            is_damping_applied = false
-        end
-        # Update gamma with relaxation and damping
-        gamma_new .= (1 - relaxation_factor) .* gamma .+ 
-                    relaxation_factor .* gamma_new .+ damp
-
-        # Check convergence
-        abs_gamma_new .= abs.(gamma_new)
-        reference_error = maximum(abs_gamma_new)
-        reference_error = max(reference_error, solver.tol_reference_error)
-        abs_gamma_new .= abs.(gamma_new .- gamma)
-        error = maximum(abs_gamma_new)
-        normalized_error = error / reference_error
-
-        @debug "Iteration: $i, normalized_error: $normalized_error, is_damping_applied: $is_damping_applied"
-
-        if normalized_error < solver.allowed_error
-            converged = true
-            break
-        end
+        res .= gamma_new .- gamma
+        return nothing
     end
+
+    prob = NonlinearProblem(f!, gamma_new, nothing)
+    sol = NonlinearSolve.solve(prob, NewtonRaphson(autodiff=AutoFiniteDiff()))
+    f!(gamma, sol, nothing)
 
     if log && converged
         @info "Converged after $iters iterations"
