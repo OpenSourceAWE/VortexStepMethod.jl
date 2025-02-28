@@ -33,7 +33,7 @@ julia --project=.
 Then add VortexStepMethod from  Julia's package manager, by typing:
 ```julia
 using Pkg
-pkg"add https://github.com/Albatross-Kite-Transport/VortexStepMethod.jl"
+pkg"add VortexStepMethod"
 ``` 
 at the Julia prompt. You can run the unit tests with the command:
 ```julia
