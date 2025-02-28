@@ -1,4 +1,4 @@
-using VortexStepMethod: Panel, Section, calculate_relative_alpha_and_relative_velocity, calculate_cl, calculate_cd_cm
+using VortexStepMethod: Panel, Section, calculate_relative_alpha_and_relative_velocity, calculate_cl, calculate_cd_cm, init!
 using Interpolations: linear_interpolation, Line
 using LinearAlgebra
 using Test
@@ -35,7 +35,9 @@ function create_panel(section1::Section, section2::Section)
     z_airf = bound_2 .- bound_1
     z_airf = z_airf ./ norm(z_airf)
 
-    Panel(
+    panel = Panel()
+    init!(
+        panel,
         section1,
         section2,
         aero_center,
@@ -46,6 +48,7 @@ function create_panel(section1::Section, section2::Section)
         y_airf,
         z_airf
     )
+    return panel
 end
 
 @testset "Panel Tests" begin
@@ -113,10 +116,10 @@ end
     end
 
     # Generate mock polar data
-    alphas = deg2rad.(-10:1:25)
+    alphas = deg2rad.(collect(-10:1:25))
     n_points = length(alphas)
-    polar_data = [zeros(n_points) for _ in 1:4]
-    big_polar_data = [zeros(n_points) for _ in 1:4]
+    polar_data = (zeros(n_points), zeros(n_points), zeros(n_points), zeros(n_points))
+    big_polar_data = (zeros(n_points), zeros(n_points), zeros(n_points), zeros(n_points))
     
     # Fill polar data with realistic values
     for (i, alpha) in enumerate(alphas)
@@ -134,8 +137,8 @@ end
     end
     
     # Create two sections with slightly different polar data
-    section1 = Section([0.0, 0.0, 0.0], [1.0, 0.0, 0.0], (POLAR_DATA, polar_data))
-    section2 = Section([0.0, 10.0, 0.0], [1.0, 10.0, 0.0], (POLAR_DATA, big_polar_data))
+    section1 = Section([0.0, 0.0, 0.0], [1.0, 0.0, 0.0], POLAR_DATA, polar_data)
+    section2 = Section([0.0, 10.0, 0.0], [1.0, 10.0, 0.0], POLAR_DATA, big_polar_data)
     
     # Create panel
     panel = create_panel(section1, section2)

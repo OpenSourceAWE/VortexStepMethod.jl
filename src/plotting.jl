@@ -177,7 +177,7 @@ function create_geometry_plot(body_aero::BodyAerodynamics, title, view_elevation
     legend_used = Dict{String,Bool}()
     for (i, panel) in enumerate(panels)
         # Plot panel edges and surfaces
-        corners = panel.corner_points
+        corners = Matrix{Float64}(panel.corner_points)
         x_corners = corners[1, :]
         y_corners = corners[2, :]
         z_corners = corners[3, :]

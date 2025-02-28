@@ -195,6 +195,7 @@ mutable struct KiteWing <: AbstractWing
     spanwise_panel_distribution::PanelDistribution
     spanwise_direction::MVec3
     sections::Vector{Section}
+    refined_sections::Vector{Section}
     
     # Additional fields for KiteWing
     mass::Float64
@@ -207,8 +208,8 @@ mutable struct KiteWing <: AbstractWing
     te_interp::Extrapolation
     area_interp::Extrapolation
 
-    function KiteWing(obj_path, dat_path; alpha=0.0, n_sections=20, crease_frac=0.75, wind_vel=10., mass=1.0, 
-        n_panels=54, spanwise_panel_distribution=LINEAR, spanwise_direction=[0.0, 1.0, 0.0])
+    function KiteWing(obj_path, dat_path; alpha=0.0, crease_frac=0.75, wind_vel=10., mass=1.0, 
+            n_panels=54, n_sections=n_panels+1, spanwise_panel_distribution=UNCHANGED, spanwise_direction=[0.0, 1.0, 0.0])
         
         !isapprox(spanwise_direction, [0.0, 1.0, 0.0]) && @error "Spanwise direction has to be [0.0, 1.0, 0.0]"
         
@@ -252,7 +253,7 @@ mutable struct KiteWing <: AbstractWing
         # Create sections
         sections = Section[]
         for gamma in range(-gamma_tip, gamma_tip, n_sections)
-            aero_input = (POLAR_DATA, (alpha_range, beta_range, cl_matrix, cd_matrix, cm_matrix))
+            aero_data = (collect(alpha_range), collect(beta_range), cl_matrix, cd_matrix, cm_matrix)
             LE_point = [0.0, 0.0, circle_center_z] .+ [le_interp(gamma), sin(gamma) * radius, cos(gamma) * radius]
             if !isapprox(alpha, 0.0)
                 local_y_vec = [0.0, sin(-gamma), cos(gamma)] × [1.0, 0.0, 0.0]
@@ -260,11 +261,11 @@ mutable struct KiteWing <: AbstractWing
             else
                 TE_point = LE_point .+ [te_interp(gamma) - le_interp(gamma), 0.0, 0.0]
             end
-            push!(sections, Section(LE_point, TE_point, aero_input))
+            push!(sections, Section(LE_point, TE_point, POLAR_DATA, aero_data))
         end
 
         new(
-            n_panels, spanwise_panel_distribution, spanwise_direction, sections,
+            n_panels, spanwise_panel_distribution, spanwise_direction, sections, sections,
             mass, center_of_mass, circle_center_z, gamma_tip, inertia_tensor, radius,
             le_interp, te_interp, area_interp
         )

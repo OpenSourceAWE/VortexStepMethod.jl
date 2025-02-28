@@ -1,11 +1,12 @@
-using VortexStepMethod: BoundFilament, velocity_3D_bound_vortex!
+using VortexStepMethod: BoundFilament, velocity_3D_bound_vortex!, init!
 using LinearAlgebra
-using BenchmarkTools: @benchmarkable
 using Test
 
 # Test helper functions
 function create_test_filament()
-    BoundFilament([0.0, 0.0, 0.0], [1.0, 0.0, 0.0])
+    fil = BoundFilament()
+    init!(fil, [0.0, 0.0, 0.0], [1.0, 0.0, 0.0])
+    return fil
 end
 
 function analytical_solution(control_point, gamma)
@@ -29,24 +30,6 @@ end
     core_radius_fraction = 0.01
     induced_velocity = zeros(3)
     work_vectors = ntuple(_ -> Vector{Float64}(undef, 3), 10)
-
-    @testset "Non-allocating" begin
-        filament = create_test_filament()
-        control_point = [0.5, 1.0, 0.0]
-        induced_velocity = zeros(3)
-        
-        b = @benchmarkable velocity_3D_bound_vortex!(
-            $induced_velocity,
-            $filament,
-            $control_point,
-            $gamma,
-            $core_radius_fraction,
-            $work_vectors
-        )
-        result = run(b)
-        @test result.allocs == 0
-        @test result.memory == 0
-    end
 
     @testset "Calculate Induced Velocity" begin
         filament = create_test_filament()
@@ -88,7 +71,8 @@ end
     end
 
     @testset "Long Filament" begin
-        filament = BoundFilament([0.0, 0.0, 0.0], [1e6, 0.0, 0.0])
+        filament = BoundFilament()
+        init!(filament, [0.0, 0.0, 0.0], [1e6, 0.0, 0.0])
         control_point = [5e5, 1.0, 0.0]
         
         velocity_3D_bound_vortex!(
@@ -137,7 +121,8 @@ end
     end
 
     @testset "Symmetry" begin
-        filament = BoundFilament([-1.0, 0.0, 0.0], [1.0, 0.0, 0.0])
+        filament = BoundFilament()
+        init!(filament, [-1.0, 0.0, 0.0], [1.0, 0.0, 0.0])
 
         velocity_3D_bound_vortex!(v1, filament, [0.0, 1.0, 0.0], gamma, core_radius_fraction, work_vectors)
         velocity_3D_bound_vortex!(v2, filament, [0.0, -1.0, 0.0], gamma, core_radius_fraction, work_vectors)

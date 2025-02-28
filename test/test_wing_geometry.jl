@@ -1,6 +1,7 @@
 using Test
 using LinearAlgebra
-using VortexStepMethod: Wing, Section, add_section!, refine_mesh_by_splitting_provided_sections, refine_aerodynamic_mesh
+using VortexStepMethod
+using VortexStepMethod: Wing, Section, add_section!, refine_mesh_by_splitting_provided_sections!, refine_aerodynamic_mesh!
 import Base: ==
 
 """
@@ -14,7 +15,8 @@ Points are compared with approximate equality to handle floating point differenc
 function ==(a::Section, b::Section)
     return (isapprox(a.LE_point, b.LE_point; rtol=1e-5, atol=1e-5) &&
             isapprox(a.TE_point, b.TE_point; rtol=1e-5, atol=1e-5) &&
-            a.aero_input === b.aero_input)
+            a.aero_model === b.aero_model &&
+            all(a.aero_data .== b.aero_data))
 end
 
 @testset "Wing Geometry Tests" begin
@@ -34,7 +36,7 @@ end
         section = example_wing.sections[1]
         @test section.LE_point ≈ [0.0, 0.0, 0.0]
         @test section.TE_point ≈ [-1.0, 0.0, 0.0]
-        @test section.aero_input === INVISCID
+        @test section.aero_model === INVISCID
     end
 
     @testset "Robustness left to right" begin
@@ -43,21 +45,24 @@ end
         add_section!(example_wing, [0.0, 1.0, 0.0], [0.0, 1.0, 0.0], INVISCID)
         add_section!(example_wing, [0.0, -1.0, 0.0], [0.0, -1.0, 0.0], INVISCID)
         add_section!(example_wing, [0.0, -1.5, 0.0], [0.0, -1.5, 0.0], INVISCID)
-        sections = refine_aerodynamic_mesh(example_wing)
+        refine_aerodynamic_mesh!(example_wing)
+        sections = example_wing.refined_sections
 
         # Test right to left order
         example_wing_1 = Wing(10)
         add_section!(example_wing_1, [0.0, -1.5, 0.0], [0.0, -1.5, 0.0], INVISCID)
         add_section!(example_wing_1, [0.0, -1.0, 0.0], [0.0, -1.0, 0.0], INVISCID)
         add_section!(example_wing_1, [0.0, 1.0, 0.0], [0.0, 1.0, 0.0], INVISCID)
-        sections_1 = refine_aerodynamic_mesh(example_wing_1)
+        refine_aerodynamic_mesh!(example_wing_1)
+        sections_1 = example_wing_1.refined_sections
 
         # Test random order
         example_wing_2 = Wing(10)
         add_section!(example_wing_2, [0.0, 1.0, 0.0], [0.0, 1.0, 0.0], INVISCID)
         add_section!(example_wing_2, [0.0, -1.5, 0.0], [0.0, -1.5, 0.0], INVISCID)
         add_section!(example_wing_2, [0.0, -1.0, 0.0], [0.0, -1.0, 0.0], INVISCID)
-        sections_2 = refine_aerodynamic_mesh(example_wing_2)
+        refine_aerodynamic_mesh!(example_wing_2)
+        sections_2 = example_wing_2.refined_sections
 
         for i in eachindex(sections)
             @test sections[i].LE_point ≈ sections_1[i].LE_point
@@ -75,7 +80,8 @@ end
         wing = Wing(n_panels; spanwise_panel_distribution=LINEAR)
         add_section!(wing, [0.0, span/2, 0.0], [-1.0, span/2, 0.0], INVISCID)
         add_section!(wing, [0.0, -span/2, 0.0], [-1.0, -span/2, 0.0], INVISCID)
-        sections = refine_aerodynamic_mesh(wing)
+        refine_aerodynamic_mesh!(wing)
+        sections = wing.refined_sections
 
         @test length(sections) == wing.n_panels + 1
 
@@ -90,7 +96,8 @@ end
         wing = Wing(n_panels; spanwise_panel_distribution=COSINE)
         add_section!(wing, [0.0, span/2, 0.0], [-1.0, span/2, 0.0], INVISCID)
         add_section!(wing, [0.0, -span/2, 0.0], [-1.0, -span/2, 0.0], INVISCID)
-        sections = refine_aerodynamic_mesh(wing)
+        refine_aerodynamic_mesh!(wing)
+        sections = wing.refined_sections
         
         @test length(sections) == wing.n_panels + 1
 
@@ -113,7 +120,8 @@ end
         add_section!(wing, [0.0, span/2, 0.0], [-1.0, span/2, 0.0], INVISCID)
         add_section!(wing, [0.0, -span/2, 0.0], [-1.0, -span/2, 0.0], INVISCID)
 
-        sections = refine_aerodynamic_mesh(wing)
+        refine_aerodynamic_mesh!(wing)
+        sections = wing.sections
         @test length(sections) == wing.n_panels + 1
         @test sections[1].LE_point ≈ [0.0, span/2, 0.0]
         @test sections[1].TE_point ≈ [-1.0, span/2, 0.0]
@@ -127,7 +135,8 @@ end
         add_section!(wing, [0.0, span/2, 0.0], [-1.0, span/2, 0.0], INVISCID)
         add_section!(wing, [0.0, -span/2, 0.0], [-1.0, -span/2, 0.0], INVISCID)
 
-        sections = refine_aerodynamic_mesh(wing)
+        refine_aerodynamic_mesh!(wing)
+        sections = wing.refined_sections
         @test length(sections) == wing.n_panels + 1
         @test sections[1].LE_point ≈ [0.0, span/2, 0.0]
         @test sections[2].LE_point ≈ [0.0, 0.0, 0.0]
@@ -144,7 +153,8 @@ end
             add_section!(wing, [0.0, y, 0.0], [-1.0, y, 0.0], INVISCID)
         end
 
-        sections = refine_aerodynamic_mesh(wing)
+        refine_aerodynamic_mesh!(wing)
+        sections = wing.refined_sections
         @test length(sections) == wing.n_panels + 1
 
         for i in eachindex(sections)
@@ -163,7 +173,8 @@ end
         add_section!(wing, [0.0, 5.0, 0.0], [-1.0, 5.0, 0.0], INVISCID)
         add_section!(wing, [0.0, -5.0, 0.0], [-1.0, -5.0, 0.0], INVISCID)
 
-        sections = refine_aerodynamic_mesh(wing)
+        refine_aerodynamic_mesh!(wing)
+        sections = wing.refined_sections
 
         # Calculate expected quarter-chord points
         qc_start = [-0.25, 5.0, 0.0]
@@ -216,11 +227,12 @@ end
         span = 20.0
 
         wing = Wing(n_panels; spanwise_panel_distribution=LINEAR)
-        add_section!(wing, [0.0, span/2, 0.0], [-1.0, span/2, 0.0], (LEI_AIRFOIL_BREUKELS, [0.0, 0.0]))
-        add_section!(wing, [0.0, 0.0, 0.0], [-1.0, 0.0, 0.0], (LEI_AIRFOIL_BREUKELS, [2.0, 0.5]))
-        add_section!(wing, [0.0, -span/2, 0.0], [-1.0, -span/2, 0.0], (LEI_AIRFOIL_BREUKELS, [4.0, 1.0]))
+        add_section!(wing, [0.0, span/2, 0.0], [-1.0, span/2, 0.0], LEI_AIRFOIL_BREUKELS, (0.0, 0.0))
+        add_section!(wing, [0.0, 0.0, 0.0], [-1.0, 0.0, 0.0], LEI_AIRFOIL_BREUKELS, (2.0, 0.5))
+        add_section!(wing, [0.0, -span/2, 0.0], [-1.0, -span/2, 0.0], LEI_AIRFOIL_BREUKELS, (4.0, 1.0))
 
-        sections = refine_aerodynamic_mesh(wing)
+        refine_aerodynamic_mesh!(wing)
+        sections = wing.refined_sections
         @test length(sections) == wing.n_panels + 1
 
         expected_tube_diameter = range(0, 4; length=n_panels+1)
@@ -233,36 +245,38 @@ end
             @test isapprox(section.LE_point, expected_LE; rtol=1e-5)
             @test isapprox(section.TE_point, expected_TE; rtol=1e-4)
 
-            aero_input = section.aero_input
-            @test aero_input[1] === LEI_AIRFOIL_BREUKELS
-            @test isapprox(aero_input[2][1], expected_tube_diameter[i])
-            @test isapprox(aero_input[2][2], expected_chamber_height[i])
+            aero_model = section.aero_model
+            aero_data = section.aero_data
+            @test aero_model === LEI_AIRFOIL_BREUKELS
+            @test isapprox(aero_data[1], expected_tube_diameter[i])
+            @test isapprox(aero_data[2], expected_chamber_height[i])
         end
     end
 
     @testset "Split provided sections" begin
         section1 = Section([0.0, 0.0, 0.0], [1.0, 0.0, 0.0], INVISCID)
-        section2 = Section([0.0, 1.0, 0.0], [1.0, 1.0, 0.0], INVISCID)
-        section3 = Section([0.0, 2.0, 0.0], [1.0, 2.0, 0.0], INVISCID)
+        section2 = Section([0.0, -1.0, 0.0], [1.0, -1.0, 0.0], INVISCID)
+        section3 = Section([0.0, -2.0, 0.0], [1.0, -2.0, 0.0], INVISCID)
 
         wing = Wing(6; spanwise_panel_distribution=SPLIT_PROVIDED)
         add_section!(wing, [0.0, 0.0, 0.0], [1.0, 0.0, 0.0], INVISCID)
-        add_section!(wing, [0.0, 1.0, 0.0], [1.0, 1.0, 0.0], INVISCID)
-        add_section!(wing, [0.0, 2.0, 0.0], [1.0, 2.0, 0.0], INVISCID)
+        add_section!(wing, [0.0, -1.0, 0.0], [1.0, -1.0, 0.0], INVISCID)
+        add_section!(wing, [0.0, -2.0, 0.0], [1.0, -2.0, 0.0], INVISCID)
 
-        new_sections = refine_mesh_by_splitting_provided_sections(wing)
+        refine_aerodynamic_mesh!(wing)
+        new_sections = wing.refined_sections
 
         @test length(new_sections) - 1 == 6
         @test new_sections[1] == section1
         @test new_sections[4] == section2
         @test new_sections[end] == section3
 
-        @test 0.0 < new_sections[2].LE_point[2] < 1.0
-        @test 0.0 < new_sections[3].LE_point[2] < 1.0
-        @test 1.0 < new_sections[5].LE_point[2] < 2.0
+        @test -1.0 < new_sections[2].LE_point[2] < 0.0
+        @test -1.0 < new_sections[3].LE_point[2] < 0.0
+        @test -2.0 < new_sections[5].LE_point[2] < -1.0
 
         for section in new_sections
-            @test section.aero_input === INVISCID
+            @test section.aero_model === INVISCID
         end
     end
 end

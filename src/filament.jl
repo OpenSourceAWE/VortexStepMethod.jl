@@ -19,15 +19,21 @@ Represents a bound vortex filament defined by two points.
 - length: Filament length
 - r0::MVec3: Vector from x1 to x2
 """
-struct BoundFilament <: Filament
-    x1::MVec3       # First point
-    x2::MVec3       # Second point
-    length::Float64 # Filament length
-    r0::MVec3       # Vector from x1 to x2
+@with_kw mutable struct BoundFilament <: Filament
+    x1::MVec3       = zeros(MVec3)
+    x2::MVec3       = zeros(MVec3)
+    length::Float64 = zero(Float64)
+    r0::MVec3       = zeros(MVec3)
+    initialized     = false
+end
 
-    function BoundFilament(x1::PosVector, x2::PosVector)
-        new(x1, x2, norm(x2 - x1), x2 - x1)
-    end
+function init!(filament::BoundFilament, x1::PosVector, x2::PosVector)
+    filament.x1 .= x1
+    filament.x2 .= x2
+    filament.length = norm(x2 - x1)
+    filament.r0 .= x2 .- x1
+    filament.initialized = true
+    return nothing
 end
 
 """
@@ -150,12 +156,28 @@ end
     SemiInfiniteFilament
 
 Represents a semi-infinite vortex filament.
+
+# Fields
+- x1::MVec3: Starting point
+- direction::MVec3: Direction vector
+- `vel_mag`::Float64: Velocity magnitude
+- `filament_direction`::Int64: Direction indicator (-1 or 1)
 """
-struct SemiInfiniteFilament <: Filament
-    x1::MVec3                    # Starting point
-    direction::MVec3             # Direction vector
-    vel_mag::Float64             # Velocity magnitude
-    filament_direction::Int64    # Direction indicator (-1 or 1)
+@with_kw mutable struct SemiInfiniteFilament <: Filament
+    x1::MVec3 = zeros(MVec3)
+    direction::MVec3 = zeros(MVec3)
+    vel_mag::Float64 = zero(Float64)
+    filament_direction::Int64 = zero(Int64)
+    initialized = false
+end
+
+function init!(filament::SemiInfiniteFilament, x1::PosVector, direction::PosVector, vel_mag::Real, filament_direction::Real)
+    filament.x1 .= x1
+    filament.direction .= direction
+    filament.vel_mag = vel_mag
+    filament.filament_direction = filament_direction
+    filament.initialized = true
+    return nothing
 end
 
 """

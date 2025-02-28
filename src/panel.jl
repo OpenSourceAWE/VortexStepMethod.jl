@@ -1,5 +1,3 @@
-using LinearAlgebra
-
 # static types for interpolations
 const I1 = Interpolations.FilledExtrapolation{Float64, 1, Interpolations.GriddedInterpolation{Float64, 1, Vector{Float64}, Interpolations.Gridded{Interpolations.Linear{Interpolations.Throw{Interpolations.OnGrid}}}, Tuple{Vector{Float64}}}, Interpolations.Gridded{Interpolations.Linear{Interpolations.Throw{Interpolations.OnGrid}}}, Float64}
 const I2 = Interpolations.FilledExtrapolation{Float64, 2, Interpolations.GriddedInterpolation{Float64, 2, Matrix{Float64}, Interpolations.Gridded{Interpolations.Linear{Interpolations.Throw{Interpolations.OnGrid}}}, Tuple{Vector{Float64}, Vector{Float64}}}, Interpolations.Gridded{Interpolations.Linear{Interpolations.Throw{Interpolations.OnGrid}}}, Float64}
@@ -28,136 +26,154 @@ Represents a panel in a vortex step method simulation. All points and vectors ar
 - `width::Float64`: Panel width
 - `filaments::Vector{BoundFilament}`: Panel filaments, see: [BoundFilament](@ref)
 """
-mutable struct Panel
-    TE_point_1::MVec3
-    LE_point_1::MVec3
-    TE_point_2::MVec3
-    LE_point_2::MVec3
-    chord::Float64
-    va::Union{Nothing, MVec3}
-    corner_points::Matrix{Float64}
-    aero_model::AeroModel
-    cl_coefficients::Vector{Float64}
-    cd_coefficients::Vector{Float64}
-    cm_coefficients::Vector{Float64}
-    cl_interp::Union{Nothing, I1, I2}
-    cd_interp::Union{Nothing, I1, I2}
-    cm_interp::Union{Nothing, I1, I2}
-    aero_center::MVec3
-    control_point::MVec3
-    bound_point_1::MVec3
-    bound_point_2::MVec3
-    x_airf::MVec3
-    y_airf::MVec3
-    z_airf::MVec3
-    width::Float64
-    filaments::Vector{Union{BoundFilament, SemiInfiniteFilament}}
-
-    function Panel(
-        section_1::Section,
-        section_2::Section,
-        aero_center::PosVector,
-        control_point::PosVector,
-        bound_point_1::PosVector,
-        bound_point_2::PosVector,
-        x_airf::PosVector,
-        y_airf::PosVector,
-        z_airf::PosVector
+@with_kw mutable struct Panel
+    TE_point_1::MVec3 = zeros(MVec3)
+    LE_point_1::MVec3 = zeros(MVec3)
+    TE_point_2::MVec3 = zeros(MVec3)
+    LE_point_2::MVec3 = zeros(MVec3)
+    chord::Float64 = zero(Float64)
+    va::MVec3 = zeros(MVec3)
+    corner_points::MMatrix{3, 4, Float64} = zeros(MMatrix{3, 4, Float64})
+    aero_model::AeroModel = INVISCID
+    cl_coeffs::Vector{Float64} = zeros(Float64, 3)
+    cd_coeffs::Vector{Float64} = zeros(Float64, 3)
+    cm_coeffs::Vector{Float64} = zeros(Float64, 3)
+    cl_interp::Union{Nothing, I1, I2} = nothing
+    cd_interp::Union{Nothing, I1, I2} = nothing
+    cm_interp::Union{Nothing, I1, I2} = nothing
+    aero_center::MVec3 = zeros(MVec3)
+    control_point::MVec3 = zeros(MVec3)
+    bound_point_1::MVec3 = zeros(MVec3)
+    bound_point_2::MVec3 = zeros(MVec3)
+    x_airf::MVec3 = zeros(MVec3)
+    y_airf::MVec3 = zeros(MVec3)
+    z_airf::MVec3 = zeros(MVec3)
+    width::Float64 = zero(Float64)
+    filaments::Tuple{BoundFilament,BoundFilament,BoundFilament,SemiInfiniteFilament,SemiInfiniteFilament} = (
+        BoundFilament(),
+        BoundFilament(),
+        BoundFilament(),
+        SemiInfiniteFilament(),
+        SemiInfiniteFilament()
     )
-        # Initialize basic geometry
-        TE_point_1 = copy(section_1.TE_point)
-        LE_point_1 = copy(section_1.LE_point)
-        TE_point_2 = copy(section_2.TE_point)
-        LE_point_2 = copy(section_2.LE_point)
-        
-        chord = mean([
-            norm(TE_point_1 - LE_point_1),
-            norm(TE_point_2 - LE_point_2)
-        ])
-        
-        corner_points = hcat(LE_point_1, TE_point_1, TE_point_2, LE_point_2)
-        
-        # Validate aero model consistency
-        aero_model = isa(section_1.aero_input, AeroModel) ? section_1.aero_input : section_1.aero_input[1]
-        aero_model_2 = isa(section_2.aero_input, AeroModel) ? section_2.aero_input : section_2.aero_input[1]
-        if !(aero_model == aero_model_2)
-            throw(ArgumentError("Both sections must have the same aero_input, not $aero_model and $aero_model_2"))
-        end
-        
-        # Initialize aerodynamic properties
-        cl_coeffs, cd_coeffs, cm_coeffs = zeros(3), zeros(3), zeros(3)
-        
-        # Calculate width
-        width = norm(bound_point_2 - bound_point_1)
-        
-        # Initialize filaments
-        filaments = [
-            BoundFilament(bound_point_2, bound_point_1),
-            BoundFilament(bound_point_1, TE_point_1),
-            BoundFilament(TE_point_2, bound_point_2)
-        ]
+end
 
-        cl_interp, cd_interp, cm_interp = nothing, nothing, nothing
+function init_pos!(
+    panel::Panel,
+    section_1::Section,
+    section_2::Section,
+    aero_center::PosVector,
+    control_point::PosVector,
+    bound_point_1::PosVector,
+    bound_point_2::PosVector,
+    x_airf::PosVector,
+    y_airf::PosVector,
+    z_airf::PosVector
+)
+    # Initialize basic geometry
+    panel.TE_point_1 .= section_1.TE_point
+    panel.LE_point_1 .= section_1.LE_point
+    panel.TE_point_2 .= section_2.TE_point
+    panel.LE_point_2 .= section_2.LE_point
+    panel.chord = (
+        norm(panel.TE_point_1 - panel.LE_point_1) +
+        norm(panel.TE_point_2 - panel.LE_point_2)
+    ) / 2
+    panel.corner_points .= hcat(panel.LE_point_1, panel.TE_point_1, panel.TE_point_2, panel.LE_point_2)
+    panel.width = norm(bound_point_2 - bound_point_1)
+    init!(panel.filaments[1], bound_point_2, bound_point_1)
+    init!(panel.filaments[2], bound_point_1, panel.TE_point_1)
+    init!(panel.filaments[3], panel.TE_point_2, bound_point_2)
 
-        if aero_model == LEI_AIRFOIL_BREUKELS
-            cl_coeffs, cd_coeffs, cm_coeffs = compute_lei_coefficients(section_1, section_2)
+    panel.bound_point_1 .= bound_point_1
+    panel.bound_point_2 .= bound_point_2
+    panel.aero_center .= aero_center
+    panel.control_point .= control_point
+    panel.x_airf .= x_airf
+    panel.y_airf .= y_airf
+    panel.z_airf .= z_airf
+    return nothing
+end
 
-        elseif aero_model == POLAR_DATA
-            aero_1 = section_1.aero_input[2]
-            aero_2 = section_2.aero_input[2]
-            if !all(size.(aero_1) .== size.(aero_2))
-                throw(ArgumentError("Polar data must have same shape"))
-            end
+function init_aero!(
+    panel::Panel,
+    section_1::Section,
+    section_2::Section,
+)
+    # Validate aero model consistency
+    panel.aero_model = section_1.aero_model
+    aero_model_2 = section_2.aero_model
+    if !(panel.aero_model === aero_model_2)
+        throw(ArgumentError("Both sections must have the same aero model, not $(panel.aero_model) and $aero_model_2"))
+    end
+    
+    if panel.aero_model === LEI_AIRFOIL_BREUKELS
+        panel.cl_coeffs, panel.cd_coeffs, panel.cm_coeffs = compute_lei_coeffs(section_1, section_2)
 
-            if length(aero_1) == 4
-                !all(isapprox.(aero_1[1], aero_2[1])) && @error "Make sure you use the same alpha range for all your interpolations."
-
-                polar_data = (
-                    Vector{Float64}((aero_1[2] + aero_2[2]) / 2),
-                    Vector{Float64}((aero_1[3] + aero_2[3]) / 2),
-                    Vector{Float64}((aero_1[4] + aero_2[4]) / 2)
-                )
-                alphas = Vector{Float64}(aero_1[1])
-
-                cl_interp = linear_interpolation(alphas, polar_data[1]; extrapolation_bc=NaN)
-                cd_interp = linear_interpolation(alphas, polar_data[2]; extrapolation_bc=NaN)
-                cm_interp = linear_interpolation(alphas, polar_data[3]; extrapolation_bc=NaN)
-
-            elseif length(aero_1) == 5
-                !all(isapprox.(aero_1[1], aero_2[1])) && @error "Make sure you use the same alpha range for all your interpolations."
-                !all(isapprox.(aero_1[2], aero_2[2])) && @error "Make sure you use the same beta range for all your interpolations."
-
-                polar_data = (
-                    Matrix{Float64}((aero_1[3] + aero_2[3]) / 2),
-                    Matrix{Float64}((aero_1[4] + aero_2[4]) / 2),
-                    Matrix{Float64}((aero_1[5] + aero_2[5]) / 2)
-                )
-                alphas = Vector{Float64}(aero_1[1])
-                betas = Vector{Float64}(aero_1[2])
-
-                cl_interp = linear_interpolation((alphas, betas), polar_data[1]; extrapolation_bc=NaN)
-                cd_interp = linear_interpolation((alphas, betas), polar_data[2]; extrapolation_bc=NaN)
-                cm_interp = linear_interpolation((alphas, betas), polar_data[3]; extrapolation_bc=NaN)
-            else
-                throw(ArgumentError("Polar data in wrong format: $aero_1"))
-            end
-
-        elseif !(aero_model == INVISCID)
-            throw(ArgumentError("Unsupported aero model: $aero_model"))
+    elseif panel.aero_model === POLAR_DATA
+        aero_1 = section_1.aero_data
+        aero_2 = section_2.aero_data
+        if !all(size.(aero_1) .== size.(aero_2))
+            throw(ArgumentError("Polar data must have same shape"))
         end
 
-        new(
-            TE_point_1, LE_point_1, TE_point_2, LE_point_2,
-            chord, nothing, corner_points, aero_model,
-            cl_coeffs, cd_coeffs, cm_coeffs,
-            cl_interp, cd_interp, cm_interp,
-            aero_center, control_point,
-            bound_point_1, bound_point_2,
-            x_airf, y_airf, z_airf,
-            width, filaments
-        )
+        if length(aero_1) == 4
+            !all(isapprox.(aero_1[1], aero_2[1])) && @error "Make sure you use the same alpha range for all your interpolations."
+
+            polar_data = (
+                Vector{Float64}((aero_1[2] + aero_2[2]) / 2),
+                Vector{Float64}((aero_1[3] + aero_2[3]) / 2),
+                Vector{Float64}((aero_1[4] + aero_2[4]) / 2)
+            )
+            alphas = Vector{Float64}(aero_1[1])
+
+            panel.cl_interp = linear_interpolation(alphas, polar_data[1]; extrapolation_bc=NaN)
+            panel.cd_interp = linear_interpolation(alphas, polar_data[2]; extrapolation_bc=NaN)
+            panel.cm_interp = linear_interpolation(alphas, polar_data[3]; extrapolation_bc=NaN)
+
+        elseif length(aero_1) == 5
+            !all(isapprox.(aero_1[1], aero_2[1])) && @error "Make sure you use the same alpha range for all your interpolations."
+            !all(isapprox.(aero_1[2], aero_2[2])) && @error "Make sure you use the same beta range for all your interpolations."
+
+            polar_data = (
+                Matrix{Float64}((aero_1[3] + aero_2[3]) / 2),
+                Matrix{Float64}((aero_1[4] + aero_2[4]) / 2),
+                Matrix{Float64}((aero_1[5] + aero_2[5]) / 2)
+            )
+            alphas = Vector{Float64}(aero_1[1])
+            betas = Vector{Float64}(aero_1[2])
+
+            panel.cl_interp = linear_interpolation((alphas, betas), polar_data[1]; extrapolation_bc=NaN)
+            panel.cd_interp = linear_interpolation((alphas, betas), polar_data[2]; extrapolation_bc=NaN)
+            panel.cm_interp = linear_interpolation((alphas, betas), polar_data[3]; extrapolation_bc=NaN)
+        else
+            throw(ArgumentError("Polar data in wrong format: $aero_1"))
+        end
+
+    elseif !(panel.aero_model === INVISCID)
+        throw(ArgumentError("Unsupported aero model: $(panel.aero_model)"))
     end
 end
+
+function init!(
+    panel::Panel,
+    section_1::Section,
+    section_2::Section,
+    aero_center::PosVector,
+    control_point::PosVector,
+    bound_point_1::PosVector,
+    bound_point_2::PosVector,
+    x_airf::PosVector,
+    y_airf::PosVector,
+    z_airf::PosVector;
+    init_aero = true
+)
+    init_pos!(panel, section_1, section_2, aero_center, control_point, bound_point_1, bound_point_2,
+        x_airf, y_airf, z_airf)
+    init_aero && init_aero!(panel, section_1, section_2)
+    return nothing
+end
+
 
 """
     calculate_relative_alpha_and_relative_velocity(panel::Panel, induced_velocity::Vector{Float64})
@@ -188,14 +204,14 @@ function calculate_relative_alpha_and_relative_velocity(
 end
 
 """
-    compute_lei_coefficients(section_1::Section, section_2::Section)
+    compute_lei_coeffs(section_1::Section, section_2::Section)
 
 Compute lift, drag and moment coefficients for Lei airfoil using Breukels model.
 """
-function compute_lei_coefficients(section_1::Section, section_2::Section)
+function compute_lei_coeffs(section_1::Section, section_2::Section)
     # Average tube diameter and camber from both sections
-    t1, k1 = section_1.aero_input[2]
-    t2, k2 = section_2.aero_input[2]
+    t1, k1 = section_1.aero_data
+    t2, k2 = section_2.aero_data
     t = (t1 + t2) / 2
     k = (k1 + k2) / 2
 
@@ -280,7 +296,7 @@ Calculate lift coefficient for given angle of attack.
 function calculate_cl(panel::Panel, alpha::Float64)::Float64
     cl = 0.0
     if panel.aero_model == LEI_AIRFOIL_BREUKELS
-        cl = evalpoly(rad2deg(alpha), reverse(panel.cl_coefficients))
+        cl = evalpoly(rad2deg(alpha), reverse(panel.cl_coeffs))
         if abs(alpha) > (π/9)
             cl = 2 * cos(alpha) * sin(alpha)^2
         end
@@ -309,8 +325,8 @@ Calculate drag and moment coefficients for given angle of attack.
 function calculate_cd_cm(panel::Panel, alpha::Float64)
     cd, cm = 0.0, 0.0
     if panel.aero_model == LEI_AIRFOIL_BREUKELS
-        cd = evalpoly(rad2deg(alpha), reverse(panel.cd_coefficients))
-        cm = evalpoly(rad2deg(alpha), reverse(panel.cm_coefficients))
+        cd = evalpoly(rad2deg(alpha), reverse(panel.cd_coeffs))
+        cm = evalpoly(rad2deg(alpha), reverse(panel.cm_coeffs))
         if abs(alpha) > (π/9)  # Outside ±20 degrees
             cd = 2 * sin(alpha)^3
         end
@@ -395,7 +411,7 @@ Calculate the velocity induced by a vortex ring at a control point.
 @inline function calculate_velocity_induced_single_ring_semiinfinite!(
     velind::MVec3,
     tempvel::MVec3,
-    filaments::Vector{Union{VortexStepMethod.BoundFilament, VortexStepMethod.SemiInfiniteFilament}},
+    filaments,
     evaluation_point::MVec3,
     evaluation_point_on_bound::Bool,
     va_norm::Float64,
@@ -408,42 +424,47 @@ Calculate the velocity induced by a vortex ring at a control point.
     tempvel .= 0.0
     # Process each filament
     @inbounds for i in eachindex(filaments)
-        if i == 1  # bound filament
-            if evaluation_point_on_bound
-                tempvel .= 0.0
-            else
-                velocity_3D_bound_vortex!(
+        if filaments[i].initialized
+            if i == 1  # bound filament
+                if evaluation_point_on_bound
+                    tempvel .= 0.0
+                else
+                    velocity_3D_bound_vortex!(
+                        tempvel,
+                        filaments[i],
+                        evaluation_point,
+                        gamma,
+                        core_radius_fraction,
+                        work_vectors
+                    )
+                end
+            elseif i == 2 || i == 3  # trailing filaments
+                velocity_3D_trailing_vortex!(
                     tempvel,
                     filaments[i],
                     evaluation_point,
                     gamma,
-                    core_radius_fraction,
+                    va_norm,
                     work_vectors
                 )
+            elseif i == 4 || i == 5  # semi-infinite trailing filaments
+                velocity_3D_trailing_vortex_semiinfinite!(
+                    tempvel,
+                    filaments[i],
+                    va_unit,
+                    evaluation_point,
+                    gamma,
+                    va_norm,
+                    work_vectors
+                )
+            else
+                throw(ArgumentError("Too many filaments."))
+                tempvel .= 0.0
             end
-        elseif i == 2 || i == 3  # trailing filaments
-            velocity_3D_trailing_vortex!(
-                tempvel,
-                filaments[i],
-                evaluation_point,
-                gamma,
-                va_norm,
-                work_vectors
-            )
-        elseif i == 4 || i == 5  # semi-infinite trailing filaments
-            velocity_3D_trailing_vortex_semiinfinite!(
-                tempvel,
-                filaments[i],
-                va_unit,
-                evaluation_point,
-                gamma,
-                va_norm,
-                work_vectors
-            )
+            velind .+= tempvel
         else
-            tempvel .= 0.0
+            throw(ArgumentError("Filament not initialized: $i, $([filaments[j].initialized for j in 1:5])"))
         end
-        velind .+= tempvel
     end
     return nothing
 end

@@ -33,13 +33,13 @@ rib_list = []
 for row in eachrow(df)
     LE = [row.LE_x, row.LE_y, row.LE_z]
     TE = [row.TE_x, row.TE_y, row.TE_z]
-    push!(rib_list, (LE, TE, (LEI_AIRFOIL_BREUKELS, [row.d_tube, row.camber])))
+    push!(rib_list, (LE, TE, LEI_AIRFOIL_BREUKELS, (row.d_tube, row.camber)))
 end
 
 # Create wing geometry
 CAD_wing = Wing(n_panels; spanwise_panel_distribution)
 for rib in rib_list
-    add_section!(CAD_wing, rib[1], rib[2], rib[3])
+    add_section!(CAD_wing, rib[1], rib[2], rib[3], rib[4])
 end
 body_aero_CAD_19ribs = BodyAerodynamics([CAD_wing])
 
