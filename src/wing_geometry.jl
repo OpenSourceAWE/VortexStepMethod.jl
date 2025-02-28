@@ -51,7 +51,9 @@ function init!(refined_section::Section, section::Section)
     if isnothing(refined_section.aero_data)
         refined_section.aero_data = section.aero_data
     else
-        refined_section.aero_data .= section.aero_data
+        for i in eachindex(section.aero_data)
+            refined_section.aero_data[i] .= section.aero_data[i]
+        end
     end
 end
 

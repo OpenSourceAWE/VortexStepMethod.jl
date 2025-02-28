@@ -33,7 +33,7 @@ rib_list = []
 for row in eachrow(df)
     LE = [row.LE_x, row.LE_y, row.LE_z]
     TE = [row.TE_x, row.TE_y, row.TE_z]
-    push!(rib_list, (LE, TE, LEI_AIRFOIL_BREUKELS, [row.d_tube, row.camber]))
+    push!(rib_list, (LE, TE, LEI_AIRFOIL_BREUKELS, (row.d_tube, row.camber)))
 end
 
 # Create wing geometry
