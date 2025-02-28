@@ -1,17 +1,22 @@
 """
-    BodyAerodynamics
+    @with_kw mutable struct BodyAerodynamics{P}
 
 Main structure for calculating aerodynamic properties of bodies.
 
 # Fields
 - panels::Vector{Panel}: Vector of [Panel](@ref) structs
-- wings::Vector{AbstractWing}: a vector of wings; a body can have multiple wings
-- `va`::Union{Nothing, MVec3}: A vector of the apparent wind speed, see: [MVec3](@ref)
-- `omega`::Union{Nothing, MVec3}: A vector of the turn rate around the kite body axes
-- `gamma_distribution`::Union{Nothing, Vector{Float64}}: unclear, please defined
-- `alpha_uncorrected`::Union{Nothing, Vector{Float64}}: unclear, please define
-- `alpha_corrected`::Union{Nothing, Vector{Float64}}: unclear, please define
-- `stall_angle_list`::Vector{Float64}: unclear, please define
+- wings::Vector{AbstractWing}:   A vector of wings; a body can have multiple wings
+- `_va`::MVec3 = zeros(MVec3):   A vector of the apparent wind speed, see: [MVec3](@ref)
+- `omega`::MVec3 = zeros(MVec3): A vector of the turn rates around the kite body axes
+- `gamma_distribution`::Vector{Float64}=zeros(Float64, P): A vector of the circulation 
+                        of the velocity field; Length: Number of segments. [m²/s]
+- `alpha_uncorrected`::Vector{Float64}=zeros(Float64, P): unclear, please define
+- `alpha_corrected`::Vector{Float64}=zeros(Float64, P):   unclear, please define
+- `stall_angle_list`::Vector{Float64}=zeros(Float64, P):  unclear, please define
+- alpha_array::Vector{Float64} = zeros(Float64, P)
+- v_a_array::Vector{Float64} = zeros(Float64, P)
+- work_vectors::NTuple{10,MVec3} = ntuple(_ -> zeros(MVec3), 10)
+- AIC::Array{Float64, 3} = zeros(3, P, P)
 """
 @with_kw mutable struct BodyAerodynamics{P}
     panels::Vector{Panel}
@@ -22,12 +27,10 @@ Main structure for calculating aerodynamic properties of bodies.
     alpha_uncorrected::Vector{Float64} = zeros(Float64, P)
     alpha_corrected::Vector{Float64} = zeros(Float64, P)
     stall_angle_list::Vector{Float64} = zeros(Float64, P)
-
     alpha_array::Vector{Float64} = zeros(Float64, P)
     v_a_array::Vector{Float64} = zeros(Float64, P)
     work_vectors::NTuple{10,MVec3} = ntuple(_ -> zeros(MVec3), 10)
     AIC::Array{Float64, 3} = zeros(3, P, P)
-
 end
 
 function BodyAerodynamics(
