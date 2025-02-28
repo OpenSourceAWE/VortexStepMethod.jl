@@ -7,13 +7,12 @@ Represents a wing section with leading edge, trailing edge, and aerodynamic prop
 # Fields
 - `LE_point::MVec3`: Leading edge point coordinates
 - `TE_point::MVec3`: Trailing edge point coordinates
-- `aero_model`::AeroModel: Aerodynamic model, one of three possible types
-- `aero_data`::Union{
-        Nothing,
-        NTuple{2, Float64},
-        Tuple{Vector{Float64}, Vector{Float64}, Vector{Float64}, Vector{Float64}},
-        Tuple{Vector{Float64}, Vector{Float64}, Matrix{Float64}, Matrix{Float64}, Matrix{Float64}}
-    }: Aerodynamic data
+- `aero_model`::AeroModel: [AeroModel](@ref)
+- `aero_data`: Can be:
+  - nothing for INVISCID
+  - (tube_diameter, camber) for `LEI_AIRFOIL_BREUKELS`
+  - (`alpha_range`, `cl_vector`, `cd_vector`, `cm_vector`) for `POLAR_DATA`
+  - (`alpha_range`, `beta_range`, `cl_matrix`, `cd_matrix`, `cm_matrix`) for `POLAR_DATA`        
 """
 mutable struct Section
     LE_point::MVec3
@@ -114,15 +113,12 @@ Add a new section to the wing.
 - wing::Wing: The [Wing](@ref) to which a section shall be added
 - LE_point::PosVector: [PosVector](@ref) of the point on the side of the leading edge
 - TE_point::PosVector: [PosVector](@ref) of the point on the side of the trailing edge
-- aero_model: Can be:
-  - INVISCID
-  - `LEI_AIRFOIL_BREUKELS`
-  - `POLAR_DATA`
-- aero_data: Can be:
+- `aero_model`::AeroModel: [AeroModel](@ref)
+- `aero_data`: Can be:
   - nothing for INVISCID
-  - (tube_diameter, camber) for LEI_AIRFOIL_BREUKELS
-  - (`alpha_range`, `cl_vector`, `cd_vector`, `cm_vector`) for POLAR_DATA
-  - (`alpha_range`, `beta_range`, `cl_matrix`, `cd_matrix`, `cm_matrix`) for POLAR_DATA
+  - (tube_diameter, camber) for `LEI_AIRFOIL_BREUKELS`
+  - (`alpha_range`, `cl_vector`, `cd_vector`, `cm_vector`) for `POLAR_DATA`
+  - (`alpha_range`, `beta_range`, `cl_matrix`, `cd_matrix`, `cm_matrix`) for `POLAR_DATA`  
 """
 function add_section!(wing::Wing, LE_point::Vector{Float64}, 
                      TE_point::Vector{Float64}, aero_model::AeroModel, aero_data=nothing)
