@@ -3,28 +3,40 @@ const I1 = Interpolations.FilledExtrapolation{Float64, 1, Interpolations.Gridded
 const I2 = Interpolations.FilledExtrapolation{Float64, 2, Interpolations.GriddedInterpolation{Float64, 2, Matrix{Float64}, Interpolations.Gridded{Interpolations.Linear{Interpolations.Throw{Interpolations.OnGrid}}}, Tuple{Vector{Float64}, Vector{Float64}}}, Interpolations.Gridded{Interpolations.Linear{Interpolations.Throw{Interpolations.OnGrid}}}, Float64}
 
 """
-    Panel
+    @with_kw mutable struct Panel
 
 Represents a panel in a vortex step method simulation. All points and vectors are in the kite body (KB) frame.
 
 # Fields
-- `TE_point_1::MVec3`: First trailing edge point
-- `LE_point_1::MVec3`: First leading edge point
-- `TE_point_2::Vector{MVec3}`: Second trailing edge point
-- `LE_point_2::Vector{MVec3}`: Second leading edge point
-- `chord::Float64`: Panel chord length
-- `va::Union{Nothing, MVec3}`: Panel velocity
-- `corner_points::Matrix{Float64}`: Panel corner points
-- `aero_model`::AeroModel: Aerodynamic model type [AeroModel](@ref)
+- `TE_point_1`::MVec3=zeros(MVec3): First trailing edge point
+- `LE_point_1`::MVec3=zeros(MVec3): First leading edge point
+- `TE_point_2`::MVec3=zeros(MVec3): Second trailing edge point
+- `LE_point_2`::MVec3=zeros(MVec3): Second leading edge point
+- `chord`::Float64=0: Panel chord length
+- `va`::MVec3=zeros(MVec3): Panel velocity
+- `corner_points`::MMatrix{3, 4, Float64}=zeros(MMatrix{3, 4, Float64}: Panel corner points
+- `aero_model`::AeroModel=INVISCID: Aerodynamic model type [AeroModel](@ref)
 - `aero_center::Vector{Float64}`: Panel aerodynamic center
-- `control_point::Vector{MVec3}`: Panel control point
-- `bound_point_1::Vector{MVec3}`: First bound point
-- `bound_point_2::Vector{MVec3}`: Second bound point
-- `x_airf::MVec3`: Unit vector perpendicular to chord line
-- `y_airf::MVec3`: Unit vector parallel to chord line
-- `z_airf::MVec3`: Unit vector in spanwise direction
-- `width::Float64`: Panel width
-- `filaments::Vector{BoundFilament}`: Panel filaments, see: [BoundFilament](@ref)
+- cl_coeffs::Vector{Float64}=zeros(Float64, 3)
+- cd_coeffs::Vector{Float64}=zeros(Float64, 3)
+- cm_coeffs::Vector{Float64}=zeros(Float64, 3)
+- cl_interp::Union{Nothing, I1, I2} = nothing
+- cd_interp::Union{Nothing, I1, I2} = nothing
+- cm_interp::Union{Nothing, I1, I2} = nothing
+- `control_point`::Vector{MVec3}: Panel control point
+- `bound_point_1`::Vector{MVec3}: First bound point
+- `bound_point_2`::Vector{MVec3}: Second bound point
+- `x_airf`::MVec3=zeros(MVec3): Unit vector perpendicular to chord line
+- `y_airf`::MVec3=zeros(MVec3): Unit vector parallel to chord line
+- `z_airf`::MVec3=zeros(MVec3): Unit vector in spanwise direction
+- `width`::Float64=0: Panel width
+- filaments::Tuple{BoundFilament,BoundFilament,BoundFilament,SemiInfiniteFilament,SemiInfiniteFilament} = (
+        BoundFilament(),
+        BoundFilament(),
+        BoundFilament(),
+        SemiInfiniteFilament(),
+        SemiInfiniteFilament()
+    ): Panel filaments, see: [BoundFilament](@ref)
 """
 @with_kw mutable struct Panel
     TE_point_1::MVec3 = zeros(MVec3)
@@ -384,26 +396,31 @@ end
 
 """
     calculate_velocity_induced_single_ring_semiinfinite!(
-        velind::Matrix{Float64},
-        tempvel::Vector{Float64},
-        panel::Panel,
-        evaluation_point::Vector{Float64},
+        velind::MVec3,
+        tempvel::MVec3,
+        filaments,
+        evaluation_point::MVec3,
         evaluation_point_on_bound::Bool,
         va_norm::Float64,
-        va_unit::Vector{Float64},
+        va_unit::MVec3,
         gamma::Float64,
-        core_radius_fraction::Float64
+        core_radius_fraction::Float64,
+        work_vectors::NTuple{10, MVec3}
     )
 
 Calculate the velocity induced by a vortex ring at a control point.
 
 # Arguments
-- `evaluation_point`: Point where induced velocity is evaluated
-- `evaluation_point_on_bound`: Whether evaluation point is on bound vortex
-- `va_norm`: Norm of apparent velocity
-- `va_unit`: Unit vector of apparent velocity
-- `gamma`: Circulation strength
-- `core_radius_fraction`: Vortex core radius as fraction of panel width
+- velind
+- tempvel
+- filaments
+- `evaluation_point`::MVec3:         Point where induced velocity is evaluated
+- `evaluation_point_on_bound`::Bool: Whether evaluation point is on bound vortex
+- `va_norm`::Float64:                Norm of apparent velocity
+- `va_unit`::MVec3:                  Unit vector of apparent velocity
+- `gamma`::Float64:                  Circulation strength
+- `core_radius_fraction`::Float64:   Vortex core radius as fraction of panel width
+- `work_vectors`::NTuple{10, MVec3}    Pre-allocated temporary variables
 
 # Returns
 - nothing
@@ -476,10 +493,10 @@ Calculate velocity induced by bound vortex filaments at the control point.
 Only needed for VSM, as LLT bound and filament align, thus no induced velocity.
 
 # Arguments
-- U_2D: resulting 2D velocity vector
-- `panel::Panel`: Panel object
+- `U_2D`:             Resulting 2D velocity vector
+- `panel::Panel`:     Panel object
 - `evaluation_point`: Point where induced velocity is evaluated
-- work_vectors: unclear
+- `work_vectors`:     Pre-allocated temporary variables
 """
 function calculate_velocity_induced_bound_2D!(
     U_2D,
