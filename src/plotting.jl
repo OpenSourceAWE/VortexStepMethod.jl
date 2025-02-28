@@ -569,10 +569,11 @@ end
 
 """
     plot_polars(solver_list, body_aero_list, label_list;
-    literature_path_list=String[], angle_range=range(0, 20, 2), angle_type="angle_of_attack", 
-    angle_of_attack=0.0, side_slip=0.0, v_a=10.0, 
-    title="polar", data_type=".pdf", save_path=nothing, 
-    is_save=true, is_show=true)
+                literature_path_list=String[], 
+                angle_range=range(0, 20, 2), angle_type="angle_of_attack", 
+                angle_of_attack=0.0, side_slip=0.0, v_a=10.0, 
+                title="polar", data_type=".pdf", save_path=nothing, 
+                is_save=true, is_show=true)
 
 Plot polar data comparing different solvers and configurations.
 
