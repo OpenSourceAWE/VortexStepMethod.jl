@@ -1,17 +1,17 @@
 
 """
-    frozen_wake(va_distribution::Matrix{Float64}, panels::Vector{Panel})
+    frozen_wake(body_aero::BodyAerodynamics, va_distribution)
 
 Update the filaments of the panels with frozen wake model.
 
 Replaces older filaments if present by checking length of filaments.
 
 # Arguments
+- `body_aero`::BodyAerodynamics: see: [BodyAerodynamics](@ref) 
 - `va_distribution::Matrix{Float64}`: Array of velocity vectors at each panel
-- `panels::Vector{Panel}`: List of panels
 
 # Returns
-- `Vector{Panel}`: List of panels with updated filaments
+- nothing
 """
 function frozen_wake!(body_aero::BodyAerodynamics, va_distribution)
     for (i, panel) in enumerate(body_aero.panels)

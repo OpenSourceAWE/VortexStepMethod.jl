@@ -1,6 +1,6 @@
 
 """
-    Section{T}
+    Section
 
 Represents a wing section with leading edge, trailing edge, and aerodynamic properties.
 
@@ -8,7 +8,12 @@ Represents a wing section with leading edge, trailing edge, and aerodynamic prop
 - `LE_point::MVec3`: Leading edge point coordinates
 - `TE_point::MVec3`: Trailing edge point coordinates
 - `aero_model`::AeroModel: Aerodynamic model, one of three possible types
-- `aero_data`::Union{Nothing, Tuple}: Aerodynamic data
+- `aero_data`::Union{
+        Nothing,
+        NTuple{2, Float64},
+        Tuple{Vector{Float64}, Vector{Float64}, Vector{Float64}, Vector{Float64}},
+        Tuple{Vector{Float64}, Vector{Float64}, Matrix{Float64}, Matrix{Float64}, Matrix{Float64}}
+    }: Aerodynamic data
 """
 mutable struct Section
     LE_point::MVec3
@@ -322,6 +327,9 @@ Refine wing mesh using linear or cosine spacing.
 - `aero_model`: Vector of aerodynamic models for each section
 - `aero_data`: Vector of aerodynamic data for each section
 
+# Keyword arguments
+- endpoints=true
+
 Returns:
     idx: Last section index
 """
@@ -423,7 +431,7 @@ end
 
 
 """
-    calculate_cosine_van_Garrel!(wing::AbstractWing)
+    calculate_cosine_van_Garrel!(wing::AbstractWing, idx)
 
 Calculate van Garrel cosine distribution of sections.
 Reference: http://dx.doi.org/10.13140/RG.2.1.2773.8000
