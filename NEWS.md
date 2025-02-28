@@ -8,3 +8,6 @@ This project is based on version 1.0 of the Python project [Vortex-Step-Method](
 - a ram-air kite example was added
 - `Umag` was replaced with `v_a` as variable name for the norm of the apparent wind speed
 - memory allocations where significantly reduced
+- a menu (examples/menu.jl) for running the examples was added
+- plotting was moved to an extension
+- added improved online documentation
