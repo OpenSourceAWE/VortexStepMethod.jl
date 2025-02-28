@@ -88,6 +88,9 @@ Main solving routine for the aerodynamic model. Reference point is in the kite b
 # Keyword Arguments:
 - log=false: If true, print the number of iterations and other info.
 - reference_point=zeros(MVec3)
+
+# Returns
+A dictionary with the results.
 """
 function solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=nothing; 
                log=false, reference_point=zeros(MVec3))
