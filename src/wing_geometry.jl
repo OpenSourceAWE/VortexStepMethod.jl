@@ -511,9 +511,6 @@ function refine_mesh_by_splitting_provided_sections!(wing::AbstractWing)
     n_section_pairs = n_sections_provided - 1
     new_sections_per_pair, remaining = divrem(n_new_sections, n_section_pairs)
     
-    # Initialize results
-    new_sections = Section[]
-    
     # Extract geometry data
     LE = [section.LE_point for section in wing.sections]
     TE = [section.TE_point for section in wing.sections]
@@ -563,7 +560,7 @@ function refine_mesh_by_splitting_provided_sections!(wing::AbstractWing)
     idx += 1
     
     # Validate result
-    if length(new_sections) != wing.n_panels + 1
+    if length(wing.refined_sections) != wing.n_panels + 1
         @warn "Number of panels ($(length(new_sections)-1)) differs from desired ($(wing.n_panels))"
     end
     
