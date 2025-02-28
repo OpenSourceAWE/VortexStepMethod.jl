@@ -38,8 +38,8 @@ function init!(filament::BoundFilament, x1::PosVector, x2::PosVector)
 end
 
 """
-    velocity_3D_bound_vortex(filament::BoundFilament, XVP::Vector{Float64}, 
-                           gamma::Float64, core_radius_fraction::Float64)
+    velocity_3D_bound_vortex(vel, filament::BoundFilament, XVP, 
+                           gamma, core_radius_fraction, work_vectors)
 
 Calculate induced velocity by a bound vortex filament at a point in space.
 """
@@ -90,10 +90,8 @@ function velocity_3D_bound_vortex!(
 end
 
 """
-    velocity_3D_trailing_vortex(filament::BoundFilament, 
-                              XVP::Vector{Float64}, 
-                              gamma::Float64, 
-                              v_a::Float64)
+    velocity_3D_trailing_vortex(vel, filament::BoundFilament, 
+                              XVP, gamma, v_a, work_vectors)
 
 Calculate induced velocity by a trailing vortex filament.
 
@@ -101,6 +99,7 @@ Calculate induced velocity by a trailing vortex filament.
 - `XVP`: Control point coordinates
 - `gamma`: Vortex strength
 - `v_a`: Inflow velocity magnitude
+- work_vectors: preallocated array of intermediate variables
 
 Reference: Rick Damiani et al. "A vortex step method for nonlinear airfoil polar data 
 as implemented in KiteAeroDyn".
@@ -159,17 +158,18 @@ end
 Represents a semi-infinite vortex filament.
 
 # Fields
-- x1::MVec3: Starting point
-- direction::MVec3: Direction vector
-- `vel_mag`::Float64: Velocity magnitude
-- `filament_direction`::Int64: Direction indicator (-1 or 1)
+- x1::MVec3=zeros(MVec3):           Starting point
+- direction::MVec3=zeros(MVec3):    Direction vector
+- `vel_mag`::Float64=zero(Float64): Velocity magnitude
+- `filament_direction`::Int64=0   : Direction indicator (-1 or 1)
+- initialized::Bool=false
 """
 @with_kw mutable struct SemiInfiniteFilament <: Filament
     x1::MVec3 = zeros(MVec3)
     direction::MVec3 = zeros(MVec3)
     vel_mag::Float64 = zero(Float64)
     filament_direction::Int64 = zero(Int64)
-    initialized = false
+    initialized::Bool = false
 end
 
 function init!(filament::SemiInfiniteFilament, x1::PosVector, direction::PosVector, vel_mag::Real, filament_direction::Real)
@@ -183,8 +183,7 @@ end
 
 """
     velocity_3D_trailing_vortex_semiinfinite(filament::SemiInfiniteFilament, 
-                                           Vf::Vector{Float64}, XVP::Vector{Float64},
-                                           GAMMA::Float64, v_a::Float64)
+                                             Vf, XVP, GAMMA, v_a, work_vectors)
 
 Calculate induced velocity by a semi-infinite trailing vortex filament.
 """
