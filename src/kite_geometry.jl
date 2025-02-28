@@ -175,10 +175,11 @@ Represents a curved wing that inherits from Wing with additional geometric prope
 
 # Fields
 - All fields from Wing:
-  - `n_panels::Int`: Number of panels in aerodynamic mesh
+  - `n_panels::Int64`: Number of panels in aerodynamic mesh
   - `spanwise_panel_distribution`::PanelDistribution: see: [PanelDistribution](@ref)
   - `spanwise_direction::MVec3`: Wing span direction vector
   - `sections::Vector{Section}`: List of wing sections, see: [Section](@ref)
+  -  refined_sections::Vector{Section}
 - Additional fields:
   - `center_of_mass::Vector{Float64}`: Center of mass coordinates
   - `circle_center_z::Vector{Float64}`: Center of circle coordinates
