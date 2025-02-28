@@ -10,7 +10,7 @@ Represents a wing section with leading edge, trailing edge, and aerodynamic prop
 - `aero_model`::AeroModel: [AeroModel](@ref)
 - `aero_data`: Can be:
   - nothing for INVISCID
-  - (tube_diameter, camber) for `LEI_AIRFOIL_BREUKELS`
+  - (`tube_diameter`, camber) for `LEI_AIRFOIL_BREUKELS`
   - (`alpha_range`, `cl_vector`, `cd_vector`, `cm_vector`) for `POLAR_DATA`
   - (`alpha_range`, `beta_range`, `cl_matrix`, `cd_matrix`, `cm_matrix`) for `POLAR_DATA`        
 """
@@ -116,7 +116,7 @@ Add a new section to the wing.
 - `aero_model`::AeroModel: [AeroModel](@ref)
 - `aero_data`: Can be:
   - nothing for INVISCID
-  - (tube_diameter, camber) for `LEI_AIRFOIL_BREUKELS`
+  - (`tube_diameter`, camber) for `LEI_AIRFOIL_BREUKELS`
   - (`alpha_range`, `cl_vector`, `cd_vector`, `cm_vector`) for `POLAR_DATA`
   - (`alpha_range`, `beta_range`, `cl_matrix`, `cd_matrix`, `cm_matrix`) for `POLAR_DATA`  
 """
