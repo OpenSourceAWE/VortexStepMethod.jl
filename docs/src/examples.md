@@ -2,7 +2,7 @@
 CurrentModule = VortexStepMethod
 ```
 
-## Examples 
+## Rectangular Wing 
 ##### Wing Aerodynamics Analysis using Vortex-Step Method (VSM) and Lift Line Theory (LLT)
 This example demonstrates the process of setting up and analyzing a wing's aerodynamics using VSM and LLT. We'll cover the following steps:
 1. Importing necessary libraries.
