@@ -10,7 +10,7 @@ Represents a wing section with leading edge, trailing edge, and aerodynamic prop
 - `aero_model`::AeroModel: Aerodynamic model, one of three possible types
 - `aero_data`::Union{Nothing, Tuple}: Aerodynamic data
 """
-struct Section
+mutable struct Section
     LE_point::MVec3
     TE_point::MVec3
     aero_model::AeroModel
@@ -34,8 +34,25 @@ function init!(section::Section, LE_point, TE_point, aero_model=nothing, aero_da
     section.LE_point .= LE_point
     section.TE_point .= TE_point
     (!isnothing(aero_model)) && (section.aero_model = aero_model)
-    (!isnothing(aero_data)) && (section.aero_data .= aero_data)
+    if !isnothing(aero_data)
+        if !isnothing(section.aero_data)
+            section.aero_data .= aero_data
+        else 
+            section.aero_data = aero_data
+        end
+    end
     nothing
+end
+
+function init!(refined_section::Section, section::Section)
+    refined_section.LE_point .= section.LE_point
+    refined_section.TE_point .= section.TE_point
+    refined_section.aero_model = section.aero_model
+    if isnothing(refined_section.aero_data)
+        refined_section.aero_data = section.aero_data
+    else
+        refined_section.aero_data .= section.aero_data
+    end
 end
 
 """
@@ -69,8 +86,18 @@ mutable struct Wing <: AbstractWing
     end
 end
 
-function init!(wing::AbstractWing)
-
+function init!(wing::AbstractWing; aero_center_location::Float64=0.25, control_point_location::Float64=0.75)
+    refine_aerodynamic_mesh!(wing)
+    n_panels_per_wing = length(wing.refined_sections) - 1
+    
+    # Calculate panel properties
+    panel_props = calculate_panel_properties(
+        wing.refined_sections,
+        n_panels_per_wing,
+        aero_center_location,
+        control_point_location
+    )
+    return panel_props, n_panels_per_wing
 end
 
 """
@@ -118,14 +145,14 @@ end
 
 
 """
-    refine_aerodynamic_mesh(wing::AbstractWing)
+    refine_aerodynamic_mesh!(wing::AbstractWing)
 
 Refine the aerodynamic mesh of the wing based on spanwise panel distribution.
 
 Returns:
     Vector{Section}: List of refined sections
 """
-function refine_aerodynamic_mesh(wing::AbstractWing)
+function refine_aerodynamic_mesh!(wing::AbstractWing)
     # Sort sections from left to right
     sort!(wing.sections, by=s -> s.LE_point[2], rev=true)
     
@@ -156,7 +183,7 @@ function refine_aerodynamic_mesh(wing::AbstractWing)
     # Handle special cases
     if wing.spanwise_panel_distribution == UNCHANGED || length(wing.sections) == n_sections
         wing.refined_sections = wing.sections
-        return wing.refined_sections
+        return nothing
     end
 
     @info "Refining aerodynamic mesh from $(length(wing.sections)) sections to $n_sections sections."
@@ -170,10 +197,11 @@ function refine_aerodynamic_mesh(wing::AbstractWing)
     
     # Handle different distribution types
     if wing.spanwise_panel_distribution == SPLIT_PROVIDED
-        wing.refined_sections = refine_mesh_by_splitting_provided_sections(wing)
-        return wing.refined_sections
+        return refine_mesh_by_splitting_provided_sections!(wing)
     elseif wing.spanwise_panel_distribution in (LINEAR, COSINE, COSINE_VAN_GARREL)
-        wing.refined_sections = refine_mesh_for_linear_cosine_distribution(
+        return refine_mesh_for_linear_cosine_distribution!(
+            wing,
+            1,
             wing.spanwise_panel_distribution,
             n_sections,
             LE,
@@ -181,7 +209,6 @@ function refine_aerodynamic_mesh(wing::AbstractWing)
             aero_model,
             aero_data
         )
-        return wing.refined_sections
     else
         throw(ArgumentError("Unsupported spanwise panel distribution: $(wing.spanwise_panel_distribution)"))
     end
@@ -268,7 +295,9 @@ function calculate_new_aero_data(aero_model,
 end
 
 """
-    refine_mesh_for_linear_cosine_distribution(
+    refine_mesh_for_linear_cosine_distribution!(
+        wing::AbstractWing,
+        idx::Int,
         spanwise_panel_distribution::PanelDistribution,
         n_sections::Int,
         LE::Matrix{Float64},
@@ -279,6 +308,8 @@ end
 Refine wing mesh using linear or cosine spacing.
 
 # Arguments
+- `wing`: Wing object
+- `idx`: Section start index
 - `spanwise_panel_distribution`: [PanelDistribution](@ref)
 - `n_sections`: Number of sections to generate
 - `LE`: Matrix of leading edge points
@@ -287,15 +318,18 @@ Refine wing mesh using linear or cosine spacing.
 - `aero_data`: Vector of aerodynamic data for each section
 
 Returns:
-    Vector{Section}: List of refined sections
+    idx: Last section index
 """
-function refine_mesh_for_linear_cosine_distribution(
+function refine_mesh_for_linear_cosine_distribution!(
+    wing::AbstractWing,
+    idx,
     spanwise_panel_distribution::PanelDistribution,
     n_sections::Int,
     LE,
     TE,
     aero_model,
-    aero_data)
+    aero_data;
+    endpoints=true)
 
     # 1. Compute quarter chord line
     quarter_chord = LE .+ 0.25 .* (TE .- LE)
@@ -368,117 +402,31 @@ function refine_mesh_for_linear_cosine_distribution(
         new_data = calculate_new_aero_data(aero_model, aero_data, section_index, left_weight, right_weight)
 
         # Create new section
-        push!(new_sections, Section(new_LE[i,:], new_TE[i,:], aero_model[1], new_data))
+        if endpoints || (i != 1 && i != n_sections)
+            @views init!(wing.refined_sections[idx], new_LE[i,:], new_TE[i,:], aero_model[1], new_data)
+            idx += 1
+        end
     end
 
     # Apply van Garrel distribution if requested
     if spanwise_panel_distribution === :cosine_van_Garrel
-        new_sections = calculate_cosine_van_Garrel(new_sections)
+        idx = calculate_cosine_van_Garrel!(wing, idx)
     end
 
-    return new_sections
-end
-
-function refine_mesh_for_linear_cosine_distribution!(
-    wing::AbstractWing,
-    spanwise_panel_distribution::PanelDistribution,
-    idx,
-    n_sections::Int,
-    LE,
-    TE,
-    aero_model,
-    aero_data)
-
-    # 1. Compute quarter chord line
-    quarter_chord = LE .+ 0.25 .* (TE .- LE)
-
-    # Calculate segment lengths
-    qc_lengths = [norm(quarter_chord[i+1,:] - quarter_chord[i,:]) for i in 1:size(quarter_chord,1)-1]
-    qc_total_length = sum(qc_lengths)
-    qc_cum_length = vcat(0, cumsum(qc_lengths))
-
-    # 2. Define target lengths
-    target_lengths = if spanwise_panel_distribution == LINEAR
-        range(0, qc_total_length, n_sections)
-    elseif spanwise_panel_distribution in (COSINE, COSINE_VAN_GARREL)
-        theta = range(0, π, n_sections)
-        qc_total_length .* (1 .- cos.(theta)) ./ 2
-    else
-        throw(ArgumentError("Unsupported distribution: $spanwise_panel_distribution"))
-    end
-
-    # Initialize arrays
-    new_quarter_chord = zeros(Float64, n_sections, 3)
-    new_LE = zeros(Float64, n_sections, 3)
-    new_TE = zeros(Float64, n_sections, 3)
-    new_sections = Section[]
-
-    # 3. Calculate new points and interpolate
-    for i in 1:n_sections
-        target_length = target_lengths[i]
-
-        # Find segment index
-        section_index = searchsortedlast(qc_cum_length, target_length) 
-        section_index = clamp(section_index, 1, length(qc_cum_length)-1)
-
-        # 4. Calculate weights
-        segment_start = qc_cum_length[section_index]
-        segment_end = qc_cum_length[section_index+1]
-        t = (target_length - segment_start) / (segment_end - segment_start)
-        left_weight = 1 - t
-        right_weight = t
-
-        # 5. Calculate quarter chord point
-        new_quarter_chord[i,:] = quarter_chord[section_index,:] + 
-                                t .* (quarter_chord[section_index+1,:] - quarter_chord[section_index,:])
-
-        # 6. Calculate chord vectors
-        left_chord = TE[section_index,:] - LE[section_index,:]
-        right_chord = TE[section_index+1,:] - LE[section_index+1,:]
-
-        # Normalize chord vectors
-        left_chord_norm = left_chord ./ max(norm(left_chord), 1e-12)
-        right_chord_norm = right_chord ./ max(norm(right_chord), 1e-12)
-
-        # Interpolate direction
-        avg_direction = left_weight .* left_chord_norm .+ right_weight .* right_chord_norm
-        avg_direction = avg_direction ./ max(norm(avg_direction), 1e-12)
-
-        # Interpolate length
-        left_length = norm(left_chord)
-        right_length = norm(right_chord)
-        avg_length = left_weight * left_length + right_weight * right_length
-
-        # Final chord vector
-        avg_chord = avg_direction .* avg_length
-
-        # Calculate LE and TE points
-        new_LE[i,:] = new_quarter_chord[i,:] .- 0.25 .* avg_chord
-        new_TE[i,:] = new_quarter_chord[i,:] .+ 0.75 .* avg_chord
-
-        # Create new section
-        update_pos!(wing.sections[idx], new_LE[i,:], new_TE[i,:])
-    end
-
-    # Apply van Garrel distribution if requested
-    if spanwise_panel_distribution === COSINE_VAN_GARREL
-        new_sections = calculate_cosine_van_Garrel(new_sections)
-    end
-
-    return new_sections
+    return idx
 end
 
 
 """
-    calculate_cosine_van_Garrel(sections::Vector{Section})
+    calculate_cosine_van_Garrel!(wing::AbstractWing)
 
 Calculate van Garrel cosine distribution of sections.
 Reference: http://dx.doi.org/10.13140/RG.2.1.2773.8000
 
 Returns:
-    Vector{Section}: Sections with van Garrel distribution
+    idx
 """
-function calculate_cosine_van_Garrel(sections::Vector{Section})
+function calculate_cosine_van_Garrel!(wing::AbstractWing, idx)
     n = length(sections)
     
     # Calculate chords and quarter chords
@@ -514,29 +462,28 @@ function calculate_cosine_van_Garrel(sections::Vector{Section})
     ]
     
     # Generate new sections
-    new_sections = [
-        Section(
-            control_point - 0.25 * chord,  # new LE
-            control_point + 0.75 * chord,  # new TE
-            sections[i].aero_model,         # keep original aero model
-            sections[i].aero_data         # keep original aero data
+    for (i, (control_point, chord)) in enumerate(zip(control_points, chords))
+        @views init!(wing.refined_sections, 
+            control_point - 0.25 * chord, 
+            control_point + 0.75 * chord,
+            sections[i].aero_model, 
+            sections[i].aero_data
         )
-        for (i, (control_point, chord)) in enumerate(zip(control_points, chords))
-    ]
-    
-    return new_sections
+        idx += 1
+    end
+    return idx
 end
 
 
 """
-    refine_mesh_by_splitting_provided_sections(wing::AbstractWing)
+    refine_mesh_by_splitting_provided_sections!(wing::AbstractWing)
 
 Refine mesh by splitting provided sections into desired number of panels.
 
 Returns:
     Vector{Section}: Refined sections
 """
-function refine_mesh_by_splitting_provided_sections(wing::AbstractWing)
+function refine_mesh_by_splitting_provided_sections!(wing::AbstractWing)
     n_sections_provided = length(wing.sections)
     n_panels_provided = n_sections_provided - 1
     n_panels_desired = wing.n_panels
@@ -545,7 +492,10 @@ function refine_mesh_by_splitting_provided_sections(wing::AbstractWing)
     
     # Check if refinement is needed
     if n_panels_provided == n_panels_desired
-        return wing.sections
+        for (refined_section, section) in zip(wing.refined_sections, wing.sections)
+            init!(refined_section, section)
+        end
+        return nothing
     end
     
     # Validate panel count relationship
@@ -571,9 +521,11 @@ function refine_mesh_by_splitting_provided_sections(wing::AbstractWing)
     aero_data = [section.aero_data for section in wing.sections]
     
     # Process each section pair
+    idx = 1
     for left_section_index in 1:n_section_pairs
         # Add left section of pair
-        push!(new_sections, wing.sections[left_section_index])
+        init!(wing.refined_sections[idx], wing.sections[left_section_index])
+        idx += 1
         
         # Calculate new sections for this pair
         num_new_sections = new_sections_per_pair + (left_section_index <= remaining ? 1 : 0)
@@ -592,29 +544,30 @@ function refine_mesh_by_splitting_provided_sections(wing::AbstractWing)
             ]
             
             # Generate sections for this pair
-            new_splitted_sections = refine_mesh_for_linear_cosine_distribution(
+            idx = refine_mesh_for_linear_cosine_distribution!(
+                wing,
+                idx,
                 LINEAR,
                 num_new_sections + 2,  # +2 for endpoints
                 LE_pair,
                 TE_pair,
                 aero_model_pair,
-                aero_data_pair
+                aero_data_pair;
+                endpoints=false
             )
-            
-            # Add new sections (excluding endpoints)
-            append!(new_sections, new_splitted_sections[2:end-1])
         end
     end
     
     # Add final section
-    push!(new_sections, wing.sections[end])
+    init!(wing.refined_sections[idx], wing.sections[end])
+    idx += 1
     
     # Validate result
     if length(new_sections) != wing.n_panels + 1
         @warn "Number of panels ($(length(new_sections)-1)) differs from desired ($(wing.n_panels))"
     end
     
-    return new_sections
+    return nothing
 end
 
 

@@ -36,23 +36,14 @@ mutable struct BodyAerodynamics
         # Initialize panels
         panels = Panel[]
         for wing in wings
-            section_list = refine_aerodynamic_mesh(wing)
-            n_panels_per_wing = length(section_list) - 1
-            
-            # Calculate panel properties
-            panel_props = calculate_panel_properties(
-                section_list,
-                n_panels_per_wing,
-                aero_center_location,
-                control_point_location
-            )
+            panel_props, n_panels_per_wing = init!(wing; aero_center_location, control_point_location)
             
             # Create panels
             for i in 1:n_panels_per_wing
                 panel = Panel()
                 init!(panel, 
-                    section_list[i],
-                    section_list[i+1],
+                    wing.refined_sections[i],
+                    wing.refined_sections[i+1],
                     panel_props.aero_centers[i],
                     panel_props.control_points[i],
                     panel_props.bound_points_1[i],
