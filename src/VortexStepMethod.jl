@@ -129,8 +129,8 @@ include("wing_geometry.jl")
 include("kite_geometry.jl")
 include("filament.jl")
 include("panel.jl")
-include("wake.jl")
 include("body_aerodynamics.jl")
+include("wake.jl")
 include("solver.jl")
 
 end # module

@@ -13,8 +13,8 @@ Replaces older filaments if present by checking length of filaments.
 # Returns
 - `Vector{Panel}`: List of panels with updated filaments
 """
-function frozen_wake(va_distribution::Matrix{Float64}, panels::Vector{Panel})
-    for (i, panel) in enumerate(panels)
+function frozen_wake!(body_aero::BodyAerodynamics, va_distribution)
+    for (i, panel) in enumerate(body_aero.panels)
         va_i = va_distribution[i, :]
         vel_mag = norm(va_i)
         direction = va_i / vel_mag
@@ -33,6 +33,5 @@ function frozen_wake(va_distribution::Matrix{Float64}, panels::Vector{Panel})
             -1
         )
     end
-    
-    return panels
+    return nothing
 end

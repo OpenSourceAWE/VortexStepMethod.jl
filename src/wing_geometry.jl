@@ -77,27 +77,25 @@ mutable struct Wing <: AbstractWing
     function Wing(n_panels::Int;
                  spanwise_panel_distribution::PanelDistribution=LINEAR,
                  spanwise_direction::PosVector=MVec3([0.0, 1.0, 0.0]))
-        refined_sections = Section[Section() for _ in 1:n_panels+1]
         new(n_panels, 
             spanwise_panel_distribution, 
             spanwise_direction, 
             Section[],
-            refined_sections)
+            Section[])
     end
 end
 
 function init!(wing::AbstractWing; aero_center_location::Float64=0.25, control_point_location::Float64=0.75)
     refine_aerodynamic_mesh!(wing)
-    n_panels_per_wing = length(wing.refined_sections) - 1
     
     # Calculate panel properties
     panel_props = calculate_panel_properties(
         wing.refined_sections,
-        n_panels_per_wing,
+        wing.n_panels,
         aero_center_location,
         control_point_location
     )
-    return panel_props, n_panels_per_wing
+    return panel_props
 end
 
 """
@@ -153,13 +151,16 @@ Returns:
     Vector{Section}: List of refined sections
 """
 function refine_aerodynamic_mesh!(wing::AbstractWing)
-    # Sort sections from left to right
     sort!(wing.sections, by=s -> s.LE_point[2], rev=true)
-    
-    # Calculate number of sections needed
     n_sections = wing.n_panels + 1
-    @debug "n_panels: $(wing.n_panels)"
-    @debug "n_sections: $n_sections"
+    if length(wing.refined_sections) == 0
+        if wing.spanwise_panel_distribution == UNCHANGED || length(wing.sections) == n_sections
+            wing.refined_sections = wing.sections
+            return nothing
+        else
+            wing.refined_sections = Section[Section() for _ in 1:wing.n_panels+1]
+        end
+    end
     
     # Extract geometry data
     n_current = length(wing.sections)
@@ -182,7 +183,9 @@ function refine_aerodynamic_mesh!(wing::AbstractWing)
     
     # Handle special cases
     if wing.spanwise_panel_distribution == UNCHANGED || length(wing.sections) == n_sections
-        wing.refined_sections = wing.sections
+        for i in eachindex(wing.sections)
+            init!(wing.refined_sections[i], wing.sections[i])
+        end
         return nothing
     end
 

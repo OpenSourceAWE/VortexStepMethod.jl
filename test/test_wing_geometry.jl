@@ -1,5 +1,6 @@
 using Test
 using LinearAlgebra
+using VortexStepMethod
 using VortexStepMethod: Wing, Section, add_section!, refine_mesh_by_splitting_provided_sections!, refine_aerodynamic_mesh!
 import Base: ==
 
@@ -254,15 +255,15 @@ end
 
     @testset "Split provided sections" begin
         section1 = Section([0.0, 0.0, 0.0], [1.0, 0.0, 0.0], INVISCID)
-        section2 = Section([0.0, 1.0, 0.0], [1.0, 1.0, 0.0], INVISCID)
-        section3 = Section([0.0, 2.0, 0.0], [1.0, 2.0, 0.0], INVISCID)
+        section2 = Section([0.0, -1.0, 0.0], [1.0, -1.0, 0.0], INVISCID)
+        section3 = Section([0.0, -2.0, 0.0], [1.0, -2.0, 0.0], INVISCID)
 
         wing = Wing(6; spanwise_panel_distribution=SPLIT_PROVIDED)
         add_section!(wing, [0.0, 0.0, 0.0], [1.0, 0.0, 0.0], INVISCID)
-        add_section!(wing, [0.0, 1.0, 0.0], [1.0, 1.0, 0.0], INVISCID)
-        add_section!(wing, [0.0, 2.0, 0.0], [1.0, 2.0, 0.0], INVISCID)
+        add_section!(wing, [0.0, -1.0, 0.0], [1.0, -1.0, 0.0], INVISCID)
+        add_section!(wing, [0.0, -2.0, 0.0], [1.0, -2.0, 0.0], INVISCID)
 
-        refine_mesh_by_splitting_provided_sections!(wing)
+        refine_aerodynamic_mesh!(wing)
         new_sections = wing.refined_sections
 
         @test length(new_sections) - 1 == 6
@@ -270,9 +271,9 @@ end
         @test new_sections[4] == section2
         @test new_sections[end] == section3
 
-        @test 0.0 < new_sections[2].LE_point[2] < 1.0
-        @test 0.0 < new_sections[3].LE_point[2] < 1.0
-        @test 1.0 < new_sections[5].LE_point[2] < 2.0
+        @test -1.0 < new_sections[2].LE_point[2] < 0.0
+        @test -1.0 < new_sections[3].LE_point[2] < 0.0
+        @test -2.0 < new_sections[5].LE_point[2] < -1.0
 
         for section in new_sections
             @test section.aero_model === INVISCID

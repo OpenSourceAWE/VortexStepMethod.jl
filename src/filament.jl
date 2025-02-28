@@ -24,6 +24,7 @@ Represents a bound vortex filament defined by two points.
     x2::MVec3       = zeros(MVec3)
     length::Float64 = zero(Float64)
     r0::MVec3       = zeros(MVec3)
+    initialized     = false
 end
 
 function init!(filament::BoundFilament, x1::PosVector, x2::PosVector)
@@ -31,6 +32,7 @@ function init!(filament::BoundFilament, x1::PosVector, x2::PosVector)
     filament.x2 .= x2
     filament.length = norm(x2 - x1)
     filament.r0 .= x2 .- x1
+    filament.initialized = true
     return nothing
 end
 
@@ -166,6 +168,7 @@ Represents a semi-infinite vortex filament.
     direction::MVec3 = zeros(MVec3)
     vel_mag::Float64 = zero(Float64)
     filament_direction::Int64 = zero(Int64)
+    initialized = false
 end
 
 function init!(filament::SemiInfiniteFilament, x1::PosVector, direction::PosVector, vel_mag::Real, filament_direction::Real)
@@ -173,6 +176,7 @@ function init!(filament::SemiInfiniteFilament, x1::PosVector, direction::PosVect
     filament.direction .= direction
     filament.vel_mag = vel_mag
     filament.filament_direction = filament_direction
+    filament.initialized = true
     return nothing
 end
 

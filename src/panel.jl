@@ -424,43 +424,47 @@ Calculate the velocity induced by a vortex ring at a control point.
     tempvel .= 0.0
     # Process each filament
     @inbounds for i in eachindex(filaments)
-        if i == 1  # bound filament
-            if evaluation_point_on_bound
-                tempvel .= 0.0
-            else
-                velocity_3D_bound_vortex!(
+        if filaments[i].initialized
+            if i == 1  # bound filament
+                if evaluation_point_on_bound
+                    tempvel .= 0.0
+                else
+                    velocity_3D_bound_vortex!(
+                        tempvel,
+                        filaments[i],
+                        evaluation_point,
+                        gamma,
+                        core_radius_fraction,
+                        work_vectors
+                    )
+                end
+            elseif i == 2 || i == 3  # trailing filaments
+                velocity_3D_trailing_vortex!(
                     tempvel,
                     filaments[i],
                     evaluation_point,
                     gamma,
-                    core_radius_fraction,
+                    va_norm,
                     work_vectors
                 )
+            elseif i == 4 || i == 5  # semi-infinite trailing filaments
+                velocity_3D_trailing_vortex_semiinfinite!(
+                    tempvel,
+                    filaments[i],
+                    va_unit,
+                    evaluation_point,
+                    gamma,
+                    va_norm,
+                    work_vectors
+                )
+            else
+                throw(ArgumentError("Too many filaments."))
+                tempvel .= 0.0
             end
-        elseif i == 2 || i == 3  # trailing filaments
-            velocity_3D_trailing_vortex!(
-                tempvel,
-                filaments[i],
-                evaluation_point,
-                gamma,
-                va_norm,
-                work_vectors
-            )
-        elseif i == 4 || i == 5  # semi-infinite trailing filaments
-            velocity_3D_trailing_vortex_semiinfinite!(
-                tempvel,
-                filaments[i],
-                va_unit,
-                evaluation_point,
-                gamma,
-                va_norm,
-                work_vectors
-            )
+            velind .+= tempvel
         else
-            throw(ArgumentError("Too many filaments."))
-            tempvel .= 0.0
+            throw(ArgumentError("Filament not initialized: $i, $([filaments[j].initialized for j in 1:5])"))
         end
-        velind .+= tempvel
     end
     return nothing
 end

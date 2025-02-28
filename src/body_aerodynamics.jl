@@ -13,73 +13,83 @@ Main structure for calculating aerodynamic properties of bodies.
 - `alpha_corrected`::Union{Nothing, Vector{Float64}}: unclear, please define
 - `stall_angle_list`::Vector{Float64}: unclear, please define
 """
-mutable struct BodyAerodynamics
+@with_kw mutable struct BodyAerodynamics{P}
     panels::Vector{Panel}
-    wings::Vector{AbstractWing} # can be a vector of Wings, or of KiteWings
-    _va::Union{Nothing, Vector{Float64}}
-    omega::Union{Nothing, MVec3}
-    gamma_distribution::Union{Nothing, Vector{Float64}}
-    alpha_uncorrected::Union{Nothing, Vector{Float64}}
-    alpha_corrected::Union{Nothing, Vector{Float64}}
-    stall_angle_list::Vector{Float64}
+    wings::Vector{AbstractWing}
+    _va::MVec3 = zeros(MVec3)
+    omega::MVec3 = zeros(MVec3)
+    gamma_distribution::Vector{Float64} = zeros(Float64, P)
+    alpha_uncorrected::Vector{Float64} = zeros(Float64, P)
+    alpha_corrected::Vector{Float64} = zeros(Float64, P)
+    stall_angle_list::Vector{Float64} = zeros(Float64, P)
 
-    alpha_array::Vector{Float64}
-    v_a_array::Vector{Float64}
-    work_vectors::NTuple{10,MVec3}
-    AIC::Array{Float64, 3}
+    alpha_array::Vector{Float64} = zeros(Float64, P)
+    v_a_array::Vector{Float64} = zeros(Float64, P)
+    work_vectors::NTuple{10,MVec3} = ntuple(_ -> zeros(MVec3), 10)
+    AIC::Array{Float64, 3} = zeros(3, P, P)
 
-    function BodyAerodynamics(
-        wings::Vector{T};
-        aero_center_location::Float64=0.25,
-        control_point_location::Float64=0.75
-    ) where T <: AbstractWing
-        # Initialize panels
-        panels = Panel[]
-        for wing in wings
-            panel_props, n_panels_per_wing = init!(wing; aero_center_location, control_point_location)
-            
-            # Create panels
-            for i in 1:n_panels_per_wing
-                panel = Panel()
-                init!(panel, 
-                    wing.refined_sections[i],
-                    wing.refined_sections[i+1],
-                    panel_props.aero_centers[i],
-                    panel_props.control_points[i],
-                    panel_props.bound_points_1[i],
-                    panel_props.bound_points_2[i],
-                    panel_props.x_airf[i],
-                    panel_props.y_airf[i],
-                    panel_props.z_airf[i]
-                )
-                push!(panels, panel)
-            end
+end
+
+function BodyAerodynamics(
+    wings::Vector{T};
+    aero_center_location=0.25,
+    control_point_location=0.75
+) where T <: AbstractWing
+    # Initialize panels
+    panels = Panel[]
+    for wing in wings
+        if wing.spanwise_panel_distribution == UNCHANGED
+            wing.n_panels = length(wing.sections) - 1
+            wing.refined_sections = wing.sections
+        else
+            wing.refined_sections = Section[Section() for _ in 1:wing.n_panels+1]
         end
-        
-        # Initialize rest of the struct
-        n_panels = length(panels)
-        stall_angle_list = calculate_stall_angle_list(panels)
 
-        alpha_array = zeros(n_panels)
-        v_a_array = zeros(n_panels)    
-        work_vectors = ntuple(_ -> zeros(MVec3), 10)
-        AIC = zeros(3, n_panels, n_panels)
-
-        new(
-            panels,
-            wings,
-            nothing,  # va
-            nothing,  # omega
-            nothing,  # gamma_distribution
-            nothing,  # alpha_uncorrected
-            nothing,  # alpha_corrected
-            stall_angle_list,
-            alpha_array,
-            v_a_array,
-            work_vectors,
-            AIC
-        )
+        # Create panels
+        for _ in 1:wing.n_panels
+            panel = Panel()
+            push!(panels, panel)
+        end
     end
+
+    body_aero = BodyAerodynamics{length(panels)}(; panels, wings)
+    init!(body_aero; aero_center_location, control_point_location)
+    return body_aero
+end
+
+function init!(body_aero::BodyAerodynamics; 
+    aero_center_location=0.25,
+    control_point_location=0.75)
+
+    idx = 1
+    for wing in body_aero.wings
+        panel_props = init!(wing; aero_center_location, control_point_location)
+        
+        # Create panels
+        for i in 1:wing.n_panels
+            init!(body_aero.panels[idx], 
+                wing.refined_sections[i],
+                wing.refined_sections[i+1],
+                panel_props.aero_centers[i],
+                panel_props.control_points[i],
+                panel_props.bound_points_1[i],
+                panel_props.bound_points_2[i],
+                panel_props.x_airf[i],
+                panel_props.y_airf[i],
+                panel_props.z_airf[i]
+            )
+            idx += 1
+        end
+    end
+
+    @assert all([panel.filaments[1].initialized for panel in body_aero.panels])
+    
+    # Initialize rest of the struct
+    body_aero.stall_angle_list .= calculate_stall_angle_list(body_aero.panels)
+    body_aero.alpha_array .= 0.0
+    body_aero.v_a_array .= 0.0 
+    body_aero.AIC .= 0.0
+    return nothing
 end
 
 function Base.getproperty(obj::BodyAerodynamics, sym::Symbol)
@@ -387,7 +397,6 @@ function update_effective_angle_of_attack_if_VSM(body_aero::BodyAerodynamics,
     v_normal = sum(x_airf_array .* relative_velocity, dims=2)
     v_tangential = sum(y_airf_array .* relative_velocity, dims=2)
     alpha_array = atan.(v_normal ./ v_tangential)
-
     return alpha_array
 end
 
@@ -668,12 +677,12 @@ function set_va!(body_aero::BodyAerodynamics, va::VelVector, omega=zeros(MVec3))
     
     # Update panel velocities
     for (i, panel) in enumerate(body_aero.panels)
-        panel.va = va_distribution[i,:]
+        panel.va .= va_distribution[i,:]
     end
     
     # Update wake elements
-    body_aero.panels = frozen_wake(va_distribution, body_aero.panels)
-    body_aero._va = va
+    frozen_wake!(body_aero, va_distribution)
+    body_aero._va .= va
     return nothing
 end
 
@@ -685,7 +694,7 @@ function set_va!(body_aero::BodyAerodynamics, va_distribution::Vector{VelVector}
     end
     
     # Update wake elements
-    body_aero.panels = frozen_wake(va_distribution, body_aero.panels)
+    frozen_wake!(body_aero, va_distribution)
     body_aero._va = va
     return nothing
 end
