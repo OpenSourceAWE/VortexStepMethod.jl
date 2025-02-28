@@ -6,12 +6,14 @@ CurrentModule = VortexStepMethod
 add_section!
 ```
 
-## Functions for setting the inflow conditions
+## Setting the inflow conditions and solving
 ```@docs
 set_va!
+solve
 ```
 
 ## Main Plotting Functions
+The plotting functions are implemented as [package extension](https://pkgdocs.julialang.org/v1.11/creating-packages/#Conditional-loading-of-code-in-packages-(Extensions)). This means that they are only available if the package `ControlPlots.jl` was loaded BEFORE loading `VortexStepMethod.jl`.
 ```@docs
 plot_geometry
 plot_distribution
