@@ -27,7 +27,7 @@ Represents a wing section with leading edge, trailing edge, and aerodynamic prop
 end
 """
     Section(LE_point::Vector{Float64}, TE_point::Vector{Float64}, 
-            aero_model=nothing, aero_data=nothing)
+            aero_model=INVISCID, aero_data=nothing)
 
 Constructor for [Section](@ref) that allows to pass Vectors of Float64 as point coordinates.
 """
@@ -35,6 +35,11 @@ function Section(LE_point::Vector{Float64}, TE_point::Vector{Float64}, aero_mode
     Section(MVec3(LE_point), MVec3(TE_point), aero_model, aero_data)
 end
 
+"""
+    init!(section::Section, LE_point, TE_point, aero_model=nothing, aero_data=nothing)
+
+Function to update a [Section](@ref) in place.
+"""
 function init!(section::Section, LE_point, TE_point, aero_model=nothing, aero_data=nothing)
     section.LE_point .= LE_point
     section.TE_point .= TE_point
