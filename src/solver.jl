@@ -29,7 +29,8 @@ struct Solver
     aerodynamic_model_type::Model
     density::Float64
     max_iterations::Int64
-    allowed_error::Float64
+    abstol::Float64
+    reltol::Float64
     tol_reference_error::Float64
     relaxation_factor::Float64
     
@@ -47,7 +48,8 @@ struct Solver
         aerodynamic_model_type::Model    = VSM,
         density::Float64                 = 1.225,
         max_iterations::Int64            = 1500,
-        allowed_error::Float64           = 1e-5, # rel_err
+        abstol::Float64           = 1e-5, # rel_err
+        reltol::Float64           = 1e-5, # rel_err
         tol_reference_error::Float64     = 0.001,
         relaxation_factor::Float64       = 0.03,
         is_with_artificial_damping::Bool = false,
@@ -61,7 +63,8 @@ struct Solver
             aerodynamic_model_type,
             density,
             max_iterations,
-            allowed_error,
+            abstol,
+            reltol,
             tol_reference_error,
             relaxation_factor,
             is_with_artificial_damping,
@@ -161,23 +164,6 @@ function solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=n
         relaxation_factor;
         log
     )
-    # Try again with reduced relaxation factor if not converged
-    # if !converged && relaxation_factor > 1e-3
-    #     log && @warn "Running again with half the relaxation_factor = $(relaxation_factor/2)"
-    #     converged, gamma_new, alpha_array, v_a_array = gamma_loop(
-    #         solver,
-    #         body_aero,
-    #         gamma_initial,
-    #         va_array,
-    #         chord_array,
-    #         x_airf_array,
-    #         y_airf_array,
-    #         z_airf_array,
-    #         panels,
-    #         relaxation_factor/2;
-    #         log
-    #     )
-    # end
 
     # Calculate final results
     results = calculate_results(
@@ -301,10 +287,7 @@ function gamma_loop(
     velocity_view_y = @view induced_velocity_all[:, 2]
     velocity_view_z = @view induced_velocity_all[:, 3]
 
-    iters = 0
     function f!(res, gamma, p)
-        iters += 1
-
         # Calculate induced velocities
         mul!(velocity_view_x, AIC_x, gamma)
         mul!(velocity_view_y, AIC_y, gamma)
@@ -360,7 +343,7 @@ function gamma_loop(
     end
 
     prob = NonlinearProblem(f!, gamma_new, nothing)
-    sol = NonlinearSolve.solve(prob, RobustMultiNewton(autodiff=AutoFiniteDiff()))
+    sol = NonlinearSolve.solve(prob, RobustMultiNewton(autodiff=AutoFiniteDiff()); reltol=solver.reltol, abstol=solver.abstol, maxiters=solver.max_iterations)
     f!(gamma, sol.u, nothing)
     @show NonlinearSolve.SciMLBase.successful_retcode(sol)
 
