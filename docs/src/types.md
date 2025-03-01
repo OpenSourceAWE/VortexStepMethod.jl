@@ -23,6 +23,8 @@ A Wing/ KiteWing has one or more sections.
 Section
 Section(LE_point::Vector{Float64}, TE_point::Vector{Float64}, aero_model=nothing, aero_data=nothing)
 Wing
+Wing(n_panels::Int; spanwise_panel_distribution::PanelDistribution=LINEAR,
+     spanwise_direction::PosVector=MVec3([0.0, 1.0, 0.0]))
 KiteWing
 BodyAerodynamics
 ```

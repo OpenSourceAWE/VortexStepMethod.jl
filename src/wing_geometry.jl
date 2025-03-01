@@ -74,9 +74,10 @@ Represents a wing composed of multiple sections with aerodynamic properties.
 
 # Fields
 - `n_panels::Int64`: Number of panels in aerodynamic mesh
-- `spanwise_panel_distribution`::PanelDistribution = LINEAR: [PanelDistribution](@ref)
-- `spanwise_direction::MVec3` = MVec3([0.0, 1.0, 0.0]): Wing span direction vector
-- `sections::Vector{Section}`: List of wing sections, see: [Section](@ref)
+- `spanwise_panel_distribution`::PanelDistribution: [PanelDistribution](@ref)
+- `spanwise_direction::MVec3`: Wing span direction vector
+- `sections::Vector{Section}`: Vector of wing sections, see: [Section](@ref)
+- `refined_sections::Vector{Section}`: Vector of refined wing sections, see: [Section](@ref)
 
 """
 mutable struct Wing <: AbstractWing
@@ -85,16 +86,25 @@ mutable struct Wing <: AbstractWing
     spanwise_direction::MVec3
     sections::Vector{Section}
     refined_sections::Vector{Section}
-    
-    function Wing(n_panels::Int;
-                 spanwise_panel_distribution::PanelDistribution=LINEAR,
-                 spanwise_direction::PosVector=MVec3([0.0, 1.0, 0.0]))
-        new(n_panels, 
-            spanwise_panel_distribution, 
-            spanwise_direction, 
-            Section[],
-            Section[])
-    end
+end
+
+"""
+    Wing(n_panels::Int;
+        spanwise_panel_distribution::PanelDistribution=LINEAR,
+        spanwise_direction::PosVector=MVec3([0.0, 1.0, 0.0]))
+
+Constructor for a [Wing](@ref) struct with default values that initializes the sections 
+and refined sections as empty arrays.
+
+# Parameters
+- `n_panels::Int64`: Number of panels in aerodynamic mesh
+- `spanwise_panel_distribution`::PanelDistribution = LINEAR: [PanelDistribution](@ref)
+- `spanwise_direction::MVec3` = MVec3([0.0, 1.0, 0.0]): Wing span direction vector
+"""
+function Wing(n_panels::Int;
+    spanwise_panel_distribution::PanelDistribution=LINEAR,
+    spanwise_direction::PosVector=MVec3([0.0, 1.0, 0.0]))
+    Wing(n_panels, spanwise_panel_distribution, spanwise_direction, Section[], Section[])
 end
 
 function init!(wing::AbstractWing; aero_center_location::Float64=0.25, control_point_location::Float64=0.75)
