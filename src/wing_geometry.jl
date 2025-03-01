@@ -74,15 +74,15 @@ Represents a wing composed of multiple sections with aerodynamic properties.
 
 # Fields
 - `n_panels::Int64`: Number of panels in aerodynamic mesh
-- `spanwise_panel_distribution`::PanelDistribution: [PanelDistribution](@ref)
-- `spanwise_direction::Vector{Float64}`: Wing span direction vector
+- `spanwise_panel_distribution`::PanelDistribution = LINEAR: [PanelDistribution](@ref)
+- `spanwise_direction::MVec3` = MVec3([0.0, 1.0, 0.0]): Wing span direction vector
 - `sections::Vector{Section}`: List of wing sections, see: [Section](@ref)
 
 """
 mutable struct Wing <: AbstractWing
     n_panels::Int64
     spanwise_panel_distribution::PanelDistribution
-    spanwise_direction::PosVector
+    spanwise_direction::MVec3
     sections::Vector{Section}
     refined_sections::Vector{Section}
     
