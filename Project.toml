@@ -1,6 +1,6 @@
 name = "VortexStepMethod"
 uuid = "ed3cd733-9f0f-46a9-93e0-89b8d4998dd9"
-authors = ["1-Bart-1 <bart@vandelint.net>"]
+authors = ["1-Bart-1 <bart@vandelint.net>", "Oriol Canyon and contributors"]
 version = "1.0.1"
 
 [deps]
