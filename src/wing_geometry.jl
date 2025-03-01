@@ -90,8 +90,8 @@ end
 
 """
     Wing(n_panels::Int;
-        spanwise_panel_distribution::PanelDistribution=LINEAR,
-        spanwise_direction::PosVector=MVec3([0.0, 1.0, 0.0]))
+         spanwise_panel_distribution::PanelDistribution=LINEAR,
+         spanwise_direction::PosVector=MVec3([0.0, 1.0, 0.0]))
 
 Constructor for a [Wing](@ref) struct with default values that initializes the sections 
 and refined sections as empty arrays.

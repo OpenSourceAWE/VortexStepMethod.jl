@@ -211,8 +211,29 @@ mutable struct KiteWing <: AbstractWing
 
 end
 
+"""
+    KiteWing
+
+Constructor for a [KiteWing](@ref) that allows to use an `.obj` and a `.dat` file as input.
+
+# Parameters
+- obj_path: Path to the `.obj` file used for creating the geometry
+- dat_path: Path to the `.dat` file
+
+# Keyword Parameters
+- alpha=0.0
+- crease_frac=0.75
+- wind_vel=10.0
+- mass=1.0 
+- `n_panels`=54
+- `n_sections`=n_panels+1
+- `spanwise_panel_distribution`=UNCHANGED: see: [PanelDistribution](@ref)
+- `spanwise_direction`=[0.0, 1.0, 0.0]
+
+"""
 function KiteWing(obj_path, dat_path; alpha=0.0, crease_frac=0.75, wind_vel=10., mass=1.0, 
-    n_panels=54, n_sections=n_panels+1, spanwise_panel_distribution=UNCHANGED, spanwise_direction=[0.0, 1.0, 0.0])
+                  n_panels=54, n_sections=n_panels+1, spanwise_panel_distribution=UNCHANGED, 
+                  spanwise_direction=[0.0, 1.0, 0.0])
 
     !isapprox(spanwise_direction, [0.0, 1.0, 0.0]) && @error "Spanwise direction has to be [0.0, 1.0, 0.0]"
 
