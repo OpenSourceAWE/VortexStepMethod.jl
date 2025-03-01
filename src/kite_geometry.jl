@@ -220,18 +220,18 @@ Constructor for a [KiteWing](@ref) that allows to use an `.obj` and a `.dat` fil
 
 # Parameters
 - obj_path: Path to the `.obj` file used for creating the geometry
-- dat_path: Path to the `.dat` file
+- dat_path: Path to the `.dat` file, a standard format for 2d foil geometry
 
 # Keyword Parameters
-- alpha=0.0
-- crease_frac=0.75
-- wind_vel=10.0
-- mass=1.0 
-- `n_panels`=54
-- `n_sections`=n_panels+1
+- alpha=0.0: Angle of attack of each segment relative to the x axis [rad]
+- crease_frac=0.75: The x coordinate around which the trailing edge rotates on a normalized 2d foil, 
+                    used in the xfoil polar generation
+- wind_vel=10.0: Apparent wind speed in m/s, used in the xfoil polar generation
+- mass=1.0: Mass of the wing in kg, used for the inertia calculations 
+- `n_panels`=54: Number of panels.
+- `n_sections`=n_panels+1: Number of sections (there is a section on each side of each panel.)
 - `spanwise_panel_distribution`=UNCHANGED: see: [PanelDistribution](@ref)
 - `spanwise_direction`=[0.0, 1.0, 0.0]
-
 """
 function KiteWing(obj_path, dat_path; alpha=0.0, crease_frac=0.75, wind_vel=10., mass=1.0, 
                   n_panels=54, n_sections=n_panels+1, spanwise_panel_distribution=UNCHANGED, 
