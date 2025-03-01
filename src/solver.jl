@@ -135,7 +135,7 @@ function solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=n
 
     # Initialize gamma distribution
     gamma_initial = if isnothing(gamma_distribution)
-        if solver.type_initial_gamma_distribution === :elliptic
+        if solver.type_initial_gamma_distribution === ELLIPTIC
             calculate_circulation_distribution_elliptical_wing(body_aero)
         else
             zeros(n_panels)
@@ -162,22 +162,22 @@ function solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=n
         log
     )
     # Try again with reduced relaxation factor if not converged
-    if !converged && relaxation_factor > 1e-3
-        log && @warn "Running again with half the relaxation_factor = $(relaxation_factor/2)"
-        converged, gamma_new, alpha_array, v_a_array = gamma_loop(
-            solver,
-            body_aero,
-            gamma_initial,
-            va_array,
-            chord_array,
-            x_airf_array,
-            y_airf_array,
-            z_airf_array,
-            panels,
-            relaxation_factor/2;
-            log
-        )
-    end
+    # if !converged && relaxation_factor > 1e-3
+    #     log && @warn "Running again with half the relaxation_factor = $(relaxation_factor/2)"
+    #     converged, gamma_new, alpha_array, v_a_array = gamma_loop(
+    #         solver,
+    #         body_aero,
+    #         gamma_initial,
+    #         va_array,
+    #         chord_array,
+    #         x_airf_array,
+    #         y_airf_array,
+    #         z_airf_array,
+    #         panels,
+    #         relaxation_factor/2;
+    #         log
+    #     )
+    # end
 
     # Calculate final results
     results = calculate_results(
@@ -204,6 +204,57 @@ function solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=n
 end
 
 cross3(x,y) = cross(SVector{3,eltype(x)}(x), SVector{3,eltype(y)}(y))
+
+"""
+    smooth_vector!(output::Vector{Float64}, input::Vector{Float64}, window::Int=3)
+
+Smooth a vector using a Gaussian-like kernel with configurable window size.
+Preserves the vector mean and handles edge cases.
+
+# Arguments
+- `output`: Pre-allocated output vector
+- `input`: Input vector to smooth
+- `window`: Window size (must be odd, will be forced odd if even)
+"""
+function smooth_vector!(output::Vector{Float64}, input::Vector{Float64}, window::Int=3)
+    n = length(input)
+    n == length(output) || throw(DimensionMismatch("Input and output must have same length"))
+    
+    # Force odd window size
+    window = window % 2 == 0 ? window + 1 : window
+    half_window = window ÷ 2
+    
+    # Handle special cases
+    if n <= window
+        output .= input
+        return nothing
+    end
+    
+    # Create Gaussian-like weights
+    weights = [exp(-(i-half_window)^2 / (2*(half_window/2)^2)) 
+              for i in 0:window-1]
+    weights ./= sum(weights)
+    
+    # Process interior points
+    for i in 1:n
+        sum_weights = 0.0
+        output[i] = 0.0
+        
+        for j in max(1, i-half_window):min(n, i+half_window)
+            weight = weights[j - (i-half_window) + 1]
+            output[i] += input[j] * weight
+            sum_weights += weight
+        end
+        
+        output[i] /= sum_weights
+    end
+    
+    # Preserve mean
+    if mean(output) != 0.0
+        output .*= mean(input) / mean(output)
+    end
+    return nothing
+end
 
 """
     gamma_loop(solver::Solver, gamma_new::Vector{Float64}, AIC_x::Matrix{Float64}, 
@@ -253,7 +304,7 @@ function gamma_loop(
     iters = 0
     function f!(res, gamma, p)
         iters += 1
-        
+
         # Calculate induced velocities
         mul!(velocity_view_x, AIC_x, gamma)
         mul!(velocity_view_y, AIC_y, gamma)
@@ -288,12 +339,30 @@ function gamma_loop(
         gamma_new .= 0.5 .* v_a_array.^2 ./ Umagw_array .* cl_array .* chord_array
 
         res .= gamma_new .- gamma
+        # Add regularization terms to enforce smoothness
+        # λ = 1e-2  # Adjust regularization strength (start with 1e-3)
+        # n = length(gamma)
+        # for i in 1:n
+        #     sign = res[i] > 0 ? 1 : -1
+        #     if i == 1
+        #         # Forward difference at left boundary
+        #         res[i] += λ * sign * (gamma[i+1] - gamma[i])
+        #     elseif i == n
+        #         # Backward difference at right boundary
+        #         res[i] += λ * sign * (gamma[i-1] - gamma[i])
+        #     else
+        #         # Central difference (discrete Laplacian)
+        #         res[i] += λ * sign * (gamma[i-1] - 2*gamma[i] + gamma[i+1])
+        #     end
+        # end
+
         return nothing
     end
 
     prob = NonlinearProblem(f!, gamma_new, nothing)
-    sol = NonlinearSolve.solve(prob, NewtonRaphson(autodiff=AutoFiniteDiff()))
-    f!(gamma, sol, nothing)
+    sol = NonlinearSolve.solve(prob, RobustMultiNewton(autodiff=AutoFiniteDiff()))
+    f!(gamma, sol.u, nothing)
+    @show NonlinearSolve.SciMLBase.successful_retcode(sol)
 
     if log && converged
         @info "Converged after $iters iterations"
