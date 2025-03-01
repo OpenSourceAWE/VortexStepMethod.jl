@@ -79,7 +79,7 @@ end
 
 """
     solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=nothing; 
-          log=false, reference_point=zeros(MVec3))
+          log=true, reference_point=zeros(MVec3))
 
 Main solving routine for the aerodynamic model. Reference point is in the kite body (KB) frame.
 
@@ -89,14 +89,14 @@ Main solving routine for the aerodynamic model. Reference point is in the kite b
 - gamma_distribution: Initial circulation vector or nothing; Length: Number of segments. [m²/s]
 
 # Keyword Arguments:
-- log=false: If true, print the number of iterations and other info.
+- log=true: If true, print the number of iterations and other info.
 - reference_point=zeros(MVec3)
 
 # Returns
 A dictionary with the results.
 """
 function solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=nothing; 
-               log=false, reference_point=zeros(MVec3))
+               log=true, reference_point=zeros(MVec3))
     
     # check arguments
     isnothing(body_aero.panels[1].va) && throw(ArgumentError("Inflow conditions are not set, use set_va!(body_aero, va)"))
@@ -270,6 +270,7 @@ function gamma_loop(
     v_a_array = body_aero.v_a_array
     Umagw_array = similar(v_a_array)
 
+    gamma_new .= 0.0
     gamma = copy(gamma_new)
     abs_gamma_new = copy(gamma_new)
     induced_velocity_all = zeros(n_panels, 3)
@@ -343,14 +344,14 @@ function gamma_loop(
     end
 
     prob = NonlinearProblem(f!, gamma_new, nothing)
-    sol = NonlinearSolve.solve(prob, RobustMultiNewton(autodiff=AutoFiniteDiff()); reltol=solver.reltol, abstol=solver.abstol, maxiters=solver.max_iterations)
+    sol = NonlinearSolve.solve(prob, NewtonRaphson(autodiff=AutoFiniteDiff(;absstep=0.01, relstep=0.01)); reltol=solver.reltol, abstol=solver.abstol, maxiters=solver.max_iterations)
     f!(gamma, sol.u, nothing)
-    @show NonlinearSolve.SciMLBase.successful_retcode(sol)
+    converged = NonlinearSolve.SciMLBase.successful_retcode(sol)
 
     if log && converged
-        @info "Converged after $iters iterations"
+        @info "Converged after $(sol.stats.nf) iterations"
     elseif log
-        @warn "NO convergence after $(solver.max_iterations) iterations"
+        @warn "NO convergence after $(sol.stats.nf) iterations"
     end
 
     return converged, gamma_new, alpha_array, v_a_array
