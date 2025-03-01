@@ -7,71 +7,41 @@ Main solver structure for the Vortex Step Method.
 # Attributes
 
 ## General settings
-- `aerodynamic_model_type`::Model: The model type, see: [Model](@ref)
-- density::Float64: Air density [kg/m³]
-- `max_iterations`::Int64
-- `allowed_error`::Float64: relative error
-- `tol_reference_error`::Float64
-- `relaxation_factor`::Float64
+- `aerodynamic_model_type`::Model = VSM: The model type, see: [Model](@ref)
+- density::Float64 = 1.225: Air density [kg/m³] 
+- `max_iterations`::Int64 = 1500
+- `allowed_error`::Float64 = 1e-5: relative error
+- `tol_reference_error`::Float64 = 0.001
+- `relaxation_factor`::Float64 = 0.03: Relaxation factor for convergence 
 
 ## Damping settings
-- `is_with_artificial_damping`::Bool
-- `artificial_damping`::NamedTuple{(:k2, :k4), Tuple{Float64, Float64}}
+- `is_with_artificial_damping`::Bool = false: Whether to apply artificial damping
+- `artificial_damping`::NamedTuple{(:k2, :k4), Tuple{Float64, Float64}} = (k2=0.1, k4=0.0): Artificial damping parameters
 
 ## Additional settings
-- `type_initial_gamma_distribution`::InitialGammaDistribution: see: [InitialGammaDistribution](@ref)
-- `core_radius_fraction`::Float64
-- mu::Float64
-- `is_only_f_and_gamma_output`::Bool
+- `type_initial_gamma_distribution`::InitialGammaDistribution = ELLIPTIC: see: [InitialGammaDistribution](@ref)
+- `core_radius_fraction`::Float64 = 1e-20: 
+- mu::Float64 = 1.81e-5: Dynamic viscosity [N·s/m²]
+- `is_only_f_and_gamma_output`::Bool = false: Whether to only output f and gamma
 """
-struct Solver
+@with_kw struct Solver
     # General settings
-    aerodynamic_model_type::Model
-    density::Float64
-    max_iterations::Int64
-    allowed_error::Float64
-    tol_reference_error::Float64
-    relaxation_factor::Float64
+    aerodynamic_model_type::Model = VSM
+    density::Float64 = 1.225
+    max_iterations::Int64 = 1500
+    allowed_error::Float64 = 1e-5
+    tol_reference_error::Float64 = 0.001
+    relaxation_factor::Float64 = 0.03
     
     # Damping settings
-    is_with_artificial_damping::Bool
-    artificial_damping::NamedTuple{(:k2, :k4), Tuple{Float64, Float64}}
+    is_with_artificial_damping::Bool = false
+    artificial_damping::NamedTuple{(:k2, :k4), Tuple{Float64, Float64}} =(k2=0.1, k4=0.0)
     
     # Additional settings
-    type_initial_gamma_distribution::InitialGammaDistribution
-    core_radius_fraction::Float64
-    mu::Float64
-    is_only_f_and_gamma_output::Bool
-
-    function Solver(;
-        aerodynamic_model_type::Model    = VSM,
-        density::Float64                 = 1.225,
-        max_iterations::Int64            = 1500,
-        allowed_error::Float64           = 1e-5, # rel_err
-        tol_reference_error::Float64     = 0.001,
-        relaxation_factor::Float64       = 0.03,
-        is_with_artificial_damping::Bool = false,
-        artificial_damping::NamedTuple{(:k2, :k4), Tuple{Float64, Float64}}=(k2=0.1, k4=0.0),
-        type_initial_gamma_distribution::InitialGammaDistribution=ELLIPTIC,
-        core_radius_fraction::Float64    = 1e-20,
-        mu::Float64                      = 1.81e-5, # TODO do not use magic constants
-        is_only_f_and_gamma_output::Bool = false
-    )
-        new(
-            aerodynamic_model_type,
-            density,
-            max_iterations,
-            allowed_error,
-            tol_reference_error,
-            relaxation_factor,
-            is_with_artificial_damping,
-            artificial_damping,
-            type_initial_gamma_distribution,
-            core_radius_fraction,
-            mu,
-            is_only_f_and_gamma_output
-        )
-    end
+    type_initial_gamma_distribution::InitialGammaDistribution = ELLIPTIC
+    core_radius_fraction::Float64 = 1e-20
+    mu::Float64 = 1.81e-5
+    is_only_f_and_gamma_output::Bool = false
 end
 
 """
