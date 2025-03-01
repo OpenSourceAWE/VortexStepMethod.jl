@@ -7,7 +7,7 @@ This project is based on version 1.0 of the Python project [Vortex-Step-Method](
 - automatic creation of polars using Xfoil.jl was added (see: [#43](https://github.com/Albatross-Kite-Transport/VortexStepMethod.jl/pull/43))
 - a ram-air kite example was added
 - `Umag` was replaced with `v_a` as variable name for the norm of the apparent wind speed
-- memory allocations where significantly reduced
+- memory allocations were significantly reduced
 - a menu (examples/menu.jl) for running the examples was added
 - plotting was moved to an extension
 - added improved online documentation
