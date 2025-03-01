@@ -25,6 +25,11 @@ Represents a wing section with leading edge, trailing edge, and aerodynamic prop
         Tuple{Vector{Float64}, Vector{Float64}, Matrix{Float64}, Matrix{Float64}, Matrix{Float64}}
     } = nothing
 end
+"""
+    Section(LE_point::Vector{Float64}, TE_point::Vector{Float64}, aero_model=nothing, aero_data=nothing)
+
+Constructor for Section that allows to pass Vectors of Float64 as point coordinates.
+"""
 function Section(LE_point::Vector{Float64}, TE_point::Vector{Float64}, aero_model=nothing, aero_data=nothing)
     Section(MVec3(LE_point), MVec3(TE_point), aero_model, aero_data)
 end
