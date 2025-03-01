@@ -212,7 +212,9 @@ mutable struct KiteWing <: AbstractWing
 end
 
 """
-    KiteWing
+    KiteWing(obj_path, dat_path; alpha=0.0, crease_frac=0.75, wind_vel=10., mass=1.0, 
+             n_panels=54, n_sections=n_panels+1, spanwise_panel_distribution=UNCHANGED, 
+             spanwise_direction=[0.0, 1.0, 0.0])
 
 Constructor for a [KiteWing](@ref) that allows to use an `.obj` and a `.dat` file as input.
 
