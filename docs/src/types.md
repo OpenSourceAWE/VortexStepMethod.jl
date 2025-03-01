@@ -11,9 +11,9 @@ InitialGammaDistribution
 
 ## Basic Vectors
 ```@docs
-   MVec3
-   PosVector
-   VelVector
+MVec3
+PosVector
+VelVector
 ```
 
 ## Wing Geometry, Panel and Aerodynamics
