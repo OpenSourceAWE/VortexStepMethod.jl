@@ -1,6 +1,6 @@
 
 """
-    Section
+    mutable struct Section
 
 Represents a wing section with leading edge, trailing edge, and aerodynamic properties.
 
@@ -26,11 +26,12 @@ Represents a wing section with leading edge, trailing edge, and aerodynamic prop
     } = nothing
 end
 """
-    Section(LE_point::Vector{Float64}, TE_point::Vector{Float64}, aero_model=nothing, aero_data=nothing)
+    Section(LE_point::Vector{Float64}, TE_point::Vector{Float64}, 
+            aero_model=nothing, aero_data=nothing)
 
-Constructor for Section that allows to pass Vectors of Float64 as point coordinates.
+Constructor for [Section](@ref) that allows to pass Vectors of Float64 as point coordinates.
 """
-function Section(LE_point::Vector{Float64}, TE_point::Vector{Float64}, aero_model=nothing, aero_data=nothing)
+function Section(LE_point::Vector{Float64}, TE_point::Vector{Float64}, aero_model=INVISCID, aero_data=nothing)
     Section(MVec3(LE_point), MVec3(TE_point), aero_model, aero_data)
 end
 
