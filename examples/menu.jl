@@ -4,7 +4,7 @@ using REPL.TerminalMenus
 
 options = ["rectangular_wing = include(\"rectangular_wing.jl\")",
            "ram_air_kite = include(\"ram_air_kite.jl\")",
-           "stall_model = include(\"stall_model.jl\")",
+           "lei_kite = include(\"lei_kite.jl\")",
            "bench = include(\"bench.jl\")",
            "cleanup = include(\"cleanup.jl\")",
            "quit"]
