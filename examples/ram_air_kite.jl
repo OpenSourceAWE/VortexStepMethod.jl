@@ -10,7 +10,7 @@ end
 using CSV
 using DataFrames
 
-plot = true
+PLOT = true
 
 # Create wing geometry
 wing = KiteWing("data/ram_air_kite_body.obj", "data/ram_air_kite_foil.dat")
@@ -36,7 +36,7 @@ vel_app = [
 set_va!(body_aero, vel_app)
 
 # Plotting geometry
-plot && plot_geometry(
+PLOT && plot_geometry(
     body_aero,
     "";
     data_type=".svg",
@@ -53,7 +53,7 @@ results = solve(vsm_solver, body_aero)
 
 body_y_coordinates = [panel.aero_center[2] for panel in body_aero.panels]
 
-plot && plot_distribution(
+PLOT && plot_distribution(
     [body_y_coordinates],
     [results],
     ["VSM"];
@@ -63,7 +63,7 @@ plot && plot_distribution(
     is_show=true
 )
 
-plot && plot_polars(
+PLOT && plot_polars(
     [vsm_solver],
     [body_aero],
     [
