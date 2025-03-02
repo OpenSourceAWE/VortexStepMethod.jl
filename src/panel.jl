@@ -315,13 +315,9 @@ function calculate_cl(panel::Panel, alpha::Float64)::Float64
     elseif panel.aero_model == INVISCID
         cl = 2π * alpha
     elseif panel.aero_model == POLAR_DATA
-        if isa(panel.cl_interp, I1)
-            cl = panel.cl_interp(alpha)::Float64
-        elseif isa(panel.cl_interp, I2)
-            cl = panel.cl_interp(alpha, 0.0)::Float64
-        else
-            throw(ArgumentError("cl_interp is $(panel.cl_interp)"))
-        end
+        cl = panel.cl_interp(alpha)::Float64
+    elseif panel.aero_model == POLAR_MATRIX
+        cl = panel.cl_interp(alpha, 0.0)::Float64
     else
         throw(ArgumentError("Unsupported aero model: $(panel.aero_model)"))
     end
