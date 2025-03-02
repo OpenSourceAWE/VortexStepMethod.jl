@@ -18,7 +18,7 @@ using SharedArrays
 # Export public interface
 export Wing, Section, KiteWing
 export BodyAerodynamics
-export Solver, solve
+export Solver, solve, solve_base
 export calculate_results, solve_circulation_distribution
 export add_section!, set_va!
 export calculate_span, calculate_projected_area
