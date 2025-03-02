@@ -78,9 +78,11 @@ Enumeration of the implemented aerodynamic models. See also: [AeroData](@ref)
 
 # Elements
 - `LEI_AIRFOIL_BREUKELS`: Polynom approximation for leading edge inflatable kites
-- `POLAR_VECTORS`: Polar data as function of alpha (lookup tables with interpolation)
-- `POLAR_MATRICES`: Polar data as function of alpha and beta (lookup tables with interpolation)
+- `POLAR_VECTORS`: Polar vectors as function of alpha (lookup tables with interpolation)
+- `POLAR_MATRICES`: Polar matrices as function of alpha and beta (lookup tables with interpolation)
 - INVISCID
+
+where `alpha` is the angle of attack, `beta` is trailing edge angle.
 """
 @enum AeroModel begin
    LEI_AIRFOIL_BREUKELS
