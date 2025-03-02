@@ -139,7 +139,7 @@ Union of different definitions of the aerodynamic properties of a wing section. 
   - (`alpha_range`, `beta_range`, `cl_matrix`, `cd_matrix`, `cm_matrix`) for `POLAR_MATRICES` 
 
 where `alpha` is the angle of attack, `beta` is trailing edge angle, `cl` the lift coefficient,
-`cd` the drag coefficient and `cm` the moment coefficient.
+`cd` the drag coefficient and `cm` the pitching moment coefficient.
 """
 const AeroData = Union{
         Nothing,
