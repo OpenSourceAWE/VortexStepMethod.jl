@@ -272,7 +272,6 @@ function gamma_loop(
     Umagw_array = similar(v_a_array)
 
     # gamma_new .= 0.0
-    @show gamma_new
     gamma = copy(gamma_new)
     abs_gamma_new = copy(gamma_new)
     induced_velocity_all = zeros(n_panels, 3)
