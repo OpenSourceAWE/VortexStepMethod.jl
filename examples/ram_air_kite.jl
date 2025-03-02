@@ -69,7 +69,7 @@ plot && plot_polars(
     [
         "VSM from Ram Air Kite OBJ and DAT file",
     ];
-    angle_range=range(0, 20, length=20),
+    angle_range=[0:25..., 24:-1:0...],
     angle_type="angle_of_attack",
     angle_of_attack=0,
     side_slip=0,

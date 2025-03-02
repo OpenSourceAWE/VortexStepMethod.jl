@@ -51,7 +51,7 @@ vsm_solver = Solver(
 
 # Setting velocity conditions
 v_a = 15.0
-aoa = 20.0
+aoa = 17.0
 side_slip = 0.0
 yaw_rate = 0.0
 aoa_rad = deg2rad(aoa)

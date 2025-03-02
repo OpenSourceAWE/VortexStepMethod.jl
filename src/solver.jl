@@ -202,8 +202,9 @@ Preserves the vector mean and handles edge cases.
 - `input`: Input vector to smooth
 - `window`: Window size (must be odd, will be forced odd if even)
 """
-function smooth_vector!(output::Vector{Float64}, input::Vector{Float64}, window::Int=3)
+function smooth_vector!(input::Vector{Float64}, window::Int=3)
     n = length(input)
+    output = copy(input)
     n == length(output) || throw(DimensionMismatch("Input and output must have same length"))
     
     # Force odd window size
@@ -212,7 +213,6 @@ function smooth_vector!(output::Vector{Float64}, input::Vector{Float64}, window:
     
     # Handle special cases
     if n <= window
-        output .= input
         return nothing
     end
     
@@ -239,6 +239,7 @@ function smooth_vector!(output::Vector{Float64}, input::Vector{Float64}, window:
     if mean(output) != 0.0
         output .*= mean(input) / mean(output)
     end
+    input .= output
     return nothing
 end
 
@@ -270,7 +271,8 @@ function gamma_loop(
     v_a_array = body_aero.v_a_array
     Umagw_array = similar(v_a_array)
 
-    gamma_new .= 0.0
+    # gamma_new .= 0.0
+    @show gamma_new
     gamma = copy(gamma_new)
     abs_gamma_new = copy(gamma_new)
     induced_velocity_all = zeros(n_panels, 3)
@@ -320,23 +322,23 @@ function gamma_loop(
         for (i, (panel, alpha)) in enumerate(zip(panels, alpha_array))
             cl_array[i] = calculate_cl(panel, alpha)
         end
+
         gamma_new .= 0.5 .* v_a_array.^2 ./ Umagw_array .* cl_array .* chord_array
 
-        res .= gamma_new .- gamma
-        # Add regularization terms to enforce smoothness
-        # λ = 1e-2  # Adjust regularization strength (start with 1e-3)
+        res .= norm.(gamma_new .- gamma)
+        # # Add regularization terms to enforce smoothness
+        # λ = 0.1  # Adjust regularization strength (start with 1e-3)
         # n = length(gamma)
         # for i in 1:n
-        #     sign = res[i] > 0 ? 1 : -1
         #     if i == 1
         #         # Forward difference at left boundary
-        #         res[i] += λ * sign * (gamma[i+1] - gamma[i])
+        #         res[i] += λ * abs(gamma[i+1] - gamma[i])
         #     elseif i == n
         #         # Backward difference at right boundary
-        #         res[i] += λ * sign * (gamma[i-1] - gamma[i])
+        #         res[i] += λ * abs(gamma[i-1] - gamma[i])
         #     else
         #         # Central difference (discrete Laplacian)
-        #         res[i] += λ * sign * (gamma[i-1] - 2*gamma[i] + gamma[i+1])
+        #         res[i] += λ * abs(gamma[i-1] - 2*gamma[i] + gamma[i+1])
         #     end
         # end
 
@@ -344,7 +346,8 @@ function gamma_loop(
     end
 
     prob = NonlinearProblem(f!, gamma_new, nothing)
-    sol = NonlinearSolve.solve(prob, NewtonRaphson(autodiff=AutoFiniteDiff(;absstep=0.01, relstep=0.01)); reltol=solver.reltol, abstol=solver.abstol, maxiters=solver.max_iterations)
+    sol = NonlinearSolve.solve(prob, NewtonRaphson(autodiff=AutoFiniteDiff()); 
+        reltol=solver.reltol, abstol=solver.abstol, maxiters=solver.max_iterations)
     f!(gamma, sol.u, nothing)
     converged = NonlinearSolve.SciMLBase.successful_retcode(sol)
 
@@ -357,7 +360,7 @@ function gamma_loop(
     return converged, gamma_new, alpha_array, v_a_array
 end
 
-"""
+"""5
     smooth_circulation(circulation::Vector{Float64}, 
                       smoothness_factor::Float64, 
                       damping_factor::Float64)

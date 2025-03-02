@@ -167,6 +167,51 @@ function calculate_inertia_tensor(vertices, faces, mass, com)
     return (mass / total_area) * I / 3
 end
 
+"""
+    interpolate_matrix_nans!(matrix::Matrix{Float64})
+
+Replace NaN values in a matrix by interpolating from nearest non-NaN neighbors.
+Uses an expanding search radius until valid neighbors are found.
+
+# Arguments
+- `matrix`: Matrix containing NaN values to be interpolated
+"""
+function interpolate_matrix_nans!(matrix::Matrix{Float64})
+    rows, cols = size(matrix)
+    
+    while any(isnan, matrix)
+        for i in 1:rows, j in 1:cols
+            if isnan(matrix[i,j])
+                # Search in expanding radius until we find valid neighbors
+                radius = 1
+                values = Float64[]
+                weights = Float64[]
+                
+                while isempty(values) && radius < max(rows, cols)
+                    # Check all points at current Manhattan distance
+                    for di in -radius:radius, dj in -radius:radius
+                        if abs(di) + abs(dj) == radius  # Points exactly at distance 'radius'
+                            ni, nj = i + di, j + dj
+                            if 1 ≤ ni ≤ rows && 1 ≤ nj ≤ cols && !isnan(matrix[ni,nj])
+                                # Weight by inverse distance
+                                dist = sqrt(di^2 + dj^2)
+                                push!(values, matrix[ni,nj])
+                                push!(weights, 1/dist)
+                            end
+                        end
+                    end
+                    radius += 1
+                end
+                
+                if !isempty(values)
+                    # Calculate weighted average of found values
+                    matrix[i,j] = sum(values .* weights) / sum(weights)
+                end
+            end
+        end
+    end
+    return matrix
+end
 
 """
     KiteWing
@@ -246,6 +291,9 @@ mutable struct KiteWing <: AbstractWing
 
         @info "Loading polars and kite info from $polar_path and $info_path"
         (alpha_range, beta_range, cl_matrix::Matrix, cd_matrix::Matrix, cm_matrix::Matrix) = deserialize(polar_path)
+        interpolate_matrix_nans!(cl_matrix)
+        interpolate_matrix_nans!(cd_matrix)
+        interpolate_matrix_nans!(cm_matrix)
     
         (center_of_mass, inertia_tensor, circle_center_z, radius, gamma_tip, 
             le_interp, te_interp, area_interp) = deserialize(info_path)

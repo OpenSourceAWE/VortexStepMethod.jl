@@ -515,7 +515,6 @@ function generate_polar_data(
     set_plot_style()
 
     for (i, angle_i) in enumerate(angle_range)
-        @show angle_i
         # Set angle based on type
         if angle_type == "angle_of_attack"
             α = deg2rad(angle_i)
@@ -551,6 +550,10 @@ function generate_polar_data(
 
         # Store gamma for next iteration
         gamma = gamma_distribution[i, :]
+
+        if angle_i == 7
+            @show angle_i norm(diff(gamma)) mean(gamma) minimum(gamma) maximum(gamma)
+        end
     end
 
     polar_data = [

@@ -1,6 +1,6 @@
 # static types for interpolations
-const I1 = Interpolations.FilledExtrapolation{Float64, 1, Interpolations.GriddedInterpolation{Float64, 1, Vector{Float64}, Interpolations.Gridded{Interpolations.Linear{Interpolations.Throw{Interpolations.OnGrid}}}, Tuple{Vector{Float64}}}, Interpolations.Gridded{Interpolations.Linear{Interpolations.Throw{Interpolations.OnGrid}}}, Float64}
-const I2 = Interpolations.FilledExtrapolation{Float64, 2, Interpolations.GriddedInterpolation{Float64, 2, Matrix{Float64}, Interpolations.Gridded{Interpolations.Linear{Interpolations.Throw{Interpolations.OnGrid}}}, Tuple{Vector{Float64}, Vector{Float64}}}, Interpolations.Gridded{Interpolations.Linear{Interpolations.Throw{Interpolations.OnGrid}}}, Float64}
+const I1 = Interpolations.Extrapolation{Float64, 1, Interpolations.GriddedInterpolation{Float64, 1, Vector{Float64}, Interpolations.Gridded{Interpolations.Linear{Interpolations.Throw{Interpolations.OnGrid}}}, Tuple{Vector{Float64}}}, Interpolations.Gridded{Interpolations.Linear{Interpolations.Throw{Interpolations.OnGrid}}}, Interpolations.Line{Nothing}}
+const I2 = Interpolations.Extrapolation{Float64, 2, Interpolations.GriddedInterpolation{Float64, 2, Matrix{Float64}, Interpolations.Gridded{Interpolations.Linear{Interpolations.Throw{Interpolations.OnGrid}}}, Tuple{Vector{Float64}, Vector{Float64}}}, Interpolations.Gridded{Interpolations.Linear{Interpolations.Throw{Interpolations.OnGrid}}}, Interpolations.Line{Nothing}}
 
 """
     Panel
@@ -127,9 +127,9 @@ function init_aero!(
             )
             alphas = Vector{Float64}(aero_1[1])
 
-            panel.cl_interp = linear_interpolation(alphas, polar_data[1]; extrapolation_bc=NaN)
-            panel.cd_interp = linear_interpolation(alphas, polar_data[2]; extrapolation_bc=NaN)
-            panel.cm_interp = linear_interpolation(alphas, polar_data[3]; extrapolation_bc=NaN)
+            panel.cl_interp = linear_interpolation(alphas, polar_data[1]; extrapolation_bc=Line())
+            panel.cd_interp = linear_interpolation(alphas, polar_data[2]; extrapolation_bc=Line())
+            panel.cm_interp = linear_interpolation(alphas, polar_data[3]; extrapolation_bc=Line())
 
         elseif length(aero_1) == 5
             !all(isapprox.(aero_1[1], aero_2[1])) && @error "Make sure you use the same alpha range for all your interpolations."
@@ -143,9 +143,9 @@ function init_aero!(
             alphas = Vector{Float64}(aero_1[1])
             betas = Vector{Float64}(aero_1[2])
 
-            panel.cl_interp = linear_interpolation((alphas, betas), polar_data[1]; extrapolation_bc=NaN)
-            panel.cd_interp = linear_interpolation((alphas, betas), polar_data[2]; extrapolation_bc=NaN)
-            panel.cm_interp = linear_interpolation((alphas, betas), polar_data[3]; extrapolation_bc=NaN)
+            panel.cl_interp = linear_interpolation((alphas, betas), polar_data[1]; extrapolation_bc=Line())
+            panel.cd_interp = linear_interpolation((alphas, betas), polar_data[2]; extrapolation_bc=Line())
+            panel.cm_interp = linear_interpolation((alphas, betas), polar_data[3]; extrapolation_bc=Line())
         else
             throw(ArgumentError("Polar data in wrong format: $aero_1"))
         end
