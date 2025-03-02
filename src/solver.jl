@@ -44,6 +44,12 @@ Main solver structure for the Vortex Step Method.
     is_only_f_and_gamma_output::Bool = false
 end
 
+struct Result
+    cl::Float64
+    cd::Float64
+    cm::Float64
+end
+
 """
     solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=nothing; 
           log=false, reference_point=zeros(MVec3))
@@ -63,6 +69,37 @@ Main solving routine for the aerodynamic model. Reference point is in the kite b
 A dictionary with the results.
 """
 function solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=nothing; 
+    log=false, reference_point=zeros(MVec3))
+    # calculate intermediate result
+    body_aero, gamma_new, reference_point, density, aerodynamic_model_type, core_radius_fraction,
+    mu, alpha_array, v_a_array, chord_array, x_airf_array, y_airf_array, z_airf_array,
+    va_array, va_norm_array, va_unit_array, panels,
+    is_only_f_and_gamma_output = solve_base(solver, body_aero, gamma_distribution; log, reference_point)
+
+    # Calculate final results as dictionary
+    results = calculate_results(
+        body_aero,
+        gamma_new,
+        reference_point,
+        density,
+        aerodynamic_model_type,
+        core_radius_fraction,
+        mu,
+        alpha_array,
+        v_a_array,
+        chord_array,
+        x_airf_array,
+        y_airf_array,
+        z_airf_array,
+        va_array,
+        va_norm_array,
+        va_unit_array,
+        panels,
+        is_only_f_and_gamma_output
+    )
+    return results
+end
+function solve_base(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=nothing; 
                log=false, reference_point=zeros(MVec3))
     
     # check arguments
@@ -149,8 +186,8 @@ function solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=n
         )
     end
 
-    # Calculate final results
-    results = calculate_results(
+    # Return results
+    return (
         body_aero,
         gamma_new,
         reference_point,
@@ -170,7 +207,6 @@ function solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=n
         panels,
         solver.is_only_f_and_gamma_output
     )
-    return results
 end
 
 cross3(x,y) = cross(SVector{3,eltype(x)}(x), SVector{3,eltype(y)}(y))
