@@ -99,7 +99,7 @@ using LinearAlgebra
         cms = [-0.1 * α for α in alphas]
 
         for model in models
-            for (aero_model, aero_data) in [(INVISCID, nothing), (POLAR_DATA, (alphas, cls, cds, cms))]
+            for (aero_model, aero_data) in [(INVISCID, nothing), (POLAR_VECTORS, (alphas, cls, cds, cms))]
                 wing = Wing(n_panels, spanwise_panel_distribution=LINEAR)
                 add_section!(wing, 
                     [0.0, span/2, 0.0],    # Left tip LE 

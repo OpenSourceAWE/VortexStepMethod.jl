@@ -16,6 +16,11 @@ PosVector
 VelVector
 ```
 
+## Aerodynamic data
+```@docs
+AeroData
+```
+
 ## Wing Geometry, Panel and Aerodynamics
 A body is constructed of one or more abstract wings. An abstract wing can be a Wing or a KiteWing. 
 A Wing/ KiteWing has one or more sections.

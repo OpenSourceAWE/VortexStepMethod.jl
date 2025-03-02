@@ -8,22 +8,13 @@ Represents a wing section with leading edge, trailing edge, and aerodynamic prop
 - `LE_point::MVec3` = zeros(MVec3): Leading edge point coordinates
 - `TE_point::MVec3` = zeros(MVec3): Trailing edge point coordinates
 - `aero_model`::AeroModel = INVISCID: [AeroModel](@ref)
-- `aero_data` = nothing: Can be:
-  - nothing for INVISCID
-  - (`tube_diameter`, camber) for `LEI_AIRFOIL_BREUKELS`
-  - (`alpha_range`, `cl_vector`, `cd_vector`, `cm_vector`) for `POLAR_DATA`
-  - (`alpha_range`, `beta_range`, `cl_matrix`, `cd_matrix`, `cm_matrix`) for `POLAR_DATA`        
+- `aero_data`::AeroData = nothing: See: [AeroData]    
 """
 @with_kw mutable struct Section
     LE_point::MVec3 = zeros(MVec3)
     TE_point::MVec3 = zeros(MVec3)
     aero_model::AeroModel = INVISCID
-    aero_data::Union{
-        Nothing,
-        NTuple{2, Float64},
-        Tuple{Vector{Float64}, Vector{Float64}, Vector{Float64}, Vector{Float64}},
-        Tuple{Vector{Float64}, Vector{Float64}, Matrix{Float64}, Matrix{Float64}, Matrix{Float64}}
-    } = nothing
+    aero_data::AeroData = nothing
 end
 """
     Section(LE_point::Vector{Float64}, TE_point::Vector{Float64}, 
@@ -130,14 +121,10 @@ Add a new section to the wing.
 - LE_point::PosVector: [PosVector](@ref) of the point on the side of the leading edge
 - TE_point::PosVector: [PosVector](@ref) of the point on the side of the trailing edge
 - `aero_model`::AeroModel: [AeroModel](@ref)
-- `aero_data`: Can be:
-  - nothing for INVISCID
-  - (`tube_diameter`, camber) for `LEI_AIRFOIL_BREUKELS`
-  - (`alpha_range`, `cl_vector`, `cd_vector`, `cm_vector`) for `POLAR_DATA`
-  - (`alpha_range`, `beta_range`, `cl_matrix`, `cd_matrix`, `cm_matrix`) for `POLAR_DATA`  
+- `aero_data`::AeroData: See [AeroData](@ref)  
 """
 function add_section!(wing::Wing, LE_point::Vector{Float64}, 
-                     TE_point::Vector{Float64}, aero_model::AeroModel, aero_data=nothing)
+                     TE_point::Vector{Float64}, aero_model::AeroModel, aero_data::AeroData=nothing)
     push!(wing.sections, Section(LE_point, TE_point, aero_model, aero_data))
     return nothing
 end
@@ -258,15 +245,15 @@ function calculate_new_aero_data(aero_model,
         throw(ArgumentError("Different aero models over the span are not supported"))
     end
     
-    if model_type === INVISCID
+    if model_type == INVISCID
         return nothing
         
-    elseif model_type === POLAR_DATA
+    elseif model_type in (POLAR_VECTORS, POLAR_MATRICES)
         polar_left = aero_data[section_index]
         polar_right = aero_data[section_index + 1]
         
         # Unpack polar data
-        if length(polar_left) == 4
+        if model_type == POLAR_VECTORS
             alpha_left, CL_left, CD_left, CM_left = polar_left
             alpha_right, CL_right, CD_right, CM_right = polar_right
 
@@ -281,7 +268,7 @@ function calculate_new_aero_data(aero_model,
             
             return (alpha_left, CL_data, CD_data, CM_data)
             
-        elseif length(polar_left) == 5
+        elseif model_type == POLAR_MATRICES
             alpha_left, beta_left, CL_left, CD_left, CM_left = polar_left
             alpha_right, beta_right, CL_right, CD_right, CM_right = polar_right
             

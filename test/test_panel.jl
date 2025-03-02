@@ -137,8 +137,8 @@ end
     end
     
     # Create two sections with slightly different polar data
-    section1 = Section([0.0, 0.0, 0.0], [1.0, 0.0, 0.0], POLAR_DATA, polar_data)
-    section2 = Section([0.0, 10.0, 0.0], [1.0, 10.0, 0.0], POLAR_DATA, big_polar_data)
+    section1 = Section([0.0, 0.0, 0.0], [1.0, 0.0, 0.0], POLAR_VECTORS, polar_data)
+    section2 = Section([0.0, 10.0, 0.0], [1.0, 10.0, 0.0], POLAR_VECTORS, big_polar_data)
     
     # Create panel
     panel = create_panel(section1, section2)

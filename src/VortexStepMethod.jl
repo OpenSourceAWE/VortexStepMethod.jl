@@ -24,7 +24,7 @@ export add_section!, set_va!
 export calculate_span, calculate_projected_area
 export menu, MVec3
 export Model, VSM, LLT
-export AeroModel, LEI_AIRFOIL_BREUKELS, POLAR_DATA, INVISCID
+export AeroModel, LEI_AIRFOIL_BREUKELS, POLAR_VECTORS, POLAR_MATRICES, INVISCID
 export PanelDistribution, LINEAR, COSINE, COSINE_VAN_GARREL, SPLIT_PROVIDED, UNCHANGED
 export InitialGammaDistribution, ELLIPTIC, ZEROS
 
@@ -72,18 +72,22 @@ Enumeration of the implemented model types.
 @enum Model VSM LLT
 
 """
-   AeroModel `LEI_AIRFOIL_BREUKELS` `POLAR_DATA` `INVISCID`
+   AeroModel `LEI_AIRFOIL_BREUKELS` `POLAR_VECTORS` `POLAR_MATRICES` `INVISCID`
 
-Enumeration of the implemented aerodynamic models.
+Enumeration of the implemented aerodynamic models. See also: [AeroData](@ref)
 
 # Elements
 - `LEI_AIRFOIL_BREUKELS`: Polynom approximation for leading edge inflatable kites
-- `POLAR_DATA`: Polar data (lookup tables with interpolation)
+- `POLAR_VECTORS`: Polar vectors as function of alpha (lookup tables with interpolation)
+- `POLAR_MATRICES`: Polar matrices as function of alpha and beta (lookup tables with interpolation)
 - INVISCID
+
+where `alpha` is the angle of attack, `beta` is trailing edge angle.
 """
 @enum AeroModel begin
    LEI_AIRFOIL_BREUKELS
-   POLAR_DATA
+   POLAR_VECTORS
+   POLAR_MATRICES
    INVISCID
 end
 
@@ -119,6 +123,30 @@ Enumeration of the implemented initial gamma distributions.
 @enum InitialGammaDistribution ELLIPTIC ZEROS
 
 abstract type AbstractWing end
+
+"""
+    AeroData= Union{
+        Nothing,
+        NTuple{2, Float64},
+        Tuple{Vector{Float64}, Vector{Float64}, Vector{Float64}, Vector{Float64}},
+        Tuple{Vector{Float64}, Vector{Float64}, Matrix{Float64}, Matrix{Float64}, Matrix{Float64}}
+    }
+
+Union of different definitions of the aerodynamic properties of a wing section. See also: [AeroModel](@ref)
+  - nothing for INVISCID
+  - (`tube_diameter`, camber) for `LEI_AIRFOIL_BREUKELS`
+  - (`alpha_range`, `cl_vector`, `cd_vector`, `cm_vector`) for `POLAR_VECTORS`
+  - (`alpha_range`, `beta_range`, `cl_matrix`, `cd_matrix`, `cm_matrix`) for `POLAR_MATRICES` 
+
+where `alpha` is the angle of attack, `beta` is trailing edge angle, `cl` the lift coefficient,
+`cd` the drag coefficient and `cm` the pitching moment coefficient.
+"""
+const AeroData = Union{
+        Nothing,
+        NTuple{2, Float64},
+        Tuple{Vector{Float64}, Vector{Float64}, Vector{Float64}, Vector{Float64}},
+        Tuple{Vector{Float64}, Vector{Float64}, Matrix{Float64}, Matrix{Float64}, Matrix{Float64}}
+    }
 
 function menu()
    Main.include("examples/menu.jl")
