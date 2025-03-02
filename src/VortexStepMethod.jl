@@ -120,6 +120,27 @@ Enumeration of the implemented initial gamma distributions.
 
 abstract type AbstractWing end
 
+"""
+    AeroData= Union{
+        Nothing,
+        NTuple{2, Float64},
+        Tuple{Vector{Float64}, Vector{Float64}, Vector{Float64}, Vector{Float64}},
+        Tuple{Vector{Float64}, Vector{Float64}, Matrix{Float64}, Matrix{Float64}, Matrix{Float64}}
+    }
+
+Union of different definitions of the aerodynamic properties of a Wing.
+  - nothing for INVISCID
+  - (`tube_diameter`, camber) for `LEI_AIRFOIL_BREUKELS`
+  - (`alpha_range`, `cl_vector`, `cd_vector`, `cm_vector`) for `POLAR_DATA`
+  - (`alpha_range`, `beta_range`, `cl_matrix`, `cd_matrix`, `cm_matrix`) for `POLAR_DATA` 
+"""
+const PolarData = Union{
+        Nothing,
+        NTuple{2, Float64},
+        Tuple{Vector{Float64}, Vector{Float64}, Vector{Float64}, Vector{Float64}},
+        Tuple{Vector{Float64}, Vector{Float64}, Matrix{Float64}, Matrix{Float64}, Matrix{Float64}}
+    }
+
 function menu()
    Main.include("examples/menu.jl")
 end
