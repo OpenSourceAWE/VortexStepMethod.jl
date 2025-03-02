@@ -22,7 +22,7 @@ export Solver, solve
 export calculate_results, solve_circulation_distribution
 export add_section!, set_va!
 export calculate_span, calculate_projected_area
-export menu
+export menu, MVec3
 export Model, VSM, LLT
 export AeroModel, LEI_AIRFOIL_BREUKELS, POLAR_DATA, INVISCID
 export PanelDistribution, LINEAR, COSINE, COSINE_VAN_GARREL, SPLIT_PROVIDED, UNCHANGED

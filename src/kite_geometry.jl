@@ -209,69 +209,92 @@ mutable struct KiteWing <: AbstractWing
     te_interp::Extrapolation
     area_interp::Extrapolation
 
-    function KiteWing(obj_path, dat_path; alpha=0.0, crease_frac=0.75, wind_vel=10., mass=1.0, 
-            n_panels=54, n_sections=n_panels+1, spanwise_panel_distribution=UNCHANGED, spanwise_direction=[0.0, 1.0, 0.0])
-        
-        !isapprox(spanwise_direction, [0.0, 1.0, 0.0]) && @error "Spanwise direction has to be [0.0, 1.0, 0.0]"
-        
-        # Load or create polars
-        (!endswith(dat_path, ".dat")) && (dat_path *= ".dat")
-        (!isfile(dat_path)) && error("DAT file not found: $dat_path")
-        polar_path = dat_path[1:end-4] * "_polar.bin"
-        
-        (!endswith(obj_path, ".obj")) && (obj_path *= ".obj")
-        (!isfile(obj_path)) && error("OBJ file not found: $obj_path")
-        info_path = obj_path[1:end-4] * "_info.bin"
-
-        if !ispath(polar_path) || !ispath(info_path)
-            @info "Reading $obj_path"
-            vertices, faces = read_faces(obj_path)
-            center_of_mass = calculate_com(vertices, faces)
-            !(abs(center_of_mass[2]) < 0.01) && @error "Center of mass $center_of_mass has to lie on x-axis."
-            inertia_tensor = calculate_inertia_tensor(vertices, faces, mass, center_of_mass)
-    
-            circle_center_z, radius, gamma_tip = find_circle_center_and_radius(vertices)
-            le_interp, te_interp, area_interp = create_interpolations(vertices, circle_center_z, radius, gamma_tip)
-            @info "Writing $info_path"
-            serialize(info_path, (center_of_mass, inertia_tensor, circle_center_z, radius, gamma_tip, 
-                le_interp, te_interp, area_interp))
-
-            width = 2gamma_tip * radius
-            area = area_interp(gamma_tip)
-            @eval Main begin
-                foil_path, polar_path, v_wind, area, width, x_turn =
-                    $dat_path, $polar_path, $wind_vel, $gamma_tip, $width, $crease_frac
-                include("../scripts/polars.jl")
-            end
-        end
-
-        @info "Loading polars and kite info from $polar_path and $info_path"
-        (alpha_range, beta_range, cl_matrix::Matrix, cd_matrix::Matrix, cm_matrix::Matrix) = deserialize(polar_path)
-    
-        (center_of_mass, inertia_tensor, circle_center_z, radius, gamma_tip, 
-            le_interp, te_interp, area_interp) = deserialize(info_path)
-        
-        # Create sections
-        sections = Section[]
-        for gamma in range(-gamma_tip, gamma_tip, n_sections)
-            aero_data = (collect(alpha_range), collect(beta_range), cl_matrix, cd_matrix, cm_matrix)
-            LE_point = [0.0, 0.0, circle_center_z] .+ [le_interp(gamma), sin(gamma) * radius, cos(gamma) * radius]
-            if !isapprox(alpha, 0.0)
-                local_y_vec = [0.0, sin(-gamma), cos(gamma)] × [1.0, 0.0, 0.0]
-                TE_point = LE_point .+ rotate_v_around_k([te_interp(gamma) - le_interp(gamma), 0.0, 0.0], local_y_vec, alpha)
-            else
-                TE_point = LE_point .+ [te_interp(gamma) - le_interp(gamma), 0.0, 0.0]
-            end
-            push!(sections, Section(LE_point, TE_point, POLAR_DATA, aero_data))
-        end
-
-        new(
-            n_panels, spanwise_panel_distribution, spanwise_direction, sections, sections,
-            mass, center_of_mass, circle_center_z, gamma_tip, inertia_tensor, radius,
-            le_interp, te_interp, area_interp
-        )
-    end
 end
+
+"""
+    KiteWing(obj_path, dat_path; alpha=0.0, crease_frac=0.75, wind_vel=10., mass=1.0, 
+             n_panels=54, n_sections=n_panels+1, spanwise_panel_distribution=UNCHANGED, 
+             spanwise_direction=[0.0, 1.0, 0.0])
+
+Constructor for a [KiteWing](@ref) that allows to use an `.obj` and a `.dat` file as input.
+
+# Parameters
+- obj_path: Path to the `.obj` file used for creating the geometry
+- dat_path: Path to the `.dat` file, a standard format for 2d foil geometry
+
+# Keyword Parameters
+- alpha=0.0: Angle of attack of each segment relative to the x axis [rad]
+- crease_frac=0.75: The x coordinate around which the trailing edge rotates on a normalized 2d foil, 
+                    used in the xfoil polar generation
+- wind_vel=10.0: Apparent wind speed in m/s, used in the xfoil polar generation
+- mass=1.0: Mass of the wing in kg, used for the inertia calculations 
+- `n_panels`=54: Number of panels.
+- `n_sections`=n_panels+1: Number of sections (there is a section on each side of each panel.)
+- `spanwise_panel_distribution`=UNCHANGED: see: [PanelDistribution](@ref)
+- `spanwise_direction`=[0.0, 1.0, 0.0]
+"""
+function KiteWing(obj_path, dat_path; alpha=0.0, crease_frac=0.75, wind_vel=10., mass=1.0, 
+                  n_panels=54, n_sections=n_panels+1, spanwise_panel_distribution=UNCHANGED, 
+                  spanwise_direction=[0.0, 1.0, 0.0])
+
+    !isapprox(spanwise_direction, [0.0, 1.0, 0.0]) && @error "Spanwise direction has to be [0.0, 1.0, 0.0]"
+
+    # Load or create polars
+    (!endswith(dat_path, ".dat")) && (dat_path *= ".dat")
+    (!isfile(dat_path)) && error("DAT file not found: $dat_path")
+    polar_path = dat_path[1:end-4] * "_polar.bin"
+
+    (!endswith(obj_path, ".obj")) && (obj_path *= ".obj")
+    (!isfile(obj_path)) && error("OBJ file not found: $obj_path")
+    info_path = obj_path[1:end-4] * "_info.bin"
+
+    if !ispath(polar_path) || !ispath(info_path)
+        @info "Reading $obj_path"
+        vertices, faces = read_faces(obj_path)
+        center_of_mass = calculate_com(vertices, faces)
+        !(abs(center_of_mass[2]) < 0.01) && @error "Center of mass $center_of_mass has to lie on x-axis."
+        inertia_tensor = calculate_inertia_tensor(vertices, faces, mass, center_of_mass)
+
+        circle_center_z, radius, gamma_tip = find_circle_center_and_radius(vertices)
+        le_interp, te_interp, area_interp = create_interpolations(vertices, circle_center_z, radius, gamma_tip)
+        @info "Writing $info_path"
+        serialize(info_path, (center_of_mass, inertia_tensor, circle_center_z, radius, gamma_tip, 
+            le_interp, te_interp, area_interp))
+
+        width = 2gamma_tip * radius
+        area = area_interp(gamma_tip)
+        @eval Main begin
+            foil_path, polar_path, v_wind, area, width, x_turn =
+                $dat_path, $polar_path, $wind_vel, $gamma_tip, $width, $crease_frac
+            include("../scripts/polars.jl")
+        end
+    end
+
+    @info "Loading polars and kite info from $polar_path and $info_path"
+    (alpha_range, beta_range, cl_matrix::Matrix, cd_matrix::Matrix, cm_matrix::Matrix) = deserialize(polar_path)
+
+    (center_of_mass, inertia_tensor, circle_center_z, radius, gamma_tip, 
+        le_interp, te_interp, area_interp) = deserialize(info_path)
+
+    # Create sections
+    sections = Section[]
+    for gamma in range(-gamma_tip, gamma_tip, n_sections)
+        aero_data = (collect(alpha_range), collect(beta_range), cl_matrix, cd_matrix, cm_matrix)
+        LE_point = [0.0, 0.0, circle_center_z] .+ [le_interp(gamma), sin(gamma) * radius, cos(gamma) * radius]
+        if !isapprox(alpha, 0.0)
+            local_y_vec = [0.0, sin(-gamma), cos(gamma)] × [1.0, 0.0, 0.0]
+            TE_point = LE_point .+ rotate_v_around_k([te_interp(gamma) - le_interp(gamma), 0.0, 0.0], local_y_vec, alpha)
+        else
+            TE_point = LE_point .+ [te_interp(gamma) - le_interp(gamma), 0.0, 0.0]
+        end
+        push!(sections, Section(LE_point, TE_point, POLAR_DATA, aero_data))
+    end
+
+    KiteWing(n_panels, spanwise_panel_distribution, spanwise_direction, sections, sections,
+        mass, center_of_mass, circle_center_z, gamma_tip, inertia_tensor, radius,
+        le_interp, te_interp, area_interp)
+end
+
 
 function rotate_v_around_k(v, k, θ)
     k = normalize(k)

@@ -1,39 +1,45 @@
 
 """
-    Section
+    mutable struct Section
 
 Represents a wing section with leading edge, trailing edge, and aerodynamic properties.
 
 # Fields
-- `LE_point::MVec3`: Leading edge point coordinates
-- `TE_point::MVec3`: Trailing edge point coordinates
-- `aero_model`::AeroModel: [AeroModel](@ref)
-- `aero_data`: Can be:
+- `LE_point::MVec3` = zeros(MVec3): Leading edge point coordinates
+- `TE_point::MVec3` = zeros(MVec3): Trailing edge point coordinates
+- `aero_model`::AeroModel = INVISCID: [AeroModel](@ref)
+- `aero_data` = nothing: Can be:
   - nothing for INVISCID
   - (`tube_diameter`, camber) for `LEI_AIRFOIL_BREUKELS`
   - (`alpha_range`, `cl_vector`, `cd_vector`, `cm_vector`) for `POLAR_DATA`
   - (`alpha_range`, `beta_range`, `cl_matrix`, `cd_matrix`, `cm_matrix`) for `POLAR_DATA`        
 """
-mutable struct Section
-    LE_point::MVec3
-    TE_point::MVec3
-    aero_model::AeroModel
+@with_kw mutable struct Section
+    LE_point::MVec3 = zeros(MVec3)
+    TE_point::MVec3 = zeros(MVec3)
+    aero_model::AeroModel = INVISCID
     aero_data::Union{
         Nothing,
         NTuple{2, Float64},
         Tuple{Vector{Float64}, Vector{Float64}, Vector{Float64}, Vector{Float64}},
         Tuple{Vector{Float64}, Vector{Float64}, Matrix{Float64}, Matrix{Float64}, Matrix{Float64}}
-    }
-    function Section(
-            LE_point::PosVector = zeros(MVec3), 
-            TE_point::PosVector = zeros(MVec3), 
-            aero_model::AeroModel = INVISCID,
-            aero_data = nothing
-            )
-        new(LE_point, TE_point, aero_model, aero_data)
-    end
+    } = nothing
+end
+"""
+    Section(LE_point::Vector{Float64}, TE_point::Vector{Float64}, 
+            aero_model=INVISCID, aero_data=nothing)
+
+Constructor for [Section](@ref) that allows to pass Vectors of Float64 as point coordinates.
+"""
+function Section(LE_point::Vector{Float64}, TE_point::Vector{Float64}, aero_model=INVISCID, aero_data=nothing)
+    Section(MVec3(LE_point), MVec3(TE_point), aero_model, aero_data)
 end
 
+"""
+    init!(section::Section, LE_point, TE_point, aero_model=nothing, aero_data=nothing)
+
+Function to update a [Section](@ref) in place.
+"""
 function init!(section::Section, LE_point, TE_point, aero_model=nothing, aero_data=nothing)
     section.LE_point .= LE_point
     section.TE_point .= TE_point
@@ -69,26 +75,36 @@ Represents a wing composed of multiple sections with aerodynamic properties.
 # Fields
 - `n_panels::Int64`: Number of panels in aerodynamic mesh
 - `spanwise_panel_distribution`::PanelDistribution: [PanelDistribution](@ref)
-- `spanwise_direction::Vector{Float64}`: Wing span direction vector
-- `sections::Vector{Section}`: List of wing sections, see: [Section](@ref)
+- `spanwise_direction::MVec3`: Wing span direction vector
+- `sections::Vector{Section}`: Vector of wing sections, see: [Section](@ref)
+- `refined_sections::Vector{Section}`: Vector of refined wing sections, see: [Section](@ref)
 
 """
 mutable struct Wing <: AbstractWing
     n_panels::Int64
     spanwise_panel_distribution::PanelDistribution
-    spanwise_direction::PosVector
+    spanwise_direction::MVec3
     sections::Vector{Section}
     refined_sections::Vector{Section}
-    
-    function Wing(n_panels::Int;
-                 spanwise_panel_distribution::PanelDistribution=LINEAR,
-                 spanwise_direction::PosVector=MVec3([0.0, 1.0, 0.0]))
-        new(n_panels, 
-            spanwise_panel_distribution, 
-            spanwise_direction, 
-            Section[],
-            Section[])
-    end
+end
+
+"""
+    Wing(n_panels::Int;
+         spanwise_panel_distribution::PanelDistribution=LINEAR,
+         spanwise_direction::PosVector=MVec3([0.0, 1.0, 0.0]))
+
+Constructor for a [Wing](@ref) struct with default values that initializes the sections 
+and refined sections as empty arrays.
+
+# Parameters
+- `n_panels::Int64`: Number of panels in aerodynamic mesh
+- `spanwise_panel_distribution`::PanelDistribution = LINEAR: [PanelDistribution](@ref)
+- `spanwise_direction::MVec3` = MVec3([0.0, 1.0, 0.0]): Wing span direction vector
+"""
+function Wing(n_panels::Int;
+    spanwise_panel_distribution::PanelDistribution=LINEAR,
+    spanwise_direction::PosVector=MVec3([0.0, 1.0, 0.0]))
+    Wing(n_panels, spanwise_panel_distribution, spanwise_direction, Section[], Section[])
 end
 
 function init!(wing::AbstractWing; aero_center_location::Float64=0.25, control_point_location::Float64=0.75)
