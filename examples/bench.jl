@@ -76,7 +76,8 @@ set_va!(body_aero, vel_app)
 
 # Solving and plotting distributions
 results = solve(vsm_solver, body_aero)
+results_base = solve_base(vsm_solver, body_aero)
 println("RAM-air kite:")
-@time results = solve(vsm_solver, body_aero)
+@time results_base = solve_base(vsm_solver, body_aero)
 
 nothing
