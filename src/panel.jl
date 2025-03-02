@@ -122,14 +122,14 @@ function init_aero!(
     if panel.aero_model == LEI_AIRFOIL_BREUKELS
         panel.cl_coeffs, panel.cd_coeffs, panel.cm_coeffs = compute_lei_coeffs(section_1, section_2)
 
-    elseif panel.aero_model in (POLAR_DATA, POLAR_MATRIX)
+    elseif panel.aero_model in (POLAR_VECTORS, POLAR_MATRICES)
         aero_1 = section_1.aero_data
         aero_2 = section_2.aero_data
         if !all(size.(aero_1) .== size.(aero_2))
             throw(ArgumentError("Polar data must have same shape"))
         end
 
-        if panel.aero_model == POLAR_DATA
+        if panel.aero_model == POLAR_VECTORS
             !all(isapprox.(aero_1[1], aero_2[1])) && @error "Make sure you use the same alpha range for all your interpolations."
 
             polar_data = (
@@ -143,7 +143,7 @@ function init_aero!(
             panel.cd_interp = linear_interpolation(alphas, polar_data[2]; extrapolation_bc=NaN)
             panel.cm_interp = linear_interpolation(alphas, polar_data[3]; extrapolation_bc=NaN)
 
-        elseif panel.aero_model == POLAR_MATRIX
+        elseif panel.aero_model == POLAR_MATRICES
             !all(isapprox.(aero_1[1], aero_2[1])) && @error "Make sure you use the same alpha range for all your interpolations."
             !all(isapprox.(aero_1[2], aero_2[2])) && @error "Make sure you use the same beta range for all your interpolations."
 
@@ -314,9 +314,9 @@ function calculate_cl(panel::Panel, alpha::Float64)::Float64
         end
     elseif panel.aero_model == INVISCID
         cl = 2π * alpha
-    elseif panel.aero_model == POLAR_DATA
+    elseif panel.aero_model == POLAR_VECTORS
         cl = panel.cl_interp(alpha)::Float64
-    elseif panel.aero_model == POLAR_MATRIX
+    elseif panel.aero_model == POLAR_MATRICES
         cl = panel.cl_interp(alpha, 0.0)::Float64
     else
         throw(ArgumentError("Unsupported aero model: $(panel.aero_model)"))
@@ -338,10 +338,10 @@ function calculate_cd_cm(panel::Panel, alpha::Float64)
         if abs(alpha) > (π/9)  # Outside ±20 degrees
             cd = 2 * sin(alpha)^3
         end
-    elseif panel.aero_model == POLAR_DATA
+    elseif panel.aero_model == POLAR_VECTORS
         cd = panel.cd_interp(alpha)::Float64
         cm = panel.cm_interp(alpha)::Float64
-    elseif panel.aero_model == POLAR_MATRIX    
+    elseif panel.aero_model == POLAR_MATRICES    
         cd = panel.cd_interp(alpha, 0.0)::Float64
         cm = panel.cm_interp(alpha, 0.0)::Float64
     elseif !(panel.aero_model == INVISCID)

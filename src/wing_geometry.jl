@@ -248,12 +248,12 @@ function calculate_new_aero_data(aero_model,
     if model_type == INVISCID
         return nothing
         
-    elseif model_type in (POLAR_DATA, POLAR_MATRIX)
+    elseif model_type in (POLAR_VECTORS, POLAR_MATRICES)
         polar_left = aero_data[section_index]
         polar_right = aero_data[section_index + 1]
         
         # Unpack polar data
-        if model_type == POLAR_DATA
+        if model_type == POLAR_VECTORS
             alpha_left, CL_left, CD_left, CM_left = polar_left
             alpha_right, CL_right, CD_right, CM_right = polar_right
 
@@ -268,7 +268,7 @@ function calculate_new_aero_data(aero_model,
             
             return (alpha_left, CL_data, CD_data, CM_data)
             
-        elseif model_type == POLAR_MATRIX
+        elseif model_type == POLAR_MATRICES
             alpha_left, beta_left, CL_left, CD_left, CM_left = polar_left
             alpha_right, beta_right, CL_right, CD_right, CM_right = polar_right
             

@@ -287,7 +287,7 @@ function KiteWing(obj_path, dat_path; alpha=0.0, crease_frac=0.75, wind_vel=10.,
         else
             TE_point = LE_point .+ [te_interp(gamma) - le_interp(gamma), 0.0, 0.0]
         end
-        push!(sections, Section(LE_point, TE_point, POLAR_MATRIX, aero_data))
+        push!(sections, Section(LE_point, TE_point, POLAR_MATRICES, aero_data))
     end
 
     KiteWing(n_panels, spanwise_panel_distribution, spanwise_direction, sections, sections,
