@@ -8,22 +8,13 @@ Represents a wing section with leading edge, trailing edge, and aerodynamic prop
 - `LE_point::MVec3` = zeros(MVec3): Leading edge point coordinates
 - `TE_point::MVec3` = zeros(MVec3): Trailing edge point coordinates
 - `aero_model`::AeroModel = INVISCID: [AeroModel](@ref)
-- `aero_data` = nothing: Can be:
-  - nothing for INVISCID
-  - (`tube_diameter`, camber) for `LEI_AIRFOIL_BREUKELS`
-  - (`alpha_range`, `cl_vector`, `cd_vector`, `cm_vector`) for `POLAR_DATA`
-  - (`alpha_range`, `beta_range`, `cl_matrix`, `cd_matrix`, `cm_matrix`) for `POLAR_DATA`        
+- `aero_data`::AeroData = nothing: See: [AeroData]    
 """
 @with_kw mutable struct Section
     LE_point::MVec3 = zeros(MVec3)
     TE_point::MVec3 = zeros(MVec3)
     aero_model::AeroModel = INVISCID
-    aero_data::Union{
-        Nothing,
-        NTuple{2, Float64},
-        Tuple{Vector{Float64}, Vector{Float64}, Vector{Float64}, Vector{Float64}},
-        Tuple{Vector{Float64}, Vector{Float64}, Matrix{Float64}, Matrix{Float64}, Matrix{Float64}}
-    } = nothing
+    aero_data::AeroData = nothing
 end
 """
     Section(LE_point::Vector{Float64}, TE_point::Vector{Float64}, 
@@ -130,14 +121,10 @@ Add a new section to the wing.
 - LE_point::PosVector: [PosVector](@ref) of the point on the side of the leading edge
 - TE_point::PosVector: [PosVector](@ref) of the point on the side of the trailing edge
 - `aero_model`::AeroModel: [AeroModel](@ref)
-- `aero_data`: Can be:
-  - nothing for INVISCID
-  - (`tube_diameter`, camber) for `LEI_AIRFOIL_BREUKELS`
-  - (`alpha_range`, `cl_vector`, `cd_vector`, `cm_vector`) for `POLAR_DATA`
-  - (`alpha_range`, `beta_range`, `cl_matrix`, `cd_matrix`, `cm_matrix`) for `POLAR_DATA`  
+- `aero_data`::AeroData: See [AeroData](@ref)  
 """
 function add_section!(wing::Wing, LE_point::Vector{Float64}, 
-                     TE_point::Vector{Float64}, aero_model::AeroModel, aero_data=nothing)
+                     TE_point::Vector{Float64}, aero_model::AeroModel, aero_data::AeroData=nothing)
     push!(wing.sections, Section(LE_point, TE_point, aero_model, aero_data))
     return nothing
 end

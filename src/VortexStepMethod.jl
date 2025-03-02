@@ -72,18 +72,20 @@ Enumeration of the implemented model types.
 @enum Model VSM LLT
 
 """
-   AeroModel `LEI_AIRFOIL_BREUKELS` `POLAR_DATA` `INVISCID`
+   AeroModel `LEI_AIRFOIL_BREUKELS` `POLAR_DATA` `POLAR_MATRIX` `INVISCID`
 
-Enumeration of the implemented aerodynamic models.
+Enumeration of the implemented aerodynamic models. See also: [AeroData](@ref)
 
 # Elements
 - `LEI_AIRFOIL_BREUKELS`: Polynom approximation for leading edge inflatable kites
-- `POLAR_DATA`: Polar data (lookup tables with interpolation)
+- `POLAR_DATA`: Polar data as function of alpha (lookup tables with interpolation)
+- `POLAR_MATRIX`: Polar data as function of alpha and beta (lookup tables with interpolation)
 - INVISCID
 """
 @enum AeroModel begin
    LEI_AIRFOIL_BREUKELS
    POLAR_DATA
+   POLAR_MATRIX
    INVISCID
 end
 
@@ -128,13 +130,13 @@ abstract type AbstractWing end
         Tuple{Vector{Float64}, Vector{Float64}, Matrix{Float64}, Matrix{Float64}, Matrix{Float64}}
     }
 
-Union of different definitions of the aerodynamic properties of a Wing.
+Union of different definitions of the aerodynamic properties of a wing section. See also: [AeroModel](@ref)
   - nothing for INVISCID
   - (`tube_diameter`, camber) for `LEI_AIRFOIL_BREUKELS`
   - (`alpha_range`, `cl_vector`, `cd_vector`, `cm_vector`) for `POLAR_DATA`
-  - (`alpha_range`, `beta_range`, `cl_matrix`, `cd_matrix`, `cm_matrix`) for `POLAR_DATA` 
+  - (`alpha_range`, `beta_range`, `cl_matrix`, `cd_matrix`, `cm_matrix`) for `POLAR_MATRIX` 
 """
-const PolarData = Union{
+const AeroData = Union{
         Nothing,
         NTuple{2, Float64},
         Tuple{Vector{Float64}, Vector{Float64}, Vector{Float64}, Vector{Float64}},
