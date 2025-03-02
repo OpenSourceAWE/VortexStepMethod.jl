@@ -139,7 +139,10 @@ Union of different definitions of the aerodynamic properties of a wing section. 
   - (`alpha_range`, `beta_range`, `cl_matrix`, `cd_matrix`, `cm_matrix`) for `POLAR_MATRICES` 
 
 where `alpha` is the angle of attack, `beta` is trailing edge angle, `cl` the lift coefficient,
-`cd` the drag coefficient and `cm` the pitching moment coefficient.
+`cd` the drag coefficient and `cm` the pitching moment coefficient. The camber of a kite refers to 
+the curvature of its airfoil shape. The camber is typically measured as the maximum distance 
+between the mean camber line (the line equidistant from the upper and lower surfaces) 
+and the chord line of the airfoil.
 """
 const AeroData = Union{
         Nothing,
