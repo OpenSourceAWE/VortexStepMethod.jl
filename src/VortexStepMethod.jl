@@ -24,7 +24,7 @@ export add_section!, set_va!
 export calculate_span, calculate_projected_area
 export menu, MVec3
 export Model, VSM, LLT
-export AeroModel, LEI_AIRFOIL_BREUKELS, POLAR_DATA, INVISCID
+export AeroModel, LEI_AIRFOIL_BREUKELS, POLAR_DATA, POLAR_MATRIX, INVISCID
 export PanelDistribution, LINEAR, COSINE, COSINE_VAN_GARREL, SPLIT_PROVIDED, UNCHANGED
 export InitialGammaDistribution, ELLIPTIC, ZEROS
 

@@ -119,17 +119,17 @@ function init_aero!(
         throw(ArgumentError("Both sections must have the same aero model, not $(panel.aero_model) and $aero_model_2"))
     end
     
-    if panel.aero_model === LEI_AIRFOIL_BREUKELS
+    if panel.aero_model == LEI_AIRFOIL_BREUKELS
         panel.cl_coeffs, panel.cd_coeffs, panel.cm_coeffs = compute_lei_coeffs(section_1, section_2)
 
-    elseif panel.aero_model === POLAR_DATA
+    elseif panel.aero_model in (POLAR_DATA, POLAR_MATRIX)
         aero_1 = section_1.aero_data
         aero_2 = section_2.aero_data
         if !all(size.(aero_1) .== size.(aero_2))
             throw(ArgumentError("Polar data must have same shape"))
         end
 
-        if length(aero_1) == 4
+        if panel.aero_model == POLAR_DATA
             !all(isapprox.(aero_1[1], aero_2[1])) && @error "Make sure you use the same alpha range for all your interpolations."
 
             polar_data = (
@@ -143,7 +143,7 @@ function init_aero!(
             panel.cd_interp = linear_interpolation(alphas, polar_data[2]; extrapolation_bc=NaN)
             panel.cm_interp = linear_interpolation(alphas, polar_data[3]; extrapolation_bc=NaN)
 
-        elseif length(aero_1) == 5
+        elseif panel.aero_model == POLAR_MATRIX
             !all(isapprox.(aero_1[1], aero_2[1])) && @error "Make sure you use the same alpha range for all your interpolations."
             !all(isapprox.(aero_1[2], aero_2[2])) && @error "Make sure you use the same beta range for all your interpolations."
 
@@ -343,13 +343,11 @@ function calculate_cd_cm(panel::Panel, alpha::Float64)
             cd = 2 * sin(alpha)^3
         end
     elseif panel.aero_model == POLAR_DATA
-        if isa(panel.cd_interp, I1)
-            cd = panel.cd_interp(alpha)::Float64
-            cm = panel.cm_interp(alpha)::Float64
-        elseif isa(panel.cd_interp, I2)
-            cd = panel.cd_interp(alpha, 0.0)::Float64
-            cm = panel.cm_interp(alpha, 0.0)::Float64
-        end
+        cd = panel.cd_interp(alpha)::Float64
+        cm = panel.cm_interp(alpha)::Float64
+    elseif panel.aero_model == POLAR_MATRIX    
+        cd = panel.cd_interp(alpha, 0.0)::Float64
+        cm = panel.cm_interp(alpha, 0.0)::Float64
     elseif !(panel.aero_model == INVISCID)
         throw(ArgumentError("Unsupported aero model: $(panel.aero_model)"))
     end
