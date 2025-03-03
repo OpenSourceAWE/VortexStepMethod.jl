@@ -75,31 +75,42 @@ function create_interpolations(vertices, circle_center_z, radius, gamma_tip)
     gamma_range = range(-gamma_tip+1e-6, gamma_tip-1e-6, 100)
     vz_centered = [v[3] - circle_center_z for v in vertices]
     
-    max_xs = zeros(length(gamma_range))
-    min_xs = zeros(length(gamma_range))
+    trailing_edges = zeros(3, length(gamma_range))
+    leading_edges = zeros(3, length(gamma_range))
     areas  = zeros(length(gamma_range))
     
     for (j, gamma) in enumerate(gamma_range)
-        max_xs[j] = -Inf
-        min_xs[j] = Inf
+        trailing_edges[1, j] = -Inf
+        leading_edges[1, j] = Inf
         for (i, v) in enumerate(vertices)
             # Rotate y coordinate to check box containment
             rotated_y = v[2] * cos(gamma) - vz_centered[i] * sin(gamma)
             if gamma ≤ 0.0 && -0.5 ≤ rotated_y ≤ 0.0
-                max_xs[j] = max(max_xs[j], v[1])
-                min_xs[j] = min(min_xs[j], v[1])
+                if v[1] > trailing_edges[1, j]
+                    trailing_edges[:, j] .= v
+                end
+                if v[1] < leading_edges[1, j]
+                    leading_edges[:, j] .= v
+                end
             elseif gamma > 0.0 && 0.0 ≤ rotated_y ≤ 0.5
-                max_xs[j] = max(max_xs[j], v[1])
-                min_xs[j] = min(min_xs[j], v[1])
+                if v[1] > trailing_edges[1, j]
+                    trailing_edges[:, j] .= v
+                end
+                if v[1] < leading_edges[1, j]
+                    leading_edges[:, j] .= v
+                end
             end
         end
-        area = abs(max_xs[j] - min_xs[j]) * gamma_range.step * radius
+        area = norm(leading_edges[:, j] - trailing_edges[:, j]) * gamma_range.step * radius
         last_area = j > 1 ? areas[j-1] : 0.0
         areas[j] = last_area + area
     end
 
-    te_interp = linear_interpolation(gamma_range, max_xs, extrapolation_bc=Line())
-    le_interp = linear_interpolation(gamma_range, min_xs, extrapolation_bc=Line())
+    le_interp = ntuple(i -> linear_interpolation(gamma_range, leading_edges[i, :],
+                                           extrapolation_bc=Line()), 3)
+    te_interp = ntuple(i -> linear_interpolation(gamma_range, trailing_edges[i, :],
+                                           extrapolation_bc=Line()), 3)
+    @show le_interp                            
     area_interp = linear_interpolation(gamma_range, areas, extrapolation_bc=Line())
     
     return (le_interp, te_interp, area_interp)
@@ -199,16 +210,16 @@ mutable struct KiteWing <: AbstractWing
     refined_sections::Vector{Section}
     
     # Additional fields for KiteWing
+    non_deformed_sections::Vector{Section}
     mass::Float64
     center_of_mass::Vector{Float64}
     circle_center_z::Float64
     gamma_tip::Float64
     inertia_tensor::Matrix{Float64}
     radius::Float64
-    le_interp::Extrapolation
-    te_interp::Extrapolation
+    le_interp::Tuple
+    te_interp::Tuple
     area_interp::Extrapolation
-
 end
 
 """
@@ -280,21 +291,21 @@ function KiteWing(obj_path, dat_path; alpha=0.0, crease_frac=0.75, wind_vel=10.,
     sections = Section[]
     for gamma in range(-gamma_tip, gamma_tip, n_sections)
         aero_data = (collect(alpha_range), collect(beta_range), cl_matrix, cd_matrix, cm_matrix)
-        LE_point = [0.0, 0.0, circle_center_z] .+ [le_interp(gamma), sin(gamma) * radius, cos(gamma) * radius]
-        if !isapprox(alpha, 0.0)
-            local_y_vec = [0.0, sin(-gamma), cos(gamma)] × [1.0, 0.0, 0.0]
-            TE_point = LE_point .+ rotate_v_around_k([te_interp(gamma) - le_interp(gamma), 0.0, 0.0], local_y_vec, alpha)
-        else
-            TE_point = LE_point .+ [te_interp(gamma) - le_interp(gamma), 0.0, 0.0]
-        end
+        LE_point = [le_interp[i](gamma) for i in 1:3]
+        TE_point = [te_interp[i](gamma) for i in 1:3]
         push!(sections, Section(LE_point, TE_point, POLAR_MATRICES, aero_data))
     end
 
-    KiteWing(n_panels, spanwise_panel_distribution, spanwise_direction, sections, sections,
+    KiteWing(n_panels, spanwise_panel_distribution, spanwise_direction, sections, sections, sections,
         mass, center_of_mass, circle_center_z, gamma_tip, inertia_tensor, radius,
         le_interp, te_interp, area_interp)
 end
 
+# function deform!(wing::KiteWing, alpha::AbstractVector, beta::AbstractVector)
+#     for i in eachindex(wing.panels)
+#         wing.refined_sections[i].TE_point .= 
+#     end
+# end
 
 function rotate_v_around_k(v, k, θ)
     k = normalize(k)
