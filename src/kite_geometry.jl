@@ -325,6 +325,14 @@ function deform!(wing::KiteWing, alphas::AbstractVector, betas::AbstractVector; 
         else
             alphas[1] * (1.0 - normalized_gamma) + alphas[2] * normalized_gamma
         end
+        wing.beta_dist[i] = if normalized_gamma <= 0.0
+            betas[1]
+        elseif normalized_gamma >= 1.0
+            betas[2]
+        else
+            betas[1] * (1.0 - normalized_gamma) + betas[2] * normalized_gamma
+        end
+
         section1 = wing.non_deformed_sections[i]
         section2 = wing.non_deformed_sections[i+1]
         local_y .= normalize(section1.LE_point - section2.LE_point)

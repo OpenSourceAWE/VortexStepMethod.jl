@@ -16,8 +16,8 @@ PLOT = true
 wing = KiteWing("data/ram_air_kite_body.obj", "data/ram_air_kite_foil.dat")
 body_aero = BodyAerodynamics([wing])
 
-alpha = [deg2rad(-5), 0]
-beta = [0.1, -0.1]
+alpha = [0, 0]
+beta = [deg2rad(10), 0]
 @time VortexStepMethod.deform!(wing, alpha, beta; width=1.0)
 @time VortexStepMethod.init!(body_aero)
 

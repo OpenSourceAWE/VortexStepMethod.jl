@@ -70,7 +70,13 @@ function init!(body_aero::BodyAerodynamics;
         
         # Create panels
         for i in 1:wing.n_panels
-            init!(body_aero.panels[idx], 
+            if wing isa KiteWing
+                beta = wing.beta_dist[i]
+            else
+                beta = 0.0
+            end
+            init!(
+                body_aero.panels[idx], 
                 wing.refined_sections[i],
                 wing.refined_sections[i+1],
                 panel_props.aero_centers[i],
@@ -79,7 +85,8 @@ function init!(body_aero::BodyAerodynamics;
                 panel_props.bound_points_2[i],
                 panel_props.x_airf[i],
                 panel_props.y_airf[i],
-                panel_props.z_airf[i]
+                panel_props.z_airf[i],
+                beta
             )
             idx += 1
         end
