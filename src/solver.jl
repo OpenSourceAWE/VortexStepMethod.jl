@@ -239,7 +239,6 @@ function solve!(res::Result, solver::Solver, body_aero::BodyAerodynamics, gamma_
     CL = lift_wing_3D_sum / (q_inf * projected_area)
     CD = drag_wing_3D_sum / (q_inf * projected_area)
     CS = side_wing_3D_sum / (q_inf * projected_area)
-    println("lift_wing_3D_sum: ", lift_wing_3D_sum)
 
     # update the result struct
     res.aero_force .= MVec3([Fx, Fy, Fz])
