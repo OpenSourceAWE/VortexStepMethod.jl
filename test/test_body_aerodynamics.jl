@@ -150,8 +150,17 @@ end
         core_radius_fraction=core_radius_fraction
     )
     results_NEW = solve(solver_object, body_aero; reference_point=[0,1,0])
+    # println(results_NEW)
 
     @test results_NEW isa Dict
+
+    res = Result()
+    solve!(res, solver_object, body_aero; reference_point=[0,1,0])
+
+    @test res.aero_force.x ≈ -117.97225244011436
+    @test res.aero_force.y ≈ 0.0
+    @test res.aero_force.z ≈ 1481.996390329679
+
 
     # Calculate forces using uncorrected alpha
     alpha = results_NEW["alpha_uncorrected"]

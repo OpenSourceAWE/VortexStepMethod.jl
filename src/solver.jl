@@ -17,6 +17,10 @@ struct Result
     solver_status::SolverStatus 
 end
 
+function Result()
+    Result(zeros(MVec3), zeros(MVec3), zeros(MVec3), FAILURE)
+end
+
 """
     Solver
 
@@ -60,6 +64,131 @@ Main solver structure for the Vortex Step Method.
     core_radius_fraction::Float64 = 1e-20
     mu::Float64 = 1.81e-5
     is_only_f_and_gamma_output::Bool = false
+end
+
+"""
+    solve!(res::Result, solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=nothing; 
+          log=false, reference_point=zeros(MVec3))
+
+Main solving routine for the aerodynamic model. Reference point is in the kite body (KB) frame.
+
+# Arguments:
+- res::Result: The result struct, that will be updated
+- solver::Solver: The solver to use, could be a VSM or LLT solver. See: [Solver](@ref)
+- body_aero::BodyAerodynamics: The aerodynamic body. See: [BodyAerodynamics](@ref)
+- gamma_distribution: Initial circulation vector or nothing; Length: Number of segments. [m²/s]
+
+# Keyword Arguments:
+- log=false: If true, print the number of iterations and other info.
+- reference_point=zeros(MVec3)
+
+# Returns
+A dictionary with the results.
+"""
+function solve!(res::Result, solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=nothing; 
+    log=false, reference_point=zeros(MVec3))
+
+    # calculate intermediate result
+    body_aero, gamma_new, reference_point, density, aerodynamic_model_type, core_radius_fraction,
+    mu, alpha_array, v_a_array, chord_array, x_airf_array, y_airf_array, z_airf_array,
+    va_array, va_norm_array, va_unit_array, panels,
+    is_only_f_and_gamma_output = solve_base(solver, body_aero, gamma_distribution; log, reference_point)
+
+    # Initialize arrays
+    n_panels = length(panels)
+    cl_array = zeros(n_panels)
+    cd_array = zeros(n_panels)
+    cm_array = zeros(n_panels)
+    panel_width_array = zeros(n_panels)
+
+    # Calculate coefficients for each panel
+    for (i, panel) in enumerate(panels)
+        cl_array[i] = calculate_cl(panel, alpha_array[i])
+        cd_array[i], cm_array[i] = calculate_cd_cm(panel, alpha_array[i])
+        panel_width_array[i] = panel.width
+    end
+
+    # Calculate forces
+    lift = reshape((cl_array .* 0.5 .* density .* v_a_array.^2 .* chord_array), :, 1)
+    drag = reshape((cd_array .* 0.5 .* density .* v_a_array.^2 .* chord_array), :, 1)
+    moment = reshape((cm_array .* 0.5 .* density .* v_a_array.^2 .* chord_array), :, 1)
+
+    # Calculate alpha corrections based on model type
+    alpha_corrected = if aerodynamic_model_type === VSM
+        update_effective_angle_of_attack_if_VSM(
+            body_aero,
+            gamma_new,
+            core_radius_fraction,
+            x_airf_array,
+            y_airf_array,
+            va_array,
+            va_norm_array,
+            va_unit_array
+        )
+    elseif aerodynamic_model_type === LLT
+        alpha_array
+    else
+        throw(ArgumentError("Unknown aerodynamic model type, should be LLT or VSM"))
+    end
+
+    # Initialize result arrays
+    # cl_prescribed_va = Float64[]
+    # cd_prescribed_va = Float64[]
+    # cs_prescribed_va = Float64[]
+    f_body_3D = zeros(3, n_panels)
+    # m_body_3D = zeros(3, n_panels)
+    area_all_panels = 0.0
+
+    # Get wing properties
+    spanwise_direction = body_aero.wings[1].spanwise_direction
+    va_mag = norm(body_aero.va)
+    va = body_aero.va
+    # va_unit = va / va_mag
+    # q_inf = 0.5 * density * va_mag^2
+    
+    for (i, panel) in enumerate(panels)
+
+        # Panel geometry
+        z_airf_span = panel.z_airf
+        y_airf_chord = panel.y_airf
+        x_airf_normal = panel.x_airf
+        panel_area = panel.chord * panel.width
+        area_all_panels += panel_area
+
+        # Calculate induced velocity direction
+        alpha_corrected_i = alpha_corrected[i]
+        induced_va_airfoil = cos(alpha_corrected_i) * y_airf_chord + 
+                            sin(alpha_corrected_i) * x_airf_normal
+        dir_induced_va_airfoil = induced_va_airfoil / norm(induced_va_airfoil)
+
+        # Calculate lift and drag directions
+        dir_lift_induced_va = cross(dir_induced_va_airfoil, z_airf_span)
+        dir_lift_induced_va = dir_lift_induced_va / norm(dir_lift_induced_va)
+        dir_drag_induced_va = cross(spanwise_direction, dir_lift_induced_va)
+        dir_drag_induced_va = dir_drag_induced_va / norm(dir_drag_induced_va)
+
+        # Calculate force vectors
+        lift_induced_va = lift[i] * dir_lift_induced_va
+        drag_induced_va = drag[i] * dir_drag_induced_va
+        ftotal_induced_va = lift_induced_va + drag_induced_va
+
+        # Body frame forces
+        f_body_3D[:,i] .= [
+            dot(ftotal_induced_va, [1.0, 0.0, 0.0]),
+            dot(ftotal_induced_va, [0.0, 1.0, 0.0]),
+            dot(ftotal_induced_va, [0.0, 0.0, 1.0])
+            ] .* panel.width
+    end
+    Fx = sum(f_body_3D[1,:])
+    Fy = sum(f_body_3D[2,:])
+    Fz = sum(f_body_3D[3,:])
+    # "Mx" => sum(m_body_3D[1,:])
+    # "My" => sum(m_body_3D[2,:])
+    # "Mz" => sum(m_body_3D[3,:])
+    # update the result struct
+    res.aero_force .= MVec3([Fx, Fy, Fz])
+    # return the result
+    return res
 end
 
 """
