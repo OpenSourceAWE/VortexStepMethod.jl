@@ -112,7 +112,8 @@ function init!(wing::AbstractWing; aero_center_location::Float64=0.25, control_p
 end
 
 """
-    add_section!(wing::Wing, LE_point::PosVector, TE_point::PosVector, aero_model, aero_data)
+    add_section!(wing::Wing, LE_point::PosVector, TE_point::PosVector, 
+                 aero_model, aero_data::AeroData=nothing)
 
 Add a new section to the wing.
 
