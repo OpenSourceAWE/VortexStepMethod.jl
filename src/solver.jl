@@ -10,7 +10,7 @@ Struct for storing the result of the solve! function. Must contain all info need
 - force_coefficients::MVec3: Aerodynamic force coefficients [CL, CD, CS] [-]
 - solver_status::SolverStatus: enum, see [SolverStatus](@ref)
 """
-struct Result    
+mutable struct Result    
     aero_force::MVec3          
     aero_moments::MVec3       
     force_coefficients::MVec3  
@@ -89,6 +89,7 @@ function solve!(res::Result, solver::Solver, body_aero::BodyAerodynamics, gamma_
     log=false, reference_point=zeros(MVec3))
 
     # calculate intermediate result
+    converged,
     body_aero, gamma_new, reference_point, density, aerodynamic_model_type, core_radius_fraction,
     mu, alpha_array, v_a_array, chord_array, x_airf_array, y_airf_array, z_airf_array,
     va_array, va_norm_array, va_unit_array, panels,
@@ -242,6 +243,12 @@ function solve!(res::Result, solver::Solver, body_aero::BodyAerodynamics, gamma_
     res.aero_force .= MVec3([Fx, Fy, Fz])
     res.aero_moments .= MVec3([Mx, My, Mz])
     res.force_coefficients .= MVec3([CL, CD, CS])
+    if converged
+        # TODO: Check if the result if feasible if converged
+        res.solver_status = FEASIBLE
+    else
+        res.solver_status = FAILURE
+    end
 
     # return the result
     return res
@@ -268,6 +275,7 @@ A dictionary with the results.
 function solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=nothing; 
     log=false, reference_point=zeros(MVec3))
     # calculate intermediate result
+    converged,
     body_aero, gamma_new, reference_point, density, aerodynamic_model_type, core_radius_fraction,
     mu, alpha_array, v_a_array, chord_array, x_airf_array, y_airf_array, z_airf_array,
     va_array, va_norm_array, va_unit_array, panels,
@@ -385,6 +393,7 @@ function solve_base(solver::Solver, body_aero::BodyAerodynamics, gamma_distribut
 
     # Return results
     return (
+        converged,
         body_aero,
         gamma_new,
         reference_point,

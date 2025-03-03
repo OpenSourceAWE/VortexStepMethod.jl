@@ -169,6 +169,8 @@ end
     @test res.force_coefficients[2] ≈ 0.0038533739066069946 # CD
     @test res.force_coefficients[3] ≈ 0.0 atol=1e-10        # CS
 
+    @test res.solver_status == FEASIBLE
+
     # Calculate forces using uncorrected alpha
     alpha = results_NEW["alpha_uncorrected"]
     dyn_visc = 0.5 * density * norm(v_a)^2

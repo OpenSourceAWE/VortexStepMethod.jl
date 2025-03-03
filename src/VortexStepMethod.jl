@@ -27,6 +27,7 @@ export Model, VSM, LLT
 export AeroModel, LEI_AIRFOIL_BREUKELS, POLAR_VECTORS, POLAR_MATRICES, INVISCID
 export PanelDistribution, LINEAR, COSINE, COSINE_VAN_GARREL, SPLIT_PROVIDED, UNCHANGED
 export InitialGammaDistribution, ELLIPTIC, ZEROS
+export SolverStatus, FEASIBLE, INFEASIBLE, FAILURE
 
 export plot_geometry, plot_distribution, plot_circulation_distribution, plot_geometry, plot_polars, save_plot, show_plot
 
