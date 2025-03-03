@@ -128,15 +128,13 @@ function create_interpolations(vertices, circle_center_z, radius, gamma_tip)
             if gamma ≤ 0.0 && -0.5 ≤ rotated_y ≤ 0.0
                 if v[1] > trailing_edges[1, j]
                     trailing_edges[:, j] .= v
-                end
-                if v[1] < leading_edges[1, j]
+                elseif v[1] < leading_edges[1, j]
                     leading_edges[:, j] .= v
                 end
             elseif gamma > 0.0 && 0.0 ≤ rotated_y ≤ 0.5
                 if v[1] > trailing_edges[1, j]
                     trailing_edges[:, j] .= v
-                end
-                if v[1] < leading_edges[1, j]
+                elseif v[1] < leading_edges[1, j]
                     leading_edges[:, j] .= v
                 end
             end
@@ -258,8 +256,8 @@ Represents a curved wing that inherits from Wing with additional geometric prope
   - gamma_tip::Float64
   - inertia_tensor::Matrix{Float64}
   - radius::Float64: Radius of curvature
-  - le_interp::Extrapolation: see: [Extrapolation](https://juliamath.github.io/Interpolations.jl/stable/extrapolation/)
-  - te_interp::Extrapolation
+  - le_interp::NTuple{3, Extrapolation}: see: [Extrapolation](https://juliamath.github.io/Interpolations.jl/stable/extrapolation/)
+  - te_interp::NTuple{3, Extrapolation}
   - area_interp::Extrapolation
 
 """
@@ -278,8 +276,8 @@ mutable struct KiteWing <: AbstractWing
     gamma_tip::Float64
     inertia_tensor::Matrix{Float64}
     radius::Float64
-    le_interp::Tuple
-    te_interp::Tuple
+    le_interp::NTuple{3, Extrapolation}
+    te_interp::NTuple{3, Extrapolation}
     area_interp::Extrapolation
     alpha_dist::Vector{Float64}
     beta_dist::Vector{Float64}
@@ -311,7 +309,7 @@ function KiteWing(obj_path, dat_path; alpha=0.0, crease_frac=0.75, wind_vel=10.,
                   n_panels=54, n_sections=n_panels+1, spanwise_panel_distribution=UNCHANGED, 
                   spanwise_direction=[0.0, 1.0, 0.0])
 
-    !isapprox(spanwise_direction, [0.0, 1.0, 0.0]) && @error "Spanwise direction has to be [0.0, 1.0, 0.0]"
+    !isapprox(spanwise_direction, [0.0, 1.0, 0.0]) && throw(ArgumentError("Spanwise direction has to be [0.0, 1.0, 0.0], not $spanwise_direction"))
 
     # Load or create polars
     (!endswith(dat_path, ".dat")) && (dat_path *= ".dat")
