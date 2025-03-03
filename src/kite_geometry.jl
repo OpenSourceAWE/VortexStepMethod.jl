@@ -1,4 +1,16 @@
+"""
+    read_faces(filename)
 
+Read vertices and faces from an OBJ file.
+
+# Arguments
+- `filename::String`: Path to .obj file
+
+# Returns
+- Tuple of (vertices, faces) where:
+  - vertices: Vector of 3D coordinates [x,y,z]
+  - faces: Vector of triangle vertex indices
+"""
 function read_faces(filename)
     vertices = []
     faces = []
@@ -22,6 +34,20 @@ function read_faces(filename)
     return vertices, faces
 end
 
+"""
+    find_circle_center_and_radius(vertices)
+
+Find the center and radius of the kite's curvature circle.
+
+# Arguments
+- `vertices`: Vector of 3D point coordinates
+
+# Returns
+- Tuple of (z_center, radius, gamma_tip) where:
+  - z_center: Z-coordinate of circle center
+  - radius: Circle radius
+  - gamma_tip: Angle of the kite tip from z-axis
+"""
 function find_circle_center_and_radius(vertices)
     r = zeros(2)
     v_min = zeros(3)
@@ -70,36 +96,60 @@ function find_circle_center_and_radius(vertices)
     return z, r[1], gamma_tip
 end
 
-# Create interpolations for max and min x coordinates
+"""
+    create_interpolations(vertices, circle_center_z, radius, gamma_tip)
+
+Create interpolation functions for leading/trailing edges and area.
+
+# Arguments
+- `vertices`: Vector of 3D point coordinates
+- `circle_center_z`: Z-coordinate of circle center
+- `radius`: Circle radius
+- `gamma_tip`: Maximum angular extent
+
+# Returns
+- Tuple of (le_interp, te_interp, area_interp) interpolation functions
+- Where le_interp and te_interp are tuples themselves, containing the x, y and z interpolations
+"""
 function create_interpolations(vertices, circle_center_z, radius, gamma_tip)
     gamma_range = range(-gamma_tip+1e-6, gamma_tip-1e-6, 100)
     vz_centered = [v[3] - circle_center_z for v in vertices]
     
-    max_xs = zeros(length(gamma_range))
-    min_xs = zeros(length(gamma_range))
+    trailing_edges = zeros(3, length(gamma_range))
+    leading_edges = zeros(3, length(gamma_range))
     areas  = zeros(length(gamma_range))
     
     for (j, gamma) in enumerate(gamma_range)
-        max_xs[j] = -Inf
-        min_xs[j] = Inf
+        trailing_edges[1, j] = -Inf
+        leading_edges[1, j] = Inf
         for (i, v) in enumerate(vertices)
             # Rotate y coordinate to check box containment
             rotated_y = v[2] * cos(gamma) - vz_centered[i] * sin(gamma)
             if gamma ≤ 0.0 && -0.5 ≤ rotated_y ≤ 0.0
-                max_xs[j] = max(max_xs[j], v[1])
-                min_xs[j] = min(min_xs[j], v[1])
+                if v[1] > trailing_edges[1, j]
+                    trailing_edges[:, j] .= v
+                end
+                if v[1] < leading_edges[1, j]
+                    leading_edges[:, j] .= v
+                end
             elseif gamma > 0.0 && 0.0 ≤ rotated_y ≤ 0.5
-                max_xs[j] = max(max_xs[j], v[1])
-                min_xs[j] = min(min_xs[j], v[1])
+                if v[1] > trailing_edges[1, j]
+                    trailing_edges[:, j] .= v
+                end
+                if v[1] < leading_edges[1, j]
+                    leading_edges[:, j] .= v
+                end
             end
         end
-        area = abs(max_xs[j] - min_xs[j]) * gamma_range.step * radius
+        area = norm(leading_edges[:, j] - trailing_edges[:, j]) * gamma_range.step * radius
         last_area = j > 1 ? areas[j-1] : 0.0
         areas[j] = last_area + area
     end
 
-    te_interp = linear_interpolation(gamma_range, max_xs, extrapolation_bc=Line())
-    le_interp = linear_interpolation(gamma_range, min_xs, extrapolation_bc=Line())
+    le_interp = ntuple(i -> linear_interpolation(gamma_range, leading_edges[i, :],
+                                           extrapolation_bc=Line()), 3)
+    te_interp = ntuple(i -> linear_interpolation(gamma_range, trailing_edges[i, :],
+                                           extrapolation_bc=Line()), 3)
     area_interp = linear_interpolation(gamma_range, areas, extrapolation_bc=Line())
     
     return (le_interp, te_interp, area_interp)
@@ -127,7 +177,29 @@ function calculate_com(vertices, faces)
     return com / area_total
 end
 
-# Calculate inertia tensor for a triangular surface mesh with given mass
+"""
+    calculate_inertia_tensor(vertices, faces, mass, com)
+
+Calculate the inertia tensor for a triangulated surface mesh, assuming a thin shell with uniform 
+surface density.
+
+# Arguments
+- `vertices`: Vector of 3D point coordinates representing mesh vertices
+- `faces`: Vector of triangle indices, each defining a face of the mesh
+- `mass`: Total mass of the shell in kg
+- `com`: Center of mass coordinates [x,y,z]
+
+# Method
+Uses the thin shell approximation where:
+1. Mass is distributed uniformly over the surface area
+2. Each triangle contributes to the inertia based on its area and position
+3. For each triangle vertex p, contribution to diagonal terms is: area * (sum(p²) - p_i²)
+4. For off-diagonal terms: area * (-p_i * p_j)
+5. Final tensor is scaled by mass/(3*total_area) to get correct units
+
+# Returns
+- 3×3 matrix representing the inertia tensor in kg⋅m²
+"""
 function calculate_inertia_tensor(vertices, faces, mass, com)
     # Initialize inertia tensor
     I = zeros(3, 3)
@@ -186,8 +258,8 @@ Represents a curved wing that inherits from Wing with additional geometric prope
   - gamma_tip::Float64
   - inertia_tensor::Matrix{Float64}
   - radius::Float64: Radius of curvature
-  - le_interp::Extrapolation: see: [Extrapolation](https://juliamath.github.io/Interpolations.jl/stable/extrapolation/)
-  - te_interp::Extrapolation
+  - le_interp::NTuple{3, Extrapolation}: see: [Extrapolation](https://juliamath.github.io/Interpolations.jl/stable/extrapolation/)
+  - te_interp::NTuple{3, Extrapolation}
   - area_interp::Extrapolation
 
 """
@@ -199,16 +271,18 @@ mutable struct KiteWing <: AbstractWing
     refined_sections::Vector{Section}
     
     # Additional fields for KiteWing
+    non_deformed_sections::Vector{Section}
     mass::Float64
     center_of_mass::Vector{Float64}
     circle_center_z::Float64
     gamma_tip::Float64
     inertia_tensor::Matrix{Float64}
     radius::Float64
-    le_interp::Extrapolation
-    te_interp::Extrapolation
+    le_interp::NTuple{3, Extrapolation}
+    te_interp::NTuple{3, Extrapolation}
     area_interp::Extrapolation
-
+    alpha_dist::Vector{Float64}
+    beta_dist::Vector{Float64}
 end
 
 """
@@ -237,7 +311,7 @@ function KiteWing(obj_path, dat_path; alpha=0.0, crease_frac=0.75, wind_vel=10.,
                   n_panels=54, n_sections=n_panels+1, spanwise_panel_distribution=UNCHANGED, 
                   spanwise_direction=[0.0, 1.0, 0.0])
 
-    !isapprox(spanwise_direction, [0.0, 1.0, 0.0]) && @error "Spanwise direction has to be [0.0, 1.0, 0.0]"
+    !isapprox(spanwise_direction, [0.0, 1.0, 0.0]) && throw(ArgumentError("Spanwise direction has to be [0.0, 1.0, 0.0], not $spanwise_direction"))
 
     # Load or create polars
     (!endswith(dat_path, ".dat")) && (dat_path *= ".dat")
@@ -280,22 +354,73 @@ function KiteWing(obj_path, dat_path; alpha=0.0, crease_frac=0.75, wind_vel=10.,
     sections = Section[]
     for gamma in range(-gamma_tip, gamma_tip, n_sections)
         aero_data = (collect(alpha_range), collect(beta_range), cl_matrix, cd_matrix, cm_matrix)
-        LE_point = [0.0, 0.0, circle_center_z] .+ [le_interp(gamma), sin(gamma) * radius, cos(gamma) * radius]
-        if !isapprox(alpha, 0.0)
-            local_y_vec = [0.0, sin(-gamma), cos(gamma)] × [1.0, 0.0, 0.0]
-            TE_point = LE_point .+ rotate_v_around_k([te_interp(gamma) - le_interp(gamma), 0.0, 0.0], local_y_vec, alpha)
-        else
-            TE_point = LE_point .+ [te_interp(gamma) - le_interp(gamma), 0.0, 0.0]
-        end
+        LE_point = [le_interp[i](gamma) for i in 1:3]
+        TE_point = [te_interp[i](gamma) for i in 1:3]
         push!(sections, Section(LE_point, TE_point, POLAR_MATRICES, aero_data))
     end
 
-    KiteWing(n_panels, spanwise_panel_distribution, spanwise_direction, sections, sections,
+    KiteWing(n_panels, spanwise_panel_distribution, spanwise_direction, sections, sections, sections,
         mass, center_of_mass, circle_center_z, gamma_tip, inertia_tensor, radius,
-        le_interp, te_interp, area_interp)
+        le_interp, te_interp, area_interp, zeros(n_panels), zeros(n_panels))
 end
 
+"""
+    deform!(wing::KiteWing, alphas::AbstractVector, betas::AbstractVector; width)
 
+Deform wing by applying left and right alpha and beta.
+
+# Arguments
+- `wing`: KiteWing to deform
+- `alphas`: [left, right] the angle between of the kite and the body x-axis in radians
+- `betas`: [left, right] the deformation of the trailing edges
+- `width`: Transition width in meters to smoothe out the transition from left to right deformation
+
+# Effects
+Updates wing.sections with deformed geometry
+"""
+function deform!(wing::KiteWing, alphas::AbstractVector, betas::AbstractVector; width)
+    local_y = zeros(MVec3)
+    chord = zeros(MVec3)
+
+    for (i, gamma) in enumerate(range(-wing.gamma_tip, wing.gamma_tip, wing.n_panels))
+        normalized_gamma = (gamma * wing.radius / width + 0.5)  # Maps [-0.5, 0.5] to [0, 1]
+        wing.alpha_dist[i] = if normalized_gamma <= 0.0
+            alphas[1]
+        elseif normalized_gamma >= 1.0
+            alphas[2]
+        else
+            alphas[1] * (1.0 - normalized_gamma) + alphas[2] * normalized_gamma
+        end
+        wing.beta_dist[i] = if normalized_gamma <= 0.0
+            betas[1]
+        elseif normalized_gamma >= 1.0
+            betas[2]
+        else
+            betas[1] * (1.0 - normalized_gamma) + betas[2] * normalized_gamma
+        end
+
+        section1 = wing.non_deformed_sections[i]
+        section2 = wing.non_deformed_sections[i+1]
+        local_y .= normalize(section1.LE_point - section2.LE_point)
+        chord .= section1.TE_point .- section1.LE_point
+        wing.sections[i].TE_point .= section1.LE_point .+ rotate_v_around_k(chord, local_y, wing.alpha_dist[i])
+    end
+    return nothing
+end
+
+"""
+    rotate_v_around_k(v, k, θ)
+
+Rotate vector v around axis k by angle θ using Rodrigues' rotation formula.
+
+# Arguments
+- `v`: Vector to rotate
+- `k`: Rotation axis (will be normalized)
+- `θ`: Rotation angle in radians
+
+# Returns
+- Rotated vector
+"""
 function rotate_v_around_k(v, k, θ)
     k = normalize(k)
     v_rot = v * cos(θ) + (k × v) * sin(θ)  + k * (k ⋅ v) * (1 - cos(θ))

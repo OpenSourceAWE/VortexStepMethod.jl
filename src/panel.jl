@@ -68,6 +68,7 @@ Represents a panel in a vortex step method simulation. All points and vectors ar
         SemiInfiniteFilament(),
         SemiInfiniteFilament()
     )
+    beta::Float64 = 0.0
 end
 
 function init_pos!(
@@ -80,7 +81,8 @@ function init_pos!(
     bound_point_2::PosVector,
     x_airf::PosVector,
     y_airf::PosVector,
-    z_airf::PosVector
+    z_airf::PosVector,
+    beta
 )
     # Initialize basic geometry
     panel.TE_point_1 .= section_1.TE_point
@@ -104,6 +106,7 @@ function init_pos!(
     panel.x_airf .= x_airf
     panel.y_airf .= y_airf
     panel.z_airf .= z_airf
+    panel.beta = Float64(beta)
     return nothing
 end
 
@@ -177,11 +180,12 @@ function init!(
     bound_point_2::PosVector,
     x_airf::PosVector,
     y_airf::PosVector,
-    z_airf::PosVector;
+    z_airf::PosVector,
+    beta;
     init_aero = true
 )
     init_pos!(panel, section_1, section_2, aero_center, control_point, bound_point_1, bound_point_2,
-        x_airf, y_airf, z_airf)
+        x_airf, y_airf, z_airf, beta)
     init_aero && init_aero!(panel, section_1, section_2)
     return nothing
 end
@@ -317,7 +321,7 @@ function calculate_cl(panel::Panel, alpha::Float64)::Float64
     elseif panel.aero_model == POLAR_VECTORS
         cl = panel.cl_interp(alpha)::Float64
     elseif panel.aero_model == POLAR_MATRICES
-        cl = panel.cl_interp(alpha, 0.0)::Float64
+        cl = panel.cl_interp(alpha, panel.beta)::Float64
     else
         throw(ArgumentError("Unsupported aero model: $(panel.aero_model)"))
     end
@@ -342,8 +346,8 @@ function calculate_cd_cm(panel::Panel, alpha::Float64)
         cd = panel.cd_interp(alpha)::Float64
         cm = panel.cm_interp(alpha)::Float64
     elseif panel.aero_model == POLAR_MATRICES    
-        cd = panel.cd_interp(alpha, 0.0)::Float64
-        cm = panel.cm_interp(alpha, 0.0)::Float64
+        cd = panel.cd_interp(alpha, panel.beta)::Float64
+        cm = panel.cm_interp(alpha, panel.beta)::Float64
     elseif !(panel.aero_model == INVISCID)
         throw(ArgumentError("Unsupported aero model: $(panel.aero_model)"))
     end

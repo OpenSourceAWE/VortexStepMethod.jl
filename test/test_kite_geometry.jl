@@ -132,9 +132,11 @@ using Serialization
             area_interp
         ))
         
+        @show [le_interp[i](0.0) for i in 1:3]
+        @show [te_interp[i](0.0) for i in 1:3]
         # Test interpolation at middle point
-        @test le_interp(0.0) ≈ 0.0 rtol=1e-2
-        @test te_interp(0.0) ≈ 1.0 rtol=1e-2
+        @test isapprox([le_interp[i](0.0) for i in 1:3], [0.0, 0.0, r+z_center], atol=0.03)
+        @test isapprox([te_interp[i](0.0) for i in 1:3], [1.0, 0.0, r+z_center], atol=0.03)
     end
     
     @testset "KiteWing Construction" begin

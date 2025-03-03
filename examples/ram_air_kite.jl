@@ -16,6 +16,11 @@ PLOT = true
 wing = KiteWing("data/ram_air_kite_body.obj", "data/ram_air_kite_foil.dat")
 body_aero = BodyAerodynamics([wing])
 
+alpha = [0, 0]
+beta = [deg2rad(10), 0]
+@time VortexStepMethod.deform!(wing, alpha, beta; width=1.0)
+@time VortexStepMethod.init!(body_aero)
+
 # Create solvers
 vsm_solver = Solver(
     aerodynamic_model_type=VSM,
@@ -24,7 +29,7 @@ vsm_solver = Solver(
 
 # Setting velocity conditions
 v_a = 15.0
-aoa = 15.0
+aoa = 10.0
 side_slip = 0.0
 yaw_rate = 0.0
 aoa_rad = deg2rad(aoa)
@@ -48,8 +53,8 @@ PLOT && plot_geometry(
 )
 
 # Solving and plotting distributions
-results = solve(vsm_solver, body_aero)
-@time results = solve(vsm_solver, body_aero)
+results = solve(vsm_solver, body_aero; log=true)
+@time results = solve(vsm_solver, body_aero; log=true)
 
 body_y_coordinates = [panel.aero_center[2] for panel in body_aero.panels]
 
