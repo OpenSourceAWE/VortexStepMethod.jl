@@ -43,13 +43,19 @@ llt_solver = Solver(aerodynamic_model_type=LLT)
 vsm_solver = Solver(aerodynamic_model_type=VSM)
 
 # Step 5: Solve using both methods
+res = Result()
 results_vsm = solve(vsm_solver, wa)
+solve!(res, vsm_solver, wa)
 results_vsm_base = solve_base(vsm_solver, wa)
-println("Rectangular wing:")
+println("Rectangular wing, solve_base:")
 @time results_vsm_base = solve_base(vsm_solver, wa)
 # time Python: 32.0 ms Ryzen 7950x
 # time Julia:   0.6 ms Ryzen 7950x
 #               0.8 ms laptop, performance mode, battery 
+println("Rectangular wing, solve!:")
+@time solve!(res, vsm_solver, wa)
+println("Rectangular wing, solve:")
+@time solve(vsm_solver, wa)
 
 # Create wing geometry
 wing = KiteWing("data/ram_air_kite_body.obj", "data/ram_air_kite_foil.dat")
