@@ -139,12 +139,15 @@ function solve!(res::Result, solver::Solver, body_aero::BodyAerodynamics, gamma_
     m_body_3D = zeros(3, n_panels)
     area_all_panels = 0.0
 
+    # Initialize force sums
+    lift_wing_3D_sum = 0.0
+    drag_wing_3D_sum = 0.0
+    side_wing_3D_sum = 0.0
+
     # Get wing properties
     spanwise_direction = body_aero.wings[1].spanwise_direction
     va_mag = norm(body_aero.va)
-    va = body_aero.va
-    # va_unit = va / va_mag
-    # q_inf = 0.5 * density * va_mag^2
+    q_inf = 0.5 * density * va_mag^2
     
     for (i, panel) in enumerate(panels)
 
@@ -200,6 +203,10 @@ function solve!(res::Result, solver::Solver, body_aero::BodyAerodynamics, gamma_
         # Total panel moment about the reference point:
         m_body_3D[:,i] = M_local_3D + M_shift
     end
+
+    # Calculate wing geometry properties
+    projected_area = sum(wing -> calculate_projected_area(wing), body_aero.wings)
+
     Fx = sum(f_body_3D[1,:])
     Fy = sum(f_body_3D[2,:])
     Fz = sum(f_body_3D[3,:])
@@ -207,9 +214,15 @@ function solve!(res::Result, solver::Solver, body_aero::BodyAerodynamics, gamma_
     My = sum(m_body_3D[2,:])
     Mz = sum(m_body_3D[3,:])
 
+    CL = lift_wing_3D_sum / (q_inf * projected_area)
+    CD = drag_wing_3D_sum / (q_inf * projected_area)
+    CS = side_wing_3D_sum / (q_inf * projected_area)
+
     # update the result struct
     res.aero_force .= MVec3([Fx, Fy, Fz])
     res.aero_moments .= MVec3([Mx, My, Mz])
+    res.force_coefficients .= MVec3([CL, CD, CS])
+    
     # return the result
     return res
 end
