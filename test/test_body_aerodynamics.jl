@@ -158,8 +158,12 @@ end
     solve!(res, solver_object, body_aero; reference_point=[0,1,0])
 
     @test res.aero_force.x ≈ -117.97225244011436
-    @test res.aero_force.y ≈ 0.0
+    @test res.aero_force.y ≈ 0.0 atol=1e-10
     @test res.aero_force.z ≈ 1481.996390329679
+
+    @test res.aero_moments.x ≈ -1481.996390329678
+    @test res.aero_moments.y ≈ 0.0 atol=1e-10
+    @test res.aero_moments.z ≈ -117.97225244011435
 
 
     # Calculate forces using uncorrected alpha

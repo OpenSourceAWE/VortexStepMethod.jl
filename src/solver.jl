@@ -136,7 +136,7 @@ function solve!(res::Result, solver::Solver, body_aero::BodyAerodynamics, gamma_
     # cd_prescribed_va = Float64[]
     # cs_prescribed_va = Float64[]
     f_body_3D = zeros(3, n_panels)
-    # m_body_3D = zeros(3, n_panels)
+    m_body_3D = zeros(3, n_panels)
     area_all_panels = 0.0
 
     # Get wing properties
@@ -178,15 +178,38 @@ function solve!(res::Result, solver::Solver, body_aero::BodyAerodynamics, gamma_
             dot(ftotal_induced_va, [0.0, 1.0, 0.0]),
             dot(ftotal_induced_va, [0.0, 0.0, 1.0])
             ] .* panel.width
+
+        # Calculate the moments
+        # (1) Panel aerodynamic center in body frame:
+        panel_ac_body = panel.aero_center  # 3D [x, y, z]
+
+        # (2) Convert local (2D) pitching moment to a 3D vector in body coords.
+        #     Use the axis around which the moment is defined,
+        #     which is the z-axis pointing "spanwise"
+        moment_axis_body = panel.z_airf
+
+        # Scale by panel width if your 'moment[i]' is 2D moment-per-unit-span:
+        M_local_3D = moment[i] * moment_axis_body * panel.width
+
+        # Vector from panel AC to the chosen reference point:
+        r_vector = panel_ac_body - reference_point  # e.g. CG, wing root, etc.
+
+        # Cross product to shift the force from panel AC to ref. point:
+        M_shift = cross(r_vector, f_body_3D[:,i])
+
+        # Total panel moment about the reference point:
+        m_body_3D[:,i] = M_local_3D + M_shift
     end
     Fx = sum(f_body_3D[1,:])
     Fy = sum(f_body_3D[2,:])
     Fz = sum(f_body_3D[3,:])
-    # "Mx" => sum(m_body_3D[1,:])
-    # "My" => sum(m_body_3D[2,:])
-    # "Mz" => sum(m_body_3D[3,:])
+    Mx = sum(m_body_3D[1,:])
+    My = sum(m_body_3D[2,:])
+    Mz = sum(m_body_3D[3,:])
+
     # update the result struct
     res.aero_force .= MVec3([Fx, Fy, Fz])
+    res.aero_moments .= MVec3([Mx, My, Mz])
     # return the result
     return res
 end
