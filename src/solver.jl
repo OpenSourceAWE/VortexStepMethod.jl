@@ -105,19 +105,19 @@ function solve!(res::Result, solver::Solver, body_aero::BodyAerodynamics, gamma_
     panel_width_array = zeros(n_panels)
 
     # Calculate coefficients for each panel
-    for (i, panel) in enumerate(panels)
+    for (i, panel) in enumerate(panels)                                               # zero bytes
         cl_array[i] = calculate_cl(panel, alpha_array[i])
         cd_array[i], cm_array[i] = calculate_cd_cm(panel, alpha_array[i])
         panel_width_array[i] = panel.width
     end
 
     # Calculate forces
-    lift = reshape((cl_array .* 0.5 .* density .* v_a_array.^2 .* chord_array), :, 1)
+    lift = reshape((cl_array .* 0.5 .* density .* v_a_array.^2 .* chord_array), :, 1) # 336 bytes
     drag = reshape((cd_array .* 0.5 .* density .* v_a_array.^2 .* chord_array), :, 1)
     moment = reshape((cm_array .* 0.5 .* density .* v_a_array.^2 .* chord_array), :, 1)
 
     # Calculate alpha corrections based on model type
-    alpha_corrected = if aerodynamic_model_type === VSM
+    alpha_corrected = if aerodynamic_model_type == VSM                                # 4188 bytes
         update_effective_angle_of_attack_if_VSM(
             body_aero,
             gamma_new,
@@ -154,7 +154,7 @@ function solve!(res::Result, solver::Solver, body_aero::BodyAerodynamics, gamma_
     va_unit = va / va_mag
     q_inf = 0.5 * density * va_mag^2
     
-    for (i, panel) in enumerate(panels)
+    for (i, panel) in enumerate(panels)                                               # 30625 bytes
 
         # Panel geometry
         z_airf_span = panel.z_airf
