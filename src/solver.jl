@@ -1,5 +1,23 @@
 
 """
+    Result
+
+Struct for storing the result of the solve! function. Must contain all info needed by `KiteModels.jl`.
+
+# Attributes
+- aero_force::MVec3: Aerodynamic force vector in KB reference frame [N]
+- aero_moments::MVec3: Aerodynamic moments [Mx, My, Mz] around the reference point [Nm]
+- force_coefficients::MVec3: Aerodynamic force coefficients [CL, CD, CS] [-]
+- solver_status::SolverStatus: enum, see [SolverStatus](@ref)
+"""
+struct Result    
+    aero_force::MVec3          
+    aero_moments::MVec3       
+    force_coefficients::MVec3  
+    solver_status::SolverStatus 
+end
+
+"""
     Solver
 
 Main solver structure for the Vortex Step Method.
@@ -42,12 +60,6 @@ Main solver structure for the Vortex Step Method.
     core_radius_fraction::Float64 = 1e-20
     mu::Float64 = 1.81e-5
     is_only_f_and_gamma_output::Bool = false
-end
-
-struct Result
-    cl::Float64
-    cd::Float64
-    cm::Float64
 end
 
 """
