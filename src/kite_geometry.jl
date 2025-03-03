@@ -128,13 +128,15 @@ function create_interpolations(vertices, circle_center_z, radius, gamma_tip)
             if gamma ≤ 0.0 && -0.5 ≤ rotated_y ≤ 0.0
                 if v[1] > trailing_edges[1, j]
                     trailing_edges[:, j] .= v
-                elseif v[1] < leading_edges[1, j]
+                end
+                if v[1] < leading_edges[1, j]
                     leading_edges[:, j] .= v
                 end
             elseif gamma > 0.0 && 0.0 ≤ rotated_y ≤ 0.5
                 if v[1] > trailing_edges[1, j]
                     trailing_edges[:, j] .= v
-                elseif v[1] < leading_edges[1, j]
+                end
+                if v[1] < leading_edges[1, j]
                     leading_edges[:, j] .= v
                 end
             end
