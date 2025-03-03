@@ -46,7 +46,8 @@ function create_panel(section1::Section, section2::Section)
         bound_2,
         x_airf,
         y_airf,
-        z_airf
+        z_airf,
+        0.0
     )
     return panel
 end

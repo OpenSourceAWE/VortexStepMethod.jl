@@ -110,7 +110,6 @@ function create_interpolations(vertices, circle_center_z, radius, gamma_tip)
                                            extrapolation_bc=Line()), 3)
     te_interp = ntuple(i -> linear_interpolation(gamma_range, trailing_edges[i, :],
                                            extrapolation_bc=Line()), 3)
-    @show le_interp                            
     area_interp = linear_interpolation(gamma_range, areas, extrapolation_bc=Line())
     
     return (le_interp, te_interp, area_interp)
