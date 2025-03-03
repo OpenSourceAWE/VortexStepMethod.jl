@@ -165,9 +165,9 @@ end
     @test res.aero_moments.y ≈ 0.0 atol=1e-10
     @test res.aero_moments.z ≈ -117.97225244011435
 
-    println("-->", res.force_coefficients)
-    println("CL: ",results_NEW["cl"])
-
+    @test res.force_coefficients[1] ≈ 0.4920964685099385    # CL
+    @test res.force_coefficients[2] ≈ 0.0038533739066069946 # CD
+    @test res.force_coefficients[3] ≈ 0.0 atol=1e-10        # CS
 
     # Calculate forces using uncorrected alpha
     alpha = results_NEW["alpha_uncorrected"]

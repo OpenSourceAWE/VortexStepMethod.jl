@@ -147,6 +147,8 @@ function solve!(res::Result, solver::Solver, body_aero::BodyAerodynamics, gamma_
     # Get wing properties
     spanwise_direction = body_aero.wings[1].spanwise_direction
     va_mag = norm(body_aero.va)
+    va = body_aero.va
+    va_unit = va / va_mag
     q_inf = 0.5 * density * va_mag^2
     
     for (i, panel) in enumerate(panels)
@@ -175,12 +177,29 @@ function solve!(res::Result, solver::Solver, body_aero::BodyAerodynamics, gamma_
         drag_induced_va = drag[i] * dir_drag_induced_va
         ftotal_induced_va = lift_induced_va + drag_induced_va
 
+        # Calculate forces in prescribed wing frame
+        dir_lift_prescribed_va = cross(va, spanwise_direction)
+        dir_lift_prescribed_va = dir_lift_prescribed_va / norm(dir_lift_prescribed_va)
+             
+        # Calculate force components
+        lift_prescribed_va = dot(lift_induced_va, dir_lift_prescribed_va) + 
+                             dot(drag_induced_va, dir_lift_prescribed_va)
+        drag_prescribed_va = dot(lift_induced_va, va_unit) + 
+                             dot(drag_induced_va, va_unit)
+        side_prescribed_va = dot(lift_induced_va, spanwise_direction) + 
+                             dot(drag_induced_va, spanwise_direction)
+        
         # Body frame forces
         f_body_3D[:,i] .= [
             dot(ftotal_induced_va, [1.0, 0.0, 0.0]),
             dot(ftotal_induced_va, [0.0, 1.0, 0.0]),
             dot(ftotal_induced_va, [0.0, 0.0, 1.0])
             ] .* panel.width
+
+        # Update sums
+        lift_wing_3D_sum += lift_prescribed_va * panel.width
+        drag_wing_3D_sum += drag_prescribed_va * panel.width  
+        side_wing_3D_sum += side_prescribed_va * panel.width
 
         # Calculate the moments
         # (1) Panel aerodynamic center in body frame:
@@ -217,12 +236,13 @@ function solve!(res::Result, solver::Solver, body_aero::BodyAerodynamics, gamma_
     CL = lift_wing_3D_sum / (q_inf * projected_area)
     CD = drag_wing_3D_sum / (q_inf * projected_area)
     CS = side_wing_3D_sum / (q_inf * projected_area)
+    println("lift_wing_3D_sum: ", lift_wing_3D_sum)
 
     # update the result struct
     res.aero_force .= MVec3([Fx, Fy, Fz])
     res.aero_moments .= MVec3([Mx, My, Mz])
     res.force_coefficients .= MVec3([CL, CD, CS])
-    
+
     # return the result
     return res
 end
