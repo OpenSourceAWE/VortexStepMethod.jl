@@ -2,7 +2,7 @@
 """
     Result
 
-Struct for storing the result of the solve! function. Must contain all info needed by `KiteModels.jl`.
+Struct for storing the result of the [solve!](@ref) function. Must contain all info needed by `KiteModels.jl`.
 
 # Attributes
 - aero_force::MVec3: Aerodynamic force vector in KB reference frame [N]
@@ -71,9 +71,11 @@ end
           log=false, reference_point=zeros(MVec3))
 
 Main solving routine for the aerodynamic model. Reference point is in the kite body (KB) frame.
+This version is modifying the `res` struct and is faster than the `solve` function which returns
+a dictionary.
 
 # Arguments:
-- res::Result: The result struct, that will be updated
+- res::Result: The result struct (see: [Result](@ref)), that will be updated
 - solver::Solver: The solver to use, could be a VSM or LLT solver. See: [Solver](@ref)
 - body_aero::BodyAerodynamics: The aerodynamic body. See: [BodyAerodynamics](@ref)
 - gamma_distribution: Initial circulation vector or nothing; Length: Number of segments. [m²/s]
@@ -83,7 +85,7 @@ Main solving routine for the aerodynamic model. Reference point is in the kite b
 - reference_point=zeros(MVec3)
 
 # Returns
-A dictionary with the results.
+nothing
 """
 function solve!(res::Result, solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=nothing; 
     log=false, reference_point=zeros(MVec3))
@@ -250,8 +252,7 @@ function solve!(res::Result, solver::Solver, body_aero::BodyAerodynamics, gamma_
         res.solver_status = FAILURE
     end
 
-    # return the result
-    return res
+    return nothing
 end
 
 """
@@ -259,6 +260,7 @@ end
           log=false, reference_point=zeros(MVec3))
 
 Main solving routine for the aerodynamic model. Reference point is in the kite body (KB) frame.
+See also: [solve!](@ref)
 
 # Arguments:
 - solver::Solver: The solver to use, could be a VSM or LLT solver. See: [Solver](@ref)
