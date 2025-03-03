@@ -220,6 +220,8 @@ mutable struct KiteWing <: AbstractWing
     le_interp::Tuple
     te_interp::Tuple
     area_interp::Extrapolation
+    alpha_dist::Vector{Float64}
+    beta_dist::Vector{Float64}
 end
 
 """
@@ -298,14 +300,39 @@ function KiteWing(obj_path, dat_path; alpha=0.0, crease_frac=0.75, wind_vel=10.,
 
     KiteWing(n_panels, spanwise_panel_distribution, spanwise_direction, sections, sections, sections,
         mass, center_of_mass, circle_center_z, gamma_tip, inertia_tensor, radius,
-        le_interp, te_interp, area_interp)
+        le_interp, te_interp, area_interp, zeros(n_panels), zeros(n_panels))
 end
 
-# function deform!(wing::KiteWing, alpha::AbstractVector, beta::AbstractVector)
-#     for i in eachindex(wing.panels)
-#         wing.refined_sections[i].TE_point .= 
-#     end
-# end
+function create_alpha_distribution(gamma::Float64, alpha_left::Float64, alpha_right::Float64, width::Float64)
+    # Create sigmoid transition
+    k = 1.0 / width  # Controls steepness of transition
+    sigmoid = 1.0 / (1.0 + exp(-k * gamma))
+    
+    # Interpolate between left and right alpha
+    return alpha_left + (alpha_right - alpha_left) * sigmoid
+end
+
+function deform!(wing::KiteWing, alphas::AbstractVector, betas::AbstractVector; width)
+    local_y = zeros(MVec3)
+    chord = zeros(MVec3)
+
+    for (i, gamma) in enumerate(range(-wing.gamma_tip, wing.gamma_tip, wing.n_panels))
+        normalized_gamma = (gamma * wing.radius / width + 0.5)  # Maps [-0.5, 0.5] to [0, 1]
+        wing.alpha_dist[i] = if normalized_gamma <= 0.0
+            alphas[1]
+        elseif normalized_gamma >= 1.0
+            alphas[2]
+        else
+            alphas[1] * (1.0 - normalized_gamma) + alphas[2] * normalized_gamma
+        end
+        section1 = wing.non_deformed_sections[i]
+        section2 = wing.non_deformed_sections[i+1]
+        local_y .= normalize(section1.LE_point - section2.LE_point)
+        chord .= section1.TE_point .- section1.LE_point
+        wing.sections[i].TE_point .= section1.LE_point .+ rotate_v_around_k(chord, local_y, wing.alpha_dist[i])
+        # wing.refined_sections[i].TE_point .= section1.LE_point .+ rotate_v_around_k(chord, local_y, wing.alpha_dist[i])
+    end
+end
 
 function rotate_v_around_k(v, k, θ)
     k = normalize(k)
