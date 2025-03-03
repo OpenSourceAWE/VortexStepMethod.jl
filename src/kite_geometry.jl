@@ -1,4 +1,16 @@
+"""
+    read_faces(filename)
 
+Read vertices and faces from an OBJ file.
+
+# Arguments
+- `filename::String`: Path to .obj file
+
+# Returns
+- Tuple of (vertices, faces) where:
+  - vertices: Vector of 3D coordinates [x,y,z]
+  - faces: Vector of triangle vertex indices
+"""
 function read_faces(filename)
     vertices = []
     faces = []
@@ -22,6 +34,20 @@ function read_faces(filename)
     return vertices, faces
 end
 
+"""
+    find_circle_center_and_radius(vertices)
+
+Find the center and radius of the kite's curvature circle.
+
+# Arguments
+- `vertices`: Vector of 3D point coordinates
+
+# Returns
+- Tuple of (z_center, radius, gamma_tip) where:
+  - z_center: Z-coordinate of circle center
+  - radius: Circle radius
+  - gamma_tip: Angle of the kite tip from z-axis
+"""
 function find_circle_center_and_radius(vertices)
     r = zeros(2)
     v_min = zeros(3)
@@ -70,7 +96,21 @@ function find_circle_center_and_radius(vertices)
     return z, r[1], gamma_tip
 end
 
-# Create interpolations for max and min x coordinates
+"""
+    create_interpolations(vertices, circle_center_z, radius, gamma_tip)
+
+Create interpolation functions for leading/trailing edges and area.
+
+# Arguments
+- `vertices`: Vector of 3D point coordinates
+- `circle_center_z`: Z-coordinate of circle center
+- `radius`: Circle radius
+- `gamma_tip`: Maximum angular extent
+
+# Returns
+- Tuple of (le_interp, te_interp, area_interp) interpolation functions
+- Where le_interp and te_interp are tuples themselves, containing the x, y and z interpolations
+"""
 function create_interpolations(vertices, circle_center_z, radius, gamma_tip)
     gamma_range = range(-gamma_tip+1e-6, gamma_tip-1e-6, 100)
     vz_centered = [v[3] - circle_center_z for v in vertices]
@@ -137,7 +177,29 @@ function calculate_com(vertices, faces)
     return com / area_total
 end
 
-# Calculate inertia tensor for a triangular surface mesh with given mass
+"""
+    calculate_inertia_tensor(vertices, faces, mass, com)
+
+Calculate the inertia tensor for a triangulated surface mesh, assuming a thin shell with uniform 
+surface density.
+
+# Arguments
+- `vertices`: Vector of 3D point coordinates representing mesh vertices
+- `faces`: Vector of triangle indices, each defining a face of the mesh
+- `mass`: Total mass of the shell in kg
+- `com`: Center of mass coordinates [x,y,z]
+
+# Method
+Uses the thin shell approximation where:
+1. Mass is distributed uniformly over the surface area
+2. Each triangle contributes to the inertia based on its area and position
+3. For each triangle vertex p, contribution to diagonal terms is: area * (sum(p²) - p_i²)
+4. For off-diagonal terms: area * (-p_i * p_j)
+5. Final tensor is scaled by mass/(3*total_area) to get correct units
+
+# Returns
+- 3×3 matrix representing the inertia tensor in kg⋅m²
+"""
 function calculate_inertia_tensor(vertices, faces, mass, com)
     # Initialize inertia tensor
     I = zeros(3, 3)
@@ -302,15 +364,20 @@ function KiteWing(obj_path, dat_path; alpha=0.0, crease_frac=0.75, wind_vel=10.,
         le_interp, te_interp, area_interp, zeros(n_panels), zeros(n_panels))
 end
 
-function create_alpha_distribution(gamma::Float64, alpha_left::Float64, alpha_right::Float64, width::Float64)
-    # Create sigmoid transition
-    k = 1.0 / width  # Controls steepness of transition
-    sigmoid = 1.0 / (1.0 + exp(-k * gamma))
-    
-    # Interpolate between left and right alpha
-    return alpha_left + (alpha_right - alpha_left) * sigmoid
-end
+"""
+    deform!(wing::KiteWing, alphas::AbstractVector, betas::AbstractVector; width)
 
+Deform wing by applying left and right alpha and beta.
+
+# Arguments
+- `wing`: KiteWing to deform
+- `alphas`: [left, right] the angle between of the kite and the body x-axis in radians
+- `betas`: [left, right] the deformation of the trailing edges
+- `width`: Transition width in meters to smoothe out the transition from left to right deformation
+
+# Effects
+Updates wing.sections with deformed geometry
+"""
 function deform!(wing::KiteWing, alphas::AbstractVector, betas::AbstractVector; width)
     local_y = zeros(MVec3)
     chord = zeros(MVec3)
@@ -337,10 +404,23 @@ function deform!(wing::KiteWing, alphas::AbstractVector, betas::AbstractVector; 
         local_y .= normalize(section1.LE_point - section2.LE_point)
         chord .= section1.TE_point .- section1.LE_point
         wing.sections[i].TE_point .= section1.LE_point .+ rotate_v_around_k(chord, local_y, wing.alpha_dist[i])
-        # wing.refined_sections[i].TE_point .= section1.LE_point .+ rotate_v_around_k(chord, local_y, wing.alpha_dist[i])
     end
+    return nothing
 end
 
+"""
+    rotate_v_around_k(v, k, θ)
+
+Rotate vector v around axis k by angle θ using Rodrigues' rotation formula.
+
+# Arguments
+- `v`: Vector to rotate
+- `k`: Rotation axis (will be normalized)
+- `θ`: Rotation angle in radians
+
+# Returns
+- Rotated vector
+"""
 function rotate_v_around_k(v, k, θ)
     k = normalize(k)
     v_rot = v * cos(θ) + (k × v) * sin(θ)  + k * (k ⋅ v) * (1 - cos(θ))
