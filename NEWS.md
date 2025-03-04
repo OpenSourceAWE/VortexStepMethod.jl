@@ -14,11 +14,12 @@ This project is based on version 1.0 of the Python project [Vortex-Step-Method](
 
 ## VortexStepMethod v1.1.0 2025-03-04
 ### Added
-- Dynamically change segments #19
-- Add rotational velocities #49
+- Dynamically deform the KiteWing by twisting the left side and right side, and deforming the trailing edges using deform! #19
+- Set turn rate `omega = [omega_x, omega_y, omega_z]` in kite body frame using set_va! #49
 - Add moment coefficient calculations around specified point #17
-- Add moment distribution around user-defined point #90
+- Add moment distribution of the moment around the local panel y-axes around user-defined points on the panels #90
 - Add function solve!() which returns a `VSMSolution` struct #87
+- Add the option to remove the NaNs in `aero_data` vectors or matrices #98
 ### Changed
-- Add origin argument to Wing and KiteWing constructor #66
+- Add origin argument to BodyAerodynamics constructor #66
 - Improve documentation
