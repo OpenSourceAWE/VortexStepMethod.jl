@@ -12,4 +12,7 @@
 | beta $\beta$| Trailing edge angle [rad] |
 | CL, cl | Lift coefficient [-] |
 | CD, cd | Drag coefficient [-] |
-| CS, cs | Side force coefficient [-]|
+| CS, cs | Side force coefficient [-] |
+| CM, cm | Pitching moment coefficient [-] |
+| camber | The camber of a kite refers to the curvature of its airfoil shape. The camber is typically measured as the maximum distance between the mean camber line (the line equidistant from the upper and lower surfaces) and the chord line of the airfoil. |
+| chord line | The chord line of an airfoil is an imaginary straight line that connects the leading edge (front) to the trailing edge (back) of the airfoil. |
