@@ -120,9 +120,12 @@ It is possible to import the wing geometry using an `.obj` file as shown in the 
 Surfplan files can be converted to an input for `VortexStepMethod.jl` using the [SurfplanAdapter](https://github.com/jellepoland/SurfplanAdapter).
 
 ## Output
-- CL, CD, CS (side force coefficient)
-- the spanwise distribution of forces  
-  --> moment coefficients (will be implemented in release 1.1) 
+- the aerodynamic forces Fx, Fy, Fz
+- the aerodynamic moments Mx, My, Mz
+- the force coefficients CL, CD, CS (side force coefficient)
+- the status of the solver (is the result valid)
+
+In addition, the spanwise distribution of these and additional values are available.
 
 See also the [documentation](https://albatross-kite-transport.github.io/VortexStepMethod.jl/dev/).
 
