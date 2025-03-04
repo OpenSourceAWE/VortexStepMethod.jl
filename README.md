@@ -115,7 +115,7 @@ wa = BodyAerodynamics([wing])
 vel_app = [cos(alpha), 0.0, sin(alpha)] .* v_a
 set_va!(wa, vel_app)
 ```
-It is possible to import the wing geometry using an `.obj` file as shown in the example `ram_air_kite.jl`.
+It is possible to import the wing geometry using an `.obj` file as shown in the example `ram_air_kite.jl`. During the import the polars are calculated automatically using XFoil. This approach is valid for rigid wings and ram-air kites, but not for leading edge inflatable kites.
 
 Surfplan files can be converted to an input for `VortexStepMethod.jl` using the [SurfplanAdapter](https://github.com/jellepoland/SurfplanAdapter).
 
