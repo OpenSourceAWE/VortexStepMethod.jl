@@ -1,8 +1,8 @@
 
 """
-    Result
+    VSMSolution
 
-Struct for storing the result of the [solve!](@ref) function. Must contain all info needed by `KiteModels.jl`.
+Struct for storing the solution of the [solve!](@ref) function. Must contain all info needed by `KiteModels.jl`.
 
 # Attributes
 - aero_force::MVec3: Aerodynamic force vector in KB reference frame [N]
@@ -10,15 +10,15 @@ Struct for storing the result of the [solve!](@ref) function. Must contain all i
 - force_coefficients::MVec3: Aerodynamic force coefficients [CL, CD, CS] [-]
 - solver_status::SolverStatus: enum, see [SolverStatus](@ref)
 """
-mutable struct Result    
+mutable struct VSMSolution    
     aero_force::MVec3          
     aero_moments::MVec3       
     force_coefficients::MVec3  
     solver_status::SolverStatus 
 end
 
-function Result()
-    Result(zeros(MVec3), zeros(MVec3), zeros(MVec3), FAILURE)
+function VSMSolution()
+    VSMSolution(zeros(MVec3), zeros(MVec3), zeros(MVec3), FAILURE)
 end
 
 """
@@ -64,18 +64,20 @@ Main solver structure for the Vortex Step Method.
     core_radius_fraction::Float64 = 1e-20
     mu::Float64 = 1.81e-5
     is_only_f_and_gamma_output::Bool = false
+
+    # Solution
+    sol::VSMSolution = VSMSolution()
 end
 
 """
-    solve!(res::Result, solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=nothing; 
+    solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=nothing; 
           log=false, reference_point=zeros(MVec3))
 
 Main solving routine for the aerodynamic model. Reference point is in the kite body (KB) frame.
-This version is modifying the `res` struct and is faster than the `solve` function which returns
+This version is modifying the `solver.sol` struct and is faster than the `solve` function which returns
 a dictionary.
 
 # Arguments:
-- res::Result: The result struct (see: [Result](@ref)), that will be updated
 - solver::Solver: The solver to use, could be a VSM or LLT solver. See: [Solver](@ref)
 - body_aero::BodyAerodynamics: The aerodynamic body. See: [BodyAerodynamics](@ref)
 - gamma_distribution: Initial circulation vector or nothing; Length: Number of segments. [m²/s]
@@ -85,9 +87,9 @@ a dictionary.
 - reference_point=zeros(MVec3)
 
 # Returns
-nothing
+The solution of type VSMSolution(@ref)
 """
-function solve!(res::Result, solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=nothing; 
+function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=nothing; 
     log=false, reference_point=zeros(MVec3))
 
     # calculate intermediate result
@@ -241,17 +243,17 @@ function solve!(res::Result, solver::Solver, body_aero::BodyAerodynamics, gamma_
     CS = side_wing_3D_sum / (q_inf * projected_area)
 
     # update the result struct
-    res.aero_force .= MVec3([Fx, Fy, Fz])
-    res.aero_moments .= MVec3([Mx, My, Mz])
-    res.force_coefficients .= MVec3([CL, CD, CS])
+    solver.sol.aero_force .= MVec3([Fx, Fy, Fz])
+    solver.sol.aero_moments .= MVec3([Mx, My, Mz])
+    solver.sol.force_coefficients .= MVec3([CL, CD, CS])
     if converged
         # TODO: Check if the result if feasible if converged
-        res.solver_status = FEASIBLE
+        solver.sol.solver_status = FEASIBLE
     else
-        res.solver_status = FAILURE
+        solver.sol.solver_status = FAILURE
     end
 
-    return nothing
+    return solver.sol
 end
 
 """

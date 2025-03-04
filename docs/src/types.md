@@ -41,5 +41,5 @@ BodyAerodynamics
 ## The Solver and its results
 ```@docs
 Solver
-Result
+VSMSolution
 ```

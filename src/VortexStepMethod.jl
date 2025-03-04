@@ -18,7 +18,7 @@ using SharedArrays
 # Export public interface
 export Wing, Section, KiteWing
 export BodyAerodynamics
-export Solver, solve, solve_base, solve!, Result
+export Solver, solve, solve_base, solve!, VSMSolution
 export calculate_results, solve_circulation_distribution
 export add_section!, set_va!
 export calculate_span, calculate_projected_area
@@ -127,7 +127,7 @@ Enumeration of the implemented initial gamma distributions.
    SolverStatus FEASIBLE INFEASIBLE FAILURE
 
 Enumeration to report back the validity of the result of the solve! function.
-Used in the [Result](@ref) struct.
+Used in the [VSMSolution](@ref) struct.
 
 # Elements
 - FEASIBLE: The gamma distribution is physically feasible
