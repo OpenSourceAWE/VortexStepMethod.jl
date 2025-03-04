@@ -8,7 +8,7 @@ Struct for storing the solution of the [solve!](@ref) function. Must contain all
 - aero_force::MVec3: Aerodynamic force vector in KB reference frame [N]
 - aero_moments::MVec3: Aerodynamic moments [Mx, My, Mz] around the reference point [Nm]
 - force_coefficients::MVec3: Aerodynamic force coefficients [CL, CD, CS] [-]
-- moment_distribution::Vector{Float64}: Moments around the span of each panel [Nm]
+- moment_distribution::Vector{Float64}: Pitching moments around the spanwise vector of each panel. [Nm]
 - solver_status::SolverStatus: enum, see [SolverStatus](@ref)
 """
 mutable struct VSMSolution    
