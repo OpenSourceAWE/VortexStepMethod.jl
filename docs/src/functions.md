@@ -10,6 +10,7 @@ add_section!
 ```@docs
 set_va!
 solve
+solve!
 ```
 
 ## Main Plotting Functions

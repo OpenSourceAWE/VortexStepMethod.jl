@@ -1,5 +1,27 @@
 
 """
+    VSMSolution
+
+Struct for storing the solution of the [solve!](@ref) function. Must contain all info needed by `KiteModels.jl`.
+
+# Attributes
+- aero_force::MVec3: Aerodynamic force vector in KB reference frame [N]
+- aero_moments::MVec3: Aerodynamic moments [Mx, My, Mz] around the reference point [Nm]
+- force_coefficients::MVec3: Aerodynamic force coefficients [CL, CD, CS] [-]
+- solver_status::SolverStatus: enum, see [SolverStatus](@ref)
+"""
+mutable struct VSMSolution    
+    aero_force::MVec3          
+    aero_moments::MVec3       
+    force_coefficients::MVec3  
+    solver_status::SolverStatus 
+end
+
+function VSMSolution()
+    VSMSolution(zeros(MVec3), zeros(MVec3), zeros(MVec3), FAILURE)
+end
+
+"""
     Solver
 
 Main solver structure for the Vortex Step Method.See also: [solve](@ref)
@@ -23,6 +45,9 @@ Main solver structure for the Vortex Step Method.See also: [solve](@ref)
 - `core_radius_fraction`::Float64 = 1e-20: 
 - mu::Float64 = 1.81e-5: Dynamic viscosity [N·s/m²]
 - `is_only_f_and_gamma_output`::Bool = false: Whether to only output f and gamma
+
+## Solution
+sol::VSMSolution = VSMSolution(): The result of calling [solve!](@ref) 
 """
 @with_kw struct Solver
     # General settings
@@ -42,6 +67,196 @@ Main solver structure for the Vortex Step Method.See also: [solve](@ref)
     core_radius_fraction::Float64 = 1e-20
     mu::Float64 = 1.81e-5
     is_only_f_and_gamma_output::Bool = false
+
+    # Solution
+    sol::VSMSolution = VSMSolution()
+end
+
+"""
+    solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=nothing; 
+          log=false, reference_point=zeros(MVec3))
+
+Main solving routine for the aerodynamic model. Reference point is in the kite body (KB) frame.
+This version is modifying the `solver.sol` struct and is faster than the `solve` function which returns
+a dictionary.
+
+# Arguments:
+- solver::Solver: The solver to use, could be a VSM or LLT solver. See: [Solver](@ref)
+- body_aero::BodyAerodynamics: The aerodynamic body. See: [BodyAerodynamics](@ref)
+- gamma_distribution: Initial circulation vector or nothing; Length: Number of segments. [m²/s]
+
+# Keyword Arguments:
+- log=false: If true, print the number of iterations and other info.
+- reference_point=zeros(MVec3)
+
+# Returns
+The solution of type [VSMSolution](@ref)
+"""
+function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=nothing; 
+    log=false, reference_point=zeros(MVec3))
+
+    # calculate intermediate result
+    converged,
+    body_aero, gamma_new, reference_point, density, aerodynamic_model_type, core_radius_fraction,
+    mu, alpha_array, v_a_array, chord_array, x_airf_array, y_airf_array, z_airf_array,
+    va_array, va_norm_array, va_unit_array, panels,
+    is_only_f_and_gamma_output = solve_base(solver, body_aero, gamma_distribution; log, reference_point)
+
+    # Initialize arrays
+    n_panels = length(panels)
+    cl_array = zeros(n_panels)
+    cd_array = zeros(n_panels)
+    cm_array = zeros(n_panels)
+    panel_width_array = zeros(n_panels)
+
+    # Calculate coefficients for each panel
+    for (i, panel) in enumerate(panels)                                               # zero bytes
+        cl_array[i] = calculate_cl(panel, alpha_array[i])
+        cd_array[i], cm_array[i] = calculate_cd_cm(panel, alpha_array[i])
+        panel_width_array[i] = panel.width
+    end
+
+    # Calculate forces
+    lift = reshape((cl_array .* 0.5 .* density .* v_a_array.^2 .* chord_array), :, 1) # 336 bytes
+    drag = reshape((cd_array .* 0.5 .* density .* v_a_array.^2 .* chord_array), :, 1)
+    moment = reshape((cm_array .* 0.5 .* density .* v_a_array.^2 .* chord_array), :, 1)
+
+    # Calculate alpha corrections based on model type
+    alpha_corrected = if aerodynamic_model_type == VSM                                # 4188 bytes
+        update_effective_angle_of_attack_if_VSM(
+            body_aero,
+            gamma_new,
+            core_radius_fraction,
+            x_airf_array,
+            y_airf_array,
+            va_array,
+            va_norm_array,
+            va_unit_array
+        )
+    elseif aerodynamic_model_type === LLT
+        alpha_array
+    else
+        throw(ArgumentError("Unknown aerodynamic model type, should be LLT or VSM"))
+    end
+
+    # Initialize result arrays
+    # cl_prescribed_va = Float64[]
+    # cd_prescribed_va = Float64[]
+    # cs_prescribed_va = Float64[]
+    f_body_3D = zeros(3, n_panels)
+    m_body_3D = zeros(3, n_panels)
+    area_all_panels = 0.0
+
+    # Initialize force sums
+    lift_wing_3D_sum = 0.0
+    drag_wing_3D_sum = 0.0
+    side_wing_3D_sum = 0.0
+
+    # Get wing properties
+    spanwise_direction = body_aero.wings[1].spanwise_direction
+    va_mag = norm(body_aero.va)
+    va = body_aero.va
+    va_unit = va / va_mag
+    q_inf = 0.5 * density * va_mag^2
+    
+    for (i, panel) in enumerate(panels)                                               # 30625 bytes
+
+        # Panel geometry
+        z_airf_span = panel.z_airf
+        y_airf_chord = panel.y_airf
+        x_airf_normal = panel.x_airf
+        panel_area = panel.chord * panel.width
+        area_all_panels += panel_area
+
+        # Calculate induced velocity direction
+        alpha_corrected_i = alpha_corrected[i]
+        induced_va_airfoil = cos(alpha_corrected_i) * y_airf_chord + 
+                            sin(alpha_corrected_i) * x_airf_normal
+        dir_induced_va_airfoil = induced_va_airfoil / norm(induced_va_airfoil)
+
+        # Calculate lift and drag directions
+        dir_lift_induced_va = cross(dir_induced_va_airfoil, z_airf_span)
+        dir_lift_induced_va = dir_lift_induced_va / norm(dir_lift_induced_va)
+        dir_drag_induced_va = cross(spanwise_direction, dir_lift_induced_va)
+        dir_drag_induced_va = dir_drag_induced_va / norm(dir_drag_induced_va)
+
+        # Calculate force vectors
+        lift_induced_va = lift[i] * dir_lift_induced_va
+        drag_induced_va = drag[i] * dir_drag_induced_va
+        ftotal_induced_va = lift_induced_va + drag_induced_va
+
+        # Calculate forces in prescribed wing frame
+        dir_lift_prescribed_va = cross(va, spanwise_direction)
+        dir_lift_prescribed_va = dir_lift_prescribed_va / norm(dir_lift_prescribed_va)
+             
+        # Calculate force components
+        lift_prescribed_va = dot(lift_induced_va, dir_lift_prescribed_va) + 
+                             dot(drag_induced_va, dir_lift_prescribed_va)
+        drag_prescribed_va = dot(lift_induced_va, va_unit) + 
+                             dot(drag_induced_va, va_unit)
+        side_prescribed_va = dot(lift_induced_va, spanwise_direction) + 
+                             dot(drag_induced_va, spanwise_direction)
+        
+        # Body frame forces
+        f_body_3D[:,i] .= [
+            dot(ftotal_induced_va, [1.0, 0.0, 0.0]),
+            dot(ftotal_induced_va, [0.0, 1.0, 0.0]),
+            dot(ftotal_induced_va, [0.0, 0.0, 1.0])
+            ] .* panel.width
+
+        # Update sums
+        lift_wing_3D_sum += lift_prescribed_va * panel.width
+        drag_wing_3D_sum += drag_prescribed_va * panel.width  
+        side_wing_3D_sum += side_prescribed_va * panel.width
+
+        # Calculate the moments
+        # (1) Panel aerodynamic center in body frame:
+        panel_ac_body = panel.aero_center  # 3D [x, y, z]
+
+        # (2) Convert local (2D) pitching moment to a 3D vector in body coords.
+        #     Use the axis around which the moment is defined,
+        #     which is the z-axis pointing "spanwise"
+        moment_axis_body = panel.z_airf
+
+        # Scale by panel width if your 'moment[i]' is 2D moment-per-unit-span:
+        M_local_3D = moment[i] * moment_axis_body * panel.width
+
+        # Vector from panel AC to the chosen reference point:
+        r_vector = panel_ac_body - reference_point  # e.g. CG, wing root, etc.
+
+        # Cross product to shift the force from panel AC to ref. point:
+        M_shift = cross(r_vector, f_body_3D[:,i])
+
+        # Total panel moment about the reference point:
+        m_body_3D[:,i] = M_local_3D + M_shift
+    end
+
+    # Calculate wing geometry properties
+    projected_area = sum(wing -> calculate_projected_area(wing), body_aero.wings)
+
+    Fx = sum(f_body_3D[1,:])
+    Fy = sum(f_body_3D[2,:])
+    Fz = sum(f_body_3D[3,:])
+    Mx = sum(m_body_3D[1,:])
+    My = sum(m_body_3D[2,:])
+    Mz = sum(m_body_3D[3,:])
+
+    CL = lift_wing_3D_sum / (q_inf * projected_area)
+    CD = drag_wing_3D_sum / (q_inf * projected_area)
+    CS = side_wing_3D_sum / (q_inf * projected_area)
+
+    # update the result struct
+    solver.sol.aero_force .= MVec3([Fx, Fy, Fz])
+    solver.sol.aero_moments .= MVec3([Mx, My, Mz])
+    solver.sol.force_coefficients .= MVec3([CL, CD, CS])
+    if converged
+        # TODO: Check if the result if feasible if converged
+        solver.sol.solver_status = FEASIBLE
+    else
+        solver.sol.solver_status = FAILURE
+    end
+
+    return solver.sol
 end
 
 """
@@ -49,6 +264,7 @@ end
           log=false, reference_point=zeros(MVec3))
 
 Main solving routine for the aerodynamic model. Reference point is in the kite body (KB) frame.
+See also: [solve!](@ref)
 
 # Arguments:
 - solver::Solver: The solver to use, could be a VSM or LLT solver. See: [Solver](@ref)
@@ -63,6 +279,38 @@ Main solving routine for the aerodynamic model. Reference point is in the kite b
 A dictionary with the results.
 """
 function solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=nothing; 
+    log=false, reference_point=zeros(MVec3))
+    # calculate intermediate result
+    converged,
+    body_aero, gamma_new, reference_point, density, aerodynamic_model_type, core_radius_fraction,
+    mu, alpha_array, v_a_array, chord_array, x_airf_array, y_airf_array, z_airf_array,
+    va_array, va_norm_array, va_unit_array, panels,
+    is_only_f_and_gamma_output = solve_base(solver, body_aero, gamma_distribution; log, reference_point)
+
+    # Calculate final results as dictionary
+    results = calculate_results(
+        body_aero,
+        gamma_new,
+        reference_point,
+        density,
+        aerodynamic_model_type,
+        core_radius_fraction,
+        mu,
+        alpha_array,
+        v_a_array,
+        chord_array,
+        x_airf_array,
+        y_airf_array,
+        z_airf_array,
+        va_array,
+        va_norm_array,
+        va_unit_array,
+        panels,
+        is_only_f_and_gamma_output
+    )
+    return results
+end
+function solve_base(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=nothing; 
                log=false, reference_point=zeros(MVec3))
     
     # check arguments
@@ -149,8 +397,9 @@ function solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=n
         )
     end
 
-    # Calculate final results
-    results = calculate_results(
+    # Return results
+    return (
+        converged,
         body_aero,
         gamma_new,
         reference_point,
@@ -170,7 +419,6 @@ function solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=n
         panels,
         solver.is_only_f_and_gamma_output
     )
-    return results
 end
 
 cross3(x,y) = cross(SVector{3,eltype(x)}(x), SVector{3,eltype(y)}(y))
