@@ -46,7 +46,7 @@ Construct a [BodyAerodynamics](@ref) object for aerodynamic calculations.
 # Keyword Arguments
 - `aero_center_location=0.25`: Chordwise location of aerodynamic center (0-1)
 - `control_point_location=0.75`: Chordwise location of control point (0-1) 
-- `kite_body_origin=zeros(MVec3)`: Origin point of kite body coordinate system
+- `kite_body_origin=zeros(MVec3)`: Origin point of kite body reference frame in CAD reference frame
 
 # Returns
 - [BodyAerodynamics](@ref) object initialized with panels and wings
