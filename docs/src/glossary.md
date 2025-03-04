@@ -11,6 +11,7 @@
 | mu $\mu$ | Dynamic viscosity [N·s/m²]  |
 | alpha $\alpha$| Angle of attack [rad]|
 | beta $\beta$| Trailing edge angle [rad] |
+| gamma $\Gamma$ |The circulation, which is a measure of the rotational speed of the spinning flow in a vortex [m²/s]. |
 | CL, cl | Lift coefficient [-] |
 | CD, cd | Drag coefficient [-] |
 | CS, cs | Side force coefficient [-] |
