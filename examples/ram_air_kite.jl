@@ -11,15 +11,18 @@ using CSV
 using DataFrames
 
 PLOT = true
+DEFORM = false
 
 # Create wing geometry
 wing = KiteWing("data/ram_air_kite_body.obj", "data/ram_air_kite_foil.dat")
 body_aero = BodyAerodynamics([wing]; kite_body_origin=wing.center_of_mass)
 
-alpha = [0, 0]
-beta = [deg2rad(10), 0]
-@time VortexStepMethod.deform!(wing, alpha, beta; width=1.0)
-@time VortexStepMethod.init!(body_aero)
+if DEFORM
+    alpha = [deg2rad(10), 0]
+    beta = [deg2rad(10), 0]
+    @time VortexStepMethod.deform!(wing, alpha, beta; width=1.0)
+    @time VortexStepMethod.init!(body_aero)
+end
 
 # Create solvers
 vsm_solver = Solver(
