@@ -12,4 +12,4 @@
 | beta $\beta$| Trailing edge angle [rad] |
 | CL, cl | Lift coefficient [-] |
 | CD, cd | Drag coefficient [-] |
-| CS, cs | Side force coefficient |
+| CS, cs | Side force coefficient [-]|
