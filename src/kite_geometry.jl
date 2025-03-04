@@ -255,7 +255,7 @@ Represents a curved wing that inherits from Wing with additional geometric prope
 - Additional fields:
   - `center_of_mass::Vector{Float64}`: Center of mass coordinates
   - `circle_center_z::Vector{Float64}`: Center of circle coordinates
-  - gamma_tip::Float64
+  - gamma_tip::Float64: Angle between the body frame z axis and the vector going from the kite circular shape center to the wing tip.
   - inertia_tensor::Matrix{Float64}
   - radius::Float64: Radius of curvature
   - le_interp::NTuple{3, Extrapolation}: see: [Extrapolation](https://juliamath.github.io/Interpolations.jl/stable/extrapolation/)
