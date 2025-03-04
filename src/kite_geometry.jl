@@ -239,6 +239,56 @@ function calculate_inertia_tensor(vertices, faces, mass, com)
     return (mass / total_area) * I / 3
 end
 
+"""
+    interpolate_matrix_nans!(matrix::Matrix{Float64})
+
+Replace NaN values in a matrix by interpolating from nearest non-NaN neighbors.
+Uses an expanding search radius until valid neighbors are found.
+
+# Arguments
+- `matrix`: Matrix containing NaN values to be interpolated
+"""
+function interpolate_matrix_nans!(matrix::Matrix{Float64})
+    rows, cols = size(matrix)
+    nans_found = 0
+    while any(isnan, matrix)
+        for i in 1:rows, j in 1:cols
+            if isnan(matrix[i,j])
+                # Search in expanding radius until we find valid neighbors
+                radius = 1
+                values = Float64[]
+                weights = Float64[]
+                
+                while isempty(values) && radius < max(rows, cols)
+                    # Check all points at current Manhattan distance
+                    for di in -radius:radius, dj in -radius:radius
+                        if abs(di) + abs(dj) == radius  # Points exactly at distance 'radius'
+                            ni, nj = i + di, j + dj
+                            if 1 ≤ ni ≤ rows && 1 ≤ nj ≤ cols && !isnan(matrix[ni,nj])
+                                # Weight by inverse distance
+                                dist = sqrt(di^2 + dj^2)
+                                push!(values, matrix[ni,nj])
+                                push!(weights, 1/dist)
+                            end
+                        end
+                    end
+                    radius += 1
+                end
+                
+                if !isempty(values)
+                    # Calculate weighted average of found values
+                    matrix[i,j] = sum(values .* weights) / sum(weights)
+                    nans_found += 1
+                else
+                    throw(ArgumentError("Could not remove NaN"))
+                end
+            end
+        end
+    end
+    @info "Removed $nans_found NaNs from the matrix."
+    return matrix
+end
+
 
 """
     KiteWing
@@ -252,6 +302,7 @@ Represents a curved wing that inherits from Wing with additional geometric prope
   - `spanwise_direction::MVec3`: Wing span direction vector
   - `sections::Vector{Section}`: List of wing sections, see: [Section](@ref)
   -  refined_sections::Vector{Section}
+  - `remove_nan::Bool`: Wether to remove the NaNs from interpolations or not
 - Additional fields:
   - `center_of_mass::Vector{Float64}`: Center of mass coordinates
   - `circle_center_z::Vector{Float64}`: Center of circle coordinates
@@ -269,6 +320,7 @@ mutable struct KiteWing <: AbstractWing
     spanwise_direction::MVec3
     sections::Vector{Section}
     refined_sections::Vector{Section}
+    remove_nan::Bool
     
     # Additional fields for KiteWing
     non_deformed_sections::Vector{Section}
@@ -288,7 +340,7 @@ end
 """
     KiteWing(obj_path, dat_path; alpha=0.0, crease_frac=0.75, wind_vel=10., mass=1.0, 
              n_panels=54, n_sections=n_panels+1, spanwise_panel_distribution=UNCHANGED, 
-             spanwise_direction=[0.0, 1.0, 0.0])
+             spanwise_direction=[0.0, 1.0, 0.0], remove_nan::Bool=true)
 
 Constructor for a [KiteWing](@ref) that allows to use an `.obj` and a `.dat` file as input.
 
@@ -306,10 +358,11 @@ Constructor for a [KiteWing](@ref) that allows to use an `.obj` and a `.dat` fil
 - `n_sections`=n_panels+1: Number of sections (there is a section on each side of each panel.)
 - `spanwise_panel_distribution`=UNCHANGED: see: [PanelDistribution](@ref)
 - `spanwise_direction`=[0.0, 1.0, 0.0]
+- `remove_nan::Bool`: Wether to remove the NaNs from interpolations or not
 """
 function KiteWing(obj_path, dat_path; alpha=0.0, crease_frac=0.75, wind_vel=10., mass=1.0, 
                   n_panels=54, n_sections=n_panels+1, spanwise_panel_distribution=UNCHANGED, 
-                  spanwise_direction=[0.0, 1.0, 0.0])
+                  spanwise_direction=[0.0, 1.0, 0.0], remove_nan=true)
 
     !isapprox(spanwise_direction, [0.0, 1.0, 0.0]) && throw(ArgumentError("Spanwise direction has to be [0.0, 1.0, 0.0], not $spanwise_direction"))
 
@@ -346,6 +399,11 @@ function KiteWing(obj_path, dat_path; alpha=0.0, crease_frac=0.75, wind_vel=10.,
 
     @info "Loading polars and kite info from $polar_path and $info_path"
     (alpha_range, beta_range, cl_matrix::Matrix, cd_matrix::Matrix, cm_matrix::Matrix) = deserialize(polar_path)
+    if remove_nan
+        interpolate_matrix_nans!(cl_matrix)
+        interpolate_matrix_nans!(cd_matrix)
+        interpolate_matrix_nans!(cm_matrix)
+    end
 
     (center_of_mass, inertia_tensor, circle_center_z, radius, gamma_tip, 
         le_interp, te_interp, area_interp) = deserialize(info_path)
@@ -359,7 +417,7 @@ function KiteWing(obj_path, dat_path; alpha=0.0, crease_frac=0.75, wind_vel=10.,
         push!(sections, Section(LE_point, TE_point, POLAR_MATRICES, aero_data))
     end
 
-    KiteWing(n_panels, spanwise_panel_distribution, spanwise_direction, sections, sections, sections,
+    KiteWing(n_panels, spanwise_panel_distribution, spanwise_direction, sections, sections, remove_nan, sections,
         mass, center_of_mass, circle_center_z, gamma_tip, inertia_tensor, radius,
         le_interp, te_interp, area_interp, zeros(n_panels), zeros(n_panels))
 end

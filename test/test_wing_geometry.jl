@@ -39,6 +39,59 @@ end
         @test section.aero_model === INVISCID
     end
 
+    @testset "Vector polar data" begin
+        wing = Wing(2; remove_nan=true)
+        
+        # Create vector data with NaNs
+        alpha = range(-10, 10, 21)
+        cl = cos.(alpha)
+        cd = sin.(alpha)
+        cm = zeros(21)
+        
+        # Insert NaNs
+        cl[5] = NaN
+        cd[10] = NaN
+        cm[15] = NaN
+        
+        aero_data = (collect(alpha), cl, cd, cm)
+        add_section!(wing, [0.0, 0.0, 0.0], [1.0, 0.0, 0.0], POLAR_VECTORS, aero_data)
+        
+        # Check if NaNs were removed consistently
+        cleaned_data = wing.sections[1].aero_data
+        @test length(cleaned_data[1]) == 18  # 21 - 3 NaN positions
+        @test !any(isnan, cleaned_data[2])   # cl
+        @test !any(isnan, cleaned_data[3])   # cd
+        @test !any(isnan, cleaned_data[4])   # cm
+        @test all(diff(cleaned_data[1]) .> 0) # alpha still monotonic
+    end
+
+    @testset "Matrix polar data" begin
+        wing = Wing(2)
+        
+        # Create matrix data with NaNs
+        alpha = collect(range(-10, 10, 21))
+        beta = collect(range(-5, 5, 11))
+        cl = [cos(a) * cos(b) for a in alpha, b in beta]
+        cd = [sin(a) * sin(b) for a in alpha, b in beta]
+        cm = zeros(21, 11)
+        
+        # Insert NaNs at various positions
+        cl[5,3] = NaN
+        cd[10,5] = NaN
+        cm[15,7] = NaN
+        
+        aero_data = (alpha, beta, cl, cd, cm)
+        add_section!(wing, [0.0, 0.0, 0.0], [1.0, 0.0, 0.0], POLAR_MATRICES, aero_data)
+        
+        # Check if NaNs were removed consistently
+        cleaned_data = wing.sections[1].aero_data
+        @test !any(isnan, cleaned_data[3])   # cl
+        @test !any(isnan, cleaned_data[4])   # cd
+        @test !any(isnan, cleaned_data[5])   # cm
+        @test all(diff(cleaned_data[1]) .> 0) # alpha still monotonic
+        @test all(diff(cleaned_data[2]) .> 0) # beta still monotonic
+    end
+
     @testset "Robustness left to right" begin
         example_wing = Wing(10)
         # Test correct order
