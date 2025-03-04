@@ -549,11 +549,7 @@ function calculate_results(
                            dot(drag_induced_va, spanwise_direction)
 
         # Body frame forces
-        f_body_3D[:,i] .= [
-            dot(ftotal_induced_va, [1.0, 0.0, 0.0]),
-            dot(ftotal_induced_va, [0.0, 1.0, 0.0]),
-            dot(ftotal_induced_va, [0.0, 0.0, 1.0])
-        ] .* panel.width
+        f_body_3D[:,i] .= ftotal_induced_va .* panel.width
 
         # Update sums
         lift_wing_3D_sum += lift_prescribed_va * panel.width
