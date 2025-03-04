@@ -324,7 +324,7 @@ function gamma_loop(
 
         gamma_new .= 0.5 .* v_a_array.^2 ./ Umagw_array .* cl_array .* chord_array
 
-        res .= norm.(gamma_new .- gamma)
+        res .= (gamma_new .- gamma)
         # # Add regularization terms to enforce smoothness
         # λ = 0.1  # Adjust regularization strength (start with 1e-3)
         # n = length(gamma)
