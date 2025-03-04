@@ -11,3 +11,11 @@ This project is based on version 1.0 of the Python project [Vortex-Step-Method](
 - a menu (examples/menu.jl) for running the examples was added
 - plotting was moved to an extension
 - added improved online documentation
+
+## Version 1.1.0
+- Dynamically change segments #19
+- Move plotting into a package extension #55
+- Add rotational velocities #49
+- Add moment coefficient calculations around specified point #17
+- Add moment distribution around user-defined point #90
+- Add origin argument to Wing and KiteWing constructor #66
