@@ -45,6 +45,9 @@ Main solver structure for the Vortex Step Method.
 - `core_radius_fraction`::Float64 = 1e-20: 
 - mu::Float64 = 1.81e-5: Dynamic viscosity [N·s/m²]
 - `is_only_f_and_gamma_output`::Bool = false: Whether to only output f and gamma
+
+## Solution
+sol::VSMSolution = VSMSolution(): The result of calling [solve!](@ref) 
 """
 @with_kw struct Solver
     # General settings
@@ -87,7 +90,7 @@ a dictionary.
 - reference_point=zeros(MVec3)
 
 # Returns
-The solution of type VSMSolution(@ref)
+The solution of type [VSMSolution](@ref)
 """
 function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=nothing; 
     log=false, reference_point=zeros(MVec3))
