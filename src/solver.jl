@@ -8,17 +8,19 @@ Struct for storing the solution of the [solve!](@ref) function. Must contain all
 - aero_force::MVec3: Aerodynamic force vector in KB reference frame [N]
 - aero_moments::MVec3: Aerodynamic moments [Mx, My, Mz] around the reference point [Nm]
 - force_coefficients::MVec3: Aerodynamic force coefficients [CL, CD, CS] [-]
+- moment_distribution::Vector{Float64}: Pitching moments around the spanwise vector of each panel. [Nm]
 - solver_status::SolverStatus: enum, see [SolverStatus](@ref)
 """
 mutable struct VSMSolution    
     aero_force::MVec3          
     aero_moments::MVec3       
     force_coefficients::MVec3  
+    moment_distribution::Vector{Float64}
     solver_status::SolverStatus 
 end
 
 function VSMSolution()
-    VSMSolution(zeros(MVec3), zeros(MVec3), zeros(MVec3), FAILURE)
+    VSMSolution(zeros(MVec3), zeros(MVec3), zeros(MVec3), zeros(3), FAILURE)
 end
 
 """
@@ -74,7 +76,7 @@ end
 
 """
     solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=nothing; 
-          log=false, reference_point=zeros(MVec3))
+          log=false, reference_point=zeros(MVec3), moment_frac=0.1)
 
 Main solving routine for the aerodynamic model. Reference point is in the kite body (KB) frame.
 This version is modifying the `solver.sol` struct and is faster than the `solve` function which returns
@@ -88,12 +90,13 @@ a dictionary.
 # Keyword Arguments:
 - log=false: If true, print the number of iterations and other info.
 - reference_point=zeros(MVec3)
+- moment_frac=0.1: X-coordinate of normalized panel around which the moment distribution should be calculated.
 
 # Returns
 The solution of type [VSMSolution](@ref)
 """
 function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=nothing; 
-    log=false, reference_point=zeros(MVec3))
+    log=false, reference_point=zeros(MVec3), moment_frac=0.1)
 
     # calculate intermediate result
     converged,
@@ -108,6 +111,8 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
     cd_array = zeros(n_panels)
     cm_array = zeros(n_panels)
     panel_width_array = zeros(n_panels)
+    solver.sol.moment_distribution = zeros(n_panels)
+    moment_distribution = solver.sol.moment_distribution
 
     # Calculate coefficients for each panel
     for (i, panel) in enumerate(panels)                                               # zero bytes
@@ -165,6 +170,7 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
         z_airf_span = panel.z_airf
         y_airf_chord = panel.y_airf
         x_airf_normal = panel.x_airf
+        # panel_moment_point = 0.5(panel.LE_point_1 + panel.LE_point_2) .+ y_airf_chord .* moment_frac
         panel_area = panel.chord * panel.width
         area_all_panels += panel_area
 
@@ -198,11 +204,7 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
                              dot(drag_induced_va, spanwise_direction)
         
         # Body frame forces
-        f_body_3D[:,i] .= [
-            dot(ftotal_induced_va, [1.0, 0.0, 0.0]),
-            dot(ftotal_induced_va, [0.0, 1.0, 0.0]),
-            dot(ftotal_induced_va, [0.0, 0.0, 1.0])
-            ] .* panel.width
+        f_body_3D[:,i] .= ftotal_induced_va .* panel.width
 
         # Update sums
         lift_wing_3D_sum += lift_prescribed_va * panel.width
@@ -212,23 +214,21 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
         # Calculate the moments
         # (1) Panel aerodynamic center in body frame:
         panel_ac_body = panel.aero_center  # 3D [x, y, z]
-
         # (2) Convert local (2D) pitching moment to a 3D vector in body coords.
         #     Use the axis around which the moment is defined,
         #     which is the z-axis pointing "spanwise"
         moment_axis_body = panel.z_airf
-
-        # Scale by panel width if your 'moment[i]' is 2D moment-per-unit-span:
         M_local_3D = moment[i] * moment_axis_body * panel.width
-
         # Vector from panel AC to the chosen reference point:
         r_vector = panel_ac_body - reference_point  # e.g. CG, wing root, etc.
-
         # Cross product to shift the force from panel AC to ref. point:
         M_shift = cross(r_vector, f_body_3D[:,i])
-
         # Total panel moment about the reference point:
         m_body_3D[:,i] = M_local_3D + M_shift
+
+        # Calculate the moment distribution (moment on each panel)
+        arm = (moment_frac - 0.25) * panel.chord
+        moment_distribution[i] = dot(ftotal_induced_va, x_airf_normal) * arm
     end
 
     # Calculate wing geometry properties
