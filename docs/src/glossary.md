@@ -1,6 +1,6 @@
 |Term   |Explanation   |
 |:---|:---|
-| VSM| Vortex Step Method|
+| VSM| Vortex Step Method, an enhanced lifting line method that improves upon the classic approach by solving the circulation system at the three-quarter chord position, among the most important details.|
 | LLM| Lifting Line Method|
 | inviscid | A fluid flow in which viscosity is considered negligible or zero. This means that there is no internal friction between the fluid layers, and the effects of viscosity on the flow are assumed to be insignificant. |
 | Panel | Flat surface element in 3D that approximate the contour of the aerodynamic body being studied.|
