@@ -60,7 +60,7 @@ function BodyAerodynamics(
     # Initialize panels
     panels = Panel[]
     for wing in wings
-        for section in sections
+        for section in wing.sections
             section.LE_point .-= kite_body_origin
             section.TE_point .-= kite_body_origin
         end

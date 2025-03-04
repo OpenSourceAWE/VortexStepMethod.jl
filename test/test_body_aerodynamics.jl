@@ -228,6 +228,26 @@ end
 end
 
 @testset "Wing Geometry Creation" begin
+    @testset "Origin Translation" begin
+        # Create minimal wing with three sections (2 panels)
+        wing = Wing(2)
+        add_section!(wing, [0.0, 0.0, 0.0], [1.0, 0.0, 0.0], INVISCID)
+        add_section!(wing, [0.0, 1.0, 0.0], [1.0, 1.0, 0.0], INVISCID)
+        add_section!(wing, [0.0, 2.0, 0.0], [1.0, 2.0, 0.0], INVISCID)
+    
+        # Test non-zero origin translation
+        origin = MVec3(1.0, 2.0, 3.0)
+        body_aero = BodyAerodynamics([wing]; kite_body_origin=origin)
+        
+        # Check if sections are correctly translated
+        @test wing.sections[3].LE_point ≈ [-1.0, -2.0, -3.0]
+        @test wing.sections[3].TE_point ≈ [0.0, -2.0, -3.0]
+        @test wing.sections[2].LE_point ≈ [-1.0, -1.0, -3.0]
+        @test wing.sections[2].TE_point ≈ [0.0, -1.0, -3.0]
+        @test wing.sections[1].LE_point ≈ [-1.0, 0.0, -3.0]
+        @test wing.sections[1].TE_point ≈ [0.0, 0.0, -3.0]
+    end
+
     function create_geometry(; model=VSM, wing_type=:rectangular, plotting=false, N=40)
         max_chord = 1.0
         span = 17.0
