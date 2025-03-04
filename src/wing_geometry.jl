@@ -69,6 +69,7 @@ Represents a wing composed of multiple sections with aerodynamic properties.
 - `spanwise_direction::MVec3`: Wing span direction vector
 - `sections::Vector{Section}`: Vector of wing sections, see: [Section](@ref)
 - `refined_sections::Vector{Section}`: Vector of refined wing sections, see: [Section](@ref)
+- `remove_nan::Bool`: Wether to remove the NaNs from interpolations or not
 
 """
 mutable struct Wing <: AbstractWing
@@ -77,12 +78,14 @@ mutable struct Wing <: AbstractWing
     spanwise_direction::MVec3
     sections::Vector{Section}
     refined_sections::Vector{Section}
+    remove_nan::Bool
 end
 
 """
     Wing(n_panels::Int;
          spanwise_panel_distribution::PanelDistribution=LINEAR,
-         spanwise_direction::PosVector=MVec3([0.0, 1.0, 0.0]))
+         spanwise_direction::PosVector=MVec3([0.0, 1.0, 0.0]),
+         remove_nan::Bool=true)
 
 Constructor for a [Wing](@ref) struct with default values that initializes the sections 
 and refined sections as empty arrays.
@@ -91,11 +94,13 @@ and refined sections as empty arrays.
 - `n_panels::Int64`: Number of panels in aerodynamic mesh
 - `spanwise_panel_distribution`::PanelDistribution = LINEAR: [PanelDistribution](@ref)
 - `spanwise_direction::MVec3` = MVec3([0.0, 1.0, 0.0]): Wing span direction vector
+- `remove_nan::Bool`: Wether to remove the NaNs from interpolations or not
 """
 function Wing(n_panels::Int;
     spanwise_panel_distribution::PanelDistribution=LINEAR,
-    spanwise_direction::PosVector=MVec3([0.0, 1.0, 0.0]))
-    Wing(n_panels, spanwise_panel_distribution, spanwise_direction, Section[], Section[])
+    spanwise_direction::PosVector=MVec3([0.0, 1.0, 0.0]),
+    remove_nan=true)
+    Wing(n_panels, spanwise_panel_distribution, spanwise_direction, Section[], Section[], remove_nan)
 end
 
 function init!(wing::AbstractWing; aero_center_location::Float64=0.25, control_point_location::Float64=0.75)
@@ -109,6 +114,36 @@ function init!(wing::AbstractWing; aero_center_location::Float64=0.25, control_p
         control_point_location
     )
     return panel_props
+end
+
+
+"""
+    remove_vector_nans(aero_data)
+
+Remove the indices from aero_data where a NaN is found.
+"""
+function remove_vector_nans(aero_data)
+    alpha_range, cl_vector, cd_vector, cm_vector = aero_data
+    alpha_range = collect(alpha_range)
+    nan_indices = Set{Int}()
+    for vec in (cl_vector, cd_vector, cm_vector)
+        union!(nan_indices, findall(isnan, vec))
+    end
+    if isempty(nan_indices)
+        return aero_data
+    end
+    # Convert to sorted array for consistent removal
+    nan_indices = sort(collect(nan_indices))
+    # Create mask for valid indices
+    valid_mask = trues(length(alpha_range))
+    valid_mask[nan_indices] .= false
+    # Remove NaN values from all vectors
+    clean_alpha = alpha_range[valid_mask]
+    clean_cl = cl_vector[valid_mask]
+    clean_cd = cd_vector[valid_mask]
+    clean_cm = cm_vector[valid_mask]
+    @info "Removed $(length(nan_indices)) indices containing NaNs from aero_data."
+    return (clean_alpha, clean_cl, clean_cd, clean_cm)
 end
 
 """
@@ -126,6 +161,11 @@ Add a new section to the wing.
 """
 function add_section!(wing::Wing, LE_point::Vector{Float64}, 
                      TE_point::Vector{Float64}, aero_model::AeroModel, aero_data::AeroData=nothing)
+    if aero_model === POLAR_VECTORS && wing.remove_nan
+        aero_data = remove_vector_nans(aero_data)
+    elseif aero_model === POLAR_MATRICES && wing.remove_nan
+        interpolate_matrix_nans!.(aero_data[3:5])
+    end
     push!(wing.sections, Section(LE_point, TE_point, aero_model, aero_data))
     return nothing
 end

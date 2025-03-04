@@ -1,6 +1,8 @@
 # static types for interpolations
 const I1 = Interpolations.FilledExtrapolation{Float64, 1, Interpolations.GriddedInterpolation{Float64, 1, Vector{Float64}, Interpolations.Gridded{Interpolations.Linear{Interpolations.Throw{Interpolations.OnGrid}}}, Tuple{Vector{Float64}}}, Interpolations.Gridded{Interpolations.Linear{Interpolations.Throw{Interpolations.OnGrid}}}, Float64}
-const I2 = Interpolations.FilledExtrapolation{Float64, 2, Interpolations.GriddedInterpolation{Float64, 2, Matrix{Float64}, Interpolations.Gridded{Interpolations.Linear{Interpolations.Throw{Interpolations.OnGrid}}}, Tuple{Vector{Float64}, Vector{Float64}}}, Interpolations.Gridded{Interpolations.Linear{Interpolations.Throw{Interpolations.OnGrid}}}, Float64}
+const I2 = Interpolations.Extrapolation{Float64, 1, Interpolations.GriddedInterpolation{Float64, 1, Vector{Float64}, Interpolations.Gridded{Interpolations.Linear{Interpolations.Throw{Interpolations.OnGrid}}}, Tuple{Vector{Float64}}}, Interpolations.Gridded{Interpolations.Linear{Interpolations.Throw{Interpolations.OnGrid}}}, Interpolations.Line{Nothing}}
+const I3 = Interpolations.FilledExtrapolation{Float64, 2, Interpolations.GriddedInterpolation{Float64, 2, Matrix{Float64}, Interpolations.Gridded{Interpolations.Linear{Interpolations.Throw{Interpolations.OnGrid}}}, Tuple{Vector{Float64}, Vector{Float64}}}, Interpolations.Gridded{Interpolations.Linear{Interpolations.Throw{Interpolations.OnGrid}}}, Float64}
+const I4 = Interpolations.Extrapolation{Float64, 2, Interpolations.GriddedInterpolation{Float64, 2, Matrix{Float64}, Interpolations.Gridded{Interpolations.Linear{Interpolations.Throw{Interpolations.OnGrid}}}, Tuple{Vector{Float64}, Vector{Float64}}}, Interpolations.Gridded{Interpolations.Linear{Interpolations.Throw{Interpolations.OnGrid}}}, Interpolations.Line{Nothing}}
 
 """
     @with_kw mutable struct Panel
@@ -50,9 +52,9 @@ Represents a panel in a vortex step method simulation. All points and vectors ar
     cl_coeffs::Vector{Float64} = zeros(Float64, 3)
     cd_coeffs::Vector{Float64} = zeros(Float64, 3)
     cm_coeffs::Vector{Float64} = zeros(Float64, 3)
-    cl_interp::Union{Nothing, I1, I2} = nothing
-    cd_interp::Union{Nothing, I1, I2} = nothing
-    cm_interp::Union{Nothing, I1, I2} = nothing
+    cl_interp::Union{Nothing, I1, I2, I3, I4} = nothing
+    cd_interp::Union{Nothing, I1, I2, I3, I4} = nothing
+    cm_interp::Union{Nothing, I1, I2, I3, I4} = nothing
     aero_center::MVec3 = zeros(MVec3)
     control_point::MVec3 = zeros(MVec3)
     bound_point_1::MVec3 = zeros(MVec3)
@@ -113,7 +115,8 @@ end
 function init_aero!(
     panel::Panel,
     section_1::Section,
-    section_2::Section,
+    section_2::Section;
+    remove_nan = true
 )
     # Validate aero model consistency
     panel.aero_model = section_1.aero_model
@@ -132,6 +135,12 @@ function init_aero!(
             throw(ArgumentError("Polar data must have same shape"))
         end
 
+        if remove_nan
+            extrapolation_bc = Line()
+        else
+            extrapolation_bc = NaN
+        end
+
         if panel.aero_model == POLAR_VECTORS
             !all(isapprox.(aero_1[1], aero_2[1])) && @error "Make sure you use the same alpha range for all your interpolations."
 
@@ -142,9 +151,9 @@ function init_aero!(
             )
             alphas = Vector{Float64}(aero_1[1])
 
-            panel.cl_interp = linear_interpolation(alphas, polar_data[1]; extrapolation_bc=NaN)
-            panel.cd_interp = linear_interpolation(alphas, polar_data[2]; extrapolation_bc=NaN)
-            panel.cm_interp = linear_interpolation(alphas, polar_data[3]; extrapolation_bc=NaN)
+            panel.cl_interp = linear_interpolation(alphas, polar_data[1]; extrapolation_bc)
+            panel.cd_interp = linear_interpolation(alphas, polar_data[2]; extrapolation_bc)
+            panel.cm_interp = linear_interpolation(alphas, polar_data[3]; extrapolation_bc)
 
         elseif panel.aero_model == POLAR_MATRICES
             !all(isapprox.(aero_1[1], aero_2[1])) && @error "Make sure you use the same alpha range for all your interpolations."
@@ -158,9 +167,9 @@ function init_aero!(
             alphas = Vector{Float64}(aero_1[1])
             betas = Vector{Float64}(aero_1[2])
 
-            panel.cl_interp = linear_interpolation((alphas, betas), polar_data[1]; extrapolation_bc=NaN)
-            panel.cd_interp = linear_interpolation((alphas, betas), polar_data[2]; extrapolation_bc=NaN)
-            panel.cm_interp = linear_interpolation((alphas, betas), polar_data[3]; extrapolation_bc=NaN)
+            panel.cl_interp = linear_interpolation((alphas, betas), polar_data[1]; extrapolation_bc)
+            panel.cd_interp = linear_interpolation((alphas, betas), polar_data[2]; extrapolation_bc)
+            panel.cm_interp = linear_interpolation((alphas, betas), polar_data[3]; extrapolation_bc)
         else
             throw(ArgumentError("Polar data in wrong format: $aero_1"))
         end
@@ -182,11 +191,12 @@ function init!(
     y_airf::PosVector,
     z_airf::PosVector,
     beta;
-    init_aero = true
+    init_aero = true,
+    remove_nan = true
 )
     init_pos!(panel, section_1, section_2, aero_center, control_point, bound_point_1, bound_point_2,
         x_airf, y_airf, z_airf, beta)
-    init_aero && init_aero!(panel, section_1, section_2)
+    init_aero && init_aero!(panel, section_1, section_2; remove_nan)
     return nothing
 end
 
