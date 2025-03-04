@@ -116,6 +116,36 @@ function init!(wing::AbstractWing; aero_center_location::Float64=0.25, control_p
     return panel_props
 end
 
+
+"""
+    remove_vector_nans(aero_data)
+
+Remove the indices from aero_data where a NaN is found.
+"""
+function remove_vector_nans(aero_data)
+    alpha_range, cl_vector, cd_vector, cm_vector = aero_data
+    alpha_range = collect(alpha_range)
+    nan_indices = Set{Int}()
+    for vec in (cl_vector, cd_vector, cm_vector)
+        union!(nan_indices, findall(isnan, vec))
+    end
+    if isempty(nan_indices)
+        return aero_data
+    end
+    # Convert to sorted array for consistent removal
+    nan_indices = sort(collect(nan_indices))
+    # Create mask for valid indices
+    valid_mask = trues(length(alpha_range))
+    valid_mask[nan_indices] .= false
+    # Remove NaN values from all vectors
+    clean_alpha = alpha_range[valid_mask]
+    clean_cl = cl_vector[valid_mask]
+    clean_cd = cd_vector[valid_mask]
+    clean_cm = cm_vector[valid_mask]
+    @info "Removed $(length(nan_indices)) indices containing NaNs from aero_data."
+    return (clean_alpha, clean_cl, clean_cd, clean_cm)
+end
+
 """
     add_section!(wing::Wing, LE_point::PosVector, TE_point::PosVector, 
                  aero_model, aero_data::AeroData=nothing)
@@ -131,6 +161,11 @@ Add a new section to the wing.
 """
 function add_section!(wing::Wing, LE_point::Vector{Float64}, 
                      TE_point::Vector{Float64}, aero_model::AeroModel, aero_data::AeroData=nothing)
+    if aero_model === POLAR_VECTORS && wing.remove_nan
+        aero_data = remove_vector_nans(aero_data)
+    elseif aero_model === POLAR_MATRICES && wing.remove_nan
+        interpolate_matrix_nans!.(aero_data[3:5])
+    end
     push!(wing.sections, Section(LE_point, TE_point, aero_model, aero_data))
     return nothing
 end

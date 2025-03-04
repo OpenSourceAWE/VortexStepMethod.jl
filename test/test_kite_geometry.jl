@@ -99,6 +99,9 @@ using Serialization
                 cm_matrix[i,j] = -0.1*sin(deg2rad(alphas[i]))
             end
         end
+        cl_matrix[end] = NaN
+        cd_matrix[end] = NaN
+        cm_matrix[end] = NaN
         
         # Serialize polar data
         polar_path = test_dat_path[1:end-4] * "_polar.bin"
@@ -140,7 +143,7 @@ using Serialization
     end
     
     @testset "KiteWing Construction" begin
-        wing = KiteWing(test_obj_path, test_dat_path)
+        wing = KiteWing(test_obj_path, test_dat_path; remove_nan=true)
         
         @test wing.n_panels == 54  # Default value
         @test wing.spanwise_panel_distribution == UNCHANGED
@@ -150,6 +153,14 @@ using Serialization
         @test length(wing.center_of_mass) == 3
         @test wing.radius ≈ r rtol=1e-2
         @test wing.gamma_tip ≈ π/4 rtol=1e-2
+        @test !isnan(wing.sections[1].aero_data[3][end])
+        @test !isnan(wing.sections[1].aero_data[4][end])
+        @test !isnan(wing.sections[1].aero_data[5][end])
+
+        wing = KiteWing(test_obj_path, test_dat_path; remove_nan=false)
+        @test isnan(wing.sections[1].aero_data[3][end])
+        @test isnan(wing.sections[1].aero_data[4][end])
+        @test isnan(wing.sections[1].aero_data[5][end])
     end
     
     rm(test_obj_path)
