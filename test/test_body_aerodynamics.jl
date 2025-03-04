@@ -167,7 +167,7 @@ end
     @test sol.force_coefficients[1] ≈ 0.4920964685099385    # CL
     @test sol.force_coefficients[2] ≈ 0.0038533739066069946 # CD
     @test sol.force_coefficients[3] ≈ 0.0 atol=1e-10        # CS
-    @test sol.moment_dist[1] ≈ -0.026242454074087297
+    @test sol.moment_distribution[1] ≈ -0.026242454074087297
 
     @test sol.solver_status == FEASIBLE
 

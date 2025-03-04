@@ -8,14 +8,14 @@ Struct for storing the solution of the [solve!](@ref) function. Must contain all
 - aero_force::MVec3: Aerodynamic force vector in KB reference frame [N]
 - aero_moments::MVec3: Aerodynamic moments [Mx, My, Mz] around the reference point [Nm]
 - force_coefficients::MVec3: Aerodynamic force coefficients [CL, CD, CS] [-]
-- moment_dist::Vector{Float64}: Moments around the span of each panel [Nm]
+- moment_distribution::Vector{Float64}: Moments around the span of each panel [Nm]
 - solver_status::SolverStatus: enum, see [SolverStatus](@ref)
 """
 mutable struct VSMSolution    
     aero_force::MVec3          
     aero_moments::MVec3       
     force_coefficients::MVec3  
-    moment_dist::Vector{Float64}
+    moment_distribution::Vector{Float64}
     solver_status::SolverStatus 
 end
 
@@ -76,7 +76,7 @@ end
 
 """
     solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=nothing; 
-          log=false, reference_point=zeros(MVec3))
+          log=false, reference_point=zeros(MVec3), moment_frac=0.1)
 
 Main solving routine for the aerodynamic model. Reference point is in the kite body (KB) frame.
 This version is modifying the `solver.sol` struct and is faster than the `solve` function which returns
@@ -90,6 +90,7 @@ a dictionary.
 # Keyword Arguments:
 - log=false: If true, print the number of iterations and other info.
 - reference_point=zeros(MVec3)
+- moment_frac=0.1: X-coordinate of normalized panel around which the moment distribution should be calculated.
 
 # Returns
 The solution of type [VSMSolution](@ref)
@@ -110,8 +111,8 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
     cd_array = zeros(n_panels)
     cm_array = zeros(n_panels)
     panel_width_array = zeros(n_panels)
-    solver.sol.moment_dist = zeros(n_panels)
-    moment_dist = solver.sol.moment_dist
+    solver.sol.moment_distribution = zeros(n_panels)
+    moment_distribution = solver.sol.moment_distribution
 
     # Calculate coefficients for each panel
     for (i, panel) in enumerate(panels)                                               # zero bytes
@@ -227,7 +228,7 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
 
         # Calculate the moment distribution (moment on each panel)
         arm = (moment_frac - 0.25) * panel.chord
-        moment_dist[i] = dot(ftotal_induced_va, x_airf_normal) * arm
+        moment_distribution[i] = dot(ftotal_induced_va, x_airf_normal) * arm
     end
 
     # Calculate wing geometry properties
