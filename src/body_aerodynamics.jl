@@ -147,8 +147,14 @@ end
 
 Calculate geometric properties for each panel.
 
-Returns:
-    PanelProperties containing vectors for each property
+# Arguments
+- section_list::Vector{Section}: List of [Section](@ref)s
+- `n_panels`::Int: Number of [Panel](@ref)s
+- `aero_center_loc`::Float64: Location of the aerodynamic center
+- `control_point_loc`::Float64: Location of the control point
+
+# Returns:
+[PanelProperties](@ref) containing vectors for each property
 """
 function calculate_panel_properties(section_list::Vector{Section}, n_panels::Int,
                                   aero_center_loc::Float64, control_point_loc::Float64)
