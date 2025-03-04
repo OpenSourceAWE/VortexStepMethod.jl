@@ -86,7 +86,8 @@ function init!(body_aero::BodyAerodynamics;
                 panel_props.x_airf[i],
                 panel_props.y_airf[i],
                 panel_props.z_airf[i],
-                beta
+                beta;
+                remove_nan=wing.remove_nan
             )
             idx += 1
         end

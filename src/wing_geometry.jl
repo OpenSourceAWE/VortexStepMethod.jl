@@ -69,6 +69,7 @@ Represents a wing composed of multiple sections with aerodynamic properties.
 - `spanwise_direction::MVec3`: Wing span direction vector
 - `sections::Vector{Section}`: Vector of wing sections, see: [Section](@ref)
 - `refined_sections::Vector{Section}`: Vector of refined wing sections, see: [Section](@ref)
+- `remove_nan::Bool`: Wether to remove the NaNs from interpolations or not
 
 """
 mutable struct Wing <: AbstractWing
@@ -77,12 +78,14 @@ mutable struct Wing <: AbstractWing
     spanwise_direction::MVec3
     sections::Vector{Section}
     refined_sections::Vector{Section}
+    remove_nan::Bool
 end
 
 """
     Wing(n_panels::Int;
          spanwise_panel_distribution::PanelDistribution=LINEAR,
-         spanwise_direction::PosVector=MVec3([0.0, 1.0, 0.0]))
+         spanwise_direction::PosVector=MVec3([0.0, 1.0, 0.0]),
+         remove_nan::Bool=true)
 
 Constructor for a [Wing](@ref) struct with default values that initializes the sections 
 and refined sections as empty arrays.
@@ -91,11 +94,13 @@ and refined sections as empty arrays.
 - `n_panels::Int64`: Number of panels in aerodynamic mesh
 - `spanwise_panel_distribution`::PanelDistribution = LINEAR: [PanelDistribution](@ref)
 - `spanwise_direction::MVec3` = MVec3([0.0, 1.0, 0.0]): Wing span direction vector
+- `remove_nan::Bool`: Wether to remove the NaNs from interpolations or not
 """
 function Wing(n_panels::Int;
     spanwise_panel_distribution::PanelDistribution=LINEAR,
-    spanwise_direction::PosVector=MVec3([0.0, 1.0, 0.0]))
-    Wing(n_panels, spanwise_panel_distribution, spanwise_direction, Section[], Section[])
+    spanwise_direction::PosVector=MVec3([0.0, 1.0, 0.0]),
+    remove_nan=true)
+    Wing(n_panels, spanwise_panel_distribution, spanwise_direction, Section[], Section[], remove_nan)
 end
 
 function init!(wing::AbstractWing; aero_center_location::Float64=0.25, control_point_location::Float64=0.75)
