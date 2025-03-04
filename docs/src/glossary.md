@@ -2,6 +2,7 @@
 |:---|:---|
 | VSM| Vortex Step Method|
 | LLM| Lifting Line Method|
+| inviscid | A fluid flow in which viscosity is considered negligible or zero. This means that there is no internal friction between the fluid layers, and the effects of viscosity on the flow are assumed to be insignificant. |
 | Panel | Flat surface element in 3D that approximate the contour of the aerodynamic body being studied.|
 | Section |A wing section, also known as an airfoil or aerofoil, is the cross-sectional shape of an aircraft wing.|
 | Span | Distance from one wing tip to the other wing tip. |
