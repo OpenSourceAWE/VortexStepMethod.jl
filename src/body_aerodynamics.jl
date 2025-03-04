@@ -33,14 +33,37 @@ Main structure for calculating aerodynamic properties of bodies.
     AIC::Array{Float64, 3} = zeros(3, P, P)
 end
 
+"""
+    BodyAerodynamics(wings::Vector{T}; aero_center_location=0.25,
+                     control_point_location=0.75,
+                     kite_body_origin=zeros(MVec3)) where T <: AbstractWing
+
+Construct a [BodyAerodynamics](@ref) object for aerodynamic calculations.
+
+# Arguments
+- `wings::Vector{T}`: Vector of wings to analyze, where T is an AbstractWing type
+
+# Keyword Arguments
+- `aero_center_location=0.25`: Chordwise location of aerodynamic center (0-1)
+- `control_point_location=0.75`: Chordwise location of control point (0-1) 
+- `kite_body_origin=zeros(MVec3)`: Origin point of kite body reference frame in CAD reference frame
+
+# Returns
+- [BodyAerodynamics](@ref) object initialized with panels and wings
+"""
 function BodyAerodynamics(
     wings::Vector{T};
     aero_center_location=0.25,
-    control_point_location=0.75
+    control_point_location=0.75,
+    kite_body_origin=zeros(MVec3)
 ) where T <: AbstractWing
     # Initialize panels
     panels = Panel[]
     for wing in wings
+        for section in wing.sections
+            section.LE_point .-= kite_body_origin
+            section.TE_point .-= kite_body_origin
+        end
         if wing.spanwise_panel_distribution == UNCHANGED
             wing.n_panels = length(wing.sections) - 1
             wing.refined_sections = wing.sections
@@ -60,6 +83,23 @@ function BodyAerodynamics(
     return body_aero
 end
 
+"""
+    init!(body_aero::BodyAerodynamics; 
+         aero_center_location=0.25,
+         control_point_location=0.75)
+
+Initialize a BodyAerodynamics struct in-place by setting up panels and coefficients.
+
+# Arguments
+- `body_aero::BodyAerodynamics`: The structure to initialize
+
+# Keyword Arguments
+- `aero_center_location=0.25`: Chordwise location of aerodynamic center (0-1)
+- `control_point_location=0.75`: Chordwise location of control point (0-1)
+
+# Returns
+nothing
+"""
 function init!(body_aero::BodyAerodynamics; 
     aero_center_location=0.25,
     control_point_location=0.75)
@@ -148,8 +188,14 @@ end
 
 Calculate geometric properties for each panel.
 
-Returns:
-    PanelProperties containing vectors for each property
+# Arguments
+- section_list::Vector{Section}: List of [Section](@ref)s
+- `n_panels`::Int: Number of [Panel](@ref)s
+- `aero_center_loc`::Float64: Location of the aerodynamic center
+- `control_point_loc`::Float64: Location of the control point
+
+# Returns:
+[PanelProperties](@ref) containing vectors for each property
 """
 function calculate_panel_properties(section_list::Vector{Section}, n_panels::Int,
                                   aero_center_loc::Float64, control_point_loc::Float64)
