@@ -16,7 +16,7 @@ function help()
     nothing
 end
 
-options = ["rectangular_wing = include(\"rectangular_wing.jl\")",
+options = ["rectangular_wing = include(\"rectangular_wing.jl"\")",
            "ram_air_kite = include(\"ram_air_kite.jl\")",
            "stall_model = include(\"stall_model.jl\")",
            "bench = include(\"bench.jl\")",
