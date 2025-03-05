@@ -8,17 +8,14 @@ function help()
     if Sys.iswindows()
         run(`cmd /c start $url`)
     else
-        run(`xdg-open $url`)
+        io = IOBuffer()
+        run(pipeline(`xdg-open $url`, stderr = io))
+        out_data = String(take!(io)) 
     end
     nothing
 end
 
-options = ["rectangular_wing = include(\"rectangular_wing.jl"\")",
-           "ram_air_kite = include(\"ram_air_kite.jl\")",
-           "stall_model = include(\"stall_model.jl\")",
-           "bench = include(\"bench.jl\")",
-           "cleanup = include(\"cleanup.jl\")",
-           "help = help()",
+options = ["help_me = help()",
            "quit"]
 
 function example_menu()
