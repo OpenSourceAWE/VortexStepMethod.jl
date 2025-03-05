@@ -393,7 +393,7 @@ function KiteWing(obj_path, dat_path; alpha=0.0, crease_frac=0.75, wind_vel=10.,
         @eval Main begin
             foil_path, polar_path, v_wind, area, width, x_turn =
                 $dat_path, $polar_path, $wind_vel, $gamma_tip, $width, $crease_frac
-            include("../scripts/polars.jl")
+            include(joinpath(dirname(@__FILE__), "../scripts/polars.jl"))
         end
     end
 
