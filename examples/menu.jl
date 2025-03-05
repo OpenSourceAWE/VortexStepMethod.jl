@@ -4,10 +4,16 @@ using REPL.TerminalMenus
 
 url = "https://albatross-kite-transport.github.io/VortexStepMethod.jl/dev"
 
-help_command = if Sys.iswindows()
-    "run(`cmd /c start $url`)"
-else
-    "run(`xdg-open $url`)"
+function help() 
+    if Sys.iswindows()
+        run(`cmd /c start $url`)
+    else
+        io = IOBuffer()
+        run(pipeline(`xdg-open $url`, stderr = io))
+        # ignore any error messages
+        out_data = String(take!(io)) 
+    end
+    nothing
 end
 
 options = ["rectangular_wing = include(\"rectangular_wing.jl\")",
@@ -15,7 +21,7 @@ options = ["rectangular_wing = include(\"rectangular_wing.jl\")",
            "stall_model = include(\"stall_model.jl\")",
            "bench = include(\"bench.jl\")",
            "cleanup = include(\"cleanup.jl\")",
-           "help = $help_command",
+           "help_me = help()",
            "quit"]
 
 function example_menu()

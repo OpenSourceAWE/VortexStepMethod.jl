@@ -14,6 +14,7 @@ using Interpolations: Extrapolation
 using Parameters
 using Serialization
 using SharedArrays
+using Pkg
 
 # Export public interface
 export Wing, Section, KiteWing
@@ -167,6 +168,54 @@ const AeroData = Union{
 
 function menu()
    Main.include("examples/menu.jl")
+end
+
+"""
+    copy_examples()
+
+Copy all example scripts to the folder "examples"
+(it will be created if it doesn't exist).
+"""
+function copy_examples()
+    PATH = "examples"
+    if ! isdir(PATH) 
+        mkdir(PATH)
+    end
+    src_path = joinpath(dirname(pathof(@__MODULE__)), "..", PATH)
+    copy_files("examples", readdir(src_path))
+end
+
+function install_examples(add_packages=true)
+    copy_examples()
+    if add_packages
+        if ! ("ControlPlots" ∈ keys(Pkg.project().dependencies))
+            Pkg.add("ControlPlots")
+        end
+        if ! ("LaTeXStrings" ∈ keys(Pkg.project().dependencies))
+            Pkg.add("LaTeXStrings")
+        end
+        if ! ("Xfoil" ∈ keys(Pkg.project().dependencies))
+            Pkg.add("Xfoil")
+        end
+        if ! ("CSV" ∈ keys(Pkg.project().dependencies))
+            Pkg.add("CSV")
+        end
+        if ! ("DataFrames" ∈ keys(Pkg.project().dependencies))
+            Pkg.add("DataFrames")
+        end
+    end
+end
+
+function copy_files(relpath, files)
+    if ! isdir(relpath) 
+        mkdir(relpath)
+    end
+    src_path = joinpath(dirname(pathof(@__MODULE__)), "..", relpath)
+    for file in files
+        cp(joinpath(src_path, file), joinpath(relpath, file), force=true)
+        chmod(joinpath(relpath, file), 0o774)
+    end
+    files
 end
 
 # Include core functionality

@@ -1,3 +1,7 @@
+## Unreleased
+### Added
+- added the function `install_examples()` which allows to easily install the examples without using `git`
+
 ## VortexStepMethod v1.1.0 2025-03-04
 ### Added
 - Dynamically deform the KiteWing by twisting the left side and right side, and deforming the trailing edges using deform! #19
