@@ -25,8 +25,8 @@ julia -e 'using Pkg; Pkg.add("TestEnv"); Pkg.add("ControlPlots")'
 
 Before installing this software it is suggested to create a new project, for example like this:
 ```bash
-mkdir test
-cd test
+mkdir vsm
+cd vsm
 julia --project=.
 ```
 Then add VortexStepMethod from  Julia's package manager, by typing:
@@ -38,8 +38,14 @@ at the Julia prompt. You can run the unit tests with the command:
 ```julia
 pkg"test VortexStepMethod"
 ```
+To run the examples, type:
+```julia
+using VortexStepMethod
+VortexStepMethod.install_examples()
+include("examples/menu.jl")
+```
 
-## Running the examples
+## Running the examples as developer
 If you have git installed, check out this repo because it makes it easier to understand the code:
 ```bash
 mkdir repos
