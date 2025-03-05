@@ -1,6 +1,3 @@
-## Initial Release
-This project is based on version 1.0 of the Python project [Vortex-Step-Method](https://github.com/ocayon/Vortex-Step-Method)
-
 ## VortexStepMethod v1.1.0 2025-03-04
 ### Added
 - Dynamically deform the KiteWing by twisting the left side and right side, and deforming the trailing edges using deform! #19
@@ -12,6 +9,9 @@ This project is based on version 1.0 of the Python project [Vortex-Step-Method](
 ### Changed
 - Add origin argument to `BodyAerodynamics` constructor #66
 - Improve documentation
+
+## Initial Release
+This project is based on version 1.0 of the Python project [Vortex-Step-Method](https://github.com/ocayon/Vortex-Step-Method)
 
 ## Noteworthy Differences of v1.0.1 to the Python version
 - implemented in Julia, therefore about 50 times faster
