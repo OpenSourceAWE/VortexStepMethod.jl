@@ -1,6 +1,9 @@
 ## Unreleased
 ### Added
 - added the function `install_examples()` which allows to easily install the examples without using `git`
+### Changed
+- in the `menu.jl`, changed `help` to `help_me`. It works better now, no more warnings on Linux, it 
+  should also work on MacOS now
 
 ## VortexStepMethod v1.1.0 2025-03-04
 ### Added
