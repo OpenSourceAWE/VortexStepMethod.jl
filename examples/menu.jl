@@ -10,6 +10,7 @@ function help()
     else
         io = IOBuffer()
         run(pipeline(`xdg-open $url`, stderr = io))
+        # ignore any error messages
         out_data = String(take!(io)) 
     end
     nothing
