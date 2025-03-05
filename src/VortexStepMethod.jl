@@ -14,6 +14,7 @@ using Interpolations: Extrapolation
 using Parameters
 using Serialization
 using SharedArrays
+using Pkg
 
 # Export public interface
 export Wing, Section, KiteWing
