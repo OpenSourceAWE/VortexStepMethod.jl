@@ -188,11 +188,21 @@ end
 function install_examples(add_packages=true)
     copy_examples()
     if add_packages
-        Pkg.add("ControlPlots")
-        Pkg.add("LaTeXStrings")
-        Pkg.add("Xfoil")
-        Pkg.add("CSV")
-        Pkg.add("DataFrames")
+        if ! ("ControlPlots" ∈ keys(Pkg.project().dependencies))
+            Pkg.add("ControlPlots")
+        end
+        if ! ("LaTeXStrings" ∈ keys(Pkg.project().dependencies))
+            Pkg.add("LaTeXStrings")
+        end
+        if ! ("Xfoil" ∈ keys(Pkg.project().dependencies))
+            Pkg.add("Xfoil")
+        end
+        if ! ("CSV" ∈ keys(Pkg.project().dependencies))
+            Pkg.add("CSV")
+        end
+        if ! ("DataFrames" ∈ keys(Pkg.project().dependencies))
+            Pkg.add("DataFrames")
+        end
     end
 end
 
