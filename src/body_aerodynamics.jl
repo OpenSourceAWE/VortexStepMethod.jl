@@ -168,9 +168,9 @@ Structure to hold calculated panel properties.
 - `control_points`::Vector{MVec3}
 - `bound_points_1`::Vector{MVec3}
 - `bound_points_2`::Vector{MVec3}
-- `x_airf`::Vector{MVec3}: Vector of unit vectors perpendicular to chord line
-- `y_airf`::Vector{MVec3}: Vector of unit vectors parallel to chord line
-- `z_airf`::Vector{MVec3}: Vector of unit vectors in spanwise direction
+- `x_airf`::Vector{MVec3}: Vector of unit vectors tangential to chord line
+- `y_airf`::Vector{MVec3}: Vector of unit vectors in spanwise direction
+- `z_airf`::Vector{MVec3}: Vector of unit vectors pointing up (cross of x_airf and y_airf)
 """
 struct PanelProperties
     aero_centers::Vector{MVec3}

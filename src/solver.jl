@@ -132,8 +132,8 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
             body_aero,
             gamma_new,
             core_radius_fraction,
+            z_airf_array,
             x_airf_array,
-            y_airf_array,
             va_array,
             va_norm_array,
             va_unit_array
@@ -166,22 +166,19 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
     
     for (i, panel) in enumerate(panels)                                               # 30625 bytes
 
+        ### Lift and Drag ###
         # Panel geometry
-        z_airf_span = panel.z_airf
-        y_airf_chord = panel.y_airf
-        x_airf_normal = panel.x_airf
-        # panel_moment_point = 0.5(panel.LE_point_1 + panel.LE_point_2) .+ y_airf_chord .* moment_frac
         panel_area = panel.chord * panel.width
         area_all_panels += panel_area
 
         # Calculate induced velocity direction
         alpha_corrected_i = alpha_corrected[i]
-        induced_va_airfoil = cos(alpha_corrected_i) * y_airf_chord + 
-                            sin(alpha_corrected_i) * x_airf_normal
+        induced_va_airfoil = cos(alpha_corrected_i) * panel.x_airf + 
+                            sin(alpha_corrected_i) * panel.z_airf
         dir_induced_va_airfoil = induced_va_airfoil / norm(induced_va_airfoil)
 
         # Calculate lift and drag directions
-        dir_lift_induced_va = cross(dir_induced_va_airfoil, z_airf_span)
+        dir_lift_induced_va = cross(dir_induced_va_airfoil, panel.y_airf)
         dir_lift_induced_va = dir_lift_induced_va / norm(dir_lift_induced_va)
         dir_drag_induced_va = cross(spanwise_direction, dir_lift_induced_va)
         dir_drag_induced_va = dir_drag_induced_va / norm(dir_drag_induced_va)
@@ -194,15 +191,15 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
         # Calculate forces in prescribed wing frame
         dir_lift_prescribed_va = cross(va, spanwise_direction)
         dir_lift_prescribed_va = dir_lift_prescribed_va / norm(dir_lift_prescribed_va)
-             
+
         # Calculate force components
         lift_prescribed_va = dot(lift_induced_va, dir_lift_prescribed_va) + 
-                             dot(drag_induced_va, dir_lift_prescribed_va)
+                           dot(drag_induced_va, dir_lift_prescribed_va)
         drag_prescribed_va = dot(lift_induced_va, va_unit) + 
-                             dot(drag_induced_va, va_unit)
+                           dot(drag_induced_va, va_unit)
         side_prescribed_va = dot(lift_induced_va, spanwise_direction) + 
-                             dot(drag_induced_va, spanwise_direction)
-        
+                           dot(drag_induced_va, spanwise_direction)
+
         # Body frame forces
         f_body_3D[:,i] .= ftotal_induced_va .* panel.width
 
@@ -216,8 +213,8 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
         panel_ac_body = panel.aero_center  # 3D [x, y, z]
         # (2) Convert local (2D) pitching moment to a 3D vector in body coords.
         #     Use the axis around which the moment is defined,
-        #     which is the z-axis pointing "spanwise"
-        moment_axis_body = panel.z_airf
+        #     which is the y-axis pointing "spanwise"
+        moment_axis_body = panel.y_airf
         M_local_3D = moment[i] * moment_axis_body * panel.width
         # Vector from panel AC to the chosen reference point:
         r_vector = panel_ac_body - reference_point  # e.g. CG, wing root, etc.
@@ -228,7 +225,7 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
 
         # Calculate the moment distribution (moment on each panel)
         arm = (moment_frac - 0.25) * panel.chord
-        moment_distribution[i] = dot(ftotal_induced_va, x_airf_normal) * arm
+        moment_distribution[i] = dot(ftotal_induced_va, panel.z_airf) * arm
     end
 
     # Calculate wing geometry properties
