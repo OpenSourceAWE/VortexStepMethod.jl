@@ -15,7 +15,12 @@ function help()
     nothing
 end
 
-options = ["help_me = help()",
+options = ["rectangular_wing = include(\"rectangular_wing.jl\")",
+           "ram_air_kite = include(\"ram_air_kite.jl\")",
+           "stall_model = include(\"stall_model.jl\")",
+           "bench = include(\"bench.jl\")",
+           "cleanup = include(\"cleanup.jl\")",
+           "help_me = help()",
            "quit"]
 
 function example_menu()
