@@ -24,7 +24,7 @@ mutable struct VSMSolution
 end
 
 function VSMSolution()
-    VSMSolution(zeros(MVec3), zeros(MVec3), zeros(MVec3), zeros(3), FAILURE)
+    VSMSolution(zeros(MVec3), zeros(MVec3), zeros(MVec3), zeros(MVec3), zeros(3), zeros(3), FAILURE)
 end
 
 """
@@ -116,6 +116,7 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
     cm_array = zeros(n_panels)
     panel_width_array = zeros(n_panels)
     solver.sol.moment_distribution = zeros(n_panels)
+    solver.sol.moment_coefficient_distribution = zeros(n_panels)
     moment_distribution = solver.sol.moment_distribution
     moment_coefficient_distribution = solver.sol.moment_coefficient_distribution
 
@@ -168,6 +169,9 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
     va = body_aero.va
     va_unit = va / va_mag
     q_inf = 0.5 * density * va_mag^2
+
+    # Calculate wing geometry properties
+    projected_area = sum(wing -> calculate_projected_area(wing), body_aero.wings)
     
     for (i, panel) in enumerate(panels)                                               # 30625 bytes
 
@@ -231,31 +235,22 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
         # Calculate the moment distribution (moment on each panel)
         arm = (moment_frac - 0.25) * panel.chord
         moment_distribution[i] = dot(ftotal_induced_va, panel.z_airf) * arm
-        moment_coefficient_distribution[i] = moment_distribution[i] / (q_inf * projected_area)
+        moment_coefficient_distribution[i] = moment_distribution[i] ./ (q_inf * projected_area)
     end
 
-    # Calculate wing geometry properties
-    projected_area = sum(wing -> calculate_projected_area(wing), body_aero.wings)
-
-    Fx = sum(f_body_3D[1,:])
-    Fy = sum(f_body_3D[2,:])
-    Fz = sum(f_body_3D[3,:])
-    Mx = sum(m_body_3D[1,:])
-    My = sum(m_body_3D[2,:])
-    Mz = sum(m_body_3D[3,:])
-
-    CFx = Fx / (0.5 * density * va[1]^2 * projected_area)
-    CFy = Fy / (0.5 * density * va[2]^2 * projected_area)
-    CFz = Fz / (0.5 * density * va[3]^2 * projected_area)
-    CMx = Mx / (0.5 * density * va[1]^2 * projected_area)
-    CMy = My / (0.5 * density * va[2]^2 * projected_area)
-    CMz = Mz / (0.5 * density * va[3]^2 * projected_area)
-
     # update the result struct
-    solver.sol.aero_force .= MVec3([Fx, Fy, Fz])
-    solver.sol.aero_moments .= MVec3([Mx, My, Mz])
-    solver.sol.force_coefficients .= MVec3([CFx, CFy, CFz])
-    solver.sol.moment_coefficients .= MVec3([CMx, CMy, CMz])
+    solver.sol.aero_force .= [
+        sum(f_body_3D[1,:]),
+        sum(f_body_3D[2,:]),
+        sum(f_body_3D[3,:])
+    ]
+    solver.sol.aero_moments .= [
+        sum(m_body_3D[1,:]),
+        sum(m_body_3D[2,:]),
+        sum(m_body_3D[3,:])
+    ]
+    solver.sol.force_coefficients .= solver.sol.aero_force ./ (q_inf * projected_area)
+    solver.sol.moment_coefficients .= solver.sol.aero_moments ./ (q_inf * projected_area)
     if converged
         # TODO: Check if the result if feasible if converged
         solver.sol.solver_status = FEASIBLE
