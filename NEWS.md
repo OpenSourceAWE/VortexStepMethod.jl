@@ -6,6 +6,7 @@
 - in the `menu.jl`, changed `help` to `help_me`. It works better now, no more warnings on Linux, it should also work on MacOS now
 - the coordinate frames of the panels now use the same convention as the kite body frame
 - the page "Glossary" of the documentation is quite complete now
+- the center of mass field of the `KiteWing` is removed, and the geometry is created such that `[0, 0, 0]` is the center of mass
 
 ## VortexStepMethod v1.1.0 2025-03-04
 ### Added
