@@ -1,17 +1,18 @@
 using ControlPlots
 using VortexStepMethod
 using REPL.TerminalMenus
+using DefaultApplication
 
 url = "https://albatross-kite-transport.github.io/VortexStepMethod.jl/dev"
 
 function help() 
-    if Sys.iswindows()
-        run(`cmd /c start $url`)
-    else
+    if Sys.islinux()
         io = IOBuffer()
         run(pipeline(`xdg-open $url`, stderr = io))
         # ignore any error messages
         out_data = String(take!(io)) 
+    else
+        DefaultApplication.open(url)
     end
     nothing
 end
