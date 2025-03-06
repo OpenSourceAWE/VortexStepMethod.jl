@@ -10,7 +10,9 @@
 | Distribution  |Vector of scalars. Length: number of panels.|
 | mu $\mu$ | Dynamic viscosity [N·s/m²]  |
 | alpha $\alpha$| Angle of attack [rad]|
-| beta $\beta$| Trailing edge angle [rad] |
+| beta $\beta$ | Elevation angle of the kite [rad]|
+| beta\_s $\beta_s$ | Side slip angle [rad] |
+| lambda $\lambda$| Trailing edge deformation angle relative to the chordwise x-axis [rad] |
 | gamma $\Gamma$ |The circulation, which is a measure of the rotational speed of the spinning flow in a vortex [m²/s]. |
 | CL, cl | Lift coefficient [-] |
 | CD, cd | Drag coefficient [-] |
