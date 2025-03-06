@@ -1,6 +1,7 @@
 ## Unreleased
 ### Added
 - added the function `install_examples()` which allows to easily install the examples without using `git`
+- the function `solve!` returns a struct now. The function `solve`that returns a dict is still available. 
 ### Changed
 - in the `menu.jl`, changed `help` to `help_me`. It works better now, no more warnings on Linux, it should also work on MacOS now
 - the coordinate frames of the panels now use the same convention as the kite body frame
