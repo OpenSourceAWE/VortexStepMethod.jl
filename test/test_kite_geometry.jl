@@ -32,11 +32,11 @@ using Serialization
     end
     
     @testset "Center of Mass Calculation" begin
-        vertices = [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]
+        vertices = [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 0.0, 1.0]]
         faces = [[1, 2, 3]]
         
         com = center_to_com!(vertices, faces)
-        expected_com = [1/3, 1/3, 0.0]
+        expected_com = [1/3, 0.0, 1/3]
         
         @test isapprox(com, expected_com, rtol=1e-5)
     end
