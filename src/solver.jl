@@ -7,15 +7,19 @@ Struct for storing the solution of the [solve!](@ref) function. Must contain all
 # Attributes
 - aero_force::MVec3: Aerodynamic force vector in KB reference frame [N]
 - aero_moments::MVec3: Aerodynamic moments [Mx, My, Mz] around the reference point [Nm]
-- force_coefficients::MVec3: Aerodynamic force coefficients [CL, CD, CS] [-]
+- force_coefficients::MVec3: Aerodynamic force coefficients [CFx, CFy, CFz] [-]
+- moment_coefficients::MVec3: Aerodynamic moment coefficients [CMx, CMy, CMz] [-]
 - moment_distribution::Vector{Float64}: Pitching moments around the spanwise vector of each panel. [Nm]
+- moment_coefficient_distribution::Vector{Float64}: Pitching moment coefficient around the spanwise vector of each panel. [-]
 - solver_status::SolverStatus: enum, see [SolverStatus](@ref)
 """
 mutable struct VSMSolution    
     aero_force::MVec3          
     aero_moments::MVec3       
     force_coefficients::MVec3  
+    moment_coefficients::MVec3  
     moment_distribution::Vector{Float64}
+    moment_coefficient_distribution::Vector{Float64}
     solver_status::SolverStatus 
 end
 
@@ -113,6 +117,7 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
     panel_width_array = zeros(n_panels)
     solver.sol.moment_distribution = zeros(n_panels)
     moment_distribution = solver.sol.moment_distribution
+    moment_coefficient_distribution = solver.sol.moment_coefficient_distribution
 
     # Calculate coefficients for each panel
     for (i, panel) in enumerate(panels)                                               # zero bytes
@@ -188,25 +193,25 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
         drag_induced_va = drag[i] * dir_drag_induced_va
         ftotal_induced_va = lift_induced_va + drag_induced_va
 
-        # Calculate forces in prescribed wing frame
-        dir_lift_prescribed_va = cross(va, spanwise_direction)
-        dir_lift_prescribed_va = dir_lift_prescribed_va / norm(dir_lift_prescribed_va)
+        # # Calculate forces in prescribed wing frame
+        # dir_lift_prescribed_va = cross(va, spanwise_direction)
+        # dir_lift_prescribed_va = dir_lift_prescribed_va / norm(dir_lift_prescribed_va)
 
-        # Calculate force components
-        lift_prescribed_va = dot(lift_induced_va, dir_lift_prescribed_va) + 
-                           dot(drag_induced_va, dir_lift_prescribed_va)
-        drag_prescribed_va = dot(lift_induced_va, va_unit) + 
-                           dot(drag_induced_va, va_unit)
-        side_prescribed_va = dot(lift_induced_va, spanwise_direction) + 
-                           dot(drag_induced_va, spanwise_direction)
+        # # Calculate force components
+        # lift_prescribed_va = dot(lift_induced_va, dir_lift_prescribed_va) + 
+        #                    dot(drag_induced_va, dir_lift_prescribed_va)
+        # drag_prescribed_va = dot(lift_induced_va, va_unit) + 
+        #                    dot(drag_induced_va, va_unit)
+        # side_prescribed_va = dot(lift_induced_va, spanwise_direction) + 
+        #                    dot(drag_induced_va, spanwise_direction)
 
         # Body frame forces
         f_body_3D[:,i] .= ftotal_induced_va .* panel.width
 
-        # Update sums
-        lift_wing_3D_sum += lift_prescribed_va * panel.width
-        drag_wing_3D_sum += drag_prescribed_va * panel.width  
-        side_wing_3D_sum += side_prescribed_va * panel.width
+        # # Update sums
+        # lift_wing_3D_sum += lift_prescribed_va * panel.width
+        # drag_wing_3D_sum += drag_prescribed_va * panel.width  
+        # side_wing_3D_sum += side_prescribed_va * panel.width
 
         # Calculate the moments
         # (1) Panel aerodynamic center in body frame:
@@ -226,6 +231,7 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
         # Calculate the moment distribution (moment on each panel)
         arm = (moment_frac - 0.25) * panel.chord
         moment_distribution[i] = dot(ftotal_induced_va, panel.z_airf) * arm
+        moment_coefficient_distribution[i] = moment_distribution[i] / (q_inf * projected_area)
     end
 
     # Calculate wing geometry properties
@@ -238,14 +244,18 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
     My = sum(m_body_3D[2,:])
     Mz = sum(m_body_3D[3,:])
 
-    CL = lift_wing_3D_sum / (q_inf * projected_area)
-    CD = drag_wing_3D_sum / (q_inf * projected_area)
-    CS = side_wing_3D_sum / (q_inf * projected_area)
+    CFx = Fx / (0.5 * density * va[1]^2 * projected_area)
+    CFy = Fy / (0.5 * density * va[2]^2 * projected_area)
+    CFz = Fz / (0.5 * density * va[3]^2 * projected_area)
+    CMx = Mx / (0.5 * density * va[1]^2 * projected_area)
+    CMy = My / (0.5 * density * va[2]^2 * projected_area)
+    CMz = Mz / (0.5 * density * va[3]^2 * projected_area)
 
     # update the result struct
     solver.sol.aero_force .= MVec3([Fx, Fy, Fz])
     solver.sol.aero_moments .= MVec3([Mx, My, Mz])
-    solver.sol.force_coefficients .= MVec3([CL, CD, CS])
+    solver.sol.force_coefficients .= MVec3([CFx, CFy, CFz])
+    solver.sol.moment_coefficients .= MVec3([CMx, CMy, CMz])
     if converged
         # TODO: Check if the result if feasible if converged
         solver.sol.solver_status = FEASIBLE
