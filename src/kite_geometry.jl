@@ -175,7 +175,7 @@ function center_to_com!(vertices, faces)
     end
     
     com = com / area_total
-    !(abs(com[2]) < 0.01) && @warn "Center of mass $com has to lie on x-axis."
+    !(abs(com[2]) < 0.01) && @warn "Center of mass $com has to lie on the xz-plane."
     @info "Centering vertices of .obj file to the center of mass: $com"
     for v in vertices
         v .-= com
