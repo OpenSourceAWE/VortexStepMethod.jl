@@ -1,7 +1,8 @@
 |Term   |Explanation   |
-|:---|:---|
-| VSM| Vortex Step Method, an enhanced lifting line method that improves upon the classic approach by solving the circulation system at the three-quarter chord position, among the most important details.|
-| LLM| Lifting Line Method|
+|:----|:---|
+| VSM | Vortex Step Method, an enhanced lifting line method that improves upon the classic approach by solving the circulation system at the three-quarter chord position, among the most important details.|
+| LLM | Lifting Line Method|
+| AIC | Aerodynamic Influence Coefficient (AIC). The AIC matrix represents the relationship between the induced velocities or pressures on aerodynamic surfaces and the circulation strength or modal deformations of the lifting surfaces.|
 | inviscid | A fluid flow in which viscosity is considered negligible or zero. This means that there is no internal friction between the fluid layers, and the effects of viscosity on the flow are assumed to be insignificant. |
 | Panel | Flat surface element in 3D that approximate the contour of the aerodynamic body being studied.|
 | Section |A wing section, also known as an airfoil or aerofoil, is the cross-sectional shape of an aircraft wing.|
