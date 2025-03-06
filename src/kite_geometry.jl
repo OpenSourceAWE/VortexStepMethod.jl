@@ -155,8 +155,8 @@ function create_interpolations(vertices, circle_center_z, radius, gamma_tip)
     return (le_interp, te_interp, area_interp)
 end
 
-# Calculate center of mass for a triangular surface mesh
-function calculate_com(vertices, faces)
+# Makes the zero coordinates lie on the com
+function center_to_com!(vertices, faces)
     area_total = 0.0
     com = zeros(3)
     
@@ -174,7 +174,13 @@ function calculate_com(vertices, faces)
         com += area * centroid
     end
     
-    return com / area_total
+    com = com / area_total
+    !(abs(com[2]) < 0.01) && @warn "Center of mass $com has to lie on the xz-plane."
+    @info "Centering vertices of .obj file to the center of mass: $com"
+    for v in vertices
+        v .-= com
+    end
+    return com
 end
 
 """
@@ -304,7 +310,6 @@ Represents a curved wing that inherits from Wing with additional geometric prope
   -  refined_sections::Vector{Section}
   - `remove_nan::Bool`: Wether to remove the NaNs from interpolations or not
 - Additional fields:
-  - `center_of_mass::Vector{Float64}`: Center of mass coordinates
   - `circle_center_z::Vector{Float64}`: Center of circle coordinates
   - gamma_tip::Float64: Angle between the body frame z axis and the vector going from the kite circular shape center to the wing tip.
   - `inertia_tensor`::Matrix{Float64}: see: [`calculate_inertia_tensor`](@ref)
@@ -325,7 +330,6 @@ mutable struct KiteWing <: AbstractWing
     # Additional fields for KiteWing
     non_deformed_sections::Vector{Section}
     mass::Float64
-    center_of_mass::Vector{Float64}
     circle_center_z::Float64
     gamma_tip::Float64
     inertia_tensor::Matrix{Float64}
@@ -378,14 +382,13 @@ function KiteWing(obj_path, dat_path; alpha=0.0, crease_frac=0.75, wind_vel=10.,
     if !ispath(polar_path) || !ispath(info_path)
         @info "Reading $obj_path"
         vertices, faces = read_faces(obj_path)
-        center_of_mass = calculate_com(vertices, faces)
-        !(abs(center_of_mass[2]) < 0.01) && @error "Center of mass $center_of_mass has to lie on x-axis."
-        inertia_tensor = calculate_inertia_tensor(vertices, faces, mass, center_of_mass)
+        center_to_com!(vertices, faces)
+        inertia_tensor = calculate_inertia_tensor(vertices, faces, mass, zeros(3))
 
         circle_center_z, radius, gamma_tip = find_circle_center_and_radius(vertices)
         le_interp, te_interp, area_interp = create_interpolations(vertices, circle_center_z, radius, gamma_tip)
         @info "Writing $info_path"
-        serialize(info_path, (center_of_mass, inertia_tensor, circle_center_z, radius, gamma_tip, 
+        serialize(info_path, (inertia_tensor, circle_center_z, radius, gamma_tip, 
             le_interp, te_interp, area_interp))
 
         width = 2gamma_tip * radius
@@ -405,7 +408,7 @@ function KiteWing(obj_path, dat_path; alpha=0.0, crease_frac=0.75, wind_vel=10.,
         interpolate_matrix_nans!(cm_matrix)
     end
 
-    (center_of_mass, inertia_tensor, circle_center_z, radius, gamma_tip, 
+    (inertia_tensor, circle_center_z, radius, gamma_tip, 
         le_interp, te_interp, area_interp) = deserialize(info_path)
 
     # Create sections
@@ -418,7 +421,7 @@ function KiteWing(obj_path, dat_path; alpha=0.0, crease_frac=0.75, wind_vel=10.,
     end
 
     KiteWing(n_panels, spanwise_panel_distribution, spanwise_direction, sections, sections, remove_nan, sections,
-        mass, center_of_mass, circle_center_z, gamma_tip, inertia_tensor, radius,
+        mass, circle_center_z, gamma_tip, inertia_tensor, radius,
         le_interp, te_interp, area_interp, zeros(n_panels), zeros(n_panels))
 end
 
