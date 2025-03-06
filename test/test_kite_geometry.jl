@@ -1,7 +1,7 @@
 
 using Test
 using VortexStepMethod
-using VortexStepMethod: create_interpolations, find_circle_center_and_radius, calculate_inertia_tensor, calculate_com, read_faces
+using VortexStepMethod: create_interpolations, find_circle_center_and_radius, calculate_inertia_tensor, center_to_com!, read_faces
 using LinearAlgebra
 using Interpolations
 using Serialization
@@ -35,7 +35,7 @@ using Serialization
         vertices = [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]
         faces = [[1, 2, 3]]
         
-        com = calculate_com(vertices, faces)
+        com = center_to_com!(vertices, faces)
         expected_com = [1/3, 1/3, 0.0]
         
         @test isapprox(com, expected_com, rtol=1e-5)
@@ -121,11 +121,10 @@ using Serialization
         # Create info file
         info_path = test_obj_path[1:end-4] * "_info.bin"
         le_interp, te_interp, area_interp = create_interpolations(vertices, z_center, r, π/4)
-        center_of_mass = calculate_com(vertices, faces)
-        inertia_tensor = calculate_inertia_tensor(vertices, faces, 1.0, center_of_mass)
+        center_of_mass = center_to_com!(vertices, faces)
+        inertia_tensor = calculate_inertia_tensor(vertices, faces, 1.0, zeros(3))
         
         serialize(info_path, (
-            center_of_mass, 
             inertia_tensor, 
             z_center, 
             r, 
@@ -150,7 +149,6 @@ using Serialization
         @test wing.spanwise_direction ≈ [0.0, 1.0, 0.0]
         @test length(wing.sections) > 0  # Should have sections now
         @test wing.mass ≈ 1.0
-        @test length(wing.center_of_mass) == 3
         @test wing.radius ≈ r rtol=1e-2
         @test wing.gamma_tip ≈ π/4 rtol=1e-2
         @test !isnan(wing.sections[1].aero_data[3][end])
