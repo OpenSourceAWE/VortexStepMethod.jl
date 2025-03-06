@@ -38,6 +38,31 @@ function get_CAD_matching_uri()
             -9.173800e01 -1.262274e03 5.961848e03]
     return CAD_matching_pos_values
 end
+function struct2aero_geometry(coord_struc)
+    coord = zeros(20, 3)
+    coord[1, :] = coord_struc[21, :]
+    coord[2, :] = coord_struc[11, :]
+    coord[3, :] = coord_struc[10, :]
+    coord[4, :] = coord_struc[12, :]
+    coord[5, :] = coord_struc[9, :]
+    coord[6, :] = coord_struc[13, :]
+    coord[7, :] = coord_struc[8, :]
+    coord[8, :] = coord_struc[14, :]
+    coord[9, :] = coord_struc[7, :]
+    coord[10, :] = coord_struc[15, :]
+    coord[11, :] = coord_struc[6, :]
+    coord[12, :] = coord_struc[16, :]
+    coord[13, :] = coord_struc[5, :]
+    coord[14, :] = coord_struc[17, :]
+    coord[15, :] = coord_struc[4, :]
+    coord[16, :] = coord_struc[18, :]
+    coord[17, :] = coord_struc[3, :]
+    coord[18, :] = coord_struc[19, :]
+    coord[19, :] = coord_struc[20, :]
+    coord[20, :] = coord_struc[2, :]
+    return coord
+end
+
 
 function get_v3_case_params()
     wing_type = "LEI_kite"
@@ -53,18 +78,18 @@ function get_v3_case_params()
 
     # Wing geometry
     coord_struc = get_CAD_matching_uri()
-    # coord = thesis_functions.struct2aero_geometry(coord_struc) / 1000
+    coord = struct2aero_geometry(coord_struc) / 1000
 
-    # N = len(coord) // 2
+    N = length(coord) ÷ 2
 
-    # # LE thickness at each section [m]
-    # # 10 sections
-    # LE_thicc = 0.1
+    # LE thickness at each section [m]
+    # 10 sections
+    LE_thicc = 0.1
 
-    # # Camber for each section (ct in my case)
-    # camber = 0.095
+    # Camber for each section (ct in my case)
+    camber = 0.095
 
-    # # Refine structrural mesh into more panels
+    # # Refine structural mesh into more panels
     # coord = thesis_functions.refine_LEI_mesh(coord, N - 1, N_split)
     # N = int(len(coord) / 2)  # Number of section after refining the mesh
 
