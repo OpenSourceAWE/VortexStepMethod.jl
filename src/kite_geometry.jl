@@ -194,7 +194,7 @@ Uses the thin shell approximation where:
 1. Mass is distributed uniformly over the surface area
 2. Each triangle contributes to the inertia based on its area and position
 3. For each triangle vertex p, contribution to diagonal terms is: area * (sum(p²) - p_i²)
-4. For off-diagonal terms: area * (-p_i * p_j)
+4. For off-diagonal terms: area * (-`p_i` * `p_j`)
 5. Final tensor is scaled by mass/(3*total_area) to get correct units
 
 # Returns
@@ -307,7 +307,7 @@ Represents a curved wing that inherits from Wing with additional geometric prope
   - `center_of_mass::Vector{Float64}`: Center of mass coordinates
   - `circle_center_z::Vector{Float64}`: Center of circle coordinates
   - gamma_tip::Float64: Angle between the body frame z axis and the vector going from the kite circular shape center to the wing tip.
-  - inertia_tensor::Matrix{Float64}
+  - `inertia_tensor`::Matrix{Float64}: see: [`calculate_inertia_tensor`](@ref)
   - radius::Float64: Radius of curvature
   - le_interp::NTuple{3, Extrapolation}: see: [Extrapolation](https://juliamath.github.io/Interpolations.jl/stable/extrapolation/)
   - te_interp::NTuple{3, Extrapolation}
