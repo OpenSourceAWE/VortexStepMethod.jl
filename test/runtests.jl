@@ -11,4 +11,5 @@ println("Running tests...")
     include("test_kite_geometry.jl")
     include("test_wing_geometry.jl")
     include("test_plotting.jl")
+    include("aqua.jl")
 end
