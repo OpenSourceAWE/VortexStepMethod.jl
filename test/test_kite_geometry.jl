@@ -75,9 +75,15 @@ using Serialization
     @testset "Interpolation Creation" begin
         vertices = []
         z_center = 2.0
-        for θ in range(-π/4, π/4, length=10)
-            push!(vertices, [0.0, r*sin(θ), z_center + r*cos(θ)])
-            push!(vertices, [1.0, r*sin(θ), z_center + r*cos(θ)])
+        Δθ = π/2 / 1000
+        for θ in range(-π/4, π/4-Δθ, 1000)
+            frac = 1.0 - abs(4θ/π)  # Goes from 0 to 1 to 0
+            x_le = 0.1 - 0.1 * frac      # Goes from 0.1 to 0.0 to 0.1
+            x_te = 0.9 + 0.1 * frac # Goes from 0.9 to 1.0 to 0.9
+        
+            push!(vertices, [x_le, r*sin(θ), z_center + r*cos(θ)])
+            push!(vertices, [x_te, r*sin(θ+0.5Δθ), z_center + r*cos(θ+0.5Δθ)])
+            push!(vertices, [x_le, r*sin(θ+Δθ), z_center + r*cos(θ+Δθ)])
         end
         
         # Create test airfoil data file
@@ -108,7 +114,7 @@ using Serialization
         serialize(polar_path, (alphas, d_trailing_edge_angles, cl_matrix, cd_matrix, cm_matrix))
         
         # Create and serialize obj file
-        faces = [[i, i+1, i+2] for i in 1:2:length(vertices)-2]
+        faces = [[i, i+1, i+2] for i in 1:3:length(vertices)-2]
         open(test_obj_path, "w") do io
             for v in vertices
                 println(io, "v $(v[1]) $(v[2]) $(v[3])")
