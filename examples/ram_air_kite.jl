@@ -15,7 +15,7 @@ DEFORM = false
 
 # Create wing geometry
 wing = KiteWing("data/ram_air_kite_body.obj", "data/ram_air_kite_foil.dat")
-body_aero = BodyAerodynamics([wing]; kite_body_origin=wing.center_of_mass)
+body_aero = BodyAerodynamics([wing];)
 
 if DEFORM
     alpha = [deg2rad(10), 0]
