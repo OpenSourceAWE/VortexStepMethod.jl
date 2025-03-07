@@ -164,10 +164,13 @@ end
     @test sol.aero_moments.y ≈ 0.0 atol=1e-10
     @test sol.aero_moments.z ≈ -117.97225244011435
 
-    @test sol.force_coefficients[1] ≈ 0.4920964685099385    # CL
-    @test sol.force_coefficients[2] ≈ 0.0038533739066069946 # CD
-    @test sol.force_coefficients[3] ≈ 0.0 atol=1e-10        # CS
+    @test sol.force_coefficients[1] ≈ -0.039050322560956294 # CFx
+    @test sol.force_coefficients[2] ≈ 0.0                   # CFy
+    @test sol.force_coefficients[3] ≈ 0.49055973654418716   # CFz
+    @test sol.force_coefficients[3] / sol.force_coefficients[1] ≈ sol.aero_force[3] / sol.aero_force[1]
     @test sol.moment_distribution[1] ≈ -0.026242454074087297
+    @test sol.moment_coefficient_distribution[1] ≈ -8.686587525353832e-6
+    @test sol.moment_distribution[1] / sol.moment_distribution[2] ≈ sol.moment_coefficient_distribution[1] / sol.moment_coefficient_distribution[2]
 
     @test sol.solver_status == FEASIBLE
 
