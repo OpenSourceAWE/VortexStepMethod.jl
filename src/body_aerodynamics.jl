@@ -17,6 +17,7 @@ Main structure for calculating aerodynamic properties of bodies.
 - v_a_array::Vector{Float64} = zeros(Float64, P)
 - work_vectors::NTuple{10,MVec3} = ntuple(_ -> zeros(MVec3), 10)
 - AIC::Array{Float64, 3} = zeros(3, P, P)
+- projected_area::Float64 = 1.0: The area projected onto the xy-plane of the kite body reference frame [m²]
 """
 @with_kw mutable struct BodyAerodynamics{P}
     panels::Vector{Panel}
@@ -31,6 +32,7 @@ Main structure for calculating aerodynamic properties of bodies.
     v_a_array::Vector{Float64} = zeros(Float64, P)
     work_vectors::NTuple{10,MVec3} = ntuple(_ -> zeros(MVec3), 10)
     AIC::Array{Float64, 3} = zeros(3, P, P)
+    projected_area::Float64 = one(Float64)
 end
 
 """
@@ -132,10 +134,9 @@ function init!(body_aero::BodyAerodynamics;
             idx += 1
         end
     end
-
-    @assert all([panel.filaments[1].initialized for panel in body_aero.panels])
     
     # Initialize rest of the struct
+    body_aero.projected_area = sum(wing -> calculate_projected_area(wing), body_aero.wings)
     body_aero.stall_angle_list .= calculate_stall_angle_list(body_aero.panels)
     body_aero.alpha_array .= 0.0
     body_aero.v_a_array .= 0.0 
@@ -635,7 +636,7 @@ function calculate_results(
     end
 
     # Calculate wing geometry properties
-    projected_area = sum(wing -> calculate_projected_area(wing), body_aero.wings)
+    projected_area = body_aero.projected_area
     wing_span = body_aero.wings[1].span
     aspect_ratio_projected = wing_span^2 / projected_area
 

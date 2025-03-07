@@ -171,7 +171,7 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
     q_inf = 0.5 * density * va_mag^2
 
     # Calculate wing geometry properties
-    projected_area = sum(wing -> calculate_projected_area(wing), body_aero.wings)
+    projected_area = body_aero.projected_area
     
     for (i, panel) in enumerate(panels)                                               # 30625 bytes
 
