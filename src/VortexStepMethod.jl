@@ -6,6 +6,7 @@ using Logging
 using Statistics
 using Colors
 using DelimitedFiles
+using DefaultApplication
 using Measures
 using LaTeXStrings
 using NonlinearSolve
@@ -216,6 +217,18 @@ function copy_files(relpath, files)
         chmod(joinpath(relpath, file), 0o774)
     end
     files
+end
+
+function help(url) 
+    if Sys.islinux()
+        io = IOBuffer()
+        run(pipeline(`xdg-open $url`, stderr = io))
+        # ignore any error messages
+        out_data = String(take!(io)) 
+    else
+        DefaultApplication.open(url)
+    end
+    nothing
 end
 
 # Include core functionality
