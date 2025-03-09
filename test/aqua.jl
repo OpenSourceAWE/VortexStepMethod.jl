@@ -1,2 +1,7 @@
 using Aqua
-Aqua.test_all(VortexStepMethod)
+@testset "Aqua.jl" begin
+    Aqua.test_all(
+      VortexStepMethod;
+      stale_deps=(ignore=[:Xfoil, :Timers],),
+    )
+  end
