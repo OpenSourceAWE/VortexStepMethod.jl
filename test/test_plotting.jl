@@ -104,7 +104,7 @@ plt.ioff()
         # Step 9: Test polar data plotting
         wing = KiteWing("test/data/ram_air_kite_body.obj", "test/data/ram_air_kite_foil.dat")
         body_aero = BodyAerodynamics([wing])
-        fig = plot_polar_data(body_aero)
+        fig = plot_polar_data(body_aero; is_show=false)
         @test fig isa plt.PyPlot.Figure
     end
 end

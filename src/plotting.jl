@@ -838,8 +838,12 @@ relative to the 2d airfoil or panel chord line.
 # Keyword arguments
 - `alphas`: Range of angle of attack values in radians (default: -5° to 25° in 0.3° steps)
 - `beta_tes`: Range of trailing edge angles in radians (default: -5° to 25° in 0.3° steps)
+- `is_show`: Whether to display plots (default: true)
 """
-function VortexStepMethod.plot_polar_data(body_aero::BodyAerodynamics; alphas=collect(deg2rad.(-5:0.3:25)), beta_tes = collect(deg2rad.(-5:0.3:25)))
+function VortexStepMethod.plot_polar_data(body_aero::BodyAerodynamics; 
+        alphas=collect(deg2rad.(-5:0.3:25)), 
+        beta_tes = collect(deg2rad.(-5:0.3:25)),
+        is_show = true)
     if body_aero.panels[1].aero_model === POLAR_MATRICES
         set_plot_style()
         
@@ -881,8 +885,9 @@ function VortexStepMethod.plot_polar_data(body_aero::BodyAerodynamics; alphas=co
         
         # Adjust layout and display
         plt.tight_layout(rect=(0.01, 0.01, 0.99, 0.99))
-        plt.show()
-        
+        if is_show
+            show_plot(fig)
+        end
         return fig
     else
         throw(ArgumentError("Plotting polar data for $(body_aero.panels[1].aero_model) is not implemented."))
