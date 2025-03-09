@@ -10,6 +10,7 @@ using CSV
 using DataFrames
 
 PLOT = true
+USE_TEX = false
 
 # Find root directory
 root_dir = dirname(@__DIR__)
@@ -75,7 +76,8 @@ PLOT && plot_geometry(
     is_save=false,
     is_show=true,
     view_elevation=15,
-    view_azimuth=-120
+    view_azimuth=-120,
+    use_tex=USE_TEX
 )
 
 # Solving and plotting distributions
@@ -93,7 +95,8 @@ PLOT && plot_distribution(
     data_type=".pdf",
     save_path=joinpath(save_folder, "spanwise_distributions"),
     is_save=false,
-    is_show=true
+    is_show=true,
+    use_tex=USE_TEX
 )
 
 # Plotting polar
@@ -124,6 +127,7 @@ PLOT && plot_polars(
     data_type=".pdf",
     save_path=joinpath(save_folder, "polars"),
     is_save=true,
-    is_show=true
+    is_show=true,
+    use_tex=USE_TEX
 )
 nothing
