@@ -1,14 +1,6 @@
 using ControlPlots
 using VortexStepMethod
 using LinearAlgebra
-using Pkg
-
-if !("CSV" ∈ keys(Pkg.project().dependencies))
-    using TestEnv
-    TestEnv.activate()
-end
-using CSV
-using DataFrames
 
 PLOT = true
 DEFORM = false
