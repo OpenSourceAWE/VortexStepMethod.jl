@@ -1,28 +1,15 @@
 using ControlPlots
 using VortexStepMethod
 using REPL.TerminalMenus
-using DefaultApplication
 
 url = "https://albatross-kite-transport.github.io/VortexStepMethod.jl/dev"
-
-function help() 
-    if Sys.islinux()
-        io = IOBuffer()
-        run(pipeline(`xdg-open $url`, stderr = io))
-        # ignore any error messages
-        out_data = String(take!(io)) 
-    else
-        DefaultApplication.open(url)
-    end
-    nothing
-end
 
 options = ["rectangular_wing = include(\"rectangular_wing.jl\")",
            "ram_air_kite = include(\"ram_air_kite.jl\")",
            "stall_model = include(\"stall_model.jl\")",
            "bench = include(\"bench.jl\")",
            "cleanup = include(\"cleanup.jl\")",
-           "help_me = help()",
+           "help_me = VortexStepMethod.help(url)",
            "quit"]
 
 function example_menu()

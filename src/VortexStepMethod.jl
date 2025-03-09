@@ -6,6 +6,7 @@ using Logging
 using Statistics
 using Colors
 using DelimitedFiles
+using DefaultApplication
 using Measures
 using LaTeXStrings
 using NonlinearSolve
@@ -20,7 +21,7 @@ using Pkg
 export Wing, Section, KiteWing
 export BodyAerodynamics
 export Solver, solve, solve_base, solve!, VSMSolution
-export calculate_results, solve_circulation_distribution
+export calculate_results
 export add_section!, set_va!
 export calculate_span, calculate_projected_area
 export menu, MVec3
@@ -216,6 +217,18 @@ function copy_files(relpath, files)
         chmod(joinpath(relpath, file), 0o774)
     end
     files
+end
+
+function help(url) 
+    if Sys.islinux()
+        io = IOBuffer()
+        run(pipeline(`xdg-open $url`, stderr = io))
+        # ignore any error messages
+        out_data = String(take!(io)) 
+    else
+        DefaultApplication.open(url)
+    end
+    nothing
 end
 
 # Include core functionality
