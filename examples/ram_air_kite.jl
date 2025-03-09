@@ -35,48 +35,51 @@ vel_app = [
 ] * v_a
 set_va!(body_aero, vel_app)
 
-# Plotting geometry
-PLOT && plot_geometry(
-    body_aero,
-    "";
-    data_type=".svg",
-    save_path="",
-    is_save=false,
-    is_show=true,
-    view_elevation=15,
-    view_azimuth=-120
-)
+# Plotting polar data
+PLOT && plot_polar_data(body_aero)
 
-# Solving and plotting distributions
-results = solve(vsm_solver, body_aero; log=true)
-@time results = solve(vsm_solver, body_aero; log=true)
+# # Plotting geometry
+# PLOT && plot_geometry(
+#     body_aero,
+#     "";
+#     data_type=".svg",
+#     save_path="",
+#     is_save=false,
+#     is_show=true,
+#     view_elevation=15,
+#     view_azimuth=-120
+# )
 
-body_y_coordinates = [panel.aero_center[2] for panel in body_aero.panels]
+# # Solving and plotting distributions
+# results = solve(vsm_solver, body_aero; log=true)
+# @time results = solve(vsm_solver, body_aero; log=true)
 
-PLOT && plot_distribution(
-    [body_y_coordinates],
-    [results],
-    ["VSM"];
-    title="CAD_spanwise_distributions_alpha_$(round(aoa, digits=1))_beta_$(round(side_slip, digits=1))_yaw_$(round(yaw_rate, digits=1))_v_a_$(round(v_a, digits=1))",
-    data_type=".pdf",
-    is_save=false,
-    is_show=true
-)
+# body_y_coordinates = [panel.aero_center[2] for panel in body_aero.panels]
 
-PLOT && plot_polars(
-    [vsm_solver],
-    [body_aero],
-    [
-        "VSM from Ram Air Kite OBJ and DAT file",
-    ];
-    angle_range=range(0, 20, length=20),
-    angle_type="angle_of_attack",
-    angle_of_attack=0,
-    side_slip=0,
-    v_a=10,
-    title="ram_kite_panels_$(wing.n_panels)_distribution_$(wing.spanwise_panel_distribution)",
-    data_type=".pdf",
-    is_save=false,
-    is_show=true
-)
+# PLOT && plot_distribution(
+#     [body_y_coordinates],
+#     [results],
+#     ["VSM"];
+#     title="CAD_spanwise_distributions_alpha_$(round(aoa, digits=1))_beta_$(round(side_slip, digits=1))_yaw_$(round(yaw_rate, digits=1))_v_a_$(round(v_a, digits=1))",
+#     data_type=".pdf",
+#     is_save=false,
+#     is_show=true
+# )
+
+# PLOT && plot_polars(
+#     [vsm_solver],
+#     [body_aero],
+#     [
+#         "VSM from Ram Air Kite OBJ and DAT file",
+#     ];
+#     angle_range=range(0, 20, length=20),
+#     angle_type="angle_of_attack",
+#     angle_of_attack=0,
+#     side_slip=0,
+#     v_a=10,
+#     title="ram_kite_panels_$(wing.n_panels)_distribution_$(wing.spanwise_panel_distribution)",
+#     data_type=".pdf",
+#     is_save=false,
+#     is_show=true
+# )
 nothing

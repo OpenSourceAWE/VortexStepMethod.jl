@@ -31,7 +31,7 @@ export PanelDistribution, LINEAR, COSINE, COSINE_VAN_GARREL, SPLIT_PROVIDED, UNC
 export InitialGammaDistribution, ELLIPTIC, ZEROS
 export SolverStatus, FEASIBLE, INFEASIBLE, FAILURE
 
-export plot_geometry, plot_distribution, plot_circulation_distribution, plot_geometry, plot_polars, save_plot, show_plot, plot_matrix_data
+export plot_geometry, plot_distribution, plot_circulation_distribution, plot_geometry, plot_polars, save_plot, show_plot, plot_polar_data
 
 # the following functions are defined in ext/VortexStepMethodExt.jl
 function plot_geometry end
@@ -41,7 +41,7 @@ function plot_geometry end
 function plot_polars end
 function save_plot end
 function show_plot end
-function plot_matrix_data end
+function plot_polar_data end
 
 """
    const MVec3    = MVector{3, Float64}

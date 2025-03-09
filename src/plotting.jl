@@ -826,38 +826,60 @@ function VortexStepMethod.plot_polars(
     return fig
 end
 
-function VortexStepMethod.plot_matrix_data(alphas, d_trailing_edge_angles, cl_matrix, cd_matrix, cm_matrix)
-    function plot_values(alphas, d_trailing_edge_angles, matrix, interp, name)
-        fig = plt.figure()
-        ax = fig.add_subplot(projection="3d")
-    
-        X_data = collect(d_trailing_edge_angles) .+ zeros(length(alphas))'
-        Y_data = collect(alphas)' .+ zeros(length(d_trailing_edge_angles))
-    
-        matrix = Matrix{Float64}(matrix)
-        interp_matrix = zeros(size(matrix)...)
-        int_alphas, int_d_trailing_edge_angles = alphas .+ deg2rad(0.5), d_trailing_edge_angles .+ deg2rad(0.5)
-        interp_matrix .= [interp(alpha, d_trailing_edge_angle) for alpha in int_alphas, d_trailing_edge_angle in int_d_trailing_edge_angles]
-        X_int = collect(int_d_trailing_edge_angles) .+ zeros(length(int_alphas))'
-        Y_int = collect(int_alphas)' .+ zeros(length(int_d_trailing_edge_angles))
-    
-        ax.plot_wireframe(X_data, Y_data, matrix, edgecolor="royalblue", lw=0.5, rstride=5, cstride=5, alpha=0.6)
-        ax.plot_wireframe(X_int, Y_int, interp_matrix, edgecolor="orange", lw=0.5, rstride=5, cstride=5, alpha=0.6)
-        plt.xlabel("Alpha")
-        plt.ylabel("Flap angle")
-        plt.zlabel("$name values")
-        plt.title("$name for different d_flap and angle")
-        plt.legend()
-        plt.grid(true)
-        plt.show()
-    end
-    
-    cl_interp = extrapolate(scale(interpolate(cl_matrix, BSpline(Linear())), alphas, d_trailing_edge_angles), NaN)
-    cd_interp = extrapolate(scale(interpolate(cd_matrix, BSpline(Linear())), alphas, d_trailing_edge_angles), NaN)
-    cm_interp = extrapolate(scale(interpolate(cm_matrix, BSpline(Linear())), alphas, d_trailing_edge_angles), NaN)
-    
-    plot_values(alphas, d_trailing_edge_angles, cl_matrix, cl_interp, "Cl")
-    plot_values(alphas, d_trailing_edge_angles, cd_matrix, cd_interp, "Cd")
-    plot_values(alphas, d_trailing_edge_angles, cm_matrix, cm_interp, "Cm")
-end
+"""
+    plot_polar_data(body_aero::BodyAerodynamics)
 
+Plot polar data (Cl, Cd, Cm) as 3D surfaces against alpha and beta angles.
+
+# Arguments
+- `body_aero`: Wing aerodynamics struct containing polar interpolations
+"""
+function VortexStepMethod.plot_polar_data(body_aero::BodyAerodynamics; alphas=collect(deg2rad.(-5:0.3:25)), betas=betas = collect(deg2rad.(-5:0.3:25)))
+    if body_aero.panels[1].aero_model === POLAR_MATRICES
+        set_plot_style()
+        
+        # Create figure with subplots
+        fig = plt.figure(figsize=(15, 6))
+        
+        # Get interpolation functions and labels
+        interp_data = [
+            (body_aero.panels[1].cl_interp, L"$C_l$"),
+            (body_aero.panels[1].cd_interp, L"$C_d$"),
+            (body_aero.panels[1].cm_interp, L"$C_m$")
+        ]
+        
+        # Create each subplot
+        for (idx, (interp, label)) in enumerate(interp_data)
+            ax = fig.add_subplot(1, 3, idx, projection="3d")
+            
+            # Create interpolation matrix
+            interp_matrix = zeros(length(alphas), length(betas))
+            interp_matrix .= [interp(alpha, beta) for alpha in alphas, beta in betas]
+            X = collect(betas) .+ zeros(length(alphas))'
+            Y = collect(alphas)' .+ zeros(length(betas))
+            
+            # Plot surface
+            ax.plot_wireframe(X, Y, interp_matrix, 
+                            edgecolor="blue", 
+                            lw=0.5, 
+                            rstride=5, 
+                            cstride=5, 
+                            alpha=0.6)
+            
+            # Set labels and title
+            ax.set_xlabel(L"$\beta$ [rad]")
+            ax.set_ylabel(L"$\alpha$ [rad]")
+            ax.set_zlabel(label)
+            ax.set_title(label * L" vs $\alpha$ and $\beta$")
+            ax.grid(true)
+        end
+        
+        # Adjust layout and display
+        plt.tight_layout(rect=(0.01, 0.01, 0.99, 0.99))
+        plt.show()
+        
+        return fig
+    else
+        throw(ArgumentError("Plotting polar data for $(body_aero.panels[1].aero_model) is not implemented."))
+    end
+end
