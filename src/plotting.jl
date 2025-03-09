@@ -265,6 +265,7 @@ Plot wing geometry from different viewpoints and optionally save/show plots.
 - `is_show`: boolean value, indicates if the graphic shall be displayed (default: `false`)
 - `view_elevation`: initial view elevation angle (default: 15) [°]
 - `view_azimuth`: initial view azimuth angle (default: -120) [°]
+- `use_tex`: if the external `pdflatex` command shall be used (default: false)
 
 """
 function VortexStepMethod.plot_geometry(body_aero::BodyAerodynamics, title;
@@ -323,7 +324,7 @@ Plot spanwise distributions of aerodynamic properties.
 - `save_path`: Path to save plots (default: nothing)
 - `is_save`: Whether to save plots (default: false)
 - `is_show`: Whether to display plots (default: true)
-- `ùse_tex`: if the external `pdflatex` command shall be used
+- `use_tex`: if the external `pdflatex` command shall be used
 """
 function VortexStepMethod.plot_distribution(y_coordinates_list, results_list, label_list;
     title="spanwise_distribution",
@@ -602,7 +603,7 @@ Plot polar data comparing different solvers and configurations.
 - `save_path`: Path to save plots (default: nothing)
 - `is_save`: Whether to save plots (default: true)
 - `is_show`: Whether to display plots (default: true)
-- `ùse_tex`: if the external `pdflatex` command shall be used (default: false)
+- `use_tex`: if the external `pdflatex` command shall be used (default: false)
 """
 function VortexStepMethod.plot_polars(
     solver_list,
