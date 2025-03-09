@@ -2,7 +2,7 @@ Manifest.toml
 .vscode/settings.json
 venv
 results/TUDELFT_V3_LEI_KITE/polars/$C_L$ vs $C_D$.pdf
-*.bin
+data/*.bin
 results/TUDELFT_V3_LEI_KITE/polars/tutorial_testing_stall_model_n_panels_54_distribution_split_provided.pdf
 docs/build/
 results/TUDELFT_V3_LEI_KITE/polars/tutorial_testing_stall_model_n_panels_54_distribution_SPLIT_PROVIDED.pdf

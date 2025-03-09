@@ -827,14 +827,19 @@ function VortexStepMethod.plot_polars(
 end
 
 """
-    plot_polar_data(body_aero::BodyAerodynamics)
+    plot_polar_data(body_aero::BodyAerodynamics; alphas=collect(deg2rad.(-5:0.3:25)), beta_tes=collect(deg2rad.(-5:0.3:25)))
 
-Plot polar data (Cl, Cd, Cm) as 3D surfaces against alpha and beta angles.
+Plot polar data (Cl, Cd, Cm) as 3D surfaces against alpha and beta_te angles. Beta_te is the trailing edge deflection angle
+relative to the 2d airfoil or panel chord line.
 
 # Arguments
-- `body_aero`: Wing aerodynamics struct containing polar interpolations
+- `body_aero`: Wing aerodynamics struct
+
+# Keyword arguments
+- `alphas`: Range of angle of attack values in radians (default: -5° to 25° in 0.3° steps)
+- `beta_tes`: Range of trailing edge angles in radians (default: -5° to 25° in 0.3° steps)
 """
-function VortexStepMethod.plot_polar_data(body_aero::BodyAerodynamics; alphas=collect(deg2rad.(-5:0.3:25)), betas=betas = collect(deg2rad.(-5:0.3:25)))
+function VortexStepMethod.plot_polar_data(body_aero::BodyAerodynamics; alphas=collect(deg2rad.(-5:0.3:25)), beta_tes = collect(deg2rad.(-5:0.3:25)))
     if body_aero.panels[1].aero_model === POLAR_MATRICES
         set_plot_style()
         
@@ -853,10 +858,10 @@ function VortexStepMethod.plot_polar_data(body_aero::BodyAerodynamics; alphas=co
             ax = fig.add_subplot(1, 3, idx, projection="3d")
             
             # Create interpolation matrix
-            interp_matrix = zeros(length(alphas), length(betas))
-            interp_matrix .= [interp(alpha, beta) for alpha in alphas, beta in betas]
-            X = collect(betas) .+ zeros(length(alphas))'
-            Y = collect(alphas)' .+ zeros(length(betas))
+            interp_matrix = zeros(length(alphas), length(beta_tes))
+            interp_matrix .= [interp(alpha, beta_te) for alpha in alphas, beta_te in beta_tes]
+            X = collect(beta_tes) .+ zeros(length(alphas))'
+            Y = collect(alphas)' .+ zeros(length(beta_tes))
             
             # Plot surface
             ax.plot_wireframe(X, Y, interp_matrix, 
