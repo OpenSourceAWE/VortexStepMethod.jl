@@ -3,7 +3,7 @@ using ControlPlots
 using VortexStepMethod
 
 PLOT = true
-USE_TEX = true
+USE_TEX = false
 
 # Step 1: Define wing parameters
 n_panels = 20          # Number of panels
