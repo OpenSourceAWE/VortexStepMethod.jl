@@ -1,17 +1,20 @@
 
 """
-    set_plot_style(titel_size=16)
+    set_plot_style(titel_size=16; use_tex=false)
 
 Set the default style for plots using LaTeX.
-
+``
 # Arguments:
 - `titel_size`: size of the plot title in points (default: 16)
+- `use_tex`: if a separately installed LaTeX version shall be used
 """
-function set_plot_style(titel_size=16)
+function set_plot_style(titel_size=16; use_tex=false)
     rcParams = plt.PyDict(plt.matplotlib."rcParams")
-    rcParams["text.usetex"] = true
+    rcParams["text.usetex"] = use_tex
     rcParams["font.family"] = "serif"
-    rcParams["font.serif"] = ["Computer Modern Roman"]
+    if use_tex
+        rcParams["font.serif"] = ["Computer Modern Roman"]
+    end
     rcParams["axes.titlesize"] = titel_size
     rcParams["axes.labelsize"] = 12
     rcParams["axes.linewidth"] = 1
@@ -21,7 +24,9 @@ function set_plot_style(titel_size=16)
     rcParams["ytick.labelsize"] = 10
     rcParams["legend.fontsize"] = 10
     rcParams["figure.titlesize"] = 16
-    rcParams["pgf.texsystem"] = "pdflatex"  # Use pdflatex
+    if use_tex
+        rcParams["pgf.texsystem"] = "pdflatex"  # Use pdflatex
+    end
     rcParams["pgf.rcfonts"] = false
     rcParams["figure.figsize"] = (10, 6)  # Default figure size
 end
@@ -221,8 +226,8 @@ function create_geometry_plot(body_aero::BodyAerodynamics, title, view_elevation
 
     # Add legends for the first occurrence of each label
     handles, labels = ax.get_legend_handles_labels()
-    by_label = Dict(zip(labels, handles))
-    ax.legend(values(by_label), keys(by_label), bbox_to_anchor=(0, 0, 1.1, 1))
+    # by_label = Dict(zip(labels, handles))
+    # ax.legend(values(by_label), keys(by_label), bbox_to_anchor=(0, 0, 1.1, 1))
 
     # Set labels and make axes equal
     ax.set_xlabel("x")
