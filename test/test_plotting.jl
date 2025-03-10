@@ -2,7 +2,7 @@ using VortexStepMethod
 using ControlPlots
 using Test
 
-function create_wa()
+function create_body_aero()
     # Step 1: Define wing parameters
     n_panels = 20          # Number of panels
     span = 20.0            # Wing span [m]
@@ -26,11 +26,11 @@ function create_wa()
         INVISCID)
 
     # Step 3: Initialize aerodynamics
-    wa = BodyAerodynamics([wing])
+    body_aero = BodyAerodynamics([wing])
     # Set inflow conditions
     vel_app = [cos(alpha), 0.0, sin(alpha)] .* v_a
-    set_va!(wa, vel_app)
-    wa
+    set_va!(body_aero, vel_app)
+    body_aero
 end
 
 plt.ioff()
@@ -43,10 +43,10 @@ plt.ioff()
     @test isfile("/tmp/plot.pdf")
     rm("/tmp/plot.pdf")
     show_plot(fig)
-    wa = create_wa()
+    body_aero = create_body_aero()
     if Sys.islinux()
         fig = plot_geometry(
-            wa,
+            body_aero,
             "Rectangular_wing_geometry";
             data_type=".pdf",
             save_path="/tmp",
@@ -67,11 +67,11 @@ plt.ioff()
         llt_solver = Solver(aerodynamic_model_type=LLT)
 
         # Step 6: Solve the VSM and LLT
-        results_vsm = solve(vsm_solver, wa)
-        results_llt = solve(llt_solver, wa)
+        results_vsm = solve(vsm_solver, body_aero)
+        results_llt = solve(llt_solver, body_aero)
 
         # Step 7: Plot spanwise distributions
-        y_coordinates = [panel.aero_center[2] for panel in wa.panels]
+        y_coordinates = [panel.aero_center[2] for panel in body_aero.panels]
 
         fig = plot_distribution(
             [y_coordinates, y_coordinates],
@@ -86,7 +86,7 @@ plt.ioff()
         angle_range = range(0, 20, 20)
         fig = plot_polars(
             [llt_solver, vsm_solver],
-            [wa, wa],
+            [body_aero, body_aero],
             ["VSM", "LLT"],
             angle_range=angle_range,
             angle_type="angle_of_attack",
@@ -100,6 +100,12 @@ plt.ioff()
         @test fig isa plt.PyPlot.Figure
         @test isfile("/tmp/Rectangular_Wing_Polars.pdf")
         rm("/tmp/Rectangular_Wing_Polars.pdf")
+
+        # Step 9: Test polar data plotting
+        wing = KiteWing("test/data/ram_air_kite_body.obj", "test/data/ram_air_kite_foil.dat")
+        body_aero = BodyAerodynamics([wing])
+        fig = plot_polar_data(body_aero; is_show=false)
+        @test fig isa plt.PyPlot.Figure
     end
 end
 plt.ion()

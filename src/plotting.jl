@@ -837,3 +837,74 @@ function VortexStepMethod.plot_polars(
 
     return fig
 end
+
+"""
+    plot_polar_data(body_aero::BodyAerodynamics; alphas=collect(deg2rad.(-5:0.3:25)), beta_tes=collect(deg2rad.(-5:0.3:25)))
+
+Plot polar data (Cl, Cd, Cm) as 3D surfaces against alpha and beta_te angles. Beta_te is the trailing edge deflection angle
+relative to the 2d airfoil or panel chord line.
+
+# Arguments
+- `body_aero`: Wing aerodynamics struct
+
+# Keyword arguments
+- `alphas`: Range of angle of attack values in radians (default: -5° to 25° in 0.3° steps)
+- `beta_tes`: Range of trailing edge angles in radians (default: -5° to 25° in 0.3° steps)
+- `is_show`: Whether to display plots (default: true)
+- `use_tex`: if the external `pdflatex` command shall be used
+"""
+function VortexStepMethod.plot_polar_data(body_aero::BodyAerodynamics; 
+        alphas=collect(deg2rad.(-5:0.3:25)), 
+        beta_tes = collect(deg2rad.(-5:0.3:25)),
+        is_show = true,
+        use_tex = false
+        )
+    if body_aero.panels[1].aero_model === POLAR_MATRICES
+        set_plot_style()
+        
+        # Create figure with subplots
+        fig = plt.figure(figsize=(15, 6))
+        
+        # Get interpolation functions and labels
+        interp_data = [
+            (body_aero.panels[1].cl_interp, L"$C_l$"),
+            (body_aero.panels[1].cd_interp, L"$C_d$"),
+            (body_aero.panels[1].cm_interp, L"$C_m$")
+        ]
+        
+        # Create each subplot
+        for (idx, (interp, label)) in enumerate(interp_data)
+            ax = fig.add_subplot(1, 3, idx, projection="3d")
+            
+            # Create interpolation matrix
+            interp_matrix = zeros(length(alphas), length(beta_tes))
+            interp_matrix .= [interp(alpha, beta_te) for alpha in alphas, beta_te in beta_tes]
+            X = collect(beta_tes) .+ zeros(length(alphas))'
+            Y = collect(alphas)' .+ zeros(length(beta_tes))
+            
+            # Plot surface
+            ax.plot_wireframe(X, Y, interp_matrix, 
+                            edgecolor="blue", 
+                            lw=0.5, 
+                            rstride=5, 
+                            cstride=5, 
+                            alpha=0.6)
+            
+            # Set labels and title
+            ax.set_xlabel(L"$\beta$ [rad]")
+            ax.set_ylabel(L"$\alpha$ [rad]")
+            ax.set_zlabel(label)
+            ax.set_title(label * L" vs $\alpha$ and $\beta$")
+            ax.grid(true)
+        end
+        
+        # Adjust layout and display
+        plt.tight_layout(rect=(0.01, 0.01, 0.99, 0.99))
+        if is_show
+            show_plot(fig)
+        end
+        return fig
+    else
+        throw(ArgumentError("Plotting polar data for $(body_aero.panels[1].aero_model) is not implemented."))
+    end
+end

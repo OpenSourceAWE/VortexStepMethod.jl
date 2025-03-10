@@ -1,14 +1,6 @@
 using ControlPlots
 using VortexStepMethod
 using LinearAlgebra
-using Pkg
-
-if !("CSV" ∈ keys(Pkg.project().dependencies))
-    using TestEnv
-    TestEnv.activate()
-end
-using CSV
-using DataFrames
 
 PLOT = true
 USE_TEX = false
@@ -43,6 +35,9 @@ vel_app = [
     sin(aoa_rad)
 ] * v_a
 set_va!(body_aero, vel_app)
+
+# Plotting polar data
+PLOT && plot_polar_data(body_aero)
 
 # Plotting geometry
 PLOT && plot_geometry(
