@@ -3,6 +3,7 @@ using ControlPlots
 using VortexStepMethod
 
 PLOT = true
+USE_TEX = false
 
 # Step 1: Define wing parameters
 n_panels = 20          # Number of panels
@@ -60,6 +61,7 @@ PLOT && plot_geometry(
       save_path=".",
       is_save=false,
       is_show=true,
+      use_tex=USE_TEX
 )
 
 # Step 7: Plot spanwise distributions
@@ -69,7 +71,8 @@ PLOT && plot_distribution(
     [y_coordinates, y_coordinates],
     [results_vsm, results_llt],
     ["VSM", "LLT"],
-    title="Spanwise Distributions"
+    title="Spanwise Distributions",
+    use_tex=USE_TEX
 )
 
 # Step 8: Plot polar curves
@@ -81,6 +84,7 @@ PLOT && plot_polars(
     angle_range,
     angle_type="angle_of_attack",
     v_a,
-    title="Rectangular Wing Polars"
+    title="Rectangular Wing Polars",
+    use_tex=USE_TEX
 )
 nothing

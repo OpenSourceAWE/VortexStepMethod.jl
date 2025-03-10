@@ -1,17 +1,20 @@
 
 """
-    set_plot_style(titel_size=16)
+    set_plot_style(titel_size=16; use_tex=false)
 
 Set the default style for plots using LaTeX.
-
+``
 # Arguments:
 - `titel_size`: size of the plot title in points (default: 16)
+- `ùse_tex`: if the external `pdflatex` command shall be used
 """
-function set_plot_style(titel_size=16)
+function set_plot_style(titel_size=16; use_tex=false)
     rcParams = plt.PyDict(plt.matplotlib."rcParams")
-    rcParams["text.usetex"] = true
+    rcParams["text.usetex"] = use_tex
     rcParams["font.family"] = "serif"
-    rcParams["font.serif"] = ["Computer Modern Roman"]
+    if use_tex
+        rcParams["font.serif"] = ["Computer Modern Roman"]
+    end
     rcParams["axes.titlesize"] = titel_size
     rcParams["axes.labelsize"] = 12
     rcParams["axes.linewidth"] = 1
@@ -21,7 +24,9 @@ function set_plot_style(titel_size=16)
     rcParams["ytick.labelsize"] = 10
     rcParams["legend.fontsize"] = 10
     rcParams["figure.titlesize"] = 16
-    rcParams["pgf.texsystem"] = "pdflatex"  # Use pdflatex
+    if use_tex
+        rcParams["pgf.texsystem"] = "pdflatex"  # Use pdflatex
+    end
     rcParams["pgf.rcfonts"] = false
     rcParams["figure.figsize"] = (10, 6)  # Default figure size
 end
@@ -143,7 +148,8 @@ function set_axes_equal!(ax; zoom=1.8)
 end
 
 """
-    create_geometry_plot(body_aero::BodyAerodynamics, title, view_elevation, view_azimuth; zoom=1.8)
+    create_geometry_plot(body_aero::BodyAerodynamics, title, view_elevation, view_azimuth; 
+                         zoom=1.8, use_tex=false)
 
 Create a 3D plot of wing geometry including panels and filaments.
 
@@ -157,8 +163,8 @@ Create a 3D plot of wing geometry including panels and filaments.
 - zoom: zoom factor (default: 1.8)
 """
 function create_geometry_plot(body_aero::BodyAerodynamics, title, view_elevation, view_azimuth; 
-                              zoom=1.8)
-    set_plot_style(28)
+                              zoom=1.8, use_tex=false)
+    set_plot_style(28; use_tex)
 
     panels = body_aero.panels
     va = isa(body_aero.va, Tuple) ? body_aero.va[1] : body_aero.va
@@ -221,8 +227,8 @@ function create_geometry_plot(body_aero::BodyAerodynamics, title, view_elevation
 
     # Add legends for the first occurrence of each label
     handles, labels = ax.get_legend_handles_labels()
-    by_label = Dict(zip(labels, handles))
-    ax.legend(values(by_label), keys(by_label), bbox_to_anchor=(0, 0, 1.1, 1))
+    # by_label = Dict(zip(labels, handles))
+    # ax.legend(values(by_label), keys(by_label), bbox_to_anchor=(0, 0, 1.1, 1))
 
     # Set labels and make axes equal
     ax.set_xlabel("x")
@@ -244,7 +250,7 @@ end
     plot_geometry(body_aero::BodyAerodynamics, title; 
                   data_type=".pdf", save_path=nothing, 
                   is_save=false, is_show=false, 
-                  view_elevation=15, view_azimuth=-120)
+                  view_elevation=15, view_azimuth=-120, use_tex=false)
 
 Plot wing geometry from different viewpoints and optionally save/show plots.
 
@@ -259,6 +265,7 @@ Plot wing geometry from different viewpoints and optionally save/show plots.
 - `is_show`: boolean value, indicates if the graphic shall be displayed (default: `false`)
 - `view_elevation`: initial view elevation angle (default: 15) [°]
 - `view_azimuth`: initial view azimuth angle (default: -120) [°]
+- `use_tex`: if the external `pdflatex` command shall be used (default: false)
 
 """
 function VortexStepMethod.plot_geometry(body_aero::BodyAerodynamics, title;
@@ -267,33 +274,34 @@ function VortexStepMethod.plot_geometry(body_aero::BodyAerodynamics, title;
     is_save=false,
     is_show=false,
     view_elevation=15,
-    view_azimuth=-120)
+    view_azimuth=-120,
+    use_tex=false)
 
     if is_save
         plt.ioff()
         # Angled view
-        fig = create_geometry_plot(body_aero, "$(title)_angled_view", 15, -120)
+        fig = create_geometry_plot(body_aero, "$(title)_angled_view", 15, -120; use_tex)
         save_plot(fig, save_path, "$(title)_angled_view", data_type=data_type)
 
         # Top view
-        fig = create_geometry_plot(body_aero, "$(title)_top_view", 90, 0)
+        fig = create_geometry_plot(body_aero, "$(title)_top_view", 90, 0; use_tex)
         save_plot(fig, save_path, "$(title)_top_view", data_type=data_type)
 
         # Front view
-        fig = create_geometry_plot(body_aero, "$(title)_front_view", 0, 0)
+        fig = create_geometry_plot(body_aero, "$(title)_front_view", 0, 0; use_tex)
         save_plot(fig, save_path, "$(title)_front_view", data_type=data_type)
 
         # Side view
-        fig = create_geometry_plot(body_aero, "$(title)_side_view", 0, -90)
+        fig = create_geometry_plot(body_aero, "$(title)_side_view", 0, -90; use_tex)
         save_plot(fig, save_path, "$(title)_side_view", data_type=data_type)
     end
 
     if is_show
         plt.ion()
-        fig = create_geometry_plot(body_aero, title, view_elevation, view_azimuth)
+        fig = create_geometry_plot(body_aero, title, view_elevation, view_azimuth; use_tex)
         plt.display(fig)
     else
-        fig = create_geometry_plot(body_aero, title, view_elevation, view_azimuth)
+        fig = create_geometry_plot(body_aero, title, view_elevation, view_azimuth; use_tex)
     end
     fig
 end
@@ -301,7 +309,7 @@ end
 """
     plot_distribution(y_coordinates_list, results_list, label_list;  
                       title="spanwise_distribution", data_type=".pdf",
-                      save_path=nothing, is_save=false, is_show=true)
+                      save_path=nothing, is_save=false, is_show=true, use_tex=false)
 
 Plot spanwise distributions of aerodynamic properties.
 
@@ -316,20 +324,22 @@ Plot spanwise distributions of aerodynamic properties.
 - `save_path`: Path to save plots (default: nothing)
 - `is_save`: Whether to save plots (default: false)
 - `is_show`: Whether to display plots (default: true)
+- `use_tex`: if the external `pdflatex` command shall be used
 """
 function VortexStepMethod.plot_distribution(y_coordinates_list, results_list, label_list;
     title="spanwise_distribution",
     data_type=".pdf",
     save_path=nothing,
     is_save=false,
-    is_show=true)
+    is_show=true,
+    use_tex=false)
 
     length(results_list) == length(label_list) || throw(ArgumentError(
         "Number of results ($(length(results_list))) must match number of labels ($(length(label_list)))"
     ))
 
     # Set the plot style
-    set_plot_style()
+    set_plot_style(; use_tex)
 
     # Initializing plot
     fig, axs = plt.subplots(3, 3, figsize=(16, 10))
@@ -469,7 +479,7 @@ end
 """
     generate_polar_data(solver, body_aero::BodyAerodynamics, angle_range;     
                         angle_type="angle_of_attack", angle_of_attack=0.0,
-                        side_slip=0.0, v_a=10.0)
+                        side_slip=0.0, v_a=10.0, use_latex=false)
 
 Generate polar data for aerodynamic analysis over a range of angles.
 
@@ -494,7 +504,8 @@ function generate_polar_data(
     angle_type="angle_of_attack",
     angle_of_attack=0.0,
     side_slip=0.0,
-    v_a=10.0
+    v_a=10.0,
+    use_latex=false
 )
     n_panels = length(body_aero.panels)
     n_angles = length(angle_range)
@@ -511,8 +522,6 @@ function generate_polar_data(
 
     # Previous gamma for initialization
     gamma = nothing
-
-    set_plot_style()
 
     for (i, angle_i) in enumerate(angle_range)
         # Set angle based on type
@@ -573,7 +582,7 @@ end
                 angle_range=range(0, 20, 2), angle_type="angle_of_attack", 
                 angle_of_attack=0.0, side_slip=0.0, v_a=10.0, 
                 title="polar", data_type=".pdf", save_path=nothing, 
-                is_save=true, is_show=true)
+                is_save=true, is_show=true, use_tex=false)
 
 Plot polar data comparing different solvers and configurations.
 
@@ -594,6 +603,7 @@ Plot polar data comparing different solvers and configurations.
 - `save_path`: Path to save plots (default: nothing)
 - `is_save`: Whether to save plots (default: true)
 - `is_show`: Whether to display plots (default: true)
+- `use_tex`: if the external `pdflatex` command shall be used (default: false)
 """
 function VortexStepMethod.plot_polars(
     solver_list,
@@ -609,7 +619,8 @@ function VortexStepMethod.plot_polars(
     data_type=".pdf",
     save_path=nothing,
     is_save=true,
-    is_show=true
+    is_show=true,
+    use_tex=false
 )
     # Validate inputs
     total_cases = length(body_aero_list) + length(literature_path_list)
@@ -618,6 +629,7 @@ function VortexStepMethod.plot_polars(
                             "cases ($total_cases), and labels ($(length(label_list)))"))
     end
     main_title = replace(title, " " => "_")
+    set_plot_style(; use_tex)
 
     # Generate polar data
     polar_data_list = []
