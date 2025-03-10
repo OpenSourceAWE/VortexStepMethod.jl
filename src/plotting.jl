@@ -851,11 +851,14 @@ relative to the 2d airfoil or panel chord line.
 - `alphas`: Range of angle of attack values in radians (default: -5° to 25° in 0.3° steps)
 - `beta_tes`: Range of trailing edge angles in radians (default: -5° to 25° in 0.3° steps)
 - `is_show`: Whether to display plots (default: true)
+- `use_tex`: if the external `pdflatex` command shall be used
 """
 function VortexStepMethod.plot_polar_data(body_aero::BodyAerodynamics; 
         alphas=collect(deg2rad.(-5:0.3:25)), 
         beta_tes = collect(deg2rad.(-5:0.3:25)),
-        is_show = true)
+        is_show = true,
+        use_tex = false
+        )
     if body_aero.panels[1].aero_model === POLAR_MATRICES
         set_plot_style()
         
