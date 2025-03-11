@@ -7,3 +7,4 @@ results/TUDELFT_V3_LEI_KITE/polars/tutorial_testing_stall_model_n_panels_54_dist
 docs/build/
 results/TUDELFT_V3_LEI_KITE/polars/tutorial_testing_stall_model_n_panels_54_distribution_SPLIT_PROVIDED.pdf
 !test/data/*.bin
+Manifest-v1.11.toml
