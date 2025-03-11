@@ -13,7 +13,8 @@
 | alpha $\alpha$| Angle of attack [rad]|
 | beta $\beta$ | Elevation angle of the kite [rad]|
 | beta\_s $\beta_s$ | Side slip angle [rad] |
-| lambda $\lambda$| Trailing edge deformation angle relative to the chordwise x-axis [rad] |
+| delta $\delta$| Trailing edge deformation angle relative to the chordwise x-axis [rad] |
+| theta $\theta$ |The angle between panel chord and body frame x-axis around the local spanwise panel y-axis, not depending on the apparent wind, and can be used to describe the "twist" or deformation of the kite body [rad]|
 | gamma $\Gamma$ |The circulation, which is a measure of the rotational speed of the spinning flow in a vortex [m²/s]. |
 | CL, cl | Lift coefficient [-] |
 | CD, cd | Drag coefficient [-] |
