@@ -5,6 +5,7 @@
 Struct for storing the solution of the [solve!](@ref) function. Must contain all info needed by `KiteModels.jl`.
 
 # Attributes
+- gamma_distribution::Union{Nothing, Vector{Float64}}: Vector containing the panel circulations
 - aero_force::MVec3: Aerodynamic force vector in KB reference frame [N]
 - aero_moments::MVec3: Aerodynamic moments [Mx, My, Mz] around the reference point [Nm]
 - force_coefficients::MVec3: Aerodynamic force coefficients [CFx, CFy, CFz] [-]
@@ -13,7 +14,8 @@ Struct for storing the solution of the [solve!](@ref) function. Must contain all
 - moment_coefficient_distribution::Vector{Float64}: Pitching moment coefficient around the spanwise vector of each panel. [-]
 - solver_status::SolverStatus: enum, see [SolverStatus](@ref)
 """
-mutable struct VSMSolution    
+mutable struct VSMSolution
+    gamma_distribution::Union{Nothing, Vector{Float64}}
     aero_force::MVec3          
     aero_moments::MVec3       
     force_coefficients::MVec3  
@@ -24,7 +26,7 @@ mutable struct VSMSolution
 end
 
 function VSMSolution()
-    VSMSolution(zeros(MVec3), zeros(MVec3), zeros(MVec3), zeros(MVec3), zeros(3), zeros(3), FAILURE)
+    VSMSolution(nothing, zeros(MVec3), zeros(MVec3), zeros(MVec3), zeros(MVec3), zeros(3), zeros(3), FAILURE)
 end
 
 """
@@ -79,7 +81,7 @@ sol::VSMSolution = VSMSolution(): The result of calling [solve!](@ref)
 end
 
 """
-    solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=nothing; 
+    solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=solver.sol.gamma_distribution; 
           log=false, reference_point=zeros(MVec3), moment_frac=0.1)
 
 Main solving routine for the aerodynamic model. Reference point is in the kite body (KB) frame.
@@ -99,15 +101,20 @@ a dictionary.
 # Returns
 The solution of type [VSMSolution](@ref)
 """
-function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=nothing; 
+function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=solver.sol.gamma_distribution; 
     log=false, reference_point=zeros(MVec3), moment_frac=0.1)
 
     # calculate intermediate result
-    converged,
+    (converged,
     body_aero, gamma_new, reference_point, density, aerodynamic_model_type, core_radius_fraction,
     mu, alpha_array, v_a_array, chord_array, x_airf_array, y_airf_array, z_airf_array,
     va_array, va_norm_array, va_unit_array, panels,
-    is_only_f_and_gamma_output = solve_base(solver, body_aero, gamma_distribution; log, reference_point)
+    is_only_f_and_gamma_output) = solve_base(solver, body_aero, gamma_distribution; log, reference_point)
+    if !isnothing(solver.sol.gamma_distribution)
+        solver.sol.gamma_distribution .= gamma_new
+    else
+        solver.sol.gamma_distribution = gamma_new
+    end
 
     # Initialize arrays
     n_panels = length(panels)
