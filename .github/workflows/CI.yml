@@ -80,7 +80,7 @@ jobs:
           DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}
       - run: |
           julia --project=docs -e '
-            ENV["PYTHON"]=""
+            using Pkg; Pkg.add("Conda")
             using Documenter: DocMeta, doctest
             using VortexStepMethod
             DocMeta.setdocmeta!(VortexStepMethod, :DocTestSetup, :(using VortexStepMethod); recursive=true)
