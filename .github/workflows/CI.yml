@@ -70,6 +70,9 @@ jobs:
       - name: Install matplotlib
         run: if [ "$RUNNER_OS" = "Linux" ]; then export PYTHON=""; fi
         shell: bash
+      - name: Install Conda
+        run: julia --project=docs/ -e 'ENV["PYTHON"]=""; using Pkg; Pkg.develop(PackageSpec(path=pwd())); Pkg.instantiate(); Pkg.build("PyCall"); using Conda; print(read(joinpath(dirname(pathof(Conda)), "..", "deps", "deps.jl"),String)); Conda.pip_interop(true); Conda.pip("install", "pythtb")'
+        shell: bash
       - uses: actions/checkout@v4
       - uses: julia-actions/setup-julia@v2
       - uses: julia-actions/cache@v2
@@ -79,7 +82,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}
       - run: |
-          julia --project=docs/ -e 'ENV["PYTHON"]=""; using Pkg; Pkg.develop(PackageSpec(path=pwd())); Pkg.instantiate(); Pkg.build("PyCall"); using Conda; print(read(joinpath(dirname(pathof(Conda)), "..", "deps", "deps.jl"),String)); Conda.pip_interop(true); Conda.pip("install", "pythtb")'
           julia --project=docs -e '
             using Documenter: DocMeta, doctest
             using VortexStepMethod
