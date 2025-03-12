@@ -8,8 +8,7 @@
 # Aerodynamic models of 3D wings using the Vortex Step Method 
 
 The Vortex Step Method (VSM) is an enhanced lifting line method that improves upon the classic approach by solving the circulation system at the three-quarter chord position, among the most important details. This adjustment allows for more accurate calculations of lift and drag forces, particularly addressing the shortcomings in induced drag prediction. 
-VSM is further refined by coupling it with 2D viscous airfoil polars, making it well-suited for complex geometries, 
-including low aspect ratio wings, as well as configurations with sweep, dihedral, and anhedral angles.
+VSM is further refined by coupling it with 2D viscous airfoil polars, making it well-suited for complex geometries, including low aspect ratio wings, as well as configurations with sweep, dihedral, and anhedral angles.
 
 The software presented here includes a couple of examples: a rectangular wing, a leading-edge inflatable kite and a ram-air kite.
 
@@ -17,10 +16,9 @@ This package was translated from the Python code version 1.0.0 available at http
 
 ## Installation
 Install [Julia 1.10](https://ufechner7.github.io/2024/08/09/installing-julia-with-juliaup.html) or later, 
-if you haven't already. On Linux, make sure that Python3, Matplotlib and LaTeX are installed:
+if you haven't already. On Linux, make sure that Python3 and Matplotlib are installed:
 ```
 sudo apt install python3-matplotlib
-sudo apt install texlive-full texlive-fonts-extra cm-super
 ```
 Furthermore, the packages `TestEnv` and `ControlPlots` must be installed globally:
 ```
@@ -80,7 +78,7 @@ To browse the code, it is suggested to use [VSCode](https://code.visualstudio.co
 Three kinds of input data is needed:
 
 - The wing geometry, defined by section:
-  - for the rectangualar wing two sections, two points in CAD reference frame + polars  
+  - for the rectangular wing two sections, two points in CAD reference frame + polars  
     (three different options to provide them) per section
   - kite wing: model of polars included, n sections to define
 
