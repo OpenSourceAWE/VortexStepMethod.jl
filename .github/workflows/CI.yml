@@ -79,8 +79,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}
       - run: |
+          julia --project=docs/ -e 'ENV["PYTHON"]=""; using Pkg; Pkg.develop(PackageSpec(path=pwd())); Pkg.instantiate(); Pkg.build("PyCall"); using Conda; print(read(joinpath(dirname(pathof(Conda)), "..", "deps", "deps.jl"),String)); Conda.pip_interop(true); Conda.pip("install", "pythtb")'
           julia --project=docs -e '
-            using Pkg; Pkg.add("Conda")
             using Documenter: DocMeta, doctest
             using VortexStepMethod
             DocMeta.setdocmeta!(VortexStepMethod, :DocTestSetup, :(using VortexStepMethod); recursive=true)
