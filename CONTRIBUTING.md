@@ -37,8 +37,8 @@ It is OK to push directly to the `main` branch for small changes for example fix
 
 #### Coding style
 1. use verbs for the names of functions, nouns for types and structs
-1. variable and function names lower case, use underscore if needed
-1. Types and structs CamelCase
+1. for variable and function names use lower case, underscore if needed
+1. use CamelCase for types and structs
 1. indent with four spaces
 1. max 120 char per line
 1. do NOT use an automated code formatter
