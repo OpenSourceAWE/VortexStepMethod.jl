@@ -36,6 +36,7 @@ It is OK to push directly to the `main` branch for small changes for example fix
 - Add function cool_feature()
 
 #### Coding style
+1. use verbs for the names of functions, nouns for types and structs
 1. variable and function names lower case, use underscore if needed
 1. Types and structs CamelCase
 1. indent with four spaces
