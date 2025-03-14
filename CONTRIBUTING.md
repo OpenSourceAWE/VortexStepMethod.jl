@@ -38,4 +38,15 @@ It is OK to merge your own pull request without review if you are very sure it w
 1. Types and structs CamelCase
 1. indent with four spaces
 1. max 120 char per line
-1. do NOT use an automated code formatter 
+1. do NOT use an automated code formatter
+
+#### File formats
+1. input files: preferably `.yaml`format
+1. CAD geometries: `.obj` files
+1. multi-dimensional arrays: `.mat` files
+1. CSV files can be used for polars for example, but if the polars are part of wing description better have one `.yaml` file that describes all aspects of the wing
+
+**Open questions** 
+- what are `.dat` files?
+- shall we use `.bin` files?
+- shall we use `.JLD2` files?
