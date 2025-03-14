@@ -32,3 +32,10 @@ It is OK to merge your own pull request without review if you are very sure it w
 - Improve docstrings
 - Implement feature #23
 - Add function cool_feature()
+
+#### Coding style
+1. variable and function names lower case, use underscore if needed
+1. Types and structs CamelCase
+1. indent with four spaces
+1. max 120 char per line
+1. do NOT use an automated code formatter 
