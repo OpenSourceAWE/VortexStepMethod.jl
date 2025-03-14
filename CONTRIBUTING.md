@@ -23,6 +23,8 @@
 
 It is OK to merge your own pull request without review if you are very sure it will not cause any problems. If in doubt, ask on Telegram.
 
+It is OK to push directly to the `main` branch for small changes for example fixing a typo in the documentation.
+
 #### Commit messages
 1. shall start with capital letter
 1. imperative form
