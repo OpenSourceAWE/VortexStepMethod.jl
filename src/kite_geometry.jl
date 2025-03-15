@@ -297,7 +297,7 @@ end
 
 
 """
-    KiteWing
+    RamAirWing
 
 Represents a curved wing that inherits from Wing with additional geometric properties.
 
@@ -319,7 +319,7 @@ Represents a curved wing that inherits from Wing with additional geometric prope
   - area_interp::Extrapolation
 
 """
-mutable struct KiteWing <: AbstractWing
+mutable struct RamAirWing <: AbstractWing
     n_panels::Int64
     spanwise_panel_distribution::PanelDistribution
     spanwise_direction::MVec3
@@ -327,7 +327,7 @@ mutable struct KiteWing <: AbstractWing
     refined_sections::Vector{Section}
     remove_nan::Bool
     
-    # Additional fields for KiteWing
+    # Additional fields for RamAirWing
     non_deformed_sections::Vector{Section}
     mass::Float64
     circle_center_z::Float64
@@ -342,11 +342,11 @@ mutable struct KiteWing <: AbstractWing
 end
 
 """
-    KiteWing(obj_path, dat_path; alpha=0.0, crease_frac=0.75, wind_vel=10., mass=1.0, 
+    RamAirWing(obj_path, dat_path; alpha=0.0, crease_frac=0.75, wind_vel=10., mass=1.0, 
              n_panels=54, n_sections=n_panels+1, spanwise_panel_distribution=UNCHANGED, 
              spanwise_direction=[0.0, 1.0, 0.0], remove_nan::Bool=true)
 
-Constructor for a [KiteWing](@ref) that allows to use an `.obj` and a `.dat` file as input.
+Constructor for a [RamAirWing](@ref) that allows to use an `.obj` and a `.dat` file as input.
 
 # Parameters
 - obj_path: Path to the `.obj` file used for creating the geometry
@@ -364,7 +364,7 @@ Constructor for a [KiteWing](@ref) that allows to use an `.obj` and a `.dat` fil
 - `spanwise_direction`=[0.0, 1.0, 0.0]
 - `remove_nan::Bool`: Wether to remove the NaNs from interpolations or not
 """
-function KiteWing(obj_path, dat_path; alpha=0.0, crease_frac=0.75, wind_vel=10., mass=1.0, 
+function RamAirWing(obj_path, dat_path; alpha=0.0, crease_frac=0.75, wind_vel=10., mass=1.0, 
                   n_panels=54, n_sections=n_panels+1, spanwise_panel_distribution=UNCHANGED, 
                   spanwise_direction=[0.0, 1.0, 0.0], remove_nan=true)
 
@@ -420,18 +420,18 @@ function KiteWing(obj_path, dat_path; alpha=0.0, crease_frac=0.75, wind_vel=10.,
         push!(sections, Section(LE_point, TE_point, POLAR_MATRICES, aero_data))
     end
 
-    KiteWing(n_panels, spanwise_panel_distribution, spanwise_direction, sections, sections, remove_nan, sections,
+    RamAirWing(n_panels, spanwise_panel_distribution, spanwise_direction, sections, sections, remove_nan, sections,
         mass, circle_center_z, gamma_tip, inertia_tensor, radius,
         le_interp, te_interp, area_interp, zeros(n_panels), zeros(n_panels))
 end
 
 """
-    deform!(wing::KiteWing, alphas::AbstractVector, betas::AbstractVector; width)
+    deform!(wing::RamAirWing, alphas::AbstractVector, betas::AbstractVector; width)
 
 Deform wing by applying left and right alpha and beta.
 
 # Arguments
-- `wing`: KiteWing to deform
+- `wing`: RamAirWing to deform
 - `alphas`: [left, right] the angle between of the kite and the body x-axis in radians
 - `betas`: [left, right] the deformation of the trailing edges
 - `width`: Transition width in meters to smoothe out the transition from left to right deformation
@@ -439,7 +439,7 @@ Deform wing by applying left and right alpha and beta.
 # Effects
 Updates wing.sections with deformed geometry
 """
-function deform!(wing::KiteWing, alphas::AbstractVector, betas::AbstractVector; width)
+function deform!(wing::RamAirWing, alphas::AbstractVector, betas::AbstractVector; width)
     local_y = zeros(MVec3)
     chord = zeros(MVec3)
 

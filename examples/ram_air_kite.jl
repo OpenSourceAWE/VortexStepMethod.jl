@@ -7,7 +7,7 @@ USE_TEX = false
 DEFORM = false
 
 # Create wing geometry
-wing = KiteWing("data/ram_air_kite_body.obj", "data/ram_air_kite_foil.dat")
+wing = RamAirWing("data/ram_air_kite_body.obj", "data/ram_air_kite_foil.dat")
 body_aero = BodyAerodynamics([wing];)
 
 if DEFORM

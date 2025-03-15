@@ -147,8 +147,8 @@ using Serialization
         @test isapprox([te_interp[i](0.0) for i in 1:3], [1.0, 0.0, r+z_center], atol=0.03)
     end
     
-    @testset "KiteWing Construction" begin
-        wing = KiteWing(test_obj_path, test_dat_path; remove_nan=true)
+    @testset "RamAirWing Construction" begin
+        wing = RamAirWing(test_obj_path, test_dat_path; remove_nan=true)
         
         @test wing.n_panels == 54  # Default value
         @test wing.spanwise_panel_distribution == UNCHANGED
@@ -161,7 +161,7 @@ using Serialization
         @test !isnan(wing.sections[1].aero_data[4][end])
         @test !isnan(wing.sections[1].aero_data[5][end])
 
-        wing = KiteWing(test_obj_path, test_dat_path; remove_nan=false)
+        wing = RamAirWing(test_obj_path, test_dat_path; remove_nan=false)
         @test isnan(wing.sections[1].aero_data[3][end])
         @test isnan(wing.sections[1].aero_data[4][end])
         @test isnan(wing.sections[1].aero_data[5][end])

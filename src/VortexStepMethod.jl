@@ -18,7 +18,7 @@ using SharedArrays
 using Pkg
 
 # Export public interface
-export Wing, Section, KiteWing
+export Wing, Section, RamAirWing
 export BodyAerodynamics
 export Solver, solve, solve_base, solve!, VSMSolution
 export calculate_results

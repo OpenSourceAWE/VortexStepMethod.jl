@@ -112,7 +112,7 @@ function init!(body_aero::BodyAerodynamics;
         
         # Create panels
         for i in 1:wing.n_panels
-            if wing isa KiteWing
+            if wing isa RamAirWing
                 beta = wing.beta_dist[i]
             else
                 beta = 0.0
