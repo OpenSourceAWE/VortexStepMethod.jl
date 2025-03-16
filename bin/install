@@ -4,6 +4,24 @@ if [[ $(basename $(pwd)) == "bin" ]]; then
     cd ..
 fi
 
+# TODO check if juliaup is installed
+
+# TODO check if Julia is installed and install it if not
+
+if ! command -v juliaup &> /dev/null; then
+    echo "Please install the Julia installer 'juliaup'!"
+    echo "See: https://github.com/JuliaLang/juliaup"
+    exit 1
+fi
+
+# if Julia is not installed, install Julia 1.11
+if ! command -v julia &> /dev/null; then
+    echo "The command 'julia' was not found."
+    echo "Installing Julia 1.11!"
+    juliaup add 1.11
+    juliaup default 1.11
+fi
+
 export JULIA_PKG_SERVER_REGISTRY_PREFERENCE=eager
 
 julia -e 'using Pkg; Pkg.add("TestEnv"); Pkg.add("ControlPlots")'
