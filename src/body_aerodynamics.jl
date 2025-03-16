@@ -113,9 +113,9 @@ function init!(body_aero::BodyAerodynamics;
         # Create panels
         for i in 1:wing.n_panels
             if wing isa RamAirWing
-                beta = wing.beta_dist[i]
+                delta = wing.delta_dist[i]
             else
-                beta = 0.0
+                delta = 0.0
             end
             init!(
                 body_aero.panels[idx], 
@@ -128,7 +128,7 @@ function init!(body_aero::BodyAerodynamics;
                 panel_props.x_airf[i],
                 panel_props.y_airf[i],
                 panel_props.z_airf[i],
-                beta;
+                delta;
                 remove_nan=wing.remove_nan
             )
             idx += 1

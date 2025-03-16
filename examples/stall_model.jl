@@ -91,7 +91,7 @@ PLOT && plot_distribution(
     [CAD_y_coordinates, CAD_y_coordinates],
     [results, results_with_stall],
     ["VSM", "VSM with stall correction"];
-    title="CAD_spanwise_distributions_alpha_$(round(aoa, digits=1))_beta_$(round(side_slip, digits=1))_yaw_$(round(yaw_rate, digits=1))_v_a_$(round(v_a, digits=1))",
+    title="CAD_spanwise_distributions_alpha_$(round(aoa, digits=1))_delta_$(round(side_slip, digits=1))_yaw_$(round(yaw_rate, digits=1))_v_a_$(round(v_a, digits=1))",
     data_type=".pdf",
     save_path=joinpath(save_folder, "spanwise_distributions"),
     is_save=false,

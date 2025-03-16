@@ -262,12 +262,12 @@ end
         v_a = [cos(aoa), 0.0, sin(aoa)] .* v_a
     
         coord = if wing_type === :rectangular
-            twist = range(-0.5, 0.5, length=N)
+            theta = range(-0.5, 0.5, length=N)
             beta = range(-2, 2, length=N)
             generate_coordinates_rect_wing(
                 fill(max_chord, N),
                 span,
-                twist,
+                theta,
                 beta,
                 N,
                 "lin"

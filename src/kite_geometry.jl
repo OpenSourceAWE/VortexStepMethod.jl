@@ -338,7 +338,7 @@ mutable struct RamAirWing <: AbstractWing
     te_interp::NTuple{3, Extrapolation}
     area_interp::Extrapolation
     alpha_dist::Vector{Float64}
-    beta_dist::Vector{Float64}
+    delta_dist::Vector{Float64}
 end
 
 """
@@ -401,7 +401,7 @@ function RamAirWing(obj_path, dat_path; alpha=0.0, crease_frac=0.75, wind_vel=10
     end
 
     @info "Loading polars and kite info from $polar_path and $info_path"
-    (alpha_range, beta_range, cl_matrix::Matrix, cd_matrix::Matrix, cm_matrix::Matrix) = deserialize(polar_path)
+    (alpha_range, delta_range, cl_matrix::Matrix, cd_matrix::Matrix, cm_matrix::Matrix) = deserialize(polar_path)
     if remove_nan
         interpolate_matrix_nans!(cl_matrix)
         interpolate_matrix_nans!(cd_matrix)
@@ -414,7 +414,7 @@ function RamAirWing(obj_path, dat_path; alpha=0.0, crease_frac=0.75, wind_vel=10
     # Create sections
     sections = Section[]
     for gamma in range(-gamma_tip, gamma_tip, n_sections)
-        aero_data = (collect(alpha_range), collect(beta_range), cl_matrix, cd_matrix, cm_matrix)
+        aero_data = (collect(alpha_range), collect(delta_range), cl_matrix, cd_matrix, cm_matrix)
         LE_point = [le_interp[i](gamma) for i in 1:3]
         TE_point = [te_interp[i](gamma) for i in 1:3]
         push!(sections, Section(LE_point, TE_point, POLAR_MATRICES, aero_data))
@@ -426,20 +426,20 @@ function RamAirWing(obj_path, dat_path; alpha=0.0, crease_frac=0.75, wind_vel=10
 end
 
 """
-    deform!(wing::RamAirWing, alphas::AbstractVector, betas::AbstractVector; width)
+    deform!(wing::RamAirWing, alphas::AbstractVector, deltas::AbstractVector; width)
 
-Deform wing by applying left and right alpha and beta.
+Deform wing by applying left and right alpha and delta.
 
 # Arguments
 - `wing`: RamAirWing to deform
 - `alphas`: [left, right] the angle between of the kite and the body x-axis in radians
-- `betas`: [left, right] the deformation of the trailing edges
+- `deltas`: [left, right] the deformation of the trailing edges
 - `width`: Transition width in meters to smoothe out the transition from left to right deformation
 
 # Effects
 Updates wing.sections with deformed geometry
 """
-function deform!(wing::RamAirWing, alphas::AbstractVector, betas::AbstractVector; width)
+function deform!(wing::RamAirWing, alphas::AbstractVector, deltas::AbstractVector; width)
     local_y = zeros(MVec3)
     chord = zeros(MVec3)
 
@@ -452,12 +452,12 @@ function deform!(wing::RamAirWing, alphas::AbstractVector, betas::AbstractVector
         else
             alphas[1] * (1.0 - normalized_gamma) + alphas[2] * normalized_gamma
         end
-        wing.beta_dist[i] = if normalized_gamma <= 0.0
-            betas[1]
+        wing.delta_dist[i] = if normalized_gamma <= 0.0
+            deltas[1]
         elseif normalized_gamma >= 1.0
-            betas[2]
+            deltas[2]
         else
-            betas[1] * (1.0 - normalized_gamma) + betas[2] * normalized_gamma
+            deltas[1] * (1.0 - normalized_gamma) + deltas[2] * normalized_gamma
         end
 
         section1 = wing.non_deformed_sections[i]

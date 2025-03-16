@@ -70,7 +70,7 @@ Represents a panel in a vortex step method simulation. All points and vectors ar
         SemiInfiniteFilament(),
         SemiInfiniteFilament()
     )
-    beta::Float64 = 0.0
+    delta::Float64 = 0.0
 end
 
 function init_pos!(
@@ -84,7 +84,7 @@ function init_pos!(
     x_airf::PosVector,
     y_airf::PosVector,
     z_airf::PosVector,
-    beta
+    delta
 )
     # Initialize basic geometry
     panel.TE_point_1 .= section_1.TE_point
@@ -108,7 +108,7 @@ function init_pos!(
     panel.x_airf .= x_airf
     panel.y_airf .= y_airf
     panel.z_airf .= z_airf
-    panel.beta = Float64(beta)
+    panel.delta = Float64(delta)
     return nothing
 end
 
@@ -157,7 +157,7 @@ function init_aero!(
 
         elseif panel.aero_model == POLAR_MATRICES
             !all(isapprox.(aero_1[1], aero_2[1])) && @error "Make sure you use the same alpha range for all your interpolations."
-            !all(isapprox.(aero_1[2], aero_2[2])) && @error "Make sure you use the same beta range for all your interpolations."
+            !all(isapprox.(aero_1[2], aero_2[2])) && @error "Make sure you use the same delta range for all your interpolations."
 
             polar_data = (
                 Matrix{Float64}((aero_1[3] + aero_2[3]) / 2),
@@ -165,11 +165,11 @@ function init_aero!(
                 Matrix{Float64}((aero_1[5] + aero_2[5]) / 2)
             )
             alphas = Vector{Float64}(aero_1[1])
-            betas = Vector{Float64}(aero_1[2])
+            deltas = Vector{Float64}(aero_1[2])
 
-            panel.cl_interp = linear_interpolation((alphas, betas), polar_data[1]; extrapolation_bc)
-            panel.cd_interp = linear_interpolation((alphas, betas), polar_data[2]; extrapolation_bc)
-            panel.cm_interp = linear_interpolation((alphas, betas), polar_data[3]; extrapolation_bc)
+            panel.cl_interp = linear_interpolation((alphas, deltas), polar_data[1]; extrapolation_bc)
+            panel.cd_interp = linear_interpolation((alphas, deltas), polar_data[2]; extrapolation_bc)
+            panel.cm_interp = linear_interpolation((alphas, deltas), polar_data[3]; extrapolation_bc)
         else
             throw(ArgumentError("Polar data in wrong format: $aero_1"))
         end
@@ -190,12 +190,12 @@ function init!(
     x_airf::PosVector,
     y_airf::PosVector,
     z_airf::PosVector,
-    beta;
+    delta;
     init_aero = true,
     remove_nan = true
 )
     init_pos!(panel, section_1, section_2, aero_center, control_point, bound_point_1, bound_point_2,
-        x_airf, y_airf, z_airf, beta)
+        x_airf, y_airf, z_airf, delta)
     init_aero && init_aero!(panel, section_1, section_2; remove_nan)
     return nothing
 end
@@ -331,7 +331,7 @@ function calculate_cl(panel::Panel, alpha::Float64)::Float64
     elseif panel.aero_model == POLAR_VECTORS
         cl = panel.cl_interp(alpha)::Float64
     elseif panel.aero_model == POLAR_MATRICES
-        cl = panel.cl_interp(alpha, panel.beta)::Float64
+        cl = panel.cl_interp(alpha, panel.delta)::Float64
     else
         throw(ArgumentError("Unsupported aero model: $(panel.aero_model)"))
     end
@@ -356,8 +356,8 @@ function calculate_cd_cm(panel::Panel, alpha::Float64)
         cd = panel.cd_interp(alpha)::Float64
         cm = panel.cm_interp(alpha)::Float64
     elseif panel.aero_model == POLAR_MATRICES    
-        cd = panel.cd_interp(alpha, panel.beta)::Float64
-        cm = panel.cm_interp(alpha, panel.beta)::Float64
+        cd = panel.cd_interp(alpha, panel.delta)::Float64
+        cm = panel.cm_interp(alpha, panel.delta)::Float64
     elseif !(panel.aero_model == INVISCID)
         throw(ArgumentError("Unsupported aero model: $(panel.aero_model)"))
     end

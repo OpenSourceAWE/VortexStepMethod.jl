@@ -310,20 +310,20 @@ function calculate_new_aero_data(aero_model,
             return (alpha_left, CL_data, CD_data, CM_data)
             
         elseif model_type == POLAR_MATRICES
-            alpha_left, beta_left, CL_left, CD_left, CM_left = polar_left
-            alpha_right, beta_right, CL_right, CD_right, CM_right = polar_right
+            alpha_left, delta_left, CL_left, CD_left, CM_left = polar_left
+            alpha_right, delta_right, CL_right, CD_right, CM_right = polar_right
             
             # Create common alpha array
             !all(isapprox.(alpha_left, alpha_right)) && @error "Make sure you use the same alpha range for all your interpolations."
-            !all(isapprox.(beta_left, beta_right)) && @error "Make sure you use the same alpha range for all your interpolations."
-            !isa(CL_right, AbstractMatrix) && @error "Provide polar data in the correct format: (alpha, beta, cl, cd, cm)"
+            !all(isapprox.(delta_left, delta_right)) && @error "Make sure you use the same alpha range for all your interpolations."
+            !isa(CL_right, AbstractMatrix) && @error "Provide polar data in the correct format: (alpha, delta, cl, cd, cm)"
 
             # Weighted interpolation
             CL_data = CL_left .* left_weight .+ CL_right .* right_weight
             CD_data = CD_left .* left_weight .+ CD_right .* right_weight
             CM_data = CM_left .* left_weight .+ CM_right .* right_weight
             
-            return (alpha_left, beta_left, CL_data, CD_data, CM_data)
+            return (alpha_left, delta_left, CL_data, CD_data, CM_data)
         end
 
     elseif model_type === LEI_AIRFOIL_BREUKELS
