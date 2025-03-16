@@ -8,3 +8,5 @@ export JULIA_PKG_SERVER_REGISTRY_PREFERENCE=eager
 
 julia -e 'using Pkg; Pkg.add("TestEnv"); Pkg.add("ControlPlots")'
 
+julia --project -e 'include("bin/install.jl")'
+
