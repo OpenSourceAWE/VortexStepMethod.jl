@@ -839,9 +839,9 @@ function VortexStepMethod.plot_polars(
 end
 
 """
-    plot_polar_data(body_aero::BodyAerodynamics; alphas=collect(deg2rad.(-5:0.3:25)), beta_tes=collect(deg2rad.(-5:0.3:25)))
+    plot_polar_data(body_aero::BodyAerodynamics; alphas=collect(deg2rad.(-5:0.3:25)), delta_tes=collect(deg2rad.(-5:0.3:25)))
 
-Plot polar data (Cl, Cd, Cm) as 3D surfaces against alpha and beta_te angles. Beta_te is the trailing edge deflection angle
+Plot polar data (Cl, Cd, Cm) as 3D surfaces against alpha and delta_te angles. delta_te is the trailing edge deflection angle
 relative to the 2d airfoil or panel chord line.
 
 # Arguments
@@ -849,13 +849,13 @@ relative to the 2d airfoil or panel chord line.
 
 # Keyword arguments
 - `alphas`: Range of angle of attack values in radians (default: -5° to 25° in 0.3° steps)
-- `beta_tes`: Range of trailing edge angles in radians (default: -5° to 25° in 0.3° steps)
+- `delta_tes`: Range of trailing edge angles in radians (default: -5° to 25° in 0.3° steps)
 - `is_show`: Whether to display plots (default: true)
 - `use_tex`: if the external `pdflatex` command shall be used
 """
 function VortexStepMethod.plot_polar_data(body_aero::BodyAerodynamics; 
         alphas=collect(deg2rad.(-5:0.3:25)), 
-        beta_tes = collect(deg2rad.(-5:0.3:25)),
+        delta_tes = collect(deg2rad.(-5:0.3:25)),
         is_show = true,
         use_tex = false
         )
@@ -877,10 +877,10 @@ function VortexStepMethod.plot_polar_data(body_aero::BodyAerodynamics;
             ax = fig.add_subplot(1, 3, idx, projection="3d")
             
             # Create interpolation matrix
-            interp_matrix = zeros(length(alphas), length(beta_tes))
-            interp_matrix .= [interp(alpha, beta_te) for alpha in alphas, beta_te in beta_tes]
-            X = collect(beta_tes) .+ zeros(length(alphas))'
-            Y = collect(alphas)' .+ zeros(length(beta_tes))
+            interp_matrix = zeros(length(alphas), length(delta_tes))
+            interp_matrix .= [interp(alpha, delta_te) for alpha in alphas, delta_te in delta_tes]
+            X = collect(delta_tes) .+ zeros(length(alphas))'
+            Y = collect(alphas)' .+ zeros(length(delta_tes))
             
             # Plot surface
             ax.plot_wireframe(X, Y, interp_matrix, 
@@ -891,10 +891,10 @@ function VortexStepMethod.plot_polar_data(body_aero::BodyAerodynamics;
                             alpha=0.6)
             
             # Set labels and title
-            ax.set_xlabel(L"$\beta$ [rad]")
+            ax.set_xlabel(L"$\delta$ [rad]")
             ax.set_ylabel(L"$\alpha$ [rad]")
             ax.set_zlabel(label)
-            ax.set_title(label * L" vs $\alpha$ and $\beta$")
+            ax.set_title(label * L" vs $\alpha$ and $\delta$")
             ax.grid(true)
         end
         

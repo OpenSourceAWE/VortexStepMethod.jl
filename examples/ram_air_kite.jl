@@ -12,8 +12,8 @@ body_aero = BodyAerodynamics([wing];)
 
 if DEFORM
     alpha = [deg2rad(10), 0]
-    beta = [deg2rad(10), 0]
-    @time VortexStepMethod.deform!(wing, alpha, beta; width=1.0)
+    delta = [deg2rad(10), 0]
+    @time VortexStepMethod.deform!(wing, alpha, delta; width=1.0)
     @time VortexStepMethod.init!(body_aero)
 end
 
@@ -62,7 +62,7 @@ PLOT && plot_distribution(
     [body_y_coordinates],
     [results],
     ["VSM"];
-    title="CAD_spanwise_distributions_alpha_$(round(aoa, digits=1))_beta_$(round(side_slip, digits=1))_yaw_$(round(yaw_rate, digits=1))_v_a_$(round(v_a, digits=1))",
+    title="CAD_spanwise_distributions_alpha_$(round(aoa, digits=1))_delta_$(round(side_slip, digits=1))_yaw_$(round(yaw_rate, digits=1))_v_a_$(round(v_a, digits=1))",
     data_type=".pdf",
     is_save=false,
     is_show=true,

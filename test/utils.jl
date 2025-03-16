@@ -20,7 +20,7 @@ Generate 3D coordinates of a rectangular wing with twist and dihedral.
 # Arguments
 - `chord::Vector{Float64}`: Chord lengths of wing panels
 - `span::Float64`: Total wing span
-- `twist::Vector{Float64}`: Twist angles in radians
+- `theta::Vector{Float64}`: Twist angles in radians
 - `beta::Vector{Float64}`: Dihedral angles in radians
 - `N::Int`: Number of spanwise panels
 - `dist::String`: Distribution type ("cos" or "lin")
@@ -28,7 +28,7 @@ Generate 3D coordinates of a rectangular wing with twist and dihedral.
 # Returns
 - `coord::Matrix{Float64}`: 2N×3 matrix of coordinates
 """
-function generate_coordinates_rect_wing(chord, span, twist, beta, N, dist)
+function generate_coordinates_rect_wing(chord, span, theta, beta, N, dist)
     coord = zeros(2 * N, 3)
     span_points = if dist == "cos"
         cosspace(-span/2, span/2, N)
@@ -40,14 +40,14 @@ function generate_coordinates_rect_wing(chord, span, twist, beta, N, dist)
 
     for i in 1:N
         coord[2i-1, :] = [
-            -0 * chord[i] * cos(twist[i]),
+            -0 * chord[i] * cos(theta[i]),
             span_points[i],
-            0 * chord[i] * sin(twist[i]) - abs(span_points[i] * sin(beta[i]))
+            0 * chord[i] * sin(theta[i]) - abs(span_points[i] * sin(beta[i]))
         ]
         coord[2i, :] = [
-            1 * chord[i] * cos(twist[i]),
+            1 * chord[i] * cos(theta[i]),
             span_points[i],
-            -1 * chord[i] * sin(twist[i]) - abs(span_points[i] * sin(beta[i]))
+            -1 * chord[i] * sin(theta[i]) - abs(span_points[i] * sin(beta[i]))
         ]
     end
     return coord

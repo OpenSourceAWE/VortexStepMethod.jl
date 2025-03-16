@@ -70,9 +70,9 @@ end
         
         # Create matrix data with NaNs
         alpha = collect(range(-10, 10, 21))
-        beta = collect(range(-5, 5, 11))
-        cl = [cos(a) * cos(b) for a in alpha, b in beta]
-        cd = [sin(a) * sin(b) for a in alpha, b in beta]
+        delta = collect(range(-5, 5, 11))
+        cl = [cos(a) * cos(b) for a in alpha, b in delta]
+        cd = [sin(a) * sin(b) for a in alpha, b in delta]
         cm = zeros(21, 11)
         
         # Insert NaNs at various positions
@@ -80,7 +80,7 @@ end
         cd[10,5] = NaN
         cm[15,7] = NaN
         
-        aero_data = (alpha, beta, cl, cd, cm)
+        aero_data = (alpha, delta, cl, cd, cm)
         add_section!(wing, [0.0, 0.0, 0.0], [1.0, 0.0, 0.0], POLAR_MATRICES, aero_data)
         
         # Check if NaNs were removed consistently
@@ -89,7 +89,7 @@ end
         @test !any(isnan, cleaned_data[4])   # cd
         @test !any(isnan, cleaned_data[5])   # cm
         @test all(diff(cleaned_data[1]) .> 0) # alpha still monotonic
-        @test all(diff(cleaned_data[2]) .> 0) # beta still monotonic
+        @test all(diff(cleaned_data[2]) .> 0) # delta still monotonic
     end
 
     @testset "Robustness left to right" begin
