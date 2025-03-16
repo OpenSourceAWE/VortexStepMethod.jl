@@ -1,13 +1,9 @@
 #!/bin/bash
-
 if [[ $(basename $(pwd)) == "bin" ]]; then
     cd ..
 fi
 
-# TODO check if juliaup is installed
-
-# TODO check if Julia is installed and install it if not
-
+# check if juliaup is installed
 if ! command -v juliaup &> /dev/null; then
     echo "Please install the Julia installer 'juliaup'!"
     echo "See: https://github.com/JuliaLang/juliaup"
@@ -27,4 +23,6 @@ export JULIA_PKG_SERVER_REGISTRY_PREFERENCE=eager
 julia -e 'using Pkg; Pkg.add("TestEnv"); Pkg.add("ControlPlots")'
 
 julia --project -e 'include("bin/install.jl")'
+
+# TODO rename Manifest.toml to Manifest-v1.11.toml if required
 
