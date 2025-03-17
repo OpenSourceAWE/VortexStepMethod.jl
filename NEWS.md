@@ -4,6 +4,8 @@
 - The function `solve!` returns a struct now. The function `solve`that returns a dict is still available.
   Add the moment coefficients distribution in `solve!`
 ### Changed
+- `deform!` by a distribution instead of just a left and right angle
+- Read the y-coordinates in the correct direction from the `ram_air_kite_body.obj` file
 - In the `menu.jl`, changed `help` to `help_me`. It works better now, no more warnings on Linux, it should also work on MacOS now
 - The coordinate frames of the panels now use the same convention as the kite body frame
 - The page "Glossary" of the documentation is quite complete now
