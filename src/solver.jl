@@ -105,11 +105,10 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
     log=false, reference_point=zeros(MVec3), moment_frac=0.1)
 
     # calculate intermediate result
-    (converged,
-    body_aero, gamma_new, reference_point, density, aerodynamic_model_type, core_radius_fraction,
-    mu, alpha_array, v_a_array, chord_array, x_airf_array, y_airf_array, z_airf_array,
-    va_array, va_norm_array, va_unit_array, panels,
-    is_only_f_and_gamma_output) = solve_base(solver, body_aero, gamma_distribution; log, reference_point)
+    (converged, body_aero, gamma_new, reference_point, density, aerodynamic_model_type, core_radius_fraction,
+        mu, alpha_array, v_a_array, chord_array, x_airf_array, y_airf_array, z_airf_array,
+        va_array, va_norm_array, va_unit_array, panels,
+        is_only_f_and_gamma_output) = solve_base(solver, body_aero, gamma_distribution; log, reference_point)
     if !isnothing(solver.sol.gamma_distribution)
         solver.sol.gamma_distribution .= gamma_new
     else
@@ -242,7 +241,7 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
         # Calculate the moment distribution (moment on each panel)
         arm = (moment_frac - 0.25) * panel.chord
         moment_distribution[i] = dot(ftotal_induced_va, panel.z_airf) * arm
-        moment_coefficient_distribution[i] = moment_distribution[i] ./ (q_inf * projected_area)
+        moment_coefficient_distribution[i] = moment_distribution[i] / (q_inf * projected_area)
     end
 
     # update the result struct

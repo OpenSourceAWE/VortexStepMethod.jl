@@ -413,14 +413,19 @@ function RamAirWing(obj_path, dat_path; alpha=0.0, crease_frac=0.75, wind_vel=10
 
     # Create sections
     sections = Section[]
+    refined_sections = Section[]
+    non_deformed_sections = Section[]
     for gamma in range(-gamma_tip, gamma_tip, n_sections)
         aero_data = (collect(alpha_range), collect(delta_range), cl_matrix, cd_matrix, cm_matrix)
         LE_point = [le_interp[i](gamma) for i in 1:3]
         TE_point = [te_interp[i](gamma) for i in 1:3]
         push!(sections, Section(LE_point, TE_point, POLAR_MATRICES, aero_data))
+        push!(refined_sections, Section(LE_point, TE_point, POLAR_MATRICES, aero_data))
+        push!(non_deformed_sections, Section(LE_point, TE_point, POLAR_MATRICES, aero_data))
     end
 
-    RamAirWing(n_panels, spanwise_panel_distribution, spanwise_direction, sections, sections, remove_nan, sections,
+    RamAirWing(n_panels, spanwise_panel_distribution, spanwise_direction, sections, 
+        refined_sections, remove_nan, non_deformed_sections,
         mass, circle_center_z, gamma_tip, inertia_tensor, radius,
         le_interp, te_interp, area_interp, zeros(n_panels), zeros(n_panels))
 end
