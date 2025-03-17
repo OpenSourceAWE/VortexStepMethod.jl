@@ -337,7 +337,7 @@ mutable struct RamAirWing <: AbstractWing
     le_interp::NTuple{3, Extrapolation}
     te_interp::NTuple{3, Extrapolation}
     area_interp::Extrapolation
-    alpha_dist::Vector{Float64}
+    theta_dist::Vector{Float64}
     delta_dist::Vector{Float64}
 end
 
@@ -426,45 +426,33 @@ function RamAirWing(obj_path, dat_path; alpha=0.0, crease_frac=0.75, wind_vel=10
 end
 
 """
-    deform!(wing::RamAirWing, alphas::AbstractVector, deltas::AbstractVector; width)
+    deform!(wing::RamAirWing, theta_dist::AbstractVector, delta_dist::AbstractVector; width)
 
-Deform wing by applying left and right alpha and delta.
+Deform wing by applying theta and delta distributions.
 
 # Arguments
 - `wing`: RamAirWing to deform
-- `alphas`: [left, right] the angle between of the kite and the body x-axis in radians
-- `deltas`: [left, right] the deformation of the trailing edges
-- `width`: Transition width in meters to smoothe out the transition from left to right deformation
+- `theta_dist`: the angle distribution between of the kite and the body x-axis in radians of each panel
+- `delta_dist`: the deformation of the trailing edges of each panel
 
 # Effects
 Updates wing.sections with deformed geometry
 """
-function deform!(wing::RamAirWing, alphas::AbstractVector, deltas::AbstractVector; width)
+function deform!(wing::RamAirWing, theta_dist::AbstractVector, delta_dist::AbstractVector)
+    !(length(theta_dist) == wing.n_panels) && throw(ArgumentError("theta_dist and panels are of different lengths"))
+    !(length(delta_dist) == wing.n_panels) && throw(ArgumentError("delta_dist and panels are of different lengths"))
+    wing.theta_dist .= theta_dist
+    wing.delta_dist .= delta_dist
+
     local_y = zeros(MVec3)
     chord = zeros(MVec3)
 
-    for (i, gamma) in enumerate(range(-wing.gamma_tip, wing.gamma_tip, wing.n_panels))
-        normalized_gamma = (gamma * wing.radius / width + 0.5)  # Maps [-0.5, 0.5] to [0, 1]
-        wing.alpha_dist[i] = if normalized_gamma <= 0.0
-            alphas[1]
-        elseif normalized_gamma >= 1.0
-            alphas[2]
-        else
-            alphas[1] * (1.0 - normalized_gamma) + alphas[2] * normalized_gamma
-        end
-        wing.delta_dist[i] = if normalized_gamma <= 0.0
-            deltas[1]
-        elseif normalized_gamma >= 1.0
-            deltas[2]
-        else
-            deltas[1] * (1.0 - normalized_gamma) + deltas[2] * normalized_gamma
-        end
-
+    for i in 1:wing.n_panels
         section1 = wing.non_deformed_sections[i]
         section2 = wing.non_deformed_sections[i+1]
         local_y .= normalize(section1.LE_point - section2.LE_point)
         chord .= section1.TE_point .- section1.LE_point
-        wing.sections[i].TE_point .= section1.LE_point .+ rotate_v_around_k(chord, local_y, wing.alpha_dist[i])
+        wing.sections[i].TE_point .= section1.LE_point .+ rotate_v_around_k(chord, local_y, wing.theta_dist[i])
     end
     return nothing
 end
