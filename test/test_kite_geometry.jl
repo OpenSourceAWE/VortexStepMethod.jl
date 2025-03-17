@@ -166,6 +166,42 @@ using Serialization
         @test isnan(wing.sections[1].aero_data[4][end])
         @test isnan(wing.sections[1].aero_data[5][end])
     end
+
+    @testset "Wing Deformation" begin
+        # Create a RamAirWing for testing
+        wing = RamAirWing(test_obj_path, test_dat_path; remove_nan=true)
+        body_aero = BodyAerodynamics([wing])
+        
+        # Store original TE point for comparison
+        i = length(body_aero.panels) ÷ 2
+        original_te_point = copy(body_aero.panels[i].TE_point_1)
+        
+        # Apply deformation with non-zero angles
+        theta_dist = fill(deg2rad(30.0), wing.n_panels)  # 10 degrees twist
+        delta_dist = fill(deg2rad(5.0), wing.n_panels)   # 5 degrees trailing edge deflection
+        
+        VortexStepMethod.deform!(wing, theta_dist, delta_dist)
+        VortexStepMethod.init!(body_aero)
+        
+        # Check if TE point changed after deformation
+        deformed_te_point = copy(body_aero.panels[i].TE_point_1)
+        @test !isapprox(original_te_point, deformed_te_point, atol=1e-2)
+        @test deformed_te_point[3] < original_te_point[3] # right hand rule
+        @test deformed_te_point[2] ≈ original_te_point[2] atol=1e-2 # right hand rule
+        @test deformed_te_point[1] < original_te_point[1] # right hand rule
+        @test body_aero.panels[i].delta ≈ deg2rad(5.0)
+        
+        # Reset deformation with zero angles
+        zero_theta_dist = zeros(wing.n_panels)
+        zero_delta_dist = zeros(wing.n_panels)
+        
+        VortexStepMethod.deform!(wing, zero_theta_dist, zero_delta_dist)
+        VortexStepMethod.init!(body_aero)
+        
+        # Check if TE point returned to original position
+        reset_te_point = copy(body_aero.panels[i].TE_point_1)
+        @test isapprox(original_te_point, reset_te_point, atol=1e-4)
+    end
     
     rm(test_obj_path)
     rm(test_dat_path)
