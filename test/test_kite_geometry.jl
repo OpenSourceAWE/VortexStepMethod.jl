@@ -200,7 +200,7 @@ using Serialization
         
         # Check if TE point returned to original position
         reset_te_point = copy(body_aero.panels[i].TE_point_1)
-        @test isapprox(original_te_point, reset_te_point, atol=1e-4)
+        @test original_te_point ≈ reset_te_point atol=1e-4
     end
     
     rm(test_obj_path)
