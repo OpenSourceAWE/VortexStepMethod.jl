@@ -101,6 +101,8 @@ const cache2 = LazyBufferCache()
 const cache3 = LazyBufferCache()
 const cache4 = LazyBufferCache()
 const cache5 = LazyBufferCache()
+const cache6 = LazyBufferCache()
+const cache7 = LazyBufferCache()
 
 """
     solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=solver.sol.gamma_distribution; 
@@ -460,14 +462,14 @@ function gamma_loop(
 
     gamma = cache2[gamma_new]
     abs_gamma_new = cache3[gamma_new]
-    induced_velocity_all = zeros(n_panels, 3)
+    induced_velocity_all = cache6[va_array]
     relative_velocity_array = cache[va_array]
     relative_velocity_crossz = cache4[relative_velocity_array]
     v_acrossz_array = cache5[va_array]
-    cl_array = zeros(n_panels)
-    damp = zeros(length(gamma))
-    v_normal_array = zeros(n_panels)
-    v_tangential_array = zeros(n_panels)
+    cl_array = cache3[gamma]
+    damp = cache3[cl_array]
+    v_normal_array = cache3[damp]
+    v_tangential_array = cache7[v_normal_array]
 
     AIC_x, AIC_y, AIC_z = body_aero.AIC[1, :, :], body_aero.AIC[2, :, :], body_aero.AIC[3, :, :]
 
