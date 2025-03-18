@@ -174,7 +174,7 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
     va_mag = norm(body_aero.va)
     va = body_aero.va
     va_unit = va / va_mag
-    @. q_inf = 0.5 * density * va^2
+    q_inf = 0.5 .* density .* va .^ 2
 
     # Calculate wing geometry properties
     projected_area = body_aero.projected_area
