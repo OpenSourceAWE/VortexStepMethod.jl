@@ -251,7 +251,7 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
 
         # Calculate the moment distribution (moment on each panel)
         arm = (moment_frac - 0.25) * panel.chord
-        moment_distribution[i] = dot(ftotal_induced_va, panel.z_airf) * arm
+        moment_distribution[i] = (ftotal_induced_va ⋅ panel.z_airf) * arm
         moment_coefficient_distribution[i] = moment_distribution[i] / (q_inf * projected_area)
     end
 
@@ -510,8 +510,8 @@ function gamma_loop(
         end
 
         for i in 1:n_panels
-            v_normal_array[i] = dot(view(z_airf_array, i, :), view(relative_velocity_array, i, :))
-            v_tangential_array[i] = dot(view(x_airf_array, i, :), view(relative_velocity_array, i, :))
+            v_normal_array[i] = view(z_airf_array, i, :) ⋅ view(relative_velocity_array, i, :)
+            v_tangential_array[i] = view(x_airf_array, i, :) ⋅ view(relative_velocity_array, i, :)
         end
         alpha_array .= atan.(v_normal_array, v_tangential_array)
 
