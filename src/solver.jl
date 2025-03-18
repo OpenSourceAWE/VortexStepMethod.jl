@@ -123,7 +123,7 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
     # calculate intermediate result
     (converged, body_aero, gamma_new, reference_point, density, aerodynamic_model_type, core_radius_fraction,
         mu, alpha_array, v_a_array, chord_array, solver.sol.x_airf_array, solver.sol.y_airf_array, solver.sol.z_airf_array,
-        va_array, va_norm_array, va_unit_array, panels,
+        solver.sol.va_array, va_norm_array, va_unit_array, panels,
         is_only_f_and_gamma_output) = solve_base(solver, body_aero, gamma_distribution; log, reference_point)
     if !isnothing(solver.sol.gamma_distribution)
         solver.sol.gamma_distribution .= gamma_new
@@ -168,7 +168,7 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
             core_radius_fraction,
             solver.sol.z_airf_array,
             solver.sol.x_airf_array,
-            va_array,
+            solver.sol.va_array,
             va_norm_array,
             va_unit_array
         )
@@ -327,7 +327,7 @@ function solve_base(solver::Solver, body_aero::BodyAerodynamics, gamma_distribut
     solver.sol.x_airf_array .= 0
     solver.sol.y_airf_array .= 0
     solver.sol.z_airf_array .= 0
-    va_array = zeros(n_panels, 3)
+    solver.sol.va_array .= 0
     chord_array = zeros(n_panels)
 
     # Fill arrays from panels
@@ -335,13 +335,13 @@ function solve_base(solver::Solver, body_aero::BodyAerodynamics, gamma_distribut
         solver.sol.x_airf_array[i, :] .= panel.x_airf
         solver.sol.y_airf_array[i, :] .= panel.y_airf
         solver.sol.z_airf_array[i, :] .= panel.z_airf
-        va_array[i, :] .= panel.va
+        solver.sol.va_array[i, :] .= panel.va
         chord_array[i] = panel.chord
     end
 
     # Calculate unit vectors
-    va_norm_array = norm.(eachrow(va_array))
-    va_unit_array = va_array ./ va_norm_array
+    va_norm_array = norm.(eachrow(solver.sol.va_array))
+    va_unit_array = solver.sol.va_array ./ va_norm_array
 
     # Calculate AIC matrices
     calculate_AIC_matrices!(
@@ -371,7 +371,7 @@ function solve_base(solver::Solver, body_aero::BodyAerodynamics, gamma_distribut
         solver,
         body_aero,
         gamma_initial,
-        va_array,
+        solver.sol.va_array,
         chord_array,
         solver.sol.x_airf_array,
         solver.sol.y_airf_array,
@@ -387,7 +387,7 @@ function solve_base(solver::Solver, body_aero::BodyAerodynamics, gamma_distribut
             solver,
             body_aero,
             gamma_initial,
-            va_array,
+            solver.sol.va_array,
             chord_array,
             solver.sol.x_airf_array,
             solver.sol.y_airf_array,
@@ -414,7 +414,7 @@ function solve_base(solver::Solver, body_aero::BodyAerodynamics, gamma_distribut
         solver.sol.x_airf_array,
         solver.sol.y_airf_array,
         solver.sol.z_airf_array,
-        va_array,
+        solver.sol.va_array,
         va_norm_array,
         va_unit_array,
         panels,
