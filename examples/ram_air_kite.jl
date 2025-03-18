@@ -24,7 +24,8 @@ if DEFORM
 end
 
 # Create solvers
-vsm_solver = Solver(
+P = length(body_aero.panels)
+vsm_solver = Solver{P}(
     aerodynamic_model_type=VSM,
     is_with_artificial_damping=false
 )

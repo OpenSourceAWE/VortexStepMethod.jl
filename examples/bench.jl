@@ -39,8 +39,9 @@ vel_app = [cos(alpha), 0.0, sin(alpha)] .* v_a
 set_va!(wa, vel_app)
 
 # Step 4: Initialize solvers for both LLT and VSM methods
-llt_solver = Solver(aerodynamic_model_type=LLT)
-vsm_solver = Solver(aerodynamic_model_type=VSM)
+P = length(wa.panels)
+llt_solver = Solver{P}(aerodynamic_model_type=LLT)
+vsm_solver = Solver{P}(aerodynamic_model_type=VSM)
 
 # Step 5: Solve using both methods
 results_vsm = solve(vsm_solver, wa)
@@ -61,7 +62,8 @@ wing = RamAirWing("data/ram_air_kite_body.obj", "data/ram_air_kite_foil.dat")
 body_aero = BodyAerodynamics([wing])
 
 # Create solvers
-vsm_solver = Solver(
+P = length(wa.panels)
+vsm_solver = Solver{P}(
     aerodynamic_model_type=VSM,
     is_with_artificial_damping=false
 )

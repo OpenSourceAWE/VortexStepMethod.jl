@@ -35,8 +35,9 @@ vel_app = [cos(alpha), 0.0, sin(alpha)] .* v_a
 set_va!(wa, vel_app, [0, 0, 0.1])
 
 # Step 4: Initialize solvers for both LLT and VSM methods
-llt_solver = Solver(aerodynamic_model_type=LLT)
-vsm_solver = Solver(aerodynamic_model_type=VSM)
+P = length(wa.panels)
+llt_solver = Solver{P}(aerodynamic_model_type=LLT)
+vsm_solver = Solver{P}(aerodynamic_model_type=VSM)
 
 # Step 5: Solve using both methods
 results_llt = solve(llt_solver, wa)
