@@ -14,24 +14,23 @@ Struct for storing the solution of the [solve!](@ref) function. Must contain all
 - moment_coefficient_distribution::Vector{Float64}: Pitching moment coefficient around the spanwise vector of each panel. [-]
 - solver_status::SolverStatus: enum, see [SolverStatus](@ref)
 """
-mutable struct VSMSolution{P}
-    panel_width_array::Vector{Float64}
-    cl_array::Vector{Float64}
-    cd_array::Vector{Float64}
-    cm_array::Vector{Float64}
-    gamma_distribution::Union{Nothing, Vector{Float64}}
-    aero_force::MVec3          
-    aero_moments::MVec3       
-    force_coefficients::MVec3  
-    moment_coefficients::MVec3  
-    moment_distribution::Vector{Float64}
-    moment_coefficient_distribution::Vector{Float64}
-    solver_status::SolverStatus 
+@with_kw mutable struct VSMSolution{P}
+    panel_width_array::Vector{Float64} = zeros(P)
+    cl_array::Vector{Float64} = zeros(P)
+    cd_array::Vector{Float64} = zeros(P)
+    cm_array::Vector{Float64} = zeros(P)
+    gamma_distribution::Union{Nothing, Vector{Float64}} = nothing
+    aero_force::MVec3 = zeros(MVec3)          
+    aero_moments::MVec3 = zeros(MVec3)       
+    force_coefficients::MVec3 = zeros(MVec3)  
+    moment_coefficients::MVec3 = zeros(MVec3)  
+    moment_distribution::Vector{Float64} = zeros(P)
+    moment_coefficient_distribution::Vector{Float64} = zeros(P)
+    solver_status::SolverStatus = FAILURE
 end
 
 function VSMSolution(P)
-    VSMSolution{P}(zeros(P), zeros(P), zeros(P), zeros(P), nothing, 
-                   zeros(MVec3), zeros(MVec3), zeros(MVec3), zeros(MVec3), zeros(3), zeros(3), FAILURE)
+    VSMSolution{P}()
 end
 
 """
@@ -126,8 +125,8 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
     cd_array = solver.sol.cd_array
     cm_array = solver.sol.cm_array
     panel_width_array = solver.sol.panel_width_array
-    solver.sol.moment_distribution = zeros(n_panels)
-    solver.sol.moment_coefficient_distribution = zeros(n_panels)
+    solver.sol.moment_distribution .= 0
+    solver.sol.moment_coefficient_distribution .= 0
     moment_distribution = solver.sol.moment_distribution
     moment_coefficient_distribution = solver.sol.moment_coefficient_distribution
 
