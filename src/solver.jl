@@ -323,7 +323,7 @@ function solve_base(solver::Solver, body_aero::BodyAerodynamics, gamma_distribut
     alpha_array = body_aero.alpha_array
     relaxation_factor = solver.relaxation_factor
     
-    # Preallocate arrays
+    # Clear arrays
     solver.sol.x_airf_array .= 0
     solver.sol.y_airf_array .= 0
     solver.sol.z_airf_array .= 0
