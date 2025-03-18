@@ -14,7 +14,7 @@ Struct for storing the solution of the [solve!](@ref) function. Must contain all
 - moment_coefficient_distribution::Vector{Float64}: Pitching moment coefficient around the spanwise vector of each panel. [-]
 - solver_status::SolverStatus: enum, see [SolverStatus](@ref)
 """
-mutable struct VSMSolution
+mutable struct VSMSolution{P}
     gamma_distribution::Union{Nothing, Vector{Float64}}
     aero_force::MVec3          
     aero_moments::MVec3       
@@ -25,8 +25,8 @@ mutable struct VSMSolution
     solver_status::SolverStatus 
 end
 
-function VSMSolution()
-    VSMSolution(nothing, zeros(MVec3), zeros(MVec3), zeros(MVec3), zeros(MVec3), zeros(3), zeros(3), FAILURE)
+function VSMSolution(P)
+    VSMSolution{P}(nothing, zeros(MVec3), zeros(MVec3), zeros(MVec3), zeros(MVec3), zeros(3), zeros(3), FAILURE)
 end
 
 """
@@ -57,7 +57,7 @@ Main solver structure for the Vortex Step Method.See also: [solve](@ref)
 ## Solution
 sol::VSMSolution = VSMSolution(): The result of calling [solve!](@ref) 
 """
-@with_kw struct Solver
+@with_kw struct Solver{P}
     # General settings
     aerodynamic_model_type::Model = VSM
     density::Float64 = 1.225
@@ -77,7 +77,7 @@ sol::VSMSolution = VSMSolution(): The result of calling [solve!](@ref)
     is_only_f_and_gamma_output::Bool = false
 
     # Solution
-    sol::VSMSolution = VSMSolution()
+    sol::VSMSolution{P} = VSMSolution(P)
 end
 
 """

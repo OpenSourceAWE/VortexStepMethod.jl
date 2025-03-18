@@ -40,8 +40,8 @@ vel_app = [cos(alpha), 0.0, sin(alpha)] .* v_a
 set_va!(wa, vel_app)
 
 # Step 4: Initialize solvers for both LLT and VSM methods
-llt_solver = Solver(aerodynamic_model_type=LLT)
-vsm_solver = Solver(aerodynamic_model_type=VSM)
+P = length(wa.panels)
+vsm_solver = Solver{P}(aerodynamic_model_type=VSM)
 
 # Step 5: Solve using both methods
 println("Rectangular wing, solve_base:")
@@ -50,5 +50,5 @@ println("Rectangular wing, solve_base:")
 # time Julia:   0.6 ms Ryzen 7950x
 #               0.47 ms laptop, performance mode, grid
 println("Rectangular wing, solve!:")
-@btime sol = solve!($vsm_solver, $wa) # 608 allocations
+@btime sol = solve!($vsm_solver, $wa)                  # 608 allocations
 nothing
