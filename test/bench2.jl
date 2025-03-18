@@ -1,5 +1,4 @@
 using LinearAlgebra
-using ControlPlots
 using VortexStepMethod
 using BenchmarkTools
 

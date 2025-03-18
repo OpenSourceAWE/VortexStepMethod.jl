@@ -15,6 +15,7 @@ Struct for storing the solution of the [solve!](@ref) function. Must contain all
 - solver_status::SolverStatus: enum, see [SolverStatus](@ref)
 """
 mutable struct VSMSolution{P}
+    panel_width_array::Vector{Float64}
     gamma_distribution::Union{Nothing, Vector{Float64}}
     aero_force::MVec3          
     aero_moments::MVec3       
@@ -26,7 +27,7 @@ mutable struct VSMSolution{P}
 end
 
 function VSMSolution(P)
-    VSMSolution{P}(nothing, zeros(MVec3), zeros(MVec3), zeros(MVec3), zeros(MVec3), zeros(3), zeros(3), FAILURE)
+    VSMSolution{P}(zeros(P), nothing, zeros(MVec3), zeros(MVec3), zeros(MVec3), zeros(MVec3), zeros(3), zeros(3), FAILURE)
 end
 
 """
@@ -120,7 +121,7 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
     cl_array = zeros(n_panels)
     cd_array = zeros(n_panels)
     cm_array = zeros(n_panels)
-    panel_width_array = zeros(n_panels)
+    panel_width_array = solver.sol.panel_width_array
     solver.sol.moment_distribution = zeros(n_panels)
     solver.sol.moment_coefficient_distribution = zeros(n_panels)
     moment_distribution = solver.sol.moment_distribution
