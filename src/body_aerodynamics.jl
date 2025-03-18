@@ -476,37 +476,6 @@ function update_effective_angle_of_attack_if_VSM(body_aero::BodyAerodynamics,
     return alpha_array
 end
 
-# function update_effective_angle_of_attack_if_VSM(body_aero::BodyAerodynamics, 
-#     gamma::Vector{Float64},
-#     core_radius_fraction::Float64,
-#     z_airf_array::Matrix{Float64},
-#     x_airf_array::Matrix{Float64},
-#     va_array::Matrix{Float64},
-#     va_norm_array::Vector{Float64},
-#     va_unit_array::Matrix{Float64})
-
-#     # Calculate AIC matrices at aerodynamic center using LLT method
-#     calculate_AIC_matrices!(
-#         body_aero, LLT, core_radius_fraction, va_norm_array, va_unit_array
-#     )
-#     AIC_x, AIC_y, AIC_z = @views body_aero.AIC[1, :, :], body_aero.AIC[2, :, :], body_aero.AIC[3, :, :]
-
-#     # Calculate induced velocities
-#     induced_velocity = [
-#         AIC_x * gamma,
-#         AIC_y * gamma,
-#         AIC_z * gamma
-#     ]
-#     induced_velocity = hcat(induced_velocity...)
-    
-#     # Calculate relative velocities and angles
-#     relative_velocity = va_array + induced_velocity
-#     v_normal = sum(z_airf_array .* relative_velocity, dims=2)
-#     v_tangential = sum(x_airf_array .* relative_velocity, dims=2)
-#     alpha_array = atan.(v_normal ./ v_tangential)
-#     return alpha_array
-# end
-
 """
     calculate_results(body_aero::BodyAerodynamics, gamma_new::Vector{Float64}, 
                      density::Float64, aerodynamic_model_type::Model,
