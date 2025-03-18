@@ -211,11 +211,6 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
         # Body frame forces
         f_body_3D[:,i] .= ftotal_induced_va .* panel.width
 
-        # # Update sums
-        # lift_wing_3D_sum += lift_prescribed_va * panel.width
-        # drag_wing_3D_sum += drag_prescribed_va * panel.width  
-        # side_wing_3D_sum += side_prescribed_va * panel.width
-
         # Calculate the moments
         # (1) Panel aerodynamic center in body frame:
         panel_ac_body = panel.aero_center  # 3D [x, y, z]
