@@ -199,15 +199,15 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
 
         # Calculate induced velocity direction
         alpha_corrected_i = alpha_corrected[i]
-        induced_va_airfoil = cos(alpha_corrected_i) * panel.x_airf + 
-                            sin(alpha_corrected_i) * panel.z_airf
-        dir_induced_va_airfoil = induced_va_airfoil / norm(induced_va_airfoil)
+        dir_induced_va_airfoil = cos(alpha_corrected_i) * panel.x_airf + 
+                                 sin(alpha_corrected_i) * panel.z_airf
+        normalize!(dir_induced_va_airfoil)
 
         # Calculate lift and drag directions
         dir_lift_induced_va = cross(dir_induced_va_airfoil, panel.y_airf)
-        dir_lift_induced_va = dir_lift_induced_va / norm(dir_lift_induced_va)
+        normalize!(dir_lift_induced_va)
         dir_drag_induced_va = cross(spanwise_direction, dir_lift_induced_va)
-        dir_drag_induced_va = dir_drag_induced_va / norm(dir_drag_induced_va)
+        normalize!(dir_drag_induced_va)
 
         # Calculate force vectors
         lift_induced_va = lift[i] * dir_lift_induced_va
