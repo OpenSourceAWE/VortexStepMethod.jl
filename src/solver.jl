@@ -19,6 +19,9 @@ Struct for storing the solution of the [solve!](@ref) function. Must contain all
     cl_array::Vector{Float64} = zeros(P)
     cd_array::Vector{Float64} = zeros(P)
     cm_array::Vector{Float64} = zeros(P)
+    lift::Matrix{Float64} = zeros(P,1)
+    drag::Matrix{Float64} = zeros(P,1)
+    moment::Matrix{Float64} = zeros(P,1)
     gamma_distribution::Union{Nothing, Vector{Float64}} = nothing
     aero_force::MVec3 = zeros(MVec3)          
     aero_moments::MVec3 = zeros(MVec3)       
@@ -137,10 +140,10 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
         panel_width_array[i] = panel.width
     end
 
-    # Pre-allocate output matrices
-    lift = similar(cl_array, length(cl_array), 1)
-    drag = similar(lift)
-    moment = similar(lift)
+    # create an alias for the three vertical output vectors
+    lift = solver.sol.lift
+    drag = solver.sol.drag
+    moment = solver.sol.moment
 
     # Compute using fused broadcasting (no intermediate allocations)
     @. lift = cl_array * 0.5 * density * v_a_array^2 * chord_array
