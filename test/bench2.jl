@@ -49,5 +49,5 @@ println("Rectangular wing, solve_base:")
 # time Julia:   0.6 ms Ryzen 7950x
 #               0.47 ms laptop, performance mode, grid
 println("Rectangular wing, solve!:")
-@btime sol = solve!($vsm_solver, $wa)                  # 608 allocations
+@btime sol = solve!($vsm_solver, $wa)                  # 590 allocations
 nothing
