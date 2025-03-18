@@ -133,10 +133,21 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
         panel_width_array[i] = panel.width
     end
 
-    # Calculate forces
-    lift = reshape((cl_array .* 0.5 .* density .* v_a_array.^2 .* chord_array), :, 1) # 336 bytes
-    drag = reshape((cd_array .* 0.5 .* density .* v_a_array.^2 .* chord_array), :, 1)
-    moment = reshape((cm_array .* 0.5 .* density .* v_a_array.^2 .* chord_array), :, 1)
+    # # Calculate forces
+    # lift = reshape((cl_array .* 0.5 .* density .* v_a_array.^2 .* chord_array), :, 1) # 336 bytes
+    # drag = reshape((cd_array .* 0.5 .* density .* v_a_array.^2 .* chord_array), :, 1)
+    # moment = reshape((cm_array .* 0.5 .* density .* v_a_array.^2 .* chord_array), :, 1)
+
+    # Pre-allocate output matrices
+    lift = similar(cl_array, length(cl_array), 1)
+    drag = similar(lift)
+    moment = similar(lift)
+
+    # Compute using fused broadcasting (no intermediate allocations)
+    @. lift = cl_array * 0.5 * density * v_a_array^2 * chord_array
+    @. drag = cd_array * 0.5 * density * v_a_array^2 * chord_array
+    @. moment = cm_array * 0.5 * density * v_a_array^2 * chord_array
+
 
     # Calculate alpha corrections based on model type
     alpha_corrected = if aerodynamic_model_type == VSM                                # 4188 bytes
