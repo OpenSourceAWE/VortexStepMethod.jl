@@ -177,8 +177,6 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
     # Get wing properties
     spanwise_direction = body_aero.wings[1].spanwise_direction
     va_mag = norm(body_aero.va)
-    va = body_aero.va
-    va_unit = va / va_mag
     q_inf = 0.5 * density * va_mag^2
 
     # Calculate wing geometry properties
