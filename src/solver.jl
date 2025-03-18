@@ -245,9 +245,9 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
         # Vector from panel AC to the chosen reference point:
         r_vector = panel_ac_body - reference_point  # e.g. CG, wing root, etc.
         # Cross product to shift the force from panel AC to ref. point:
-        M_shift = cross(r_vector, f_body_3D[:,i])
+        M_shift = cross(r_vector, MVec3(f_body_3D[:,i]))
         # Total panel moment about the reference point:
-        m_body_3D[:,i] = M_local_3D + M_shift
+        m_body_3D[:,i] .= M_local_3D + M_shift
 
         # Calculate the moment distribution (moment on each panel)
         arm = (moment_frac - 0.25) * panel.chord
