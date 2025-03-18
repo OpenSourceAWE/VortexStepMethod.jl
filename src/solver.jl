@@ -96,6 +96,12 @@ sol::VSMSolution = VSMSolution(): The result of calling [solve!](@ref)
     sol::VSMSolution{P} = VSMSolution(P)
 end
 
+const cache = LazyBufferCache()
+const cache2 = LazyBufferCache()
+const cache3 = LazyBufferCache()
+const cache4 = LazyBufferCache()
+const cache5 = LazyBufferCache()
+
 """
     solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=solver.sol.gamma_distribution; 
           log=false, reference_point=zeros(MVec3), moment_frac=0.1)
@@ -450,14 +456,14 @@ function gamma_loop(
     n_panels = length(body_aero.panels)
     alpha_array = body_aero.alpha_array
     v_a_array = body_aero.v_a_array
-    Umagw_array = similar(v_a_array)
+    Umagw_array = cache[v_a_array]
 
-    gamma = copy(gamma_new)
-    abs_gamma_new = copy(gamma_new)
+    gamma = cache2[gamma_new]
+    abs_gamma_new = cache3[gamma_new]
     induced_velocity_all = zeros(n_panels, 3)
-    relative_velocity_array = similar(va_array)
-    relative_velocity_crossz = similar(relative_velocity_array)
-    v_acrossz_array = similar(va_array)
+    relative_velocity_array = cache[va_array]
+    relative_velocity_crossz = cache4[relative_velocity_array]
+    v_acrossz_array = cache5[va_array]
     cl_array = zeros(n_panels)
     damp = zeros(length(gamma))
     v_normal_array = zeros(n_panels)
