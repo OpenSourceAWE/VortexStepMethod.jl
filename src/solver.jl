@@ -133,11 +133,6 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
         panel_width_array[i] = panel.width
     end
 
-    # # Calculate forces
-    # lift = reshape((cl_array .* 0.5 .* density .* v_a_array.^2 .* chord_array), :, 1) # 336 bytes
-    # drag = reshape((cd_array .* 0.5 .* density .* v_a_array.^2 .* chord_array), :, 1)
-    # moment = reshape((cm_array .* 0.5 .* density .* v_a_array.^2 .* chord_array), :, 1)
-
     # Pre-allocate output matrices
     lift = similar(cl_array, length(cl_array), 1)
     drag = similar(lift)
@@ -168,17 +163,9 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
     end
 
     # Initialize result arrays
-    # cl_prescribed_va = Float64[]
-    # cd_prescribed_va = Float64[]
-    # cs_prescribed_va = Float64[]
     f_body_3D = zeros(3, n_panels)
     m_body_3D = zeros(3, n_panels)
     area_all_panels = 0.0
-
-    # Initialize force sums
-    lift_wing_3D_sum = 0.0
-    drag_wing_3D_sum = 0.0
-    side_wing_3D_sum = 0.0
 
     # Get wing properties
     spanwise_direction = body_aero.wings[1].spanwise_direction
@@ -213,18 +200,6 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
         lift_induced_va = lift[i] * dir_lift_induced_va
         drag_induced_va = drag[i] * dir_drag_induced_va
         ftotal_induced_va = lift_induced_va + drag_induced_va
-
-        # # Calculate forces in prescribed wing frame
-        # dir_lift_prescribed_va = cross(va, spanwise_direction)
-        # dir_lift_prescribed_va = dir_lift_prescribed_va / norm(dir_lift_prescribed_va)
-
-        # # Calculate force components
-        # lift_prescribed_va = dot(lift_induced_va, dir_lift_prescribed_va) + 
-        #                    dot(drag_induced_va, dir_lift_prescribed_va)
-        # drag_prescribed_va = dot(lift_induced_va, va_unit) + 
-        #                    dot(drag_induced_va, va_unit)
-        # side_prescribed_va = dot(lift_induced_va, spanwise_direction) + 
-        #                    dot(drag_induced_va, spanwise_direction)
 
         # Body frame forces
         f_body_3D[:,i] .= ftotal_induced_va .* panel.width
