@@ -15,6 +15,13 @@ Struct for storing the solution of the [solve!](@ref) function. Must contain all
 - solver_status::SolverStatus: enum, see [SolverStatus](@ref)
 """
 @with_kw mutable struct VSMSolution{P}
+    ### private vectors of solve_base
+    x_airf_array::Matrix{Float64} = zeros(P, 3)
+    y_airf_array::Matrix{Float64} = zeros(P, 3)
+    z_airf_array::Matrix{Float64} = zeros(P, 3)
+    va_array::Matrix{Float64} = zeros(P, 3)
+    chord_array::Vector{Float64} = zeros(P)
+    ###
     panel_width_array::Vector{Float64} = zeros(P)
     cl_array::Vector{Float64} = zeros(P)
     cd_array::Vector{Float64} = zeros(P)
@@ -115,7 +122,7 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
 
     # calculate intermediate result
     (converged, body_aero, gamma_new, reference_point, density, aerodynamic_model_type, core_radius_fraction,
-        mu, alpha_array, v_a_array, chord_array, x_airf_array, y_airf_array, z_airf_array,
+        mu, alpha_array, v_a_array, chord_array, solver.sol.x_airf_array, solver.sol.y_airf_array, solver.sol.z_airf_array,
         va_array, va_norm_array, va_unit_array, panels,
         is_only_f_and_gamma_output) = solve_base(solver, body_aero, gamma_distribution; log, reference_point)
     if !isnothing(solver.sol.gamma_distribution)
@@ -159,8 +166,8 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
             body_aero,
             gamma_new,
             core_radius_fraction,
-            z_airf_array,
-            x_airf_array,
+            solver.sol.z_airf_array,
+            solver.sol.x_airf_array,
             va_array,
             va_norm_array,
             va_unit_array
@@ -317,17 +324,17 @@ function solve_base(solver::Solver, body_aero::BodyAerodynamics, gamma_distribut
     relaxation_factor = solver.relaxation_factor
     
     # Preallocate arrays
-    x_airf_array = zeros(n_panels, 3)
-    y_airf_array = zeros(n_panels, 3)
-    z_airf_array = zeros(n_panels, 3)
+    solver.sol.x_airf_array .= 0
+    solver.sol.y_airf_array .= 0
+    solver.sol.z_airf_array .= 0
     va_array = zeros(n_panels, 3)
     chord_array = zeros(n_panels)
 
     # Fill arrays from panels
     for (i, panel) in enumerate(panels)
-        x_airf_array[i, :] .= panel.x_airf
-        y_airf_array[i, :] .= panel.y_airf
-        z_airf_array[i, :] .= panel.z_airf
+        solver.sol.x_airf_array[i, :] .= panel.x_airf
+        solver.sol.y_airf_array[i, :] .= panel.y_airf
+        solver.sol.z_airf_array[i, :] .= panel.z_airf
         va_array[i, :] .= panel.va
         chord_array[i] = panel.chord
     end
@@ -366,9 +373,9 @@ function solve_base(solver::Solver, body_aero::BodyAerodynamics, gamma_distribut
         gamma_initial,
         va_array,
         chord_array,
-        x_airf_array,
-        y_airf_array,
-        z_airf_array,
+        solver.sol.x_airf_array,
+        solver.sol.y_airf_array,
+        solver.sol.z_airf_array,
         panels,
         relaxation_factor;
         log
@@ -382,9 +389,9 @@ function solve_base(solver::Solver, body_aero::BodyAerodynamics, gamma_distribut
             gamma_initial,
             va_array,
             chord_array,
-            x_airf_array,
-            y_airf_array,
-            z_airf_array,
+            solver.sol.x_airf_array,
+            solver.sol.y_airf_array,
+            solver.sol.z_airf_array,
             panels,
             relaxation_factor/2;
             log
@@ -404,9 +411,9 @@ function solve_base(solver::Solver, body_aero::BodyAerodynamics, gamma_distribut
         alpha_array,
         v_a_array,
         chord_array,
-        x_airf_array,
-        y_airf_array,
-        z_airf_array,
+        solver.sol.x_airf_array,
+        solver.sol.y_airf_array,
+        solver.sol.z_airf_array,
         va_array,
         va_norm_array,
         va_unit_array,
