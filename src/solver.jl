@@ -22,6 +22,8 @@ Struct for storing the solution of the [solve!](@ref) function. Must contain all
     lift::Matrix{Float64} = zeros(P,1)
     drag::Matrix{Float64} = zeros(P,1)
     moment::Matrix{Float64} = zeros(P,1)
+    f_body_3D::Matrix{Float64} = zeros(3, P)
+    m_body_3D::Matrix{Float64} = zeros(3, P)
     gamma_distribution::Union{Nothing, Vector{Float64}} = nothing
     aero_force::MVec3 = zeros(MVec3)          
     aero_moments::MVec3 = zeros(MVec3)       
@@ -170,8 +172,6 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
     end
 
     # Initialize result arrays
-    f_body_3D = zeros(3, n_panels)
-    m_body_3D = zeros(3, n_panels)
     area_all_panels = 0.0
 
     # Get wing properties
@@ -207,7 +207,7 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
         ftotal_induced_va = lift_induced_va + drag_induced_va
 
         # Body frame forces
-        f_body_3D[:,i] .= ftotal_induced_va .* panel.width
+        solver.sol.f_body_3D[:,i] .= ftotal_induced_va .* panel.width
 
         # Calculate the moments
         # (1) Panel aerodynamic center in body frame:
@@ -220,9 +220,9 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
         # Vector from panel AC to the chosen reference point:
         r_vector = panel_ac_body - reference_point  # e.g. CG, wing root, etc.
         # Cross product to shift the force from panel AC to ref. point:
-        M_shift = r_vector × MVec3(f_body_3D[:,i])
+        M_shift = r_vector × MVec3(solver.sol.f_body_3D[:,i])
         # Total panel moment about the reference point:
-        m_body_3D[:,i] .= M_local_3D + M_shift
+        solver.sol.m_body_3D[:,i] .= M_local_3D + M_shift
 
         # Calculate the moment distribution (moment on each panel)
         arm = (moment_frac - 0.25) * panel.chord
@@ -232,14 +232,14 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
 
     # update the result struct
     solver.sol.aero_force .= [
-        sum(f_body_3D[1,:]),
-        sum(f_body_3D[2,:]),
-        sum(f_body_3D[3,:])
+        sum(solver.sol.f_body_3D[1,:]),
+        sum(solver.sol.f_body_3D[2,:]),
+        sum(solver.sol.f_body_3D[3,:])
     ]
     solver.sol.aero_moments .= [
-        sum(m_body_3D[1,:]),
-        sum(m_body_3D[2,:]),
-        sum(m_body_3D[3,:])
+        sum(solver.sol.m_body_3D[1,:]),
+        sum(solver.sol.m_body_3D[2,:]),
+        sum(solver.sol.m_body_3D[3,:])
     ]
     solver.sol.force_coefficients .= solver.sol.aero_force ./ (q_inf * projected_area)
     solver.sol.moment_coefficients .= solver.sol.aero_moments ./ (q_inf * projected_area)
