@@ -44,7 +44,8 @@ using LinearAlgebra
     set_va!(body_aero, vel_app)
 
     # Initialize solvers for both LLT and VSM methods
-    solver = Solver()
+    P = length(body_aero.panels)
+    solver = Solver{P}()
 
     # Pre-allocate arrays
     gamma = rand(n_panels)
@@ -112,8 +113,9 @@ using LinearAlgebra
                     aero_model,
                     aero_data)
                 body_aero = BodyAerodynamics([wing])
-
-                solver = Solver(
+                
+                P = length(body_aero.panels)
+                solver = Solver{P}(
                     aerodynamic_model_type=model
                 )
                 result = @benchmark gamma_loop(
