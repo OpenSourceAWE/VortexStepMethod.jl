@@ -191,9 +191,9 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
         normalize!(dir_induced_va_airfoil)
 
         # Calculate lift and drag directions
-        dir_lift_induced_va = cross(dir_induced_va_airfoil, panel.y_airf)
+        dir_lift_induced_va = dir_induced_va_airfoil × panel.y_airf
         normalize!(dir_lift_induced_va)
-        dir_drag_induced_va = cross(spanwise_direction, dir_lift_induced_va)
+        dir_drag_induced_va = spanwise_direction × dir_lift_induced_va
         normalize!(dir_drag_induced_va)
 
         # Calculate force vectors
@@ -220,7 +220,7 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
         # Vector from panel AC to the chosen reference point:
         r_vector = panel_ac_body - reference_point  # e.g. CG, wing root, etc.
         # Cross product to shift the force from panel AC to ref. point:
-        M_shift = cross(r_vector, MVec3(f_body_3D[:,i]))
+        M_shift = r_vector × MVec3(f_body_3D[:,i])
         # Total panel moment about the reference point:
         m_body_3D[:,i] .= M_local_3D + M_shift
 
@@ -415,7 +415,7 @@ function solve_base(solver::Solver, body_aero::BodyAerodynamics, gamma_distribut
     )
 end
 
-cross3(x,y) = cross(SVector{3,eltype(x)}(x), SVector{3,eltype(y)}(y))
+cross3(x,y) = SVector{3,eltype(x)}(x) × SVector{3,eltype(y)}(y)
 
 """
     gamma_loop(solver::Solver, gamma_new::Vector{Float64}, AIC_x::Matrix{Float64}, 
