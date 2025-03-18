@@ -122,7 +122,7 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
 
     # calculate intermediate result
     (converged, body_aero, gamma_new, reference_point, density, aerodynamic_model_type, core_radius_fraction,
-        mu, alpha_array, v_a_array, chord_array, solver.sol.x_airf_array, solver.sol.y_airf_array, solver.sol.z_airf_array,
+        mu, alpha_array, v_a_array, solver.sol.chord_array, solver.sol.x_airf_array, solver.sol.y_airf_array, solver.sol.z_airf_array,
         solver.sol.va_array, va_norm_array, va_unit_array, panels,
         is_only_f_and_gamma_output) = solve_base(solver, body_aero, gamma_distribution; log, reference_point)
     if !isnothing(solver.sol.gamma_distribution)
@@ -155,9 +155,9 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
     moment = solver.sol.moment
 
     # Compute using fused broadcasting (no intermediate allocations)
-    @. lift = cl_array * 0.5 * density * v_a_array^2 * chord_array
-    @. drag = cd_array * 0.5 * density * v_a_array^2 * chord_array
-    @. moment = cm_array * 0.5 * density * v_a_array^2 * chord_array
+    @. lift = cl_array * 0.5 * density * v_a_array^2 * solver.sol.chord_array
+    @. drag = cd_array * 0.5 * density * v_a_array^2 * solver.sol.chord_array
+    @. moment = cm_array * 0.5 * density * v_a_array^2 * solver.sol.chord_array
 
 
     # Calculate alpha corrections based on model type
@@ -328,7 +328,7 @@ function solve_base(solver::Solver, body_aero::BodyAerodynamics, gamma_distribut
     solver.sol.y_airf_array .= 0
     solver.sol.z_airf_array .= 0
     solver.sol.va_array .= 0
-    chord_array = zeros(n_panels)
+    solver.sol.chord_array .= 0
 
     # Fill arrays from panels
     for (i, panel) in enumerate(panels)
@@ -336,7 +336,7 @@ function solve_base(solver::Solver, body_aero::BodyAerodynamics, gamma_distribut
         solver.sol.y_airf_array[i, :] .= panel.y_airf
         solver.sol.z_airf_array[i, :] .= panel.z_airf
         solver.sol.va_array[i, :] .= panel.va
-        chord_array[i] = panel.chord
+        solver.sol.chord_array[i] = panel.chord
     end
 
     # Calculate unit vectors
@@ -372,7 +372,7 @@ function solve_base(solver::Solver, body_aero::BodyAerodynamics, gamma_distribut
         body_aero,
         gamma_initial,
         solver.sol.va_array,
-        chord_array,
+        solver.sol.chord_array,
         solver.sol.x_airf_array,
         solver.sol.y_airf_array,
         solver.sol.z_airf_array,
@@ -388,7 +388,7 @@ function solve_base(solver::Solver, body_aero::BodyAerodynamics, gamma_distribut
             body_aero,
             gamma_initial,
             solver.sol.va_array,
-            chord_array,
+            solver.sol.chord_array,
             solver.sol.x_airf_array,
             solver.sol.y_airf_array,
             solver.sol.z_airf_array,
@@ -410,7 +410,7 @@ function solve_base(solver::Solver, body_aero::BodyAerodynamics, gamma_distribut
         solver.mu,
         alpha_array,
         v_a_array,
-        chord_array,
+        solver.sol.chord_array,
         solver.sol.x_airf_array,
         solver.sol.y_airf_array,
         solver.sol.z_airf_array,
