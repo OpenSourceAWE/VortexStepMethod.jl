@@ -48,7 +48,7 @@ end
 @with_kw mutable struct LoopResult{P}
     converged::Bool              = false
     gamma_new::Vector{Float64}   = zeros(P)
-    alpha_array::Vector{Float64} = zeros(P)
+    alpha_array::Vector{Float64} = zeros(P) # TODO: Is this different from BodyAerodynamics.alpha_array ?
     v_a_array::Vector{Float64}   = zeros(P)
 end
 
