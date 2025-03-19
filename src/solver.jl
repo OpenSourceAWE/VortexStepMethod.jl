@@ -45,11 +45,15 @@ function VSMSolution(P)
     VSMSolution{P}()
 end
 
-struct LoopResult
-    converged::Bool
-    gamma_new::Vector{Float64}
-    alpha_array::Vector{Float64}
-    v_a_array::Vector{Float64}
+@with_kw struct LoopResult{P}
+    converged::Bool              = false
+    gamma_new::Vector{Float64}   = zeros(P)
+    alpha_array::Vector{Float64} = zeros(P)
+    v_a_array::Vector{Float64}   = zeros(P)
+end
+
+function LoopResult(P)
+    LoopResult{P}()
 end
 
 struct BaseResult
@@ -465,11 +469,11 @@ function gamma_loop(
     abs_gamma_new            = cache[3][gamma_new]
     induced_velocity_all     = cache[4][va_array]
     relative_velocity_array  = cache[5][va_array]
-    relative_velocity_crossz = cache[6][relative_velocity_array]
+    relative_velocity_crossz = cache[6][va_array]
     v_acrossz_array          = cache[7][va_array]
     cl_array                 = cache[8][gamma]
     damp                     = cache[9][cl_array]
-    v_normal_array           = cache[10][damp]
+    v_normal_array           = cache[10][cl_array]
     v_tangential_array       = cache[11][v_normal_array]
 
     AIC_x, AIC_y, AIC_z = body_aero.AIC[1, :, :], body_aero.AIC[2, :, :], body_aero.AIC[3, :, :]
