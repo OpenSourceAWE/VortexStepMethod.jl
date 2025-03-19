@@ -96,13 +96,9 @@ sol::VSMSolution = VSMSolution(): The result of calling [solve!](@ref)
     sol::VSMSolution{P} = VSMSolution(P)
 end
 
-const cache = LazyBufferCache()
-const cache2 = LazyBufferCache()
-const cache3 = LazyBufferCache()
-const cache4 = LazyBufferCache()
-const cache5 = LazyBufferCache()
-const cache6 = LazyBufferCache()
-const cache7 = LazyBufferCache()
+const cache = [LazyBufferCache(), LazyBufferCache(), LazyBufferCache(), LazyBufferCache(),
+               LazyBufferCache(), LazyBufferCache(), LazyBufferCache(), LazyBufferCache(),
+               LazyBufferCache(), LazyBufferCache(), LazyBufferCache()]
 
 """
     solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=solver.sol.gamma_distribution; 
@@ -454,22 +450,22 @@ function gamma_loop(
     relaxation_factor::Float64;
     log::Bool = true
 )
-    converged = false
-    n_panels = length(body_aero.panels)
+    converged   = false
+    n_panels    = length(body_aero.panels)
     alpha_array = body_aero.alpha_array
-    v_a_array = body_aero.v_a_array
-    Umagw_array = cache[v_a_array]
+    v_a_array   = body_aero.v_a_array
+    Umagw_array = cache[1][v_a_array]
 
-    gamma = cache2[gamma_new]
-    abs_gamma_new = cache3[gamma_new]
-    induced_velocity_all = cache6[va_array]
-    relative_velocity_array = cache[va_array]
-    relative_velocity_crossz = cache4[relative_velocity_array]
-    v_acrossz_array = cache5[va_array]
-    cl_array = cache3[gamma]
-    damp = cache3[cl_array]
-    v_normal_array = cache3[damp]
-    v_tangential_array = cache7[v_normal_array]
+    gamma                    = cache[2][gamma_new]
+    abs_gamma_new            = cache[3][gamma_new]
+    induced_velocity_all     = cache[4][va_array]
+    relative_velocity_array  = cache[5][va_array]
+    relative_velocity_crossz = cache[6][relative_velocity_array]
+    v_acrossz_array          = cache[7][va_array]
+    cl_array                 = cache[8][gamma]
+    damp                     = cache[9][cl_array]
+    v_normal_array           = cache[10][damp]
+    v_tangential_array       = cache[11][v_normal_array]
 
     AIC_x, AIC_y, AIC_z = body_aero.AIC[1, :, :], body_aero.AIC[2, :, :], body_aero.AIC[3, :, :]
 
