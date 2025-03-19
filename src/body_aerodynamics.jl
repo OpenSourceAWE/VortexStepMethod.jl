@@ -412,7 +412,7 @@ function calculate_stall_angle_list(panels::Vector{Panel};
     return stall_angles
 end
 
-const cache_body = [LazyBufferCache(), LazyBufferCache(), LazyBufferCache()]
+const cache_body = [LazyBufferCache(), LazyBufferCache(), LazyBufferCache(), LazyBufferCache()]
 
 """
     update_effective_angle_of_attack_if_VSM(body_aero::BodyAerodynamics, gamma::Vector{Float64},
@@ -469,7 +469,7 @@ function update_effective_angle_of_attack_if_VSM(body_aero::BodyAerodynamics,
     end
 
     # Direct angle calculation without temporary arrays
-    alpha_array = Vector{Float64}(undef, n)
+    alpha_array = cache_body[4][relative_velocity]
     @inbounds for i in 1:n
         alpha_array[i] = atan(v_normal[i], v_tangential[i])
     end
