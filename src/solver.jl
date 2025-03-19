@@ -419,8 +419,6 @@ function solve_base(solver::Solver, body_aero::BodyAerodynamics, gamma_distribut
     )
 end
 
-cross3(x,y) = SVector{3,eltype(x)}(x) × SVector{3,eltype(y)}(y)
-
 """
     gamma_loop(solver::Solver, gamma_new::Vector{Float64}, AIC_x::Matrix{Float64}, 
               AIC_y::Matrix{Float64}, AIC_z::Matrix{Float64}, va_array::Matrix{Float64}, 
