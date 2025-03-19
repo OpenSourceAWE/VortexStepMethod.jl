@@ -146,8 +146,7 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
     log=false, reference_point=zeros(MVec3), moment_frac=0.1)
 
     # calculate intermediate result
-    va_norm_array, va_unit_array = solve_base(solver, body_aero, gamma_distribution; 
-                                                      log, reference_point)
+    solve_base(solver, body_aero, gamma_distribution; log, reference_point)
     gamma_new = solver.lr.gamma_new
     if !isnothing(solver.sol.gamma_distribution)
         solver.sol.gamma_distribution .= gamma_new
@@ -199,8 +198,8 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
             solver.sol.z_airf_array,
             solver.sol.x_airf_array,
             solver.sol.va_array,
-            va_norm_array,
-            va_unit_array
+            solver.br.va_norm_array,
+            solver.br.va_unit_array
         )
     elseif aerodynamic_model_type === LLT
         alpha_array
@@ -312,8 +311,7 @@ A dictionary with the results.
 function solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=nothing; 
     log=false, reference_point=zeros(MVec3))
     # calculate intermediate result
-    va_norm_array, va_unit_array = solve_base(solver, body_aero, gamma_distribution; 
-                                              log, reference_point)
+    solve_base(solver, body_aero, gamma_distribution; log, reference_point)
 
     # Calculate final results as dictionary
     results = calculate_results(
@@ -331,8 +329,8 @@ function solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=n
         solver.sol.y_airf_array,
         solver.sol.z_airf_array,
         solver.sol.va_array,
-        va_norm_array,
-        va_unit_array,
+        solver.br.va_norm_array,
+        solver.br.va_unit_array,
         body_aero.panels,
         solver.is_only_f_and_gamma_output
     )
@@ -404,11 +402,7 @@ function solve_base(solver::Solver, body_aero::BodyAerodynamics, gamma_distribut
         gamma_loop!(solver, body_aero, panels, relaxation_factor/2; log)
     end
 
-    # Return results
-    return (
-        solver.br.va_norm_array,
-        solver.br.va_unit_array
-    )
+    nothing
 end
 
 """
