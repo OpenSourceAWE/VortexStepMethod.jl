@@ -149,10 +149,11 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
     log=false, reference_point=zeros(MVec3), moment_frac=0.1)
 
     # calculate intermediate result
-    converged, reference_point, alpha_array, v_a_array, va_norm_array, 
+    reference_point, alpha_array, v_a_array, va_norm_array, 
                va_unit_array, panels = solve_base(solver, body_aero, gamma_distribution; 
                                                   log, reference_point)
     gamma_new = solver.lr.gamma_new
+    converged = solver.lr.converged
     if !isnothing(solver.sol.gamma_distribution)
         solver.sol.gamma_distribution .= gamma_new
     else
@@ -312,7 +313,7 @@ A dictionary with the results.
 function solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=nothing; 
     log=false, reference_point=zeros(MVec3))
     # calculate intermediate result
-    converged, reference_point, alpha_array, v_a_array, va_norm_array, 
+    reference_point, alpha_array, v_a_array, va_norm_array, 
     va_unit_array, panels = solve_base(solver, body_aero, gamma_distribution; 
                                        log, reference_point)
 
@@ -400,7 +401,6 @@ function solve_base(solver::Solver, body_aero::BodyAerodynamics, gamma_distribut
 
     # Return results
     return (
-        solver.lr.converged,
         reference_point,
         solver.lr.alpha_array,
         solver.lr.v_a_array,
