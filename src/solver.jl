@@ -132,7 +132,7 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
     log=false, reference_point=zeros(MVec3), moment_frac=0.1)
 
     # calculate intermediate result
-    (converged, body_aero, gamma_new, reference_point, aerodynamic_model_type, core_radius_fraction,
+    (converged, body_aero, gamma_new, reference_point, core_radius_fraction,
         mu, alpha_array, v_a_array, va_norm_array, va_unit_array, panels,
         is_only_f_and_gamma_output) = solve_base(solver, body_aero, gamma_distribution; log, reference_point)
     if !isnothing(solver.sol.gamma_distribution)
@@ -151,6 +151,7 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
     moment_distribution = solver.sol.moment_distribution
     moment_coefficient_distribution = solver.sol.moment_coefficient_distribution
     density = solver.density
+    aerodynamic_model_type = solver.aerodynamic_model_type
 
     # Calculate coefficients for each panel
     for (i, panel) in enumerate(panels)                                               # zero bytes
@@ -293,7 +294,7 @@ function solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=n
     log=false, reference_point=zeros(MVec3))
     # calculate intermediate result
     converged,
-    body_aero, gamma_new, reference_point, aerodynamic_model_type, core_radius_fraction,
+    body_aero, gamma_new, reference_point, core_radius_fraction,
     mu, alpha_array, v_a_array, va_norm_array, va_unit_array, panels,
     is_only_f_and_gamma_output = solve_base(solver, body_aero, gamma_distribution; log, reference_point)
 
@@ -303,7 +304,7 @@ function solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=n
         gamma_new,
         reference_point,
         solver.density,
-        aerodynamic_model_type,
+        solver.aerodynamic_model_type,
         core_radius_fraction,
         mu,
         alpha_array,
@@ -413,7 +414,6 @@ function solve_base(solver::Solver, body_aero::BodyAerodynamics, gamma_distribut
         body_aero,
         gamma_new,
         reference_point,
-        solver.aerodynamic_model_type,
         solver.core_radius_fraction,
         solver.mu,
         alpha_array,
