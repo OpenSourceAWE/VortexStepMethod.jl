@@ -52,6 +52,18 @@ struct LoopResult
     v_a_array::Vector{Float64}
 end
 
+struct BaseResult
+    converged
+    body_aero
+    gamma_new
+    reference_point
+    alpha_array
+    v_a_array
+    va_norm_array
+    va_unit_array
+    panels
+end
+
 """
     Solver
 
