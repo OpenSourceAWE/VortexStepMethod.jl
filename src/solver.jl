@@ -349,7 +349,6 @@ function solve_base(solver::Solver, body_aero::BodyAerodynamics, gamma_distribut
     # Initialize variables
     panels = body_aero.panels
     n_panels = length(panels)
-    alpha_array = body_aero.alpha_array
     relaxation_factor = solver.relaxation_factor
     
     # Clear arrays
@@ -373,13 +372,8 @@ function solve_base(solver::Solver, body_aero::BodyAerodynamics, gamma_distribut
     va_unit_array = solver.sol.va_array ./ va_norm_array
 
     # Calculate AIC matrices
-    calculate_AIC_matrices!(
-        body_aero,
-        solver.aerodynamic_model_type,
-        solver.core_radius_fraction,
-        va_norm_array,
-        va_unit_array
-    )
+    calculate_AIC_matrices!(body_aero, solver.aerodynamic_model_type, solver.core_radius_fraction, va_norm_array,
+                            va_unit_array)
 
     # Initialize gamma distribution
     gamma_initial = if isnothing(gamma_distribution)
