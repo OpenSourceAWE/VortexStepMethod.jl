@@ -58,12 +58,8 @@ function LoopResult(P)
 end
 
 @with_kw struct BaseResult{P}
-    reference_point
-    alpha_array
-    v_a_array
-    va_norm_array
-    va_unit_array
-    panels
+    va_norm_array::Vector{Float64} = zeros(P)
+    va_unit_array::Matrix{Float64} = zeros(P, 3)
 end
 
 """
@@ -115,6 +111,7 @@ sol::VSMSolution = VSMSolution(): The result of calling [solve!](@ref)
 
     # Intermediate results
     lr::LoopResult{P} = LoopResult(P)
+    br::BaseResult{P} = BaseResult{P}()
 
     # Solution
     sol::VSMSolution{P} = VSMSolution(P)
@@ -149,7 +146,7 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
     log=false, reference_point=zeros(MVec3), moment_frac=0.1)
 
     # calculate intermediate result
-    va_norm_array, va_unit_array, panels = solve_base(solver, body_aero, gamma_distribution; 
+    va_norm_array, va_unit_array = solve_base(solver, body_aero, gamma_distribution; 
                                                       log, reference_point)
     gamma_new = solver.lr.gamma_new
     if !isnothing(solver.sol.gamma_distribution)
@@ -165,6 +162,7 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
     converged = solver.lr.converged
     alpha_array = solver.lr.alpha_array
     v_a_array = solver.lr.v_a_array
+    panels = body_aero.panels
    
     panel_width_array = solver.sol.panel_width_array
     solver.sol.moment_distribution .= 0
@@ -314,8 +312,8 @@ A dictionary with the results.
 function solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=nothing; 
     log=false, reference_point=zeros(MVec3))
     # calculate intermediate result
-    va_norm_array, va_unit_array, panels = solve_base(solver, body_aero, gamma_distribution; 
-                                                      log, reference_point)
+    va_norm_array, va_unit_array = solve_base(solver, body_aero, gamma_distribution; 
+                                              log, reference_point)
 
     # Calculate final results as dictionary
     results = calculate_results(
@@ -335,7 +333,7 @@ function solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=n
         solver.sol.va_array,
         va_norm_array,
         va_unit_array,
-        panels,
+        body_aero.panels,
         solver.is_only_f_and_gamma_output
     )
     return results
@@ -368,7 +366,7 @@ function solve_base(solver::Solver, body_aero::BodyAerodynamics, gamma_distribut
     end
 
     # Calculate unit vectors
-    va_norm_array = norm.(eachrow(solver.sol.va_array))
+    va_norm_array = norm.(eachrow(solver.sol.va_array))   # TODO: replace with for loop
     va_unit_array = solver.sol.va_array ./ va_norm_array
 
     # Calculate AIC matrices
@@ -402,8 +400,7 @@ function solve_base(solver::Solver, body_aero::BodyAerodynamics, gamma_distribut
     # Return results
     return (
         va_norm_array,
-        va_unit_array,
-        panels
+        va_unit_array
     )
 end
 
