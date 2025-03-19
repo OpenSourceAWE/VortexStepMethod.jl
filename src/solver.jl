@@ -338,6 +338,13 @@ function solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=n
     )
     return results
 end
+
+@inline @inbounds function calc_norm_array!(va_norm_array, va_array)
+    for i in 1:size(va_array, 1)
+        va_norm_array[i] = norm(MVec3(view(va_array, i, :)))
+    end
+end
+
 function solve_base(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=nothing; 
                log=false, reference_point=zeros(MVec3))
     
@@ -366,12 +373,12 @@ function solve_base(solver::Solver, body_aero::BodyAerodynamics, gamma_distribut
     end
 
     # Calculate unit vectors
-    va_norm_array = norm.(eachrow(solver.sol.va_array))   # TODO: replace with for loop
-    va_unit_array = solver.sol.va_array ./ va_norm_array
+    calc_norm_array!(solver.br.va_norm_array, solver.sol.va_array)
+    solver.br.va_unit_array .= solver.sol.va_array ./ solver.br.va_norm_array
 
     # Calculate AIC matrices
-    calculate_AIC_matrices!(body_aero, solver.aerodynamic_model_type, solver.core_radius_fraction, va_norm_array,
-                            va_unit_array)
+    calculate_AIC_matrices!(body_aero, solver.aerodynamic_model_type, solver.core_radius_fraction, solver.br.va_norm_array,
+                            solver.br.va_unit_array)
 
     # Initialize gamma distribution
     gamma_initial = if isnothing(gamma_distribution)
@@ -399,8 +406,8 @@ function solve_base(solver::Solver, body_aero::BodyAerodynamics, gamma_distribut
 
     # Return results
     return (
-        va_norm_array,
-        va_unit_array
+        solver.br.va_norm_array,
+        solver.br.va_unit_array
     )
 end
 
