@@ -297,16 +297,15 @@ Calculate Aerodynamic Influence Coefficient matrices.
 
 See also: [BodyAerodynamics](@ref), [Model](@ref)
 
-Returns:
-    Tuple of (`AIC_x`, `AIC_y`, `AIC_z`) matrices
+Returns: nothing
 """
-function calculate_AIC_matrices!(body_aero::BodyAerodynamics, model::Model,
+@inline function calculate_AIC_matrices!(body_aero::BodyAerodynamics, model::Model,
                               core_radius_fraction::Float64,
                               va_norm_array::Vector{Float64}, 
                               va_unit_array::Matrix{Float64})
     # Determine evaluation point based on model
-    evaluation_point = model === VSM ? :control_point : :aero_center
-    evaluation_point_on_bound = model === LLT
+    evaluation_point = model == VSM ? :control_point : :aero_center
+    evaluation_point_on_bound = model == LLT
     
     # Initialize AIC matrices
     velocity_induced, tempvel, va_unit, U_2D = zeros(MVec3), zeros(MVec3), zeros(MVec3), zeros(MVec3)
