@@ -190,6 +190,7 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
 
 
     # Calculate alpha corrections based on model type
+    # TODO: this vector needs to be pre-allocated !!!
     alpha_corrected = if aerodynamic_model_type == VSM                                # 4188 bytes
         update_effective_angle_of_attack_if_VSM(
             body_aero,
