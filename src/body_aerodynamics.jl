@@ -334,6 +334,7 @@ function calculate_AIC_matrices!(body_aero::BodyAerodynamics, model::Model,
             
             # Subtract 2D induced velocity for VSM
             if icp == jring && model === VSM
+                # TODO why is this allocating?
                 calculate_velocity_induced_bound_2D!(U_2D, body_aero.panels[jring], ep, body_aero.work_vectors)
                 body_aero.AIC[:, icp, jring] .-= U_2D
             end
