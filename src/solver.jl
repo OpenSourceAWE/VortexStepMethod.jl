@@ -465,7 +465,7 @@ function gamma_loop!(
     n_panels    = length(body_aero.panels)
     solver.lr.alpha_array .= body_aero.alpha_array
     solver.lr.v_a_array   .= body_aero.v_a_array
-    Umagw_array = cache[1][solver.lr.v_a_array]
+    va_magw_array = cache[1][solver.lr.v_a_array]
 
     gamma                    = cache[2][solver.lr.gamma_new]
     abs_gamma_new            = cache[3][solver.lr.gamma_new]
@@ -510,13 +510,13 @@ function gamma_loop!(
 
         for i in 1:n_panels
             @views solver.lr.v_a_array[i] = norm(relative_velocity_crossz[i, :])
-            @views Umagw_array[i] = norm(v_acrossz_array[i, :])
+            @views va_magw_array[i] = norm(v_acrossz_array[i, :])
         end
         
         for (i, (panel, alpha)) in enumerate(zip(panels, solver.lr.alpha_array))
             cl_array[i] = calculate_cl(panel, alpha)
         end
-        solver.lr.gamma_new .= 0.5 .* solver.lr.v_a_array.^2 ./ Umagw_array .* cl_array .* chord_array
+        solver.lr.gamma_new .= 0.5 .* solver.lr.v_a_array.^2 ./ va_magw_array .* cl_array .* chord_array
 
         # Apply damping if needed
         if solver.is_with_artificial_damping
