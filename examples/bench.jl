@@ -46,12 +46,11 @@ vsm_solver = Solver{P}(aerodynamic_model_type=VSM)
 # Step 5: Solve using both methods
 results_vsm = solve(vsm_solver, wa)
 sol = solve!(vsm_solver, wa)
-results_vsm_base = solve_base(vsm_solver, wa)
-println("Rectangular wing, solve_base:")
-@time results_vsm_base = solve_base(vsm_solver, wa)
-# time Python: 32.0 ms Ryzen 7950x
-# time Julia:   0.6 ms Ryzen 7950x
-#               0.8 ms laptop, performance mode, battery 
+results_vsm_base = solve_base!(vsm_solver, wa)
+println("Rectangular wing, solve_base!:")
+@time results_vsm_base = solve_base!(vsm_solver, wa)
+# time Python: 32.0  ms Ryzen 7950x
+# time Julia:   0.42 ms Ryzen 7950x
 println("Rectangular wing, solve!:")
 @time sol = solve!(vsm_solver, wa)
 println("Rectangular wing, solve:")
@@ -83,8 +82,8 @@ set_va!(body_aero, vel_app)
 
 # Solving and plotting distributions
 results = solve(vsm_solver, body_aero)
-results_base = solve_base(vsm_solver, body_aero)
+results_base = solve_base!(vsm_solver, body_aero)
 println("RAM-air kite:")
-@time results_base = solve_base(vsm_solver, body_aero)
+@time results_base = solve_base!(vsm_solver, body_aero)
 
 nothing

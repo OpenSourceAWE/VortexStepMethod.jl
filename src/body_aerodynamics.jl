@@ -438,9 +438,7 @@ function update_effective_angle_of_attack_if_VSM(body_aero::BodyAerodynamics,
     va_unit_array::Matrix{Float64})
 
     # Calculate AIC matrices (keep existing optimized view)
-    calculate_AIC_matrices!(
-        body_aero, LLT, core_radius_fraction, va_norm_array, va_unit_array
-    )
+    calculate_AIC_matrices!(body_aero, LLT, core_radius_fraction, va_norm_array, va_unit_array)
     AIC_x, AIC_y, AIC_z = @views body_aero.AIC[1, :, :], body_aero.AIC[2, :, :], body_aero.AIC[3, :, :]
 
     # Preallocate and calculate induced velocity directly

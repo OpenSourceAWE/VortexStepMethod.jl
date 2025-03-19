@@ -15,7 +15,7 @@ Struct for storing the solution of the [solve!](@ref) function. Must contain all
 - solver_status::SolverStatus: enum, see [SolverStatus](@ref)
 """
 @with_kw mutable struct VSMSolution{P}
-    ### private vectors of solve_base
+    ### private vectors of solve_base!
     x_airf_array::Matrix{Float64} = zeros(P, 3)
     y_airf_array::Matrix{Float64} = zeros(P, 3)
     z_airf_array::Matrix{Float64} = zeros(P, 3)
@@ -146,7 +146,7 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
     log=false, reference_point=zeros(MVec3), moment_frac=0.1)
 
     # calculate intermediate result
-    solve_base(solver, body_aero, gamma_distribution; log, reference_point)
+    solve_base!(solver, body_aero, gamma_distribution; log, reference_point)
     gamma_new = solver.lr.gamma_new
     if !isnothing(solver.sol.gamma_distribution)
         solver.sol.gamma_distribution .= gamma_new
@@ -312,7 +312,7 @@ A dictionary with the results.
 function solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=nothing; 
     log=false, reference_point=zeros(MVec3))
     # calculate intermediate result
-    solve_base(solver, body_aero, gamma_distribution; log, reference_point)
+    solve_base!(solver, body_aero, gamma_distribution; log, reference_point)
 
     # Calculate final results as dictionary
     results = calculate_results(
@@ -344,7 +344,7 @@ end
     end
 end
 
-function solve_base(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=nothing; 
+function solve_base!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=nothing; 
                log=false, reference_point=zeros(MVec3))
     
     # check arguments
