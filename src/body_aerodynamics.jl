@@ -412,6 +412,8 @@ function calculate_stall_angle_list(panels::Vector{Panel};
     return stall_angles
 end
 
+const cache_body = [LazyBufferCache()]
+
 """
     update_effective_angle_of_attack_if_VSM(body_aero::BodyAerodynamics, gamma::Vector{Float64},
                                           core_radius_fraction::Float64,
@@ -442,7 +444,7 @@ function update_effective_angle_of_attack_if_VSM(body_aero::BodyAerodynamics,
     AIC_x, AIC_y, AIC_z = @views body_aero.AIC[1, :, :], body_aero.AIC[2, :, :], body_aero.AIC[3, :, :]
 
     # Preallocate and calculate induced velocity directly
-    induced_velocity = similar(va_array)
+    induced_velocity = cache_body[1][va_array]
     induced_velocity[:, 1] .= AIC_x * gamma
     induced_velocity[:, 2] .= AIC_y * gamma
     induced_velocity[:, 3] .= AIC_z * gamma
