@@ -249,16 +249,16 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
     end
 
     # update the result struct
-    solver.sol.aero_force .= [
+    solver.sol.aero_force .= MVec3(
         sum(solver.sol.f_body_3D[1,:]),
         sum(solver.sol.f_body_3D[2,:]),
         sum(solver.sol.f_body_3D[3,:])
-    ]
-    solver.sol.aero_moments .= [
+    )
+    solver.sol.aero_moments .= MVec3(
         sum(solver.sol.m_body_3D[1,:]),
         sum(solver.sol.m_body_3D[2,:]),
         sum(solver.sol.m_body_3D[3,:])
-    ]
+    )
     solver.sol.force_coefficients .= solver.sol.aero_force ./ (q_inf * projected_area)
     solver.sol.moment_coefficients .= solver.sol.aero_moments ./ (q_inf * projected_area)
     if converged
