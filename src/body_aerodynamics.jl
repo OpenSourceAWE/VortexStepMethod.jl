@@ -412,7 +412,7 @@ function calculate_stall_angle_list(panels::Vector{Panel};
     return stall_angles
 end
 
-const cache_body = [LazyBufferCache()]
+const cache_body = [LazyBufferCache(), LazyBufferCache(), LazyBufferCache()]
 
 """
     update_effective_angle_of_attack_if_VSM(body_aero::BodyAerodynamics, gamma::Vector{Float64},
@@ -454,8 +454,8 @@ function update_effective_angle_of_attack_if_VSM(body_aero::BodyAerodynamics,
 
     # Preallocate and compute dot products manually
     n = size(relative_velocity, 1)
-    v_normal = Vector{Float64}(undef, n)
-    v_tangential = Vector{Float64}(undef, n)
+    v_normal     = cache_body[2][relative_velocity]
+    v_tangential = cache_body[3][relative_velocity]
     
     @inbounds for i in 1:n
         vn = 0.0
