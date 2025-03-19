@@ -478,14 +478,10 @@ function gamma_loop(
         
         relative_velocity_array .= va_array .+ induced_velocity_all
         for i in 1:n_panels
-            relative_velocity_crossz[i, :] .= cross3(
-                view(relative_velocity_array, i, :),
-                view(y_airf_array, i, :)
-            )
-            v_acrossz_array[i, :] .= cross3(
-                view(va_array, i, :),
-                view(y_airf_array, i, :)
-            )
+            relative_velocity_crossz[i, :] .=  MVec3(view(relative_velocity_array, i, :)) ×
+                                               MVec3(view(y_airf_array, i, :))
+            v_acrossz_array[i, :]          .=  MVec3(view(va_array, i, :)) ×
+                                               MVec3(view(y_airf_array, i, :))
         end
 
         for i in 1:n_panels
