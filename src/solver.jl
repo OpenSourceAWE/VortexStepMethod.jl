@@ -121,6 +121,8 @@ const cache = [LazyBufferCache(), LazyBufferCache(), LazyBufferCache(), LazyBuff
                LazyBufferCache(), LazyBufferCache(), LazyBufferCache(), LazyBufferCache(),
                LazyBufferCache(), LazyBufferCache(), LazyBufferCache()]
 
+const cache_base = [LazyBufferCache()]
+
 """
     solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=solver.sol.gamma_distribution; 
           log=false, reference_point=zeros(MVec3), moment_frac=0.1)
@@ -380,16 +382,17 @@ function solve_base!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribu
                             solver.br.va_unit_array)
 
     # Initialize gamma distribution
-    gamma_initial = if isnothing(gamma_distribution)
+    gamma_initial = cache_base[1][solver.sol.chord_array]
+    if isnothing(gamma_distribution)
         if solver.type_initial_gamma_distribution === :elliptic
-            calculate_circulation_distribution_elliptical_wing(body_aero)
+            calculate_circulation_distribution_elliptical_wing(gamma_initial, body_aero)
         else
-            zeros(n_panels)
+            gamma_initial .= 0
         end
     else
         length(gamma_distribution) == n_panels || 
             throw(ArgumentError("gamma_distribution length must match number of panels"))
-        gamma_distribution
+        gamma_initial .= gamma_distribution
     end
 
     @debug "Initial gamma_new: $gamma_initial"

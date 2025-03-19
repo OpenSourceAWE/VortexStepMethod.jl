@@ -346,24 +346,24 @@ end
 
 Calculate circulation distribution for an elliptical wing.
 
-Returns:
-    Vector{Float64}: Circulation distribution along the wing
+Returns: nothing
 """
-function calculate_circulation_distribution_elliptical_wing(body_aero::BodyAerodynamics, gamma_0::Float64=1.0)
+function calculate_circulation_distribution_elliptical_wing(gamma_i, body_aero::BodyAerodynamics, gamma_0::Float64=1.0)
     length(body_aero.wings) == 1 || throw(ArgumentError("Multiple wings not yet implemented"))
     
     wing_span = body_aero.wings[1].span
     @debug "Wing span: $wing_span"
     
     # Calculate y-coordinates of control points
-    y = [panel.control_point[2] for panel in body_aero.panels]
+    # TODO: pre-allocate y
+    n = @allocated y = [panel.control_point[2] for panel in body_aero.panels]
+    println(n)
     
     # Calculate elliptical distribution
-    gamma_i = gamma_0 * sqrt.(1 .- (2 .* y ./ wing_span).^2)
+    gamma_i .= gamma_0 * sqrt.(1 .- (2 .* y ./ wing_span).^2)
     
     @debug "Calculated circulation distribution: $gamma_i"
-    
-    return gamma_i
+    nothing
 end
 
 """
