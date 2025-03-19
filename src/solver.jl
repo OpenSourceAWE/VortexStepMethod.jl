@@ -45,6 +45,7 @@ function VSMSolution(P)
     VSMSolution{P}()
 end
 
+# Output of the function gamma_loop!
 @with_kw mutable struct LoopResult{P}
     converged::Bool              = false
     gamma_new::Vector{Float64}   = zeros(P)
@@ -399,7 +400,6 @@ function solve_base(solver::Solver, body_aero::BodyAerodynamics, gamma_distribut
     gamma_loop!(
         solver,
         body_aero,
-        solver.sol.va_array,
         solver.sol.chord_array,
         solver.sol.x_airf_array,
         solver.sol.y_airf_array,
@@ -415,7 +415,6 @@ function solve_base(solver::Solver, body_aero::BodyAerodynamics, gamma_distribut
         gamma_loop!(
             solver,
             body_aero,
-            solver.sol.va_array,
             solver.sol.chord_array,
             solver.sol.x_airf_array,
             solver.sol.y_airf_array,
@@ -452,7 +451,6 @@ Main iteration loop for calculating circulation distribution.
 function gamma_loop!(
     solver::Solver,
     body_aero::BodyAerodynamics,
-    va_array::Matrix{Float64},
     chord_array::Vector{Float64},
     x_airf_array::Matrix{Float64},
     y_airf_array::Matrix{Float64},
@@ -461,6 +459,7 @@ function gamma_loop!(
     relaxation_factor::Float64;
     log::Bool = true
 )
+    va_array = solver.sol.va_array
     solver.lr.converged   = false
     n_panels    = length(body_aero.panels)
     solver.lr.alpha_array .= body_aero.alpha_array
