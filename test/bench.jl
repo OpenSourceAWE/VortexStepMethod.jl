@@ -6,7 +6,7 @@ end
 using BenchmarkTools
 using StaticArrays
 using VortexStepMethod
-using VortexStepMethod: calculate_AIC_matrices!, gamma_loop, calculate_results,
+using VortexStepMethod: calculate_AIC_matrices!, gamma_loop!, calculate_results,
                        update_effective_angle_of_attack_if_VSM, calculate_projected_area,
                        calculate_cl, calculate_cd_cm,
                        calculate_velocity_induced_single_ring_semiinfinite!,
@@ -118,10 +118,9 @@ using LinearAlgebra
                 solver = Solver{P}(
                     aerodynamic_model_type=model
                 )
-                result = @benchmark gamma_loop(
+                result = @benchmark gamma_loop!(
                     $solver,
                     $body_aero,
-                    $gamma_new,
                     $va_array,
                     $chord_array,
                     $x_airf_array,

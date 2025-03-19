@@ -45,7 +45,7 @@ function VSMSolution(P)
     VSMSolution{P}()
 end
 
-@with_kw struct LoopResult{P}
+@with_kw mutable struct LoopResult{P}
     converged::Bool              = false
     gamma_new::Vector{Float64}   = zeros(P)
     alpha_array::Vector{Float64} = zeros(P)
@@ -114,6 +114,9 @@ sol::VSMSolution = VSMSolution(): The result of calling [solve!](@ref)
     core_radius_fraction::Float64 = 1e-20
     mu::Float64 = 1.81e-5
     is_only_f_and_gamma_output::Bool = false
+
+    # Intermediate results
+    lr::LoopResult{P} = LoopResult(P)
 
     # Solution
     sol::VSMSolution{P} = VSMSolution(P)
@@ -391,11 +394,11 @@ function solve_base(solver::Solver, body_aero::BodyAerodynamics, gamma_distribut
     end
 
     @debug "Initial gamma_new: $gamma_initial"
+    solver.lr.gamma_new .= gamma_initial
     # Run main iteration loop
-    converged, gamma_new, alpha_array, v_a_array = gamma_loop(
+    gamma_loop!(
         solver,
         body_aero,
-        gamma_initial,
         solver.sol.va_array,
         solver.sol.chord_array,
         solver.sol.x_airf_array,
@@ -406,12 +409,12 @@ function solve_base(solver::Solver, body_aero::BodyAerodynamics, gamma_distribut
         log
     )
     # Try again with reduced relaxation factor if not converged
-    if !converged && relaxation_factor > 1e-3
+    if ! solver.lr.converged && relaxation_factor > 1e-3
         log && @warn "Running again with half the relaxation_factor = $(relaxation_factor/2)"
-        converged, gamma_new, alpha_array, v_a_array = gamma_loop(
+        solver.lr.gamma_new .= gamma_initial
+        gamma_loop!(
             solver,
             body_aero,
-            gamma_initial,
             solver.sol.va_array,
             solver.sol.chord_array,
             solver.sol.x_airf_array,
@@ -425,12 +428,12 @@ function solve_base(solver::Solver, body_aero::BodyAerodynamics, gamma_distribut
 
     # Return results
     return (
-        converged,
+        solver.lr.converged,
         body_aero,
-        gamma_new,
+        solver.lr.gamma_new,
         reference_point,
-        alpha_array,
-        v_a_array,
+        solver.lr.alpha_array,
+        solver.lr.v_a_array,
         va_norm_array,
         va_unit_array,
         panels
@@ -438,7 +441,7 @@ function solve_base(solver::Solver, body_aero::BodyAerodynamics, gamma_distribut
 end
 
 """
-    gamma_loop(solver::Solver, gamma_new::Vector{Float64}, AIC_x::Matrix{Float64}, 
+    gamma_loop!(solver::Solver, AIC_x::Matrix{Float64}, 
               AIC_y::Matrix{Float64}, AIC_z::Matrix{Float64}, va_array::Matrix{Float64}, 
               chord_array::Vector{Float64}, x_airf_array::Matrix{Float64}, 
               y_airf_array::Matrix{Float64}, z_airf_array::Matrix{Float64}, 
@@ -446,10 +449,9 @@ end
 
 Main iteration loop for calculating circulation distribution.
 """
-function gamma_loop(
+function gamma_loop!(
     solver::Solver,
     body_aero::BodyAerodynamics,
-    gamma_new::Vector{Float64},
     va_array::Matrix{Float64},
     chord_array::Vector{Float64},
     x_airf_array::Matrix{Float64},
@@ -459,14 +461,14 @@ function gamma_loop(
     relaxation_factor::Float64;
     log::Bool = true
 )
-    converged   = false
+    solver.lr.converged   = false
     n_panels    = length(body_aero.panels)
-    alpha_array = body_aero.alpha_array
-    v_a_array   = body_aero.v_a_array
-    Umagw_array = cache[1][v_a_array]
+    solver.lr.alpha_array .= body_aero.alpha_array
+    solver.lr.v_a_array   .= body_aero.v_a_array
+    Umagw_array = cache[1][solver.lr.v_a_array]
 
-    gamma                    = cache[2][gamma_new]
-    abs_gamma_new            = cache[3][gamma_new]
+    gamma                    = cache[2][solver.lr.gamma_new]
+    abs_gamma_new            = cache[3][solver.lr.gamma_new]
     induced_velocity_all     = cache[4][va_array]
     relative_velocity_array  = cache[5][va_array]
     relative_velocity_crossz = cache[6][va_array]
@@ -485,7 +487,7 @@ function gamma_loop(
     iters = 0
     for i in 1:solver.max_iterations
         iters += 1
-        gamma .= gamma_new
+        gamma .= solver.lr.gamma_new
         
         # Calculate induced velocities
         mul!(velocity_view_x, AIC_x, gamma)
@@ -504,17 +506,17 @@ function gamma_loop(
             v_normal_array[i] = view(z_airf_array, i, :) ⋅ view(relative_velocity_array, i, :)
             v_tangential_array[i] = view(x_airf_array, i, :) ⋅ view(relative_velocity_array, i, :)
         end
-        alpha_array .= atan.(v_normal_array, v_tangential_array)
+        solver.lr.alpha_array .= atan.(v_normal_array, v_tangential_array)
 
         for i in 1:n_panels
-            @views v_a_array[i] = norm(relative_velocity_crossz[i, :])
+            @views solver.lr.v_a_array[i] = norm(relative_velocity_crossz[i, :])
             @views Umagw_array[i] = norm(v_acrossz_array[i, :])
         end
         
-        for (i, (panel, alpha)) in enumerate(zip(panels, alpha_array))
+        for (i, (panel, alpha)) in enumerate(zip(panels, solver.lr.alpha_array))
             cl_array[i] = calculate_cl(panel, alpha)
         end
-        gamma_new .= 0.5 .* v_a_array.^2 ./ Umagw_array .* cl_array .* chord_array
+        solver.lr.gamma_new .= 0.5 .* solver.lr.v_a_array.^2 ./ Umagw_array .* cl_array .* chord_array
 
         # Apply damping if needed
         if solver.is_with_artificial_damping
@@ -525,32 +527,32 @@ function gamma_loop(
             is_damping_applied = false
         end
         # Update gamma with relaxation and damping
-        gamma_new .= (1 - relaxation_factor) .* gamma .+ 
-                    relaxation_factor .* gamma_new .+ damp
+        solver.lr.gamma_new .= (1 - relaxation_factor) .* gamma .+ 
+                    relaxation_factor .* solver.lr.gamma_new .+ damp
 
         # Check convergence
-        abs_gamma_new .= abs.(gamma_new)
+        abs_gamma_new .= abs.(solver.lr.gamma_new)
         reference_error = maximum(abs_gamma_new)
         reference_error = max(reference_error, solver.tol_reference_error)
-        abs_gamma_new .= abs.(gamma_new .- gamma)
+        abs_gamma_new .= abs.(solver.lr.gamma_new .- gamma)
         error = maximum(abs_gamma_new)
         normalized_error = error / reference_error
 
         @debug "Iteration: $i, normalized_error: $normalized_error, is_damping_applied: $is_damping_applied"
 
         if normalized_error < solver.allowed_error
-            converged = true
+            solver.lr.converged = true
             break
         end
     end
 
-    if log && converged
+    if log && solver.lr.converged
         @info "Converged after $iters iterations"
     elseif log
         @warn "NO convergence after $(solver.max_iterations) iterations"
     end
 
-    return converged, gamma_new, alpha_array, v_a_array
+    nothing
 end
 
 """
