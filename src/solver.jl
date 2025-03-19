@@ -439,8 +439,8 @@ end
 
 """
     gamma_loop!(solver::Solver, AIC_x::Matrix{Float64}, 
-              AIC_y::Matrix{Float64}, AIC_z::Matrix{Float64}, va_array::Matrix{Float64}, 
-              chord_array::Vector{Float64}, x_airf_array::Matrix{Float64}, 
+              AIC_y::Matrix{Float64}, AIC_z::Matrix{Float64},
+              x_airf_array::Matrix{Float64}, 
               y_airf_array::Matrix{Float64}, z_airf_array::Matrix{Float64}, 
               panels::Vector{Panel}, relaxation_factor::Float64; log=true)
 
