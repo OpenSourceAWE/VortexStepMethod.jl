@@ -126,7 +126,7 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
 
     # calculate intermediate result
     (converged, body_aero, gamma_new, reference_point, density, aerodynamic_model_type, core_radius_fraction,
-        mu, alpha_array, v_a_array, solver.sol.chord_array, solver.sol.x_airf_array, solver.sol.y_airf_array, solver.sol.z_airf_array,
+        mu, alpha_array, v_a_array, solver.sol.x_airf_array, solver.sol.y_airf_array, solver.sol.z_airf_array,
         solver.sol.va_array, va_norm_array, va_unit_array, panels,
         is_only_f_and_gamma_output) = solve_base(solver, body_aero, gamma_distribution; log, reference_point)
     if !isnothing(solver.sol.gamma_distribution)
@@ -288,7 +288,7 @@ function solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=n
     # calculate intermediate result
     converged,
     body_aero, gamma_new, reference_point, density, aerodynamic_model_type, core_radius_fraction,
-    mu, alpha_array, v_a_array, chord_array, x_airf_array, y_airf_array, z_airf_array,
+    mu, alpha_array, v_a_array, x_airf_array, y_airf_array, z_airf_array,
     va_array, va_norm_array, va_unit_array, panels,
     is_only_f_and_gamma_output = solve_base(solver, body_aero, gamma_distribution; log, reference_point)
 
@@ -303,7 +303,7 @@ function solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=n
         mu,
         alpha_array,
         v_a_array,
-        chord_array,
+        solver.sol.chord_array,
         x_airf_array,
         y_airf_array,
         z_airf_array,
@@ -414,7 +414,6 @@ function solve_base(solver::Solver, body_aero::BodyAerodynamics, gamma_distribut
         solver.mu,
         alpha_array,
         v_a_array,
-        solver.sol.chord_array,
         solver.sol.x_airf_array,
         solver.sol.y_airf_array,
         solver.sol.z_airf_array,
