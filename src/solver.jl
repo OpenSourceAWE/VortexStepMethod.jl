@@ -57,10 +57,7 @@ function LoopResult(P)
     LoopResult{P}()
 end
 
-struct BaseResult
-    converged
-    body_aero
-    gamma_new
+@with_kw struct BaseResult{P}
     reference_point
     alpha_array
     v_a_array
@@ -152,9 +149,10 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
     log=false, reference_point=zeros(MVec3), moment_frac=0.1)
 
     # calculate intermediate result
-    converged, body_aero, gamma_new, reference_point, alpha_array, v_a_array, va_norm_array, 
+    converged, reference_point, alpha_array, v_a_array, va_norm_array, 
                va_unit_array, panels = solve_base(solver, body_aero, gamma_distribution; 
                                                   log, reference_point)
+    gamma_new = solver.lr.gamma_new
     if !isnothing(solver.sol.gamma_distribution)
         solver.sol.gamma_distribution .= gamma_new
     else
@@ -165,6 +163,7 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
     cl_array = solver.sol.cl_array
     cd_array = solver.sol.cd_array
     cm_array = solver.sol.cm_array
+   
     panel_width_array = solver.sol.panel_width_array
     solver.sol.moment_distribution .= 0
     solver.sol.moment_coefficient_distribution .= 0
@@ -313,14 +312,14 @@ A dictionary with the results.
 function solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=nothing; 
     log=false, reference_point=zeros(MVec3))
     # calculate intermediate result
-    converged, body_aero, gamma_new, reference_point, alpha_array, v_a_array, va_norm_array, 
+    converged, reference_point, alpha_array, v_a_array, va_norm_array, 
     va_unit_array, panels = solve_base(solver, body_aero, gamma_distribution; 
                                        log, reference_point)
 
     # Calculate final results as dictionary
     results = calculate_results(
         body_aero,
-        gamma_new,
+        solver.lr.gamma_new,
         reference_point,
         solver.density,
         solver.aerodynamic_model_type,
@@ -402,8 +401,6 @@ function solve_base(solver::Solver, body_aero::BodyAerodynamics, gamma_distribut
     # Return results
     return (
         solver.lr.converged,
-        body_aero,
-        solver.lr.gamma_new,
         reference_point,
         solver.lr.alpha_array,
         solver.lr.v_a_array,
