@@ -149,11 +149,10 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
     log=false, reference_point=zeros(MVec3), moment_frac=0.1)
 
     # calculate intermediate result
-    reference_point, alpha_array, v_a_array, va_norm_array, 
+    reference_point, va_norm_array, 
                va_unit_array, panels = solve_base(solver, body_aero, gamma_distribution; 
                                                   log, reference_point)
     gamma_new = solver.lr.gamma_new
-    converged = solver.lr.converged
     if !isnothing(solver.sol.gamma_distribution)
         solver.sol.gamma_distribution .= gamma_new
     else
@@ -164,6 +163,9 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
     cl_array = solver.sol.cl_array
     cd_array = solver.sol.cd_array
     cm_array = solver.sol.cm_array
+    converged = solver.lr.converged
+    alpha_array = solver.lr.alpha_array
+    v_a_array = solver.lr.v_a_array
    
     panel_width_array = solver.sol.panel_width_array
     solver.sol.moment_distribution .= 0
@@ -313,9 +315,8 @@ A dictionary with the results.
 function solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=nothing; 
     log=false, reference_point=zeros(MVec3))
     # calculate intermediate result
-    reference_point, alpha_array, v_a_array, va_norm_array, 
-    va_unit_array, panels = solve_base(solver, body_aero, gamma_distribution; 
-                                       log, reference_point)
+    reference_point, va_norm_array, va_unit_array, panels = solve_base(solver, body_aero, gamma_distribution; 
+                                                                       log, reference_point)
 
     # Calculate final results as dictionary
     results = calculate_results(
@@ -326,8 +327,8 @@ function solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=n
         solver.aerodynamic_model_type,
         solver.core_radius_fraction,
         solver.mu,
-        alpha_array,
-        v_a_array,
+        solver.lr.alpha_array,
+        solver.lr.v_a_array,
         solver.sol.chord_array,
         solver.sol.x_airf_array,
         solver.sol.y_airf_array,
@@ -402,8 +403,6 @@ function solve_base(solver::Solver, body_aero::BodyAerodynamics, gamma_distribut
     # Return results
     return (
         reference_point,
-        solver.lr.alpha_array,
-        solver.lr.v_a_array,
         va_norm_array,
         va_unit_array,
         panels
