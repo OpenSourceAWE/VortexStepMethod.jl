@@ -397,30 +397,12 @@ function solve_base(solver::Solver, body_aero::BodyAerodynamics, gamma_distribut
     @debug "Initial gamma_new: $gamma_initial"
     solver.lr.gamma_new .= gamma_initial
     # Run main iteration loop
-    gamma_loop!(
-        solver,
-        body_aero,
-        solver.sol.x_airf_array,
-        solver.sol.y_airf_array,
-        solver.sol.z_airf_array,
-        panels,
-        relaxation_factor;
-        log
-    )
+    gamma_loop!(solver, body_aero, panels, relaxation_factor; log)
     # Try again with reduced relaxation factor if not converged
     if ! solver.lr.converged && relaxation_factor > 1e-3
         log && @warn "Running again with half the relaxation_factor = $(relaxation_factor/2)"
         solver.lr.gamma_new .= gamma_initial
-        gamma_loop!(
-            solver,
-            body_aero,
-            solver.sol.x_airf_array,
-            solver.sol.y_airf_array,
-            solver.sol.z_airf_array,
-            panels,
-            relaxation_factor/2;
-            log
-        )
+        gamma_loop!(solver, body_aero, panels, relaxation_factor/2; log)
     end
 
     # Return results
@@ -440,8 +422,6 @@ end
 """
     gamma_loop!(solver::Solver, AIC_x::Matrix{Float64}, 
               AIC_y::Matrix{Float64}, AIC_z::Matrix{Float64},
-              x_airf_array::Matrix{Float64}, 
-              y_airf_array::Matrix{Float64}, z_airf_array::Matrix{Float64}, 
               panels::Vector{Panel}, relaxation_factor::Float64; log=true)
 
 Main iteration loop for calculating circulation distribution.
@@ -449,15 +429,15 @@ Main iteration loop for calculating circulation distribution.
 function gamma_loop!(
     solver::Solver,
     body_aero::BodyAerodynamics,
-    x_airf_array::Matrix{Float64},
-    y_airf_array::Matrix{Float64},
-    z_airf_array::Matrix{Float64},
     panels::Vector{Panel},
     relaxation_factor::Float64;
     log::Bool = true
 )
     va_array = solver.sol.va_array
     chord_array = solver.sol.chord_array
+    x_airf_array = solver.sol.x_airf_array
+    y_airf_array = solver.sol.y_airf_array
+    z_airf_array = solver.sol.z_airf_array
     solver.lr.converged   = false
     n_panels    = length(body_aero.panels)
     solver.lr.alpha_array .= body_aero.alpha_array

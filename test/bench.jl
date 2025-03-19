@@ -120,17 +120,17 @@ using LinearAlgebra
                 )
                 solver.sol.va_array .= va_array
                 solver.sol.chord_array .= chord_array
+                solver.sol.x_airf_array .= x_airf_array
+                solver.sol.y_airf_array .= y_airf_array
+                solver.sol.z_airf_array .= z_airf_array
                 result = @benchmark gamma_loop!(
                     $solver,
                     $body_aero,
-                    $x_airf_array,
-                    $y_airf_array,
-                    $z_airf_array,
                     $body_aero.panels,
                     0.5;
                     log = false
                 ) samples = 1 evals = 1
-                @test result.allocs ≤ 100
+                @test result.allocs ≤ 10
                 @info "Model: $model \t Aero_model: $aero_model \t Allocations: $(result.allocs) Memory: $(result.memory)"
             end
         end
