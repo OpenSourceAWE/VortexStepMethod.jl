@@ -27,7 +27,10 @@ add_section!(wing,
     INVISCID)
 
 # Step 3: Initialize aerodynamics
-body_aero = BodyAerodynamics([wing])
+body_aero::BodyAerodynamics = BodyAerodynamics([wing])
 
 y = [panel.control_point[2] for panel in body_aero.panels]
-@allocated y = [panel.control_point[2] for panel in body_aero.panels]
+n = @allocated y = [panel.control_point[2] for panel in body_aero.panels]
+
+for panel in body_aero.panels end
+@time for panel in body_aero.panels end
