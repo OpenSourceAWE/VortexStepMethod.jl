@@ -385,7 +385,7 @@ function solve_base!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribu
     # Initialize gamma distribution
     gamma_initial = cache_base[1][solver.sol.chord_array]
     if isnothing(gamma_distribution)
-        if solver.type_initial_gamma_distribution === :elliptic
+        if solver.type_initial_gamma_distribution == ELLIPTIC
             calculate_circulation_distribution_elliptical_wing(gamma_initial, body_aero)
         else
             gamma_initial .= 0
