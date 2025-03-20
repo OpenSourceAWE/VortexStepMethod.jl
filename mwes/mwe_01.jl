@@ -1,6 +1,6 @@
-# replace va_norm_array = norm.(eachrow(solver.sol.va_array)) with a for loop
+# Replace va_norm_array = norm.(eachrow(solver.sol.va_array)) with a for loop
 
-# testcase
+# Testcase that shows that the new function is equivalent to the old, allocating line of code.
 using Test
 using LinearAlgebra  # for the norm function
 
