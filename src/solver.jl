@@ -117,7 +117,7 @@ sol::VSMSolution = VSMSolution(): The result of calling [solve!](@ref)
     sol::VSMSolution{P} = VSMSolution(P)
 end
 
-function Solver(body_aero; kwargs)
+function Solver(body_aero; kwargs...)
     P = length(body_aero.panels)
     return Solver{P}(; kwargs...)
 end
@@ -266,7 +266,7 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
 
         # Calculate the moment distribution (moment on each panel)
         arm = (moment_frac - 0.25) * panel.chord
-        moment_distribution[i] = (ftotal_induced_va ⋅ panel.z_airf) * arm
+        moment_distribution[i] = ((ftotal_induced_va ⋅ panel.z_airf) * arm + moment[i]) * panel.width
         moment_coefficient_distribution[i] = moment_distribution[i] / (q_inf * projected_area)
     end
 
