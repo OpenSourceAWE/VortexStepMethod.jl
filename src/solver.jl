@@ -193,7 +193,7 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
     @. moment = cm_array * 0.5 * density * v_a_array^2 * solver.sol.chord_array
 
     # Calculate alpha corrections based on model type
-    if aerodynamic_model_type == VSM                             # 1568 bytes
+    if aerodynamic_model_type == VSM                             # 64 bytes
         update_effective_angle_of_attack!(
             alpha_corrected,
             body_aero,
