@@ -236,7 +236,7 @@ function refine_aerodynamic_mesh!(wing::AbstractWing)
         return nothing
     end
 
-    @info "Refining aerodynamic mesh from $(length(wing.sections)) sections to $n_sections sections."
+    @debug "Refining aerodynamic mesh from $(length(wing.sections)) sections to $n_sections sections."
     
     # Handle two-section case
     if n_sections == 2
