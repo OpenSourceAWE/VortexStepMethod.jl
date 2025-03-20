@@ -317,7 +317,7 @@ end
                 index_reversed = length(body_aero.panels) - i + 1
                 panel = body_aero.panels[index_reversed]
                 
-                evaluation_point = if model === VSM
+                evaluation_point = if model == VSM
                     panel.control_point
                 else  # LLT
                     panel.aero_center
@@ -333,7 +333,7 @@ end
                     atol=1e-4
                 )
                 
-                if model === VSM
+                if model == VSM
                     @test isapprox(
                         panel.aero_center,
                         expected_controlpoints[i]["coordinates_aoa"],
