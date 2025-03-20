@@ -117,6 +117,11 @@ sol::VSMSolution = VSMSolution(): The result of calling [solve!](@ref)
     sol::VSMSolution{P} = VSMSolution(P)
 end
 
+function Solver(body_aero; kwargs)
+    P = length(body_aero.panels)
+    return Solver{P}(; kwargs...)
+end
+
 const cache = [LazyBufferCache() for _ in 1:11]
 const cache_base  = [LazyBufferCache()]
 const cache_solve = [LazyBufferCache()]
