@@ -277,7 +277,8 @@ include("solver.jl")
         # Step 3: Initialize aerodynamics
         body_aero::BodyAerodynamics = BodyAerodynamics([wing])
 
-        y = [panel.control_point[2] for panel in body_aero.panels]
+        gamma_initial = zeros(length(body_aero.panels))
+        calculate_circulation_distribution_elliptical_wing(gamma_initial, body_aero)
 
         nothing
     end
