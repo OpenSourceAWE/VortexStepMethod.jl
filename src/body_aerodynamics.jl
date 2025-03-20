@@ -356,8 +356,7 @@ function calculate_circulation_distribution_elliptical_wing(gamma_i, body_aero::
     
     # Calculate y-coordinates of control points
     # TODO: pre-allocate y
-    n = @allocated y = [panel.control_point[2] for panel in body_aero.panels]
-    println(n)
+    y = [panel.control_point[2] for panel in body_aero.panels]
     
     # Calculate elliptical distribution
     gamma_i .= gamma_0 * sqrt.(1 .- (2 .* y ./ wing_span).^2)
