@@ -104,7 +104,7 @@ plt.ioff()
         # Step 9: Test polar data plotting
         cp("data/ram_air_kite_body.obj", "/tmp/ram_air_kite_body.obj"; force=true)
         cp("data/ram_air_kite_foil.dat", "/tmp/ram_air_kite_foil.dat"; force=true)
-        wing = RamAirWing("/tmp/ram_air_kite_body.obj", "/tmp/ram_air_kite_foil.dat"; alpha_range=deg2rad.(-1:0:1), delta_range=deg2rad.(-1:0:1))
+        wing = RamAirWing("/tmp/ram_air_kite_body.obj", "/tmp/ram_air_kite_foil.dat"; alpha_range=deg2rad.(-1:1), delta_range=deg2rad.(-1:1))
         body_aero = BodyAerodynamics([wing])
         fig = plot_polar_data(body_aero; is_show=false)
         @test fig isa plt.PyPlot.Figure
