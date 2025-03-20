@@ -171,9 +171,10 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
 
     # Get wing properties
     spanwise_direction = body_aero.wings[1].spanwise_direction
+    va_mag = norm(body_aero.va)
     va = body_aero.va
-    q_inf = 0.5 * density * norm(va) ^ 2
-    q_inf_vec = 0.5 .* density .* va .^ 2
+    va_unit = va / va_mag
+    q_inf = 0.5 * density * va_mag^2
 
     # Calculate wing geometry properties
     projected_area = body_aero.projected_area
@@ -254,15 +255,8 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
         sum(m_body_3D[2,:]),
         sum(m_body_3D[3,:])
     ]
-    for (i, q) in enumerate(q_inf_vec)
-        if isapprox(q, 0.0, atol=1e-5)
-            solver.sol.force_coefficients[i] = 0.0
-            solver.sol.moment_coefficients[i] = 0.0
-        else
-            solver.sol.force_coefficients[i] = solver.sol.aero_force[i] / (q * projected_area)
-            solver.sol.moment_coefficients[i] = solver.sol.aero_moments[i] / (q * projected_area)
-        end
-    end
+    solver.sol.force_coefficients .= solver.sol.aero_force ./ (q_inf * projected_area)
+    solver.sol.moment_coefficients .= solver.sol.aero_moments ./ (q_inf * projected_area)
     if converged
         # TODO: Check if the result if feasible if converged
         solver.sol.solver_status = FEASIBLE
