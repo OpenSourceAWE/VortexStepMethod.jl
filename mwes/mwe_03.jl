@@ -1,7 +1,7 @@
 # fix allocations of this array comprehension:
 # y = [panel.control_point[2] for panel in body_aero.panels]
 
-using VortexStepMethod
+using VortexStepMethod, PreallocationTools
 
 # Step 1: Define wing parameters
 n_panels = 20          # Number of panels
@@ -31,12 +31,17 @@ body_aero::BodyAerodynamics = BodyAerodynamics([wing])
 y = [panel.control_point[2] for panel in body_aero.panels]
 n = @allocated y = [panel.control_point[2] for panel in body_aero.panels]
 
-function test(body_aero)
-    # for panel in body_aero.panels end
-    y = [panel.control_point[2] for panel in body_aero.panels]
-    nothing
+function test(body_aero, gamma_i)
+    y = body_aero.y
+    for (i, panel) in pairs(body_aero.panels) 
+        y[i] = panel.control_point[2] 
+    end
+    # y = [panel.control_point[2] for panel in body_aero.panels]
+    y
 end
 
-test(body_aero)
-@allocated test(body_aero)
+gamma_i=zeros(length(body_aero.panels))
+
+test(body_aero, gamma_i)
+@allocated test(body_aero, gamma_i)
 
