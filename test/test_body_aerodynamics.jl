@@ -253,7 +253,7 @@ end
         @test wing.sections[1].TE_point ≈ [0.0, 0.0, -3.0]
     end
 
-    function create_geometry(; model=VSM, wing_type=:rectangular, plotting=false, N=40)
+    function create_geometry(; model=VSM, wing_type=RECTANGULAR, plotting=false, N=40)
         max_chord = 1.0
         span = 17.0
         AR = span^2 / (π * span * max_chord / 4)
@@ -262,7 +262,7 @@ end
         aoa = 5.7106 * π / 180
         v_a = [cos(aoa), 0.0, sin(aoa)] .* v_a
     
-        coord = if wing_type === :rectangular
+        coord = if wing_type == RECTANGULAR
             theta = range(-0.5, 0.5, length=N)
             beta = range(-2, 2, length=N)
             generate_coordinates_rect_wing(
@@ -273,14 +273,12 @@ end
                 N,
                 "lin"
             )
-        elseif wing_type === :curved
+        elseif wing_type == CURVED
             generate_coordinates_curved_wing(
                 max_chord, span, π/4, 5, N, "cos"
             )
-        elseif wing_type === :elliptical
+        elseif wing_type == ELLIPTICAL
             generate_coordinates_el_wing(max_chord, span, N, "cos")
-        else
-            error("Invalid wing type")
         end
     
         coord_left_to_right = flip_created_coord_in_pairs(deepcopy(coord))
@@ -301,7 +299,7 @@ end
 
     for model in [VSM, LLT]
         @debug "model: $model"
-        for wing_type in [:rectangular, :curved, :elliptical]
+        for wing_type in [RECTANGULAR, CURVED, ELLIPTICAL]
             @debug "wing_type: $wing_type"
             body_aero, coord, v_a, model = create_geometry(
                 model=model, wing_type=wing_type

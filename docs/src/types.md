@@ -4,6 +4,7 @@ CurrentModule = VortexStepMethod
 ## Enumerations
 ```@docs
 Model
+WingType
 AeroModel
 PanelDistribution
 InitialGammaDistribution

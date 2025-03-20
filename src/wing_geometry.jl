@@ -161,9 +161,9 @@ Add a new section to the wing.
 """
 function add_section!(wing::Wing, LE_point::Vector{Float64}, 
                      TE_point::Vector{Float64}, aero_model::AeroModel, aero_data::AeroData=nothing)
-    if aero_model === POLAR_VECTORS && wing.remove_nan
+    if aero_model == POLAR_VECTORS && wing.remove_nan
         aero_data = remove_vector_nans(aero_data)
-    elseif aero_model === POLAR_MATRICES && wing.remove_nan
+    elseif aero_model == POLAR_MATRICES && wing.remove_nan
         interpolate_matrix_nans!.(aero_data[3:5])
     end
     push!(wing.sections, Section(LE_point, TE_point, aero_model, aero_data))
@@ -282,7 +282,7 @@ function calculate_new_aero_data(aero_model,
     
     model_type = aero_model[section_index]
     model_type_2 = aero_model[section_index+1]
-    if !(model_type === model_type_2)
+    if !(model_type == model_type_2)
         throw(ArgumentError("Different aero models over the span are not supported"))
     end
     
@@ -326,7 +326,7 @@ function calculate_new_aero_data(aero_model,
             return (alpha_left, delta_left, CL_data, CD_data, CM_data)
         end
 
-    elseif model_type === LEI_AIRFOIL_BREUKELS
+    elseif model_type == LEI_AIRFOIL_BREUKELS
         tube_diameter_left = aero_data[section_index][1]
         tube_diameter_right = aero_data[section_index + 1][1]
         tube_diameter_i = tube_diameter_left * left_weight + tube_diameter_right * right_weight
@@ -462,7 +462,7 @@ function refine_mesh_for_linear_cosine_distribution!(
     end
 
     # Apply van Garrel distribution if requested
-    if spanwise_panel_distribution === :cosine_van_Garrel
+    if spanwise_panel_distribution == COSINE_VAN_GARREL
         idx = calculate_cosine_van_Garrel!(wing, idx)
     end
 

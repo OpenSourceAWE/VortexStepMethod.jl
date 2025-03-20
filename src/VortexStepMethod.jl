@@ -78,6 +78,18 @@ Enumeration of the implemented model types.
 @enum Model VSM LLT
 
 """
+    WingType `RECTANGULAR` `CURVED` `ELLIPTICAL`
+
+Enumeration of the implemented wing types.
+
+# Elements:
+- RECTANGULAR
+- CURVED
+- ELLIPTICAL
+"""
+@enum WingType  RECTANGULAR CURVED ELLIPTICAL
+
+"""
    AeroModel `LEI_AIRFOIL_BREUKELS` `POLAR_VECTORS` `POLAR_MATRICES` `INVISCID`
 
 Enumeration of the implemented aerodynamic models. See also: [AeroData](@ref)
