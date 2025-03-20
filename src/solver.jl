@@ -117,10 +117,7 @@ sol::VSMSolution = VSMSolution(): The result of calling [solve!](@ref)
     sol::VSMSolution{P} = VSMSolution(P)
 end
 
-const cache = [LazyBufferCache(), LazyBufferCache(), LazyBufferCache(), LazyBufferCache(),
-               LazyBufferCache(), LazyBufferCache(), LazyBufferCache(), LazyBufferCache(),
-               LazyBufferCache(), LazyBufferCache(), LazyBufferCache()]
-
+const cache = [LazyBufferCache() for _ in 1:11]
 const cache_base  = [LazyBufferCache()]
 const cache_solve = [LazyBufferCache()]
 
