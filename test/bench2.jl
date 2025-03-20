@@ -48,5 +48,5 @@ println("Rectangular wing, solve_base!:")
 # time Python: 32.0 ms  Ryzen 7950x
 # time Julia:   0.48 ms laptop, performance mode, grid
 println("Rectangular wing, solve!:")
-@btime sol = solve!($vsm_solver, $wa, nothing) # 337 allocations
+@btime sol = solve!($vsm_solver, $wa, nothing) # 328 allocations
 nothing

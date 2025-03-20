@@ -450,17 +450,35 @@ function update_effective_angle_of_attack!(alpha_corrected,
     # induced_velocity[:, 2] .= AIC_y * gamma
     # induced_velocity[:, 3] .= AIC_z * gamma
 
-    # Get views of AIC matrices without copying
-    AIC_views = (@view(body_aero.AIC[1, :, :]), 
-                 @view(body_aero.AIC[2, :, :]), 
-                 @view(body_aero.AIC[3, :, :]))
+    # # Get views of AIC matrices without copying
+    # AIC_views = (@view(body_aero.AIC[1, :, :]), 
+    #              @view(body_aero.AIC[2, :, :]), 
+    #              @view(body_aero.AIC[3, :, :]))
+
+    # # Preallocate induced velocity array
+    # induced_velocity = cache_body[1][va_array]
+
+    # # Calculate induced velocity components in-place
+    # for (j, aic) in enumerate(AIC_views)                     # 384 allocated
+    #     mul!(@view(induced_velocity[:, j]), aic, gamma)
+    # end
+
+    # Get dimensions from existing data
+    n_rows = size(body_aero.AIC, 2)
+    n_cols = size(body_aero.AIC, 3)
 
     # Preallocate induced velocity array
     induced_velocity = cache_body[1][va_array]
 
-    # Calculate induced velocity components in-place
-    for (j, aic) in enumerate(AIC_views)                     # 384 allocated
-        mul!(@view(induced_velocity[:, j]), aic, gamma)
+    # Calculate each component with explicit loops
+    for j in 1:3  # For each x/y/z component
+        for i in 1:n_rows
+            acc = zero(eltype(induced_velocity))  # Type-stable accumulator
+            for k in 1:n_cols
+                acc += body_aero.AIC[j, i, k] * gamma[k]
+            end
+            induced_velocity[i, j] = acc
+        end
     end
 
     # In-place relative velocity calculation
