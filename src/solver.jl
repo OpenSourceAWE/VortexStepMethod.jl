@@ -220,7 +220,7 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
     # Calculate wing geometry properties
     projected_area = body_aero.projected_area
     
-    for (i, panel) in enumerate(panels)                                               # 8008 bytes
+    for (i, panel) in enumerate(panels)                                               # 8000 bytes
 
         ### Lift and Drag ###
         # Panel geometry
