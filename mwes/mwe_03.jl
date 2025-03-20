@@ -3,7 +3,6 @@
 
 using VortexStepMethod
 
-
 # Step 1: Define wing parameters
 n_panels = 20          # Number of panels
 span = 20.0            # Wing span [m]
@@ -32,5 +31,12 @@ body_aero::BodyAerodynamics = BodyAerodynamics([wing])
 y = [panel.control_point[2] for panel in body_aero.panels]
 n = @allocated y = [panel.control_point[2] for panel in body_aero.panels]
 
-for panel in body_aero.panels end
-@time for panel in body_aero.panels end
+function test(body_aero)
+    # for panel in body_aero.panels end
+    y = [panel.control_point[2] for panel in body_aero.panels]
+    nothing
+end
+
+test(body_aero)
+@allocated test(body_aero)
+
