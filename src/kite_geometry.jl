@@ -367,7 +367,9 @@ Constructor for a [RamAirWing](@ref) that allows to use an `.obj` and a `.dat` f
 """
 function RamAirWing(obj_path, dat_path; alpha=0.0, crease_frac=0.75, wind_vel=10., mass=1.0, 
                   n_panels=54, n_sections=n_panels+1, spanwise_panel_distribution=UNCHANGED, 
-                  spanwise_direction=[0.0, 1.0, 0.0], remove_nan=true)
+                  spanwise_direction=[0.0, 1.0, 0.0], remove_nan=true,
+                  alpha_range=deg2rad.(-5:1:20), delta_range=deg2rad.(-5:1:20) 
+                  )
 
     !isapprox(spanwise_direction, [0.0, 1.0, 0.0]) && throw(ArgumentError("Spanwise direction has to be [0.0, 1.0, 0.0], not $spanwise_direction"))
 
@@ -395,8 +397,8 @@ function RamAirWing(obj_path, dat_path; alpha=0.0, crease_frac=0.75, wind_vel=10
         width = 2gamma_tip * radius
         area = area_interp(gamma_tip)
         @eval Main begin
-            foil_path, polar_path, v_wind, area, width, x_turn =
-                $dat_path, $polar_path, $wind_vel, $gamma_tip, $width, $crease_frac
+            foil_path, polar_path, v_wind, area, width, x_turn, alpha_range, delta_range =
+                $dat_path, $polar_path, $wind_vel, $gamma_tip, $width, $crease_frac, $alpha_range, $delta_range
             include(joinpath(dirname(@__FILE__), "../scripts/polars.jl"))
         end
     end
