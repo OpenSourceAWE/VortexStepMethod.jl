@@ -444,8 +444,9 @@ function update_effective_angle_of_attack!(alpha_corrected,
     AIC_x, AIC_y, AIC_z = @views body_aero.AIC[1, :, :], body_aero.AIC[2, :, :], body_aero.AIC[3, :, :]
 
     # Preallocate and calculate induced velocity directly
+    # TODO rewrite
     induced_velocity = cache_body[1][va_array]
-    induced_velocity[:, 1] .= AIC_x * gamma
+    induced_velocity[:, 1] .= AIC_x * gamma              # 304 bytes
     induced_velocity[:, 2] .= AIC_y * gamma
     induced_velocity[:, 3] .= AIC_z * gamma
 
