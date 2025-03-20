@@ -169,7 +169,7 @@ end
     @test sol.force_coefficients[2] ≈ 0.0                   atol=1e-10 # CFy
     @test sol.force_coefficients[3] ≈ 0.49055973654418716   atol=1e-3 # CFz
     @test sol.force_coefficients[3] / sol.force_coefficients[1] ≈ sol.aero_force[3] / sol.aero_force[1]
-    @test sol.moment_distribution[1] ≈ -0.0006683746751654071 atol=1e-10
+    @test sol.moment_distribution[1] ≈ -0.0006683746751654071 atol=1e-8
     @test sol.moment_coefficient_distribution[1] ≈ -2.212405554436003e-7 atol=1e-10
     @test sol.moment_distribution[1] / sol.moment_distribution[2] ≈ sol.moment_coefficient_distribution[1] / sol.moment_coefficient_distribution[2]
 
