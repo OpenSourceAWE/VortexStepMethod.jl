@@ -44,9 +44,9 @@ vsm_solver = Solver{P}(aerodynamic_model_type=VSM)
 
 # Step 5: Solve using both methods
 println("Rectangular wing, solve_base!:")
-@btime solve_base!($vsm_solver, $wa, nothing)  # 34 allocations
+@btime solve_base!($vsm_solver, $wa, nothing)  #  34 allocations
 # time Python: 32.0 ms  Ryzen 7950x
-# time Julia:   0.45 ms laptop, performance mode, grid
+# time Julia:   0.48 ms laptop, performance mode, grid
 println("Rectangular wing, solve!:")
-@btime sol = solve!($vsm_solver, $wa, nothing) # 342 allocations
+@btime sol = solve!($vsm_solver, $wa, nothing) # 337 allocations
 nothing
