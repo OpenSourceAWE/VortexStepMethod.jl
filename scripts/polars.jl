@@ -24,12 +24,12 @@ try
 
     @eval @everywhere using VortexStepMethod, Xfoil, Statistics, SharedArrays
 
-    alphas = -deg2rad(5):deg2rad(1.0):deg2rad(20)
-    d_trailing_edge_angles = -deg2rad(5):deg2rad(1.0):deg2rad(20)
+    # alpha_range = deg2rad.(-5:1:20)
+    # delta_range = deg2rad.(-5:1:20)
 
-    cl_matrix = SharedArray{Float64}((length(alphas), length(d_trailing_edge_angles)))
-    cd_matrix = SharedArray{Float64}((length(alphas), length(d_trailing_edge_angles)))
-    cm_matrix = SharedArray{Float64}((length(alphas), length(d_trailing_edge_angles)))
+    cl_matrix = SharedArray{Float64}((length(alpha_range), length(delta_range)))
+    cd_matrix = SharedArray{Float64}((length(alpha_range), length(delta_range)))
+    cm_matrix = SharedArray{Float64}((length(alpha_range), length(delta_range)))
 
     @everywhere begin
         function turn_trailing_edge!(angle, x, y, lower_turn, upper_turn, x_turn)
@@ -69,14 +69,14 @@ try
             nothing
         end
         
-        function solve_alpha!(cls, cds, cms, alphas, alpha_idxs, d_trailing_edge_angle, re, x_, y_, lower, upper, kite_speed, speed_of_sound, x_turn)
+        function solve_alpha!(cls, cds, cms, alpha_range, alpha_idxs, delta, re, x_, y_, lower, upper, kite_speed, speed_of_sound, x_turn)
             x = deepcopy(x_)
             y = deepcopy(y_)
-            turn_trailing_edge!(d_trailing_edge_angle, x, y, lower, upper, x_turn)
+            turn_trailing_edge!(delta, x, y, lower, upper, x_turn)
             Xfoil.set_coordinates(x, y)
             x, y = Xfoil.pane(npan=140)
             reinit = true
-            for (alpha, alpha_idx) in zip(alphas, alpha_idxs)
+            for (alpha, alpha_idx) in zip(alpha_range, alpha_idxs)
                 converged = false
                 cl = 0.0
                 cd = 0.0
@@ -92,18 +92,18 @@ try
             return nothing
         end
         
-        function run_solve_alpha(alphas, d_trailing_edge_angle, re, x_, y_, lower, upper, kite_speed, speed_of_sound, x_turn)
-            @info "solving alpha with trailing edge angle: $(rad2deg(d_trailing_edge_angle)) degrees"
-            cls = Float64[NaN for _ in alphas]
-            cds = Float64[NaN for _ in alphas]
-            cms = Float64[NaN for _ in alphas]
-            neg_idxs = sort(findall(alphas .< 0.0), rev=true)
-            neg_alphas = alphas[neg_idxs]
-            pos_idxs = sort(findall(alphas .>= 0.0))
-            pos_alphas = alphas[pos_idxs]
-            solve_alpha!(cls, cds, cms, neg_alphas, neg_idxs, d_trailing_edge_angle, 
+        function run_solve_alpha(alpha_range, delta, re, x_, y_, lower, upper, kite_speed, speed_of_sound, x_turn)
+            @info "solving alpha with trailing edge angle: $(rad2deg(delta)) degrees"
+            cls = Float64[NaN for _ in alpha_range]
+            cds = Float64[NaN for _ in alpha_range]
+            cms = Float64[NaN for _ in alpha_range]
+            neg_idxs = sort(findall(alpha_range .< 0.0), rev=true)
+            neg_alpha_range = alpha_range[neg_idxs]
+            pos_idxs = sort(findall(alpha_range .>= 0.0))
+            pos_alpha_range = alpha_range[pos_idxs]
+            solve_alpha!(cls, cds, cms, neg_alpha_range, neg_idxs, delta, 
                                 re, x_, y_, lower, upper, kite_speed, speed_of_sound, x_turn)
-            solve_alpha!(cls, cds, cms, pos_alphas, pos_idxs, d_trailing_edge_angle, 
+            solve_alpha!(cls, cds, cms, pos_alpha_range, pos_idxs, delta, 
                                 re, x_, y_, lower, upper, kite_speed, speed_of_sound, x_turn)
             return cls, cds, cms
         end
@@ -163,8 +163,8 @@ try
         reynolds_number = $reynolds_number
     end
 
-    @sync @distributed for j in eachindex(d_trailing_edge_angles)
-        cl_matrix[:, j], cd_matrix[:, j], cm_matrix[:, j] = run_solve_alpha(alphas, d_trailing_edge_angles[j], 
+    @sync @distributed for j in eachindex(delta_range)
+        cl_matrix[:, j], cd_matrix[:, j], cm_matrix[:, j] = run_solve_alpha(alpha_range, delta_range[j], 
                         reynolds_number, x, y, lower, upper, kite_speed, SPEED_OF_SOUND, x_turn)
     end
     cl_matrix = Matrix{Float64}(cl_matrix)
@@ -181,7 +181,7 @@ try
     @info "Relative trailing_edge height: $(upper - lower)"
     @info "Reynolds number for flying speed of $kite_speed is $reynolds_number"
     
-    serialize(polar_path, (alphas, d_trailing_edge_angles, cl_matrix, cd_matrix, cm_matrix))
+    serialize(polar_path, (alpha_range, delta_range, cl_matrix, cd_matrix, cm_matrix))
     
 catch e
     @info "Removing processes"
