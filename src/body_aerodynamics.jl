@@ -5,17 +5,17 @@ Main structure for calculating aerodynamic properties of bodies.
 
 # Fields
 - panels::Vector{Panel}: Vector of [Panel](@ref) structs
-- wings::Vector{AbstractWing}:   A vector of wings; a body can have multiple wings
+- wings::Union{Vector{Wing}, Vector{RamAirWing}}: A vector of wings; a body can have multiple wings
 - `_va`::MVec3 = zeros(MVec3):   A vector of the apparent wind speed, see: [MVec3](@ref)
 - `omega`::MVec3 = zeros(MVec3): A vector of the turn rates around the kite body axes
 - `gamma_distribution`::Vector{Float64}=zeros(Float64, P): A vector of the circulation 
                         of the velocity field; Length: Number of segments. [m²/s]
-- `alpha_uncorrected`::Vector{Float64}=zeros(Float64, P): unclear, please define
-- `alpha_corrected`::Vector{Float64}=zeros(Float64, P):   unclear, please define
-- `stall_angle_list`::Vector{Float64}=zeros(Float64, P):  unclear, please define
+- `alpha_uncorrected`::Vector{Float64}=zeros(Float64, P): angles of attack per panel
+- `alpha_corrected`::Vector{Float64}=zeros(Float64, P):   corrected angles of attack per panel
+- `stall_angle_list`::Vector{Float64}=zeros(Float64, P):  stall angle per panel
 - alpha_array::Vector{Float64} = zeros(Float64, P)
 - v_a_array::Vector{Float64} = zeros(Float64, P)
-- work_vectors::NTuple{10,MVec3} = ntuple(_ -> zeros(MVec3), 10)
+- work_vectors::NTuple{10, MVec3} = ntuple(_ -> zeros(MVec3), 10)
 - AIC::Array{Float64, 3} = zeros(3, P, P)
 - projected_area::Float64 = 1.0: The area projected onto the xy-plane of the kite body reference frame [m²]
 """
