@@ -131,7 +131,8 @@ using Serialization
         inertia_tensor = calculate_inertia_tensor(vertices, faces, 1.0, zeros(3))
         
         serialize(info_path, (
-            inertia_tensor, 
+            inertia_tensor,
+            center_of_mass,
             z_center, 
             r, 
             π/4, 

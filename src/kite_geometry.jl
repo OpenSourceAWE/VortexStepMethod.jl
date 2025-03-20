@@ -333,6 +333,7 @@ mutable struct RamAirWing <: AbstractWing
     circle_center_z::Float64
     gamma_tip::Float64
     inertia_tensor::Matrix{Float64}
+    center_of_mass::Vector{Float64}
     radius::Float64
     le_interp::NTuple{3, Extrapolation}
     te_interp::NTuple{3, Extrapolation}
@@ -382,13 +383,13 @@ function RamAirWing(obj_path, dat_path; alpha=0.0, crease_frac=0.75, wind_vel=10
     if !ispath(polar_path) || !ispath(info_path)
         @info "Reading $obj_path"
         vertices, faces = read_faces(obj_path)
-        center_to_com!(vertices, faces)
+        center_of_mass = center_to_com!(vertices, faces)
         inertia_tensor = calculate_inertia_tensor(vertices, faces, mass, zeros(3))
 
         circle_center_z, radius, gamma_tip = find_circle_center_and_radius(vertices)
         le_interp, te_interp, area_interp = create_interpolations(vertices, circle_center_z, radius, gamma_tip)
         @info "Writing $info_path"
-        serialize(info_path, (inertia_tensor, circle_center_z, radius, gamma_tip, 
+        serialize(info_path, (inertia_tensor, center_of_mass, circle_center_z, radius, gamma_tip, 
             le_interp, te_interp, area_interp))
 
         width = 2gamma_tip * radius
@@ -401,33 +402,39 @@ function RamAirWing(obj_path, dat_path; alpha=0.0, crease_frac=0.75, wind_vel=10
     end
 
     @info "Loading polars and kite info from $polar_path and $info_path"
-    (alpha_range, delta_range, cl_matrix::Matrix, cd_matrix::Matrix, cm_matrix::Matrix) = deserialize(polar_path)
-    if remove_nan
-        interpolate_matrix_nans!(cl_matrix)
-        interpolate_matrix_nans!(cd_matrix)
-        interpolate_matrix_nans!(cm_matrix)
+    try
+        (alpha_range, delta_range, cl_matrix::Matrix, cd_matrix::Matrix, cm_matrix::Matrix) = deserialize(polar_path)
+        if remove_nan
+            interpolate_matrix_nans!(cl_matrix)
+            interpolate_matrix_nans!(cd_matrix)
+            interpolate_matrix_nans!(cm_matrix)
+        end
+        (inertia_tensor::Matrix, center_of_mass::Vector, circle_center_z::Real,
+            radius::Real, gamma_tip::Real, le_interp, te_interp, area_interp) = deserialize(info_path)
+    
+        # Create sections
+        sections = Section[]
+        refined_sections = Section[]
+        non_deformed_sections = Section[]
+        for gamma in range(-gamma_tip, gamma_tip, n_sections)
+            aero_data = (collect(alpha_range), collect(delta_range), cl_matrix, cd_matrix, cm_matrix)
+            LE_point = [le_interp[i](gamma) for i in 1:3]
+            TE_point = [te_interp[i](gamma) for i in 1:3]
+            push!(sections, Section(LE_point, TE_point, POLAR_MATRICES, aero_data))
+            push!(refined_sections, Section(LE_point, TE_point, POLAR_MATRICES, aero_data))
+            push!(non_deformed_sections, Section(LE_point, TE_point, POLAR_MATRICES, aero_data))
+        end
+    
+        RamAirWing(n_panels, spanwise_panel_distribution, spanwise_direction, sections, 
+            refined_sections, remove_nan, non_deformed_sections,
+            mass, circle_center_z, gamma_tip, inertia_tensor, center_of_mass, radius,
+            le_interp, te_interp, area_interp, zeros(n_panels), zeros(n_panels))
+    catch e
+        if e isa BoundsError
+            @error "Delete $polar_path and $info_path and try again."
+        end
+        rethrow(e)
     end
-
-    (inertia_tensor, circle_center_z, radius, gamma_tip, 
-        le_interp, te_interp, area_interp) = deserialize(info_path)
-
-    # Create sections
-    sections = Section[]
-    refined_sections = Section[]
-    non_deformed_sections = Section[]
-    for gamma in range(-gamma_tip, gamma_tip, n_sections)
-        aero_data = (collect(alpha_range), collect(delta_range), cl_matrix, cd_matrix, cm_matrix)
-        LE_point = [le_interp[i](gamma) for i in 1:3]
-        TE_point = [te_interp[i](gamma) for i in 1:3]
-        push!(sections, Section(LE_point, TE_point, POLAR_MATRICES, aero_data))
-        push!(refined_sections, Section(LE_point, TE_point, POLAR_MATRICES, aero_data))
-        push!(non_deformed_sections, Section(LE_point, TE_point, POLAR_MATRICES, aero_data))
-    end
-
-    RamAirWing(n_panels, spanwise_panel_distribution, spanwise_direction, sections, 
-        refined_sections, remove_nan, non_deformed_sections,
-        mass, circle_center_z, gamma_tip, inertia_tensor, radius,
-        le_interp, te_interp, area_interp, zeros(n_panels), zeros(n_panels))
 end
 
 """
