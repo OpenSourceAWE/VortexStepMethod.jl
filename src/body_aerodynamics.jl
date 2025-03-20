@@ -547,7 +547,7 @@ function calculate_results(
     moment = reshape((cm_array .* 0.5 .* density .* v_a_array.^2 .* chord_array), :, 1)
 
     # Calculate alpha corrections based on model type
-    if aerodynamic_model_type  VSM
+    if aerodynamic_model_type == VSM
         update_effective_angle_of_attack!(
             alpha_corrected,
             body_aero,

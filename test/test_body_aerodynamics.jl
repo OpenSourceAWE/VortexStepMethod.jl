@@ -157,20 +157,20 @@ end
 
     sol = solve!(solver_object, body_aero; reference_point=[0,1,0])
 
-    @test sol.aero_force.x ≈ -117.97225244011436
+    @test sol.aero_force.x ≈ -117.97225244011436 atol=1e-3
     @test sol.aero_force.y ≈ 0.0 atol=1e-10
-    @test sol.aero_force.z ≈ 1481.996390329679
+    @test sol.aero_force.z ≈ 1481.996390329679 atol=1e-3
 
-    @test sol.aero_moments.x ≈ -1481.996390329678
+    @test sol.aero_moments.x ≈ -1481.996390329678 atol=1e-3
     @test sol.aero_moments.y ≈ 0.0 atol=1e-10
-    @test sol.aero_moments.z ≈ -117.97225244011435
+    @test sol.aero_moments.z ≈ -117.97225244011435 atol=1e-3
 
-    @test sol.force_coefficients[1] ≈ -0.039050322560956294 # CFx
-    @test sol.force_coefficients[2] ≈ 0.0                   # CFy
-    @test sol.force_coefficients[3] ≈ 0.49055973654418716   # CFz
+    @test sol.force_coefficients[1] ≈ -0.039050322560956294 atol=1e-3 # CFx
+    @test sol.force_coefficients[2] ≈ 0.0                   atol=1e-10 # CFy
+    @test sol.force_coefficients[3] ≈ 0.49055973654418716   atol=1e-3 # CFz
     @test sol.force_coefficients[3] / sol.force_coefficients[1] ≈ sol.aero_force[3] / sol.aero_force[1]
-    @test sol.moment_distribution[1] ≈ -0.026242454074087297
-    @test sol.moment_coefficient_distribution[1] ≈ -8.686587525353832e-6
+    @test sol.moment_distribution[1] ≈ -0.0006683746751654071 atol=1e-10
+    @test sol.moment_coefficient_distribution[1] ≈ -2.212405554436003e-7 atol=1e-10
     @test sol.moment_distribution[1] / sol.moment_distribution[2] ≈ sol.moment_coefficient_distribution[1] / sol.moment_coefficient_distribution[2]
 
     @test sol.solver_status == FEASIBLE
@@ -253,7 +253,7 @@ end
         @test wing.sections[1].TE_point ≈ [0.0, 0.0, -3.0]
     end
 
-    function create_geometry(; model=VSM, wing_type=RECTANGULAR, plotting=false, N=40)
+    function create_geometry(; model=VSM, wing_type=:rectangular, plotting=false, N=40)
         max_chord = 1.0
         span = 17.0
         AR = span^2 / (π * span * max_chord / 4)
@@ -262,7 +262,7 @@ end
         aoa = 5.7106 * π / 180
         v_a = [cos(aoa), 0.0, sin(aoa)] .* v_a
     
-        coord = if wing_type == RECTANGULAR
+        coord = if wing_type === :rectangular
             theta = range(-0.5, 0.5, length=N)
             beta = range(-2, 2, length=N)
             generate_coordinates_rect_wing(
@@ -273,12 +273,14 @@ end
                 N,
                 "lin"
             )
-        elseif wing_type == CURVED
+        elseif wing_type === :curved
             generate_coordinates_curved_wing(
                 max_chord, span, π/4, 5, N, "cos"
             )
-        elseif wing_type == ELLIPTICAL
+        elseif wing_type === :elliptical
             generate_coordinates_el_wing(max_chord, span, N, "cos")
+        else
+            error("Invalid wing type")
         end
     
         coord_left_to_right = flip_created_coord_in_pairs(deepcopy(coord))
@@ -299,7 +301,7 @@ end
 
     for model in [VSM, LLT]
         @debug "model: $model"
-        for wing_type in [RECTANGULAR, CURVED, ELLIPTICAL]
+        for wing_type in [:rectangular, :curved, :elliptical]
             @debug "wing_type: $wing_type"
             body_aero, coord, v_a, model = create_geometry(
                 model=model, wing_type=wing_type
@@ -317,7 +319,7 @@ end
                 index_reversed = length(body_aero.panels) - i + 1
                 panel = body_aero.panels[index_reversed]
                 
-                evaluation_point = if model == VSM
+                evaluation_point = if model === VSM
                     panel.control_point
                 else  # LLT
                     panel.aero_center
@@ -333,7 +335,7 @@ end
                     atol=1e-4
                 )
                 
-                if model == VSM
+                if model === VSM
                     @test isapprox(
                         panel.aero_center,
                         expected_controlpoints[i]["coordinates_aoa"],

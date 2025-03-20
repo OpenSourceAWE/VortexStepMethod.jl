@@ -215,7 +215,7 @@ function create_geometry_general(coordinates, Uinf, N, ring_geo, model)
                 "coordinates_aoa" => LLpoint
             )
             push!(controlpoints, cp)
-        elseif model  LLT
+        elseif model == LLT
             cp = Dict(
                 "coordinates" => LLpoint,
                 "chord" => chord,
