@@ -7,7 +7,7 @@ using BenchmarkTools
 using StaticArrays
 using VortexStepMethod
 using VortexStepMethod: calculate_AIC_matrices!, gamma_loop!, calculate_results,
-                       update_effective_angle_of_attack_if_VSM, calculate_projected_area,
+                       update_effective_angle_of_attack!, calculate_projected_area,
                        calculate_cl, calculate_cd_cm,
                        calculate_velocity_induced_single_ring_semiinfinite!,
                        calculate_velocity_induced_bound_2D!,
