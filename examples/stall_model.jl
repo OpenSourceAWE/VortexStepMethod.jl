@@ -45,7 +45,7 @@ end
 body_aero_CAD_19ribs = BodyAerodynamics([CAD_wing])
 
 # Create solvers
-P = length(wa.panels)
+P = length(body_aero_CAD_19ribs.panels)
 vsm_solver = Solver{P}(
     aerodynamic_model_type=VSM,
     is_with_artificial_damping=false
