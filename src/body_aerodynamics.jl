@@ -428,7 +428,8 @@ Update angle of attack at aerodynamic center for VSM method.
 Returns:
     Vector{Float64}: Updated angles of attack
 """
-function update_effective_angle_of_attack_if_VSM(body_aero::BodyAerodynamics, 
+function update_effective_angle_of_attack!(alpha_corrected,
+    body_aero::BodyAerodynamics, 
     gamma::Vector{Float64},
     core_radius_fraction::Float64,
     z_airf_array::Matrix{Float64},
@@ -467,12 +468,11 @@ function update_effective_angle_of_attack_if_VSM(body_aero::BodyAerodynamics,
     end
 
     # Direct angle calculation without temporary arrays
-    alpha_array = cache_body[4][relative_velocity]
     @inbounds for i in 1:n
-        alpha_array[i] = atan(v_normal[i], v_tangential[i])
+        alpha_corrected[i] = atan(v_normal[i], v_tangential[i])
     end
 
-    return alpha_array
+    nothing
 end
 
 """
@@ -518,6 +518,7 @@ function calculate_results(
     cd_array = zeros(n_panels)
     cm_array = zeros(n_panels)
     panel_width_array = zeros(n_panels)
+    alpha_corrected = zeros(n_panels)
 
     # Calculate coefficients for each panel
     for (i, panel) in enumerate(panels)
@@ -532,8 +533,9 @@ function calculate_results(
     moment = reshape((cm_array .* 0.5 .* density .* v_a_array.^2 .* chord_array), :, 1)
 
     # Calculate alpha corrections based on model type
-    alpha_corrected = if aerodynamic_model_type === VSM
-        update_effective_angle_of_attack_if_VSM(
+    if aerodynamic_model_type === VSM
+        update_effective_angle_of_attack!(
+            alpha_corrected,
             body_aero,
             gamma_new,
             core_radius_fraction,
@@ -543,10 +545,8 @@ function calculate_results(
             va_norm_array,
             va_unit_array
         )
-    elseif aerodynamic_model_type === LLT
-        alpha_array
-    else
-        throw(ArgumentError("Unknown aerodynamic model type, should be LLT or VSM"))
+    elseif aerodynamic_model_type == LLT
+        alpha_corrected .= alpha_array
     end
 
     # Verify va is not distributed

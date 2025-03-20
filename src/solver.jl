@@ -121,7 +121,8 @@ const cache = [LazyBufferCache(), LazyBufferCache(), LazyBufferCache(), LazyBuff
                LazyBufferCache(), LazyBufferCache(), LazyBufferCache(), LazyBufferCache(),
                LazyBufferCache(), LazyBufferCache(), LazyBufferCache()]
 
-const cache_base = [LazyBufferCache()]
+const cache_base  = [LazyBufferCache()]
+const cache_solve = [LazyBufferCache()]
 
 """
     solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=solver.sol.gamma_distribution; 
@@ -162,6 +163,7 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
     cm_array = solver.sol.cm_array
     converged = solver.lr.converged
     alpha_array = solver.lr.alpha_array
+    alpha_corrected = cache_solve[1][alpha_array]
     v_a_array = solver.lr.v_a_array
     panels = body_aero.panels
    
@@ -190,11 +192,10 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
     @. drag = cd_array * 0.5 * density * v_a_array^2 * solver.sol.chord_array
     @. moment = cm_array * 0.5 * density * v_a_array^2 * solver.sol.chord_array
 
-
     # Calculate alpha corrections based on model type
-    # TODO: this vector needs to be pre-allocated !!!
-    alpha_corrected = if aerodynamic_model_type == VSM                                # 4188 bytes
-        update_effective_angle_of_attack_if_VSM(
+    if aerodynamic_model_type == VSM                             # 1568 bytes
+        update_effective_angle_of_attack!(
+            alpha_corrected,
             body_aero,
             gamma_new,
             solver.core_radius_fraction,
@@ -204,10 +205,8 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
             solver.br.va_norm_array,
             solver.br.va_unit_array
         )
-    elseif aerodynamic_model_type === LLT
-        alpha_array
-    else
-        throw(ArgumentError("Unknown aerodynamic model type, should be LLT or VSM"))
+    elseif aerodynamic_model_type == LLT
+        alpha_corrected .= alpha_array
     end
 
     # Initialize result arrays
