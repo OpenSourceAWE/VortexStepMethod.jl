@@ -145,7 +145,8 @@ end
     set_va!(body_aero, v_a)
 
     # Run analysis
-    solver_object = Solver(
+    P = length(body_aero.panels)
+    solver_object = Solver{P}(
         aerodynamic_model_type=model, 
         core_radius_fraction=core_radius_fraction
     )

@@ -1,6 +1,6 @@
 using LinearAlgebra
-using ControlPlots
 using VortexStepMethod
+using BenchmarkTools
 
 using Pkg
 
@@ -40,50 +40,13 @@ set_va!(wa, vel_app)
 
 # Step 4: Initialize solvers for both LLT and VSM methods
 P = length(wa.panels)
-llt_solver = Solver{P}(aerodynamic_model_type=LLT)
 vsm_solver = Solver{P}(aerodynamic_model_type=VSM)
 
 # Step 5: Solve using both methods
-results_vsm = solve(vsm_solver, wa)
-sol = solve!(vsm_solver, wa)
-results_vsm_base = solve_base!(vsm_solver, wa)
 println("Rectangular wing, solve_base!:")
-@time results_vsm_base = solve_base!(vsm_solver, wa)
-# time Python: 32.0  ms Ryzen 7950x
-# time Julia:   0.42 ms Ryzen 7950x
+@btime solve_base!($vsm_solver, $wa, nothing)  #  34 allocations
+# time Python: 32.0 ms  Ryzen 7950x
+# time Julia:   0.45 ms Ryzen 7950x
 println("Rectangular wing, solve!:")
-@time sol = solve!(vsm_solver, wa)
-println("Rectangular wing, solve:")
-@time solve(vsm_solver, wa)
-
-# Create wing geometry
-wing = RamAirWing("data/ram_air_kite_body.obj", "data/ram_air_kite_foil.dat")
-body_aero = BodyAerodynamics([wing])
-
-# Create solvers
-P = length(wa.panels)
-vsm_solver = Solver{P}(
-    aerodynamic_model_type=VSM,
-    is_with_artificial_damping=false
-)
-
-# Setting velocity conditions
-v_a = 15.0
-aoa = 15.0
-side_slip = 0.0
-yaw_rate = 0.0
-aoa_rad = deg2rad(aoa)
-vel_app = [
-    cos(aoa_rad) * cos(side_slip),
-    sin(side_slip),
-    sin(aoa_rad)
-] * v_a
-set_va!(body_aero, vel_app)
-
-# Solving and plotting distributions
-results = solve(vsm_solver, body_aero)
-results_base = solve_base!(vsm_solver, body_aero)
-println("RAM-air kite:")
-@time results_base = solve_base!(vsm_solver, body_aero)
-
+@btime sol = solve!($vsm_solver, $wa, nothing) # 328 allocations
 nothing
