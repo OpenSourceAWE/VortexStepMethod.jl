@@ -33,6 +33,7 @@ Main structure for calculating aerodynamic properties of bodies.
     work_vectors::NTuple{10,MVec3} = ntuple(_ -> zeros(MVec3), 10)
     AIC::Array{Float64, 3} = zeros(3, P, P)
     projected_area::Float64 = one(Float64)
+    y::Vector{Float64} = zeros(Float64, P)
 end
 
 """
@@ -355,8 +356,10 @@ function calculate_circulation_distribution_elliptical_wing(gamma_i, body_aero::
     @debug "Wing span: $wing_span"
     
     # Calculate y-coordinates of control points
-    # TODO: pre-allocate y
-    y = [panel.control_point[2] for panel in body_aero.panels]
+    y = body_aero.y
+    for (i, panel) in pairs(body_aero.panels) 
+        y[i] = panel.control_point[2] 
+    end
     
     # Calculate elliptical distribution
     gamma_i .= gamma_0 * sqrt.(1 .- (2 .* y ./ wing_span).^2)
