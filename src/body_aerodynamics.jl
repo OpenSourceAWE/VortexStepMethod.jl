@@ -441,14 +441,27 @@ function update_effective_angle_of_attack!(alpha_corrected,
 
     # Calculate AIC matrices (keep existing optimized view)
     calculate_AIC_matrices!(body_aero, LLT, core_radius_fraction, va_norm_array, va_unit_array)
-    AIC_x, AIC_y, AIC_z = @views body_aero.AIC[1, :, :], body_aero.AIC[2, :, :], body_aero.AIC[3, :, :]
+    # AIC_x, AIC_y, AIC_z = @views body_aero.AIC[1, :, :], body_aero.AIC[2, :, :], body_aero.AIC[3, :, :]
 
-    # Preallocate and calculate induced velocity directly
-    # TODO rewrite
+    # # Preallocate and calculate induced velocity directly
+    # # TODO rewrite
+    # induced_velocity = cache_body[1][va_array]
+    # induced_velocity[:, 1] .= AIC_x * gamma              # 304 bytes
+    # induced_velocity[:, 2] .= AIC_y * gamma
+    # induced_velocity[:, 3] .= AIC_z * gamma
+
+    # Get views of AIC matrices without copying
+    AIC_views = (@view(body_aero.AIC[1, :, :]), 
+                 @view(body_aero.AIC[2, :, :]), 
+                 @view(body_aero.AIC[3, :, :]))
+
+    # Preallocate induced velocity array
     induced_velocity = cache_body[1][va_array]
-    induced_velocity[:, 1] .= AIC_x * gamma              # 304 bytes
-    induced_velocity[:, 2] .= AIC_y * gamma
-    induced_velocity[:, 3] .= AIC_z * gamma
+
+    # Calculate induced velocity components in-place
+    for (j, aic) in enumerate(AIC_views)                     # 384 allocated
+        mul!(@view(induced_velocity[:, j]), aic, gamma)
+    end
 
     # In-place relative velocity calculation
     relative_velocity = cache_body[2][va_array]
