@@ -859,7 +859,7 @@ function VortexStepMethod.plot_polar_data(body_aero::BodyAerodynamics;
         is_show = true,
         use_tex = false
         )
-    if body_aero.panels[1].aero_model === POLAR_MATRICES
+    if body_aero.panels[1].aero_model == POLAR_MATRICES
         set_plot_style()
         
         # Create figure with subplots

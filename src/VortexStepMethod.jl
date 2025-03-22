@@ -16,6 +16,7 @@ using Parameters
 using Serialization
 using SharedArrays
 using PreallocationTools
+using PrecompileTools
 using Pkg
 
 # Export public interface
@@ -75,6 +76,18 @@ Enumeration of the implemented model types.
 - LLT: Lifting Line Theory
 """
 @enum Model VSM LLT
+
+"""
+    WingType `RECTANGULAR` `CURVED` `ELLIPTICAL`
+
+Enumeration of the implemented wing types.
+
+# Elements:
+- RECTANGULAR
+- CURVED
+- ELLIPTICAL
+"""
+@enum WingType  RECTANGULAR CURVED ELLIPTICAL
 
 """
    AeroModel `LEI_AIRFOIL_BREUKELS` `POLAR_VECTORS` `POLAR_MATRICES` `INVISCID`
@@ -241,5 +254,7 @@ include("panel.jl")
 include("body_aerodynamics.jl")
 include("wake.jl")
 include("solver.jl")
+include("precompile.jl")
+
 
 end # module

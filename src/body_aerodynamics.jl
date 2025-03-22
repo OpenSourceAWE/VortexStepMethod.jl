@@ -5,23 +5,23 @@ Main structure for calculating aerodynamic properties of bodies.
 
 # Fields
 - panels::Vector{Panel}: Vector of [Panel](@ref) structs
-- wings::Vector{AbstractWing}:   A vector of wings; a body can have multiple wings
+- wings::Union{Vector{Wing}, Vector{RamAirWing}}: A vector of wings; a body can have multiple wings
 - `_va`::MVec3 = zeros(MVec3):   A vector of the apparent wind speed, see: [MVec3](@ref)
 - `omega`::MVec3 = zeros(MVec3): A vector of the turn rates around the kite body axes
 - `gamma_distribution`::Vector{Float64}=zeros(Float64, P): A vector of the circulation 
                         of the velocity field; Length: Number of segments. [m²/s]
-- `alpha_uncorrected`::Vector{Float64}=zeros(Float64, P): unclear, please define
-- `alpha_corrected`::Vector{Float64}=zeros(Float64, P):   unclear, please define
-- `stall_angle_list`::Vector{Float64}=zeros(Float64, P):  unclear, please define
+- `alpha_uncorrected`::Vector{Float64}=zeros(Float64, P): angles of attack per panel
+- `alpha_corrected`::Vector{Float64}=zeros(Float64, P):   corrected angles of attack per panel
+- `stall_angle_list`::Vector{Float64}=zeros(Float64, P):  stall angle per panel
 - alpha_array::Vector{Float64} = zeros(Float64, P)
 - v_a_array::Vector{Float64} = zeros(Float64, P)
-- work_vectors::NTuple{10,MVec3} = ntuple(_ -> zeros(MVec3), 10)
+- work_vectors::NTuple{10, MVec3} = ntuple(_ -> zeros(MVec3), 10)
 - AIC::Array{Float64, 3} = zeros(3, P, P)
 - projected_area::Float64 = 1.0: The area projected onto the xy-plane of the kite body reference frame [m²]
 """
 @with_kw mutable struct BodyAerodynamics{P}
     panels::Vector{Panel}
-    wings::Vector{AbstractWing}
+    wings::Union{Vector{Wing}, Vector{RamAirWing}}
     _va::MVec3 = zeros(MVec3)
     omega::MVec3 = zeros(MVec3)
     gamma_distribution::Vector{Float64} = zeros(Float64, P)
@@ -33,6 +33,7 @@ Main structure for calculating aerodynamic properties of bodies.
     work_vectors::NTuple{10,MVec3} = ntuple(_ -> zeros(MVec3), 10)
     AIC::Array{Float64, 3} = zeros(3, P, P)
     projected_area::Float64 = one(Float64)
+    y::Vector{Float64} = zeros(Float64, P)
 end
 
 """
@@ -355,8 +356,10 @@ function calculate_circulation_distribution_elliptical_wing(gamma_i, body_aero::
     @debug "Wing span: $wing_span"
     
     # Calculate y-coordinates of control points
-    # TODO: pre-allocate y
-    y = [panel.control_point[2] for panel in body_aero.panels]
+    y = body_aero.y
+    for (i, panel) in pairs(body_aero.panels) 
+        y[i] = panel.control_point[2] 
+    end
     
     # Calculate elliptical distribution
     gamma_i .= gamma_0 * sqrt.(1 .- (2 .* y ./ wing_span).^2)
@@ -544,7 +547,7 @@ function calculate_results(
     moment = reshape((cm_array .* 0.5 .* density .* v_a_array.^2 .* chord_array), :, 1)
 
     # Calculate alpha corrections based on model type
-    if aerodynamic_model_type === VSM
+    if aerodynamic_model_type == VSM
         update_effective_angle_of_attack!(
             alpha_corrected,
             body_aero,

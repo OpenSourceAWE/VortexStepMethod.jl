@@ -15,7 +15,7 @@ Points are compared with approximate equality to handle floating point differenc
 function ==(a::Section, b::Section)
     return (isapprox(a.LE_point, b.LE_point; rtol=1e-5, atol=1e-5) &&
             isapprox(a.TE_point, b.TE_point; rtol=1e-5, atol=1e-5) &&
-            a.aero_model === b.aero_model &&
+            a.aero_model == b.aero_model &&
             all(a.aero_data .== b.aero_data))
 end
 
@@ -329,7 +329,7 @@ end
         @test -2.0 < new_sections[5].LE_point[2] < -1.0
 
         for section in new_sections
-            @test section.aero_model === INVISCID
+            @test section.aero_model == INVISCID
         end
     end
 end

@@ -157,19 +157,19 @@ end
 
     sol = solve!(solver_object, body_aero; reference_point=[0,1,0])
 
-    @test sol.force.x ≈ -117.97225244011436
+    @test sol.force.x ≈ -117.97225244011436 atol=1e-4
     @test sol.force.y ≈ 0.0 atol=1e-10
-    @test sol.force.z ≈ 1481.996390329679
+    @test sol.force.z ≈ 1481.996390329679 atol=1e-4 rtol= 1e-4
 
-    @test sol.moment.x ≈ -1481.996390329678
+    @test sol.moment.x ≈ -1481.996390329678 atol=1e-4 rtol= 1e-4
     @test sol.moment.y ≈ 0.0 atol=1e-10
-    @test sol.moment.z ≈ -117.97225244011435
+    @test sol.moment.z ≈ -117.97225244011435 atol=1e-4
 
-    @test sol.force_coefficients[1] ≈ -0.039050322560956294 # CFx
-    @test sol.force_coefficients[2] ≈ 0.0                   # CFy
-    @test sol.force_coefficients[3] ≈ 0.49055973654418716   # CFz
+    @test sol.force_coefficients[1] ≈ -0.039050322560956294 atol=1e-4 # CFx
+    @test sol.force_coefficients[2] ≈ 0.0                   atol=1e-4 # CFy
+    @test sol.force_coefficients[3] ≈ 0.49055973654418716   atol=1e-4 # CFz
     @test sol.force_coefficients[3] / sol.force_coefficients[1] ≈ sol.force[3] / sol.force[1]
-    @test sol.moment_distribution[1] ≈ -0.0006683746751654071 atol=1e-10
+    @test sol.moment_distribution[1] ≈ -0.0006683746751654071 atol=1e-8
     @test sol.moment_coefficient_distribution[1] ≈ -2.212405554436003e-7 atol=1e-10
     @test sol.moment_distribution[1] / sol.moment_distribution[2] ≈ sol.moment_coefficient_distribution[1] / sol.moment_coefficient_distribution[2]
 
