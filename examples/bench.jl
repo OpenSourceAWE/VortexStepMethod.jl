@@ -61,8 +61,8 @@ wing = RamAirWing("data/ram_air_kite_body.obj", "data/ram_air_kite_foil.dat")
 body_aero = BodyAerodynamics([wing])
 
 # Create solvers
-P = length(wa.panels)
-vsm_solver = Solver{P}(
+vsm_solver = Solver(
+    body_aero;
     aerodynamic_model_type=VSM,
     is_with_artificial_damping=false
 )
