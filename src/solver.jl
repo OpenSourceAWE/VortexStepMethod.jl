@@ -6,8 +6,8 @@ Struct for storing the solution of the [solve!](@ref) function. Must contain all
 
 # Attributes
 - gamma_distribution::Union{Nothing, Vector{Float64}}: Vector containing the panel circulations
-- aero_force::MVec3: Aerodynamic force vector in KB reference frame [N]
-- aero_moments::MVec3: Aerodynamic moments [Mx, My, Mz] around the reference point [Nm]
+- force::MVec3: Aerodynamic force vector in KB reference frame [N]
+- moment::MVec3: Aerodynamic moments [Mx, My, Mz] around the reference point [Nm]
 - force_coefficients::MVec3: Aerodynamic force coefficients [CFx, CFy, CFz] [-]
 - moment_coefficients::MVec3: Aerodynamic moment coefficients [CMx, CMy, CMz] [-]
 - moment_distribution::Vector{Float64}: Pitching moments around the spanwise vector of each panel. [Nm]
@@ -26,14 +26,14 @@ Struct for storing the solution of the [solve!](@ref) function. Must contain all
     cl_array::Vector{Float64} = zeros(P)
     cd_array::Vector{Float64} = zeros(P)
     cm_array::Vector{Float64} = zeros(P)
-    lift::Matrix{Float64} = zeros(P,1)
-    drag::Matrix{Float64} = zeros(P,1)
-    moment::Matrix{Float64} = zeros(P,1)
+    panel_lift::Matrix{Float64} = zeros(P,1)
+    panel_drag::Matrix{Float64} = zeros(P,1)
+    panel_moment::Matrix{Float64} = zeros(P,1)
     f_body_3D::Matrix{Float64} = zeros(3, P)
     m_body_3D::Matrix{Float64} = zeros(3, P)
     gamma_distribution::Union{Nothing, Vector{Float64}} = nothing
-    aero_force::MVec3 = zeros(MVec3)          
-    aero_moments::MVec3 = zeros(MVec3)       
+    force::MVec3 = zeros(MVec3)          
+    moment::MVec3 = zeros(MVec3)       
     force_coefficients::MVec3 = zeros(MVec3)  
     moment_coefficients::MVec3 = zeros(MVec3)  
     moment_distribution::Vector{Float64} = zeros(P)
@@ -185,14 +185,14 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
     end
 
     # create an alias for the three vertical output vectors
-    lift = solver.sol.lift
-    drag = solver.sol.drag
-    moment = solver.sol.moment
+    lift = solver.sol.panel_lift
+    drag = solver.sol.panel_drag
+    panel_moment = solver.sol.panel_moment
 
     # Compute using fused broadcasting (no intermediate allocations)
     @. lift = cl_array * 0.5 * density * v_a_array^2 * solver.sol.chord_array
     @. drag = cd_array * 0.5 * density * v_a_array^2 * solver.sol.chord_array
-    @. moment = cm_array * 0.5 * density * v_a_array^2 * solver.sol.chord_array
+    @. panel_moment = cm_array * 0.5 * density * v_a_array^2 * solver.sol.chord_array
 
     # Calculate alpha corrections based on model type
     if aerodynamic_model_type == VSM                             # 64 bytes
@@ -256,7 +256,7 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
         #     Use the axis around which the moment is defined,
         #     which is the y-axis pointing "spanwise"
         moment_axis_body = panel.y_airf
-        M_local_3D = moment[i] * moment_axis_body * panel.width
+        M_local_3D = panel_moment[i] * moment_axis_body * panel.width
         # Vector from panel AC to the chosen reference point:
         r_vector = panel_ac_body - reference_point  # e.g. CG, wing root, etc.
         # Cross product to shift the force from panel AC to ref. point:
@@ -266,23 +266,23 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
 
         # Calculate the moment distribution (moment on each panel)
         arm = (moment_frac - 0.25) * panel.chord
-        moment_distribution[i] = ((ftotal_induced_va ⋅ panel.z_airf) * arm + moment[i]) * panel.width
+        moment_distribution[i] = ((ftotal_induced_va ⋅ panel.z_airf) * arm + panel_moment[i]) * panel.width
         moment_coefficient_distribution[i] = moment_distribution[i] / (q_inf * projected_area)
     end
 
     # update the result struct
-    solver.sol.aero_force .= MVec3(
+    solver.sol.force .= MVec3(
         sum(solver.sol.f_body_3D[1,:]),
         sum(solver.sol.f_body_3D[2,:]),
         sum(solver.sol.f_body_3D[3,:])
     )
-    solver.sol.aero_moments .= MVec3(
+    solver.sol.moment .= MVec3(
         sum(solver.sol.m_body_3D[1,:]),
         sum(solver.sol.m_body_3D[2,:]),
         sum(solver.sol.m_body_3D[3,:])
     )
-    solver.sol.force_coefficients .= solver.sol.aero_force ./ (q_inf * projected_area)
-    solver.sol.moment_coefficients .= solver.sol.aero_moments ./ (q_inf * projected_area)
+    solver.sol.force_coefficients .= solver.sol.force ./ (q_inf * projected_area)
+    solver.sol.moment_coefficients .= solver.sol.moment ./ (q_inf * projected_area)
     if converged
         # TODO: Check if the result if feasible if converged
         solver.sol.solver_status = FEASIBLE
