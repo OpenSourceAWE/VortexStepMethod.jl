@@ -1,5 +1,7 @@
-# fix allocations of this array comprehension:
+# Fix allocations of this array comprehension:
 # y = [panel.control_point[2] for panel in body_aero.panels]
+# This mwe shows that the line above is allocating a lot,
+# and provides the function test_new() that shows a better way of implementing.
 
 using VortexStepMethod, PreallocationTools
 
@@ -31,17 +33,30 @@ body_aero::BodyAerodynamics = BodyAerodynamics([wing])
 y = [panel.control_point[2] for panel in body_aero.panels]
 n = @allocated y = [panel.control_point[2] for panel in body_aero.panels]
 
-function test(body_aero, gamma_i)
+function test_old(body_aero, gamma_i)
+    y = [panel.control_point[2] for panel in body_aero.panels]
+    y
+end
+
+function test_new(body_aero, gamma_i)
     y = body_aero.y
     for (i, panel) in pairs(body_aero.panels) 
         y[i] = panel.control_point[2] 
     end
-    # y = [panel.control_point[2] for panel in body_aero.panels]
     y
 end
 
+
 gamma_i=zeros(length(body_aero.panels))
 
-test(body_aero, gamma_i)
-@allocated test(body_aero, gamma_i)
+# make sure the two test functions get compiled
+test_old(body_aero, gamma_i)
+test_new(body_aero, gamma_i)
 
+println("Old function, using an array comprehension:")
+n = @allocated test_old(body_aero, gamma_i)
+println("Allocations: ", n)
+
+println("New function, using a pre-allocated array and a for loop:")
+m = @allocated test_new(body_aero, gamma_i)
+println("Allocations: ", m)
