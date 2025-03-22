@@ -2,7 +2,7 @@ using ControlPlots
 using VortexStepMethod
 using LinearAlgebra
 
-PLOT = true
+PLOT = false
 USE_TEX = false
 DEFORM = false
 
@@ -46,7 +46,7 @@ set_va!(body_aero, vel_app)
 PLOT && plot_polar_data(body_aero)
 
 # Plotting geometry
-PLOT && plot_geometry(
+true && plot_geometry(
     body_aero,
     "";
     data_type=".svg",
