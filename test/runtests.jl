@@ -1,4 +1,4 @@
-using Test
+using Test, VortexStepMethod
 
 # TODO fix allocation tests
 # and: https://github.com/JuliaArrays/FixedSizeArrays.jl/blob/d17373edf4144a672cd80a062bf24d017f01e42f/.github/workflows/UnitTests.yml
