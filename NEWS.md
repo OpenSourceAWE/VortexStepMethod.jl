@@ -4,6 +4,7 @@
 - The function `solve!` returns a struct now. The function `solve`that returns a dict is still available.
 - The moment coefficients distribution in `solve!`
 - The script `install` to the `bin` folder for users who checked out this git repository
+- The script `bench2.jl` was added for allocation testing of the `solve!` function
 ### Changed
 - `deform!` by a distribution instead of just a left and right angle
 - Read the y-coordinates in the correct direction from the `ram_air_kite_body.obj` file
