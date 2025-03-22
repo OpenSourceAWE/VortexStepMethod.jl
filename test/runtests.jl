@@ -19,7 +19,9 @@ end::Bool
 cd("..")
 println("Running tests...")
 @testset verbose = true "Testing VortexStepMethod..." begin
-    include("bench.jl")
+    if build_is_production_build
+        include("bench.jl")
+    end
     include("test_bound_filament.jl")
     include("test_panel.jl")
     include("test_semi_infinite_filament.jl")
