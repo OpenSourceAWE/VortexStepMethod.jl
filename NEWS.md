@@ -13,7 +13,7 @@
 - The page "Glossary" of the documentation is quite complete now
 - The center of mass field of the `RamAirWing` is removed, and the geometry is created such that `[0, 0, 0]` is the center of mass
 - The enumeration `WingType` was added and replaces the symbols, used before
-- The allocations of the function `solve!` where reduced by a factor of three
+- The allocations of the function `solve!` where reduced by a factor of 11 to 85 allocations
 ### Fixed
 - The function `calculate_circulation_distribution_elliptical_wing()` was never called
 - Fix the calculation of force coefficients in `solve!`
