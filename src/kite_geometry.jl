@@ -203,21 +203,7 @@ function center_to_com!(vertices, faces)
             area_total += area
             com += area * centroid
         else
-            println("found non-triangular face")
-            # Non-triangular face case - triangulate the face
-            v1 = vertices[face[1]]  # Use first vertex as pivot
-            for i in 2:length(face)-1
-                v2 = vertices[face[i]]
-                v3 = vertices[face[i+1]]
-                
-                # Calculate triangle area and centroid for this triangle
-                normal = cross(v2 - v1, v3 - v1)
-                area = norm(normal) / 2
-                centroid = (v1 + v2 + v3) / 3
-                
-                area_total += area
-                com += area * centroid
-            end
+            throw(ArgumentError("Triangulate faces in a CAD program first"))
         end
     end
     
