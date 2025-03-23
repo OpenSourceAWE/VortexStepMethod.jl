@@ -111,10 +111,13 @@ Create interpolation functions for leading/trailing edges and area.
 - Tuple of (le_interp, te_interp, area_interp) interpolation functions
 - Where le_interp and te_interp are tuples themselves, containing the x, y and z interpolations
 """
-function create_interpolations(vertices, circle_center_z, radius, gamma_tip)
-    gamma_range = range(-gamma_tip+1e-6, gamma_tip-1e-6, 100)
+function create_interpolations(vertices, circle_center_z, radius, gamma_tip, R; interp_steps=40)
+    gamma_range = range(-gamma_tip+1e-6, gamma_tip-1e-6, interp_steps)
+    stepsize = gamma_range.step.hi
     vz_centered = [v[3] - circle_center_z for v in vertices]
     
+    te_gammas = zeros(length(gamma_range))
+    le_gammas = zeros(length(gamma_range))
     trailing_edges = zeros(3, length(gamma_range))
     leading_edges = zeros(3, length(gamma_range))
     areas  = zeros(length(gamma_range))
@@ -124,59 +127,90 @@ function create_interpolations(vertices, circle_center_z, radius, gamma_tip)
         leading_edges[1, j] = Inf
         for (i, v) in enumerate(vertices)
             # Rotate y coordinate to check box containment
-            rotated_y = v[2] * cos(-gamma) - vz_centered[i] * sin(-gamma)
-            if gamma ≤ 0.0 && 0.0 ≤ rotated_y ≤ 0.5
+            # rotated_y = v[2] * cos(-gamma) - vz_centered[i] * sin(-gamma)
+            gamma_v = atan(-v[2], vz_centered[i])
+            if gamma < 0 && gamma - stepsize ≤ gamma_v ≤ gamma
                 if v[1] > trailing_edges[1, j]
                     trailing_edges[:, j] .= v
+                    te_gammas[j] = gamma_v
                 end
                 if v[1] < leading_edges[1, j]
                     leading_edges[:, j] .= v
+                    le_gammas[j] = gamma_v
                 end
-            elseif gamma > 0.0 && -0.5 ≤ rotated_y ≤ 0.0
+            elseif gamma > 0 && gamma ≤ gamma_v ≤ gamma + stepsize
                 if v[1] > trailing_edges[1, j]
                     trailing_edges[:, j] .= v
+                    te_gammas[j] = gamma_v
                 end
                 if v[1] < leading_edges[1, j]
                     leading_edges[:, j] .= v
+                    le_gammas[j] = gamma_v
                 end
             end
         end
-        area = norm(leading_edges[:, j] - trailing_edges[:, j]) * gamma_range.step * radius
+        area = norm(leading_edges[:, j] - trailing_edges[:, j]) * stepsize * radius
         last_area = j > 1 ? areas[j-1] : 0.0
         areas[j] = last_area + area
     end
 
-    le_interp = ntuple(i -> linear_interpolation(gamma_range, leading_edges[i, :],
+    for j in eachindex(gamma_range)
+        leading_edges[:, j] .= R * leading_edges[:, j]
+        trailing_edges[:, j] .= R * trailing_edges[:, j]
+    end
+
+    le_interp = ntuple(i -> linear_interpolation(te_gammas, leading_edges[i, :],
                                            extrapolation_bc=Line()), 3)
-    te_interp = ntuple(i -> linear_interpolation(gamma_range, trailing_edges[i, :],
+    te_interp = ntuple(i -> linear_interpolation(le_gammas, trailing_edges[i, :],
                                            extrapolation_bc=Line()), 3)
     area_interp = linear_interpolation(gamma_range, areas, extrapolation_bc=Line())
     
     return (le_interp, te_interp, area_interp)
 end
 
-# Makes the zero coordinates lie on the com
+"""
+    center_to_com!(vertices, faces)
+
+Calculate center of mass of a mesh and translate vertices so that COM is at origin.
+
+# Arguments
+- `vertices`: Vector of 3D point coordinates
+- `faces`: Vector of vertex indices for each face (can be triangular or non-triangular)
+
+# Returns
+- Vector representing the original center of mass before translation
+
+# Notes
+- Non-triangular faces are automatically triangulated into triangles
+- Assumes uniform surface density
+"""
 function center_to_com!(vertices, faces)
     area_total = 0.0
     com = zeros(3)
     
     for face in faces
-        v1 = vertices[face[1]]
-        v2 = vertices[face[2]]
-        v3 = vertices[face[3]]
-        
-        # Calculate triangle area and centroid
-        normal = cross(v2 - v1, v3 - v1)
-        area = norm(normal) / 2
-        centroid = (v1 + v2 + v3) / 3
-        
-        area_total += area
-        com += area * centroid
+        if length(face) == 3
+            # Triangle case
+            v1 = vertices[face[1]]
+            v2 = vertices[face[2]]
+            v3 = vertices[face[3]]
+            
+            # Calculate triangle area and centroid
+            normal = cross(v2 - v1, v3 - v1)
+            area = norm(normal) / 2
+            centroid = (v1 + v2 + v3) / 3
+            
+            area_total += area
+            com += area * centroid
+        else
+            throw(ArgumentError("Triangulate faces in a CAD program first"))
+        end
     end
     
     com = com / area_total
     !(abs(com[2]) < 0.01) && throw(ArgumentError("Center of mass $com of .obj file has to lie on the xz-plane."))
     @info "Centering vertices of .obj file to the center of mass: $com"
+    com[2] = 0.0
     for v in vertices
         v .-= com
     end
@@ -243,6 +277,40 @@ function calculate_inertia_tensor(vertices, faces, mass, com)
     
     # Scale by mass/total_area to get actual inertia tensor
     return (mass / total_area) * I / 3
+end
+
+function calc_inertia_y_rotation(I_b_tensor)
+    # Function for nonlinear solver - off-diagonal element should be zero
+    function eq!(F, theta, _)
+        # Rotation matrix around y-axis
+        R_y = [
+            cos(theta[1])  0  sin(theta[1]);
+            0              1  0;
+            -sin(theta[1]) 0  cos(theta[1])
+        ]
+        # Transform inertia tensor
+        I_rotated = R_y * I_b_tensor * R_y'
+        # We want the off-diagonal xz elements to be zero
+        F[1] = I_rotated[1,3] 
+    end
+    
+    theta0 = [0.0]
+    prob = NonlinearProblem(eq!, theta0, nothing)
+    sol = NonlinearSolve.solve(prob, NewtonRaphson())
+    theta_opt = sol.u[1]
+    
+    R_b_p = [
+        cos(theta_opt)  0  sin(theta_opt);
+        0               1  0;
+        -sin(theta_opt) 0  cos(theta_opt)
+    ]
+    @show theta_opt
+    # Calculate diagonalized inertia tensor
+    I_diag = R_b_p * I_b_tensor * R_b_p'
+    @show I_diag
+    @assert isapprox(I_diag[1,3], 0.0, atol=1e-5)
+    @show R_b_p
+    return I_diag, R_b_p
 end
 
 """
@@ -330,7 +398,6 @@ mutable struct RamAirWing <: AbstractWing
     # Additional fields for RamAirWing
     non_deformed_sections::Vector{Section}
     mass::Float64
-    circle_center_z::Float64
     gamma_tip::Float64
     inertia_tensor::Matrix{Float64}
     center_of_mass::Vector{Float64}
@@ -367,8 +434,8 @@ Constructor for a [RamAirWing](@ref) that allows to use an `.obj` and a `.dat` f
 """
 function RamAirWing(obj_path, dat_path; alpha=0.0, crease_frac=0.75, wind_vel=10., mass=1.0, 
                   n_panels=54, n_sections=n_panels+1, spanwise_panel_distribution=UNCHANGED, 
-                  spanwise_direction=[0.0, 1.0, 0.0], remove_nan=true,
-                  alpha_range=deg2rad.(-5:1:20), delta_range=deg2rad.(-5:1:20) 
+                  spanwise_direction=[0.0, 1.0, 0.0], remove_nan=true, align_to_principal=false,
+                  alpha_range=deg2rad.(-5:1:20), delta_range=deg2rad.(-5:1:20), interp_steps=40
                   )
 
     !isapprox(spanwise_direction, [0.0, 1.0, 0.0]) && throw(ArgumentError("Spanwise direction has to be [0.0, 1.0, 0.0], not $spanwise_direction"))
@@ -382,38 +449,48 @@ function RamAirWing(obj_path, dat_path; alpha=0.0, crease_frac=0.75, wind_vel=10
     (!isfile(obj_path)) && error("OBJ file not found: $obj_path")
     info_path = obj_path[1:end-4] * "_info.bin"
 
-    if !ispath(polar_path) || !ispath(info_path)
+    if true || !ispath(info_path)
         @info "Reading $obj_path"
         vertices, faces = read_faces(obj_path)
         center_of_mass = center_to_com!(vertices, faces)
         inertia_tensor = calculate_inertia_tensor(vertices, faces, mass, zeros(3))
 
-        circle_center_z, radius, gamma_tip = find_circle_center_and_radius(vertices)
-        le_interp, te_interp, area_interp = create_interpolations(vertices, circle_center_z, radius, gamma_tip)
-        @info "Writing $info_path"
-        serialize(info_path, (inertia_tensor, center_of_mass, circle_center_z, radius, gamma_tip, 
-            le_interp, te_interp, area_interp))
-
-        width = 2gamma_tip * radius
-        area = area_interp(gamma_tip)
-        @eval Main begin
-            foil_path, polar_path, v_wind, area, width, x_turn, alpha_range, delta_range =
-                $dat_path, $polar_path, $wind_vel, $gamma_tip, $width, $crease_frac, $alpha_range, $delta_range
-            include(joinpath(dirname(@__FILE__), "../scripts/polars.jl"))
+        if align_to_principal
+            inertia_tensor, R_b_p = calc_inertia_y_rotation(inertia_tensor)
+            circle_center_z, radius, gamma_tip = find_circle_center_and_radius(vertices)
+            le_interp, te_interp, area_interp = create_interpolations(vertices, circle_center_z, radius, gamma_tip, R_b_p; interp_steps)
+        else
+            circle_center_z, radius, gamma_tip = find_circle_center_and_radius(vertices)
+            le_interp, te_interp, area_interp = create_interpolations(vertices, circle_center_z, radius, gamma_tip, I(3); interp_steps)
         end
+
+        @info "Writing $info_path"
+        serialize(info_path, (inertia_tensor, center_of_mass, radius, gamma_tip, 
+            le_interp, te_interp, area_interp))
     end
 
-    @info "Loading polars and kite info from $polar_path and $info_path"
+    @info "Loading kite info from $info_path and polars from $polar_path"
     try
+        (inertia_tensor::Matrix, center_of_mass::Vector,
+            radius::Real, gamma_tip::Real, le_interp, te_interp, area_interp) = deserialize(info_path)
+
+        if !ispath(polar_path)
+            width = 2gamma_tip * radius
+            area = area_interp(gamma_tip)
+            @eval Main begin
+                foil_path, polar_path, v_wind, area, width, x_turn, alpha_range, delta_range =
+                    $dat_path, $polar_path, $wind_vel, $gamma_tip, $width, $crease_frac, $alpha_range, $delta_range
+                include(joinpath(dirname(@__FILE__), "../scripts/polars.jl"))
+            end
+        end
+
         (alpha_range, delta_range, cl_matrix::Matrix, cd_matrix::Matrix, cm_matrix::Matrix) = deserialize(polar_path)
         if remove_nan
             interpolate_matrix_nans!(cl_matrix)
             interpolate_matrix_nans!(cd_matrix)
             interpolate_matrix_nans!(cm_matrix)
         end
-        (inertia_tensor::Matrix, center_of_mass::Vector, circle_center_z::Real,
-            radius::Real, gamma_tip::Real, le_interp, te_interp, area_interp) = deserialize(info_path)
-    
+
         # Create sections
         sections = Section[]
         refined_sections = Section[]
@@ -426,14 +503,15 @@ function RamAirWing(obj_path, dat_path; alpha=0.0, crease_frac=0.75, wind_vel=10
             push!(refined_sections, Section(LE_point, TE_point, POLAR_MATRICES, aero_data))
             push!(non_deformed_sections, Section(LE_point, TE_point, POLAR_MATRICES, aero_data))
         end
-    
+
         RamAirWing(n_panels, spanwise_panel_distribution, spanwise_direction, sections, 
             refined_sections, remove_nan, non_deformed_sections,
-            mass, circle_center_z, gamma_tip, inertia_tensor, center_of_mass, radius,
+            mass, gamma_tip, inertia_tensor, center_of_mass, radius,
             le_interp, te_interp, area_interp, zeros(n_panels), zeros(n_panels))
-    catch e
+
+    catch
         if e isa BoundsError
-            @error "Delete $polar_path and $info_path and try again."
+            @error "Delete $info_path and $polar_path and try again."
         end
         rethrow(e)
     end
@@ -460,32 +538,15 @@ function deform!(wing::RamAirWing, theta_dist::AbstractVector, delta_dist::Abstr
 
     local_y = zeros(MVec3)
     chord = zeros(MVec3)
+    normal = zeros(MVec3)
 
     for i in 1:wing.n_panels
         section1 = wing.non_deformed_sections[i]
         section2 = wing.non_deformed_sections[i+1]
         local_y .= normalize(section1.LE_point - section2.LE_point)
         chord .= section1.TE_point .- section1.LE_point
-        wing.sections[i].TE_point .= section1.LE_point .+ rotate_v_around_k(chord, local_y, wing.theta_dist[i])
+        normal .= chord × local_y
+        @. wing.sections[i].TE_point = section1.LE_point + cos(wing.theta_dist[i]) * chord - sin(wing.theta_dist[i]) * normal
     end
     return nothing
-end
-
-"""
-    rotate_v_around_k(v, k, θ)
-
-Rotate vector v around axis k by angle θ using Rodrigues' rotation formula.
-
-# Arguments
-- `v`: Vector to rotate
-- `k`: Rotation axis (will be normalized)
-- `θ`: Rotation angle in radians
-
-# Returns
-- Rotated vector
-"""
-function rotate_v_around_k(v, k, θ)
-    k = normalize(k)
-    v_rot = v * cos(θ) + (k × v) * sin(θ)  + k * (k ⋅ v) * (1 - cos(θ))
-    return v_rot
 end

@@ -1,7 +1,7 @@
 
 using Test
 using VortexStepMethod
-using VortexStepMethod: create_interpolations, find_circle_center_and_radius, calculate_inertia_tensor, center_to_com!, read_faces
+using VortexStepMethod: create_interpolations, find_circle_center_and_radius, calculate_inertia_tensor, center_to_com!, read_faces, calc_inertia_y_rotation
 using LinearAlgebra
 using Interpolations
 using Serialization
@@ -126,7 +126,7 @@ using Serialization
         
         # Create info file
         info_path = test_obj_path[1:end-4] * "_info.bin"
-        le_interp, te_interp, area_interp = create_interpolations(vertices, z_center, r, π/4)
+        le_interp, te_interp, area_interp = create_interpolations(vertices, z_center, r, π/4, I(3))
         center_of_mass = center_to_com!(vertices, faces)
         inertia_tensor = calculate_inertia_tensor(vertices, faces, 1.0, zeros(3))
         
@@ -146,6 +146,20 @@ using Serialization
         # Test interpolation at middle point
         @test isapprox([le_interp[i](0.0) for i in 1:3], [0.0, 0.0, r+z_center], atol=0.03)
         @test isapprox([te_interp[i](0.0) for i in 1:3], [1.0, 0.0, r+z_center], atol=0.03)
+    end
+
+    @testset "Alignment to principal frame" begin
+        vertices, faces = read_faces(test_obj_path)
+        center_of_mass = center_to_com!(vertices, faces)
+        inertia_tensor_b = calculate_inertia_tensor(vertices, faces, 1.0, zeros(3))
+        inertia_tensor_p, R_b_p = calc_inertia_y_rotation(inertia_tensor_b)
+        for v in vertices
+            v .= R_b_p * v
+        end
+        inertia_tensor_b2 = calculate_inertia_tensor(vertices, faces, 1.0, zeros(3))
+        inertia_tensor_p2, R_b_p2 = calc_inertia_y_rotation(inertia_tensor_b2)
+        @test inertia_tensor_p ≈ inertia_tensor_p2
+        @test R_b_p2 ≈ I(3)
     end
     
     @testset "RamAirWing Construction" begin
