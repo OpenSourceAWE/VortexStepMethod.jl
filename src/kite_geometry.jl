@@ -111,10 +111,13 @@ Create interpolation functions for leading/trailing edges and area.
 - Tuple of (le_interp, te_interp, area_interp) interpolation functions
 - Where le_interp and te_interp are tuples themselves, containing the x, y and z interpolations
 """
-function create_interpolations(vertices, circle_center_z, radius, gamma_tip)
-    gamma_range = range(-gamma_tip+1e-6, gamma_tip-1e-6, 100)
+function create_interpolations(vertices, circle_center_z, radius, gamma_tip; interp_steps=40)
+    gamma_range = range(-gamma_tip+1e-6, gamma_tip-1e-6, interp_steps)
+    stepsize = gamma_range.step.hi
     vz_centered = [v[3] - circle_center_z for v in vertices]
     
+    te_gammas = zeros(length(gamma_range))
+    le_gammas = zeros(length(gamma_range))
     trailing_edges = zeros(3, length(gamma_range))
     leading_edges = zeros(3, length(gamma_range))
     areas  = zeros(length(gamma_range))
@@ -124,31 +127,36 @@ function create_interpolations(vertices, circle_center_z, radius, gamma_tip)
         leading_edges[1, j] = Inf
         for (i, v) in enumerate(vertices)
             # Rotate y coordinate to check box containment
-            rotated_y = v[2] * cos(-gamma) - vz_centered[i] * sin(-gamma)
-            if gamma ≤ 0.0 && 0.0 ≤ rotated_y ≤ 0.5
+            # rotated_y = v[2] * cos(-gamma) - vz_centered[i] * sin(-gamma)
+            gamma_v = atan(-v[2], vz_centered[i])
+            if gamma < 0 && gamma - stepsize ≤ gamma_v ≤ gamma
                 if v[1] > trailing_edges[1, j]
                     trailing_edges[:, j] .= v
+                    te_gammas[j] = gamma_v
                 end
                 if v[1] < leading_edges[1, j]
                     leading_edges[:, j] .= v
+                    le_gammas[j] = gamma_v
                 end
-            elseif gamma > 0.0 && -0.5 ≤ rotated_y ≤ 0.0
+            elseif gamma > 0 && gamma ≤ gamma_v ≤ gamma + stepsize
                 if v[1] > trailing_edges[1, j]
                     trailing_edges[:, j] .= v
+                    te_gammas[j] = gamma_v
                 end
                 if v[1] < leading_edges[1, j]
                     leading_edges[:, j] .= v
+                    le_gammas[j] = gamma_v
                 end
             end
         end
-        area = norm(leading_edges[:, j] - trailing_edges[:, j]) * gamma_range.step * radius
+        area = norm(leading_edges[:, j] - trailing_edges[:, j]) * stepsize * radius
         last_area = j > 1 ? areas[j-1] : 0.0
         areas[j] = last_area + area
     end
 
-    le_interp = ntuple(i -> linear_interpolation(gamma_range, leading_edges[i, :],
+    le_interp = ntuple(i -> linear_interpolation(te_gammas, leading_edges[i, :],
                                            extrapolation_bc=Line()), 3)
-    te_interp = ntuple(i -> linear_interpolation(gamma_range, trailing_edges[i, :],
+    te_interp = ntuple(i -> linear_interpolation(le_gammas, trailing_edges[i, :],
                                            extrapolation_bc=Line()), 3)
     area_interp = linear_interpolation(gamma_range, areas, extrapolation_bc=Line())
     
@@ -446,7 +454,7 @@ Constructor for a [RamAirWing](@ref) that allows to use an `.obj` and a `.dat` f
 function RamAirWing(obj_path, dat_path; alpha=0.0, crease_frac=0.75, wind_vel=10., mass=1.0, 
                   n_panels=54, n_sections=n_panels+1, spanwise_panel_distribution=UNCHANGED, 
                   spanwise_direction=[0.0, 1.0, 0.0], remove_nan=true, align_to_principal=false,
-                  alpha_range=deg2rad.(-5:1:20), delta_range=deg2rad.(-5:1:20) 
+                  alpha_range=deg2rad.(-5:1:20), delta_range=deg2rad.(-5:1:20), interp_steps=40
                   )
 
     !isapprox(spanwise_direction, [0.0, 1.0, 0.0]) && throw(ArgumentError("Spanwise direction has to be [0.0, 1.0, 0.0], not $spanwise_direction"))
@@ -468,7 +476,7 @@ function RamAirWing(obj_path, dat_path; alpha=0.0, crease_frac=0.75, wind_vel=10
         align_to_principal && align_to_principal!(vertices, inertia_tensor)
 
         circle_center_z, radius, gamma_tip = find_circle_center_and_radius(vertices)
-        le_interp, te_interp, area_interp = create_interpolations(vertices, circle_center_z, radius, gamma_tip)
+        le_interp, te_interp, area_interp = create_interpolations(vertices, circle_center_z, radius, gamma_tip; interp_steps)
         @info "Writing $info_path"
         serialize(info_path, (inertia_tensor, center_of_mass, circle_center_z, radius, gamma_tip, 
             le_interp, te_interp, area_interp))
