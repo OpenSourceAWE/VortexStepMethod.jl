@@ -1,4 +1,4 @@
-## Unreleased
+## VortexStepMethod v1.1.2 2025-03-23
 ### Added
 - The function `install_examples()` which allows to easily install the examples without using `git`
 - The function `solve!` returns a struct now. The function `solve`that returns a dict is still available.
@@ -6,7 +6,6 @@
 - The script `install` to the `bin` folder for users who checked out this git repository
 - The script `bench2.jl` was added for allocation testing of the `solve!` function
 ### Changed
-- `deform!` by a distribution instead of just a left and right angle
 - Read the y-coordinates in the correct direction from the `ram_air_kite_body.obj` file
 - In the `menu.jl`, changed `help` to `help_me`. It works better now, no more warnings on Linux, it should also work on MacOS now
 - The coordinate frames of the panels now use the same convention as the kite body frame
@@ -14,6 +13,8 @@
 - The center of mass field of the `RamAirWing` is removed, and the geometry is created such that `[0, 0, 0]` is the center of mass
 - The enumeration `WingType` was added and replaces the symbols, used before
 - The allocations of the function `solve!` where reduced by a factor of 11 to 85 allocations
+- `align_to_principal` option added to `RamAirWing`
+- `deform!` by a distribution instead of just a left and right angle
 ### Fixed
 - The function `calculate_circulation_distribution_elliptical_wing()` was never called
 - Fix the calculation of force coefficients in `solve!`
