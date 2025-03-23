@@ -304,12 +304,9 @@ function calc_inertia_y_rotation(I_b_tensor)
         0               1  0;
         -sin(theta_opt) 0  cos(theta_opt)
     ]
-    @show theta_opt
     # Calculate diagonalized inertia tensor
     I_diag = R_b_p * I_b_tensor * R_b_p'
-    @show I_diag
     @assert isapprox(I_diag[1,3], 0.0, atol=1e-5)
-    @show R_b_p
     return I_diag, R_b_p
 end
 
@@ -509,7 +506,7 @@ function RamAirWing(obj_path, dat_path; alpha=0.0, crease_frac=0.75, wind_vel=10
             mass, gamma_tip, inertia_tensor, center_of_mass, radius,
             le_interp, te_interp, area_interp, zeros(n_panels), zeros(n_panels))
 
-    catch
+    catch e
         if e isa BoundsError
             @error "Delete $info_path and $polar_path and try again."
         end

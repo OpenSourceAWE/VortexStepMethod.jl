@@ -130,19 +130,9 @@ using Serialization
         center_of_mass = center_to_com!(vertices, faces)
         inertia_tensor = calculate_inertia_tensor(vertices, faces, 1.0, zeros(3))
         
-        serialize(info_path, (
-            inertia_tensor,
-            center_of_mass,
-            z_center, 
-            r, 
-            π/4, 
-            le_interp, 
-            te_interp, 
-            area_interp
-        ))
+        serialize(info_path, (inertia_tensor, center_of_mass, r, π/4, 
+            le_interp, te_interp, area_interp))
         
-        @show [le_interp[i](0.0) for i in 1:3]
-        @show [te_interp[i](0.0) for i in 1:3]
         # Test interpolation at middle point
         @test isapprox([le_interp[i](0.0) for i in 1:3], [0.0, 0.0, r+z_center], atol=0.03)
         @test isapprox([te_interp[i](0.0) for i in 1:3], [1.0, 0.0, r+z_center], atol=0.03)
