@@ -111,7 +111,7 @@ Create interpolation functions for leading/trailing edges and area.
 - Tuple of (le_interp, te_interp, area_interp) interpolation functions
 - Where le_interp and te_interp are tuples themselves, containing the x, y and z interpolations
 """
-function create_interpolations(vertices, circle_center_z, radius, gamma_tip; interp_steps=40)
+function create_interpolations(vertices, circle_center_z, radius, gamma_tip, R; interp_steps=40)
     gamma_range = range(-gamma_tip+1e-6, gamma_tip-1e-6, interp_steps)
     stepsize = gamma_range.step.hi
     vz_centered = [v[3] - circle_center_z for v in vertices]
@@ -152,6 +152,11 @@ function create_interpolations(vertices, circle_center_z, radius, gamma_tip; int
         area = norm(leading_edges[:, j] - trailing_edges[:, j]) * stepsize * radius
         last_area = j > 1 ? areas[j-1] : 0.0
         areas[j] = last_area + area
+    end
+
+    for j in eachindex(gamma_range)
+        leading_edges[:, j] .= R * leading_edges[:, j]
+        trailing_edges[:, j] .= R * trailing_edges[:, j]
     end
 
     le_interp = ntuple(i -> linear_interpolation(te_gammas, leading_edges[i, :],
@@ -322,15 +327,6 @@ function calc_inertia_y_rotation(I_b_tensor)
     return I_diag, R_b_p
 end
 
-function align_to_principal!(vertices, I_b_tensor)
-    I_diag, R_b_p = calc_inertia_y_rotation(I_b_tensor)
-    for v in vertices
-        v .= R_b_p * v # transform body frame vertices to principal frame
-    end
-    # the rotation between body frame and principal frame is now zero
-    return I_diag
-end
-
 """
     interpolate_matrix_nans!(matrix::Matrix{Float64})
 
@@ -416,7 +412,6 @@ mutable struct RamAirWing <: AbstractWing
     # Additional fields for RamAirWing
     non_deformed_sections::Vector{Section}
     mass::Float64
-    circle_center_z::Float64
     gamma_tip::Float64
     inertia_tensor::Matrix{Float64}
     center_of_mass::Vector{Float64}
@@ -473,18 +468,24 @@ function RamAirWing(obj_path, dat_path; alpha=0.0, crease_frac=0.75, wind_vel=10
         vertices, faces = read_faces(obj_path)
         center_of_mass = center_to_com!(vertices, faces)
         inertia_tensor = calculate_inertia_tensor(vertices, faces, mass, zeros(3))
-        align_to_principal && align_to_principal!(vertices, inertia_tensor)
 
-        circle_center_z, radius, gamma_tip = find_circle_center_and_radius(vertices)
-        le_interp, te_interp, area_interp = create_interpolations(vertices, circle_center_z, radius, gamma_tip; interp_steps)
+        if align_to_principal
+            inertia_tensor, R_b_p = calc_inertia_y_rotation(inertia_tensor)
+            circle_center_z, radius, gamma_tip = find_circle_center_and_radius(vertices)
+            le_interp, te_interp, area_interp = create_interpolations(vertices, circle_center_z, radius, gamma_tip, R_b_p; interp_steps)
+        else
+            circle_center_z, radius, gamma_tip = find_circle_center_and_radius(vertices)
+            le_interp, te_interp, area_interp = create_interpolations(vertices, circle_center_z, radius, gamma_tip, I(3); interp_steps)
+        end
+
         @info "Writing $info_path"
-        serialize(info_path, (inertia_tensor, center_of_mass, circle_center_z, radius, gamma_tip, 
+        serialize(info_path, (inertia_tensor, center_of_mass, radius, gamma_tip, 
             le_interp, te_interp, area_interp))
     end
 
     @info "Loading kite info from $info_path and polars from $polar_path"
     try
-        (inertia_tensor::Matrix, center_of_mass::Vector, circle_center_z::Real,
+        (inertia_tensor::Matrix, center_of_mass::Vector,
             radius::Real, gamma_tip::Real, le_interp, te_interp, area_interp) = deserialize(info_path)
 
         if !ispath(polar_path)
@@ -519,7 +520,7 @@ function RamAirWing(obj_path, dat_path; alpha=0.0, crease_frac=0.75, wind_vel=10
 
         RamAirWing(n_panels, spanwise_panel_distribution, spanwise_direction, sections, 
             refined_sections, remove_nan, non_deformed_sections,
-            mass, circle_center_z, gamma_tip, inertia_tensor, center_of_mass, radius,
+            mass, gamma_tip, inertia_tensor, center_of_mass, radius,
             le_interp, te_interp, area_interp, zeros(n_panels), zeros(n_panels))
 
     catch
