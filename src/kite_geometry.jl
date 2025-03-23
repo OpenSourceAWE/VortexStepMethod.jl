@@ -552,32 +552,15 @@ function deform!(wing::RamAirWing, theta_dist::AbstractVector, delta_dist::Abstr
 
     local_y = zeros(MVec3)
     chord = zeros(MVec3)
+    normal = zeros(MVec3)
 
     for i in 1:wing.n_panels
         section1 = wing.non_deformed_sections[i]
         section2 = wing.non_deformed_sections[i+1]
         local_y .= normalize(section1.LE_point - section2.LE_point)
         chord .= section1.TE_point .- section1.LE_point
-        wing.sections[i].TE_point .= section1.LE_point .+ rotate_v_around_k(chord, local_y, wing.theta_dist[i])
+        normal .= chord × local_y
+        @. wing.sections[i].TE_point = section1.LE_point + cos(wing.theta_dist[i]) * chord - sin(wing.theta_dist[i]) * normal
     end
     return nothing
-end
-
-"""
-    rotate_v_around_k(v, k, θ)
-
-Rotate vector v around axis k by angle θ using Rodrigues' rotation formula.
-
-# Arguments
-- `v`: Vector to rotate
-- `k`: Rotation axis (will be normalized)
-- `θ`: Rotation angle in radians
-
-# Returns
-- Rotated vector
-"""
-function rotate_v_around_k(v, k, θ)
-    k = normalize(k)
-    v_rot = v * cos(θ) + (k × v) * sin(θ) + k * (k ⋅ v) * (1 - cos(θ))
-    return v_rot
 end
