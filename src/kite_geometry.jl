@@ -449,7 +449,7 @@ function RamAirWing(obj_path, dat_path; alpha=0.0, crease_frac=0.75, wind_vel=10
     (!isfile(obj_path)) && error("OBJ file not found: $obj_path")
     info_path = obj_path[1:end-4] * "_info.bin"
 
-    if true || !ispath(info_path)
+    if !ispath(info_path)
         @info "Reading $obj_path"
         vertices, faces = read_faces(obj_path)
         center_of_mass = center_to_com!(vertices, faces)
