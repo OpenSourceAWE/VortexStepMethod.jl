@@ -1,4 +1,4 @@
-## Unreleased
+## VortexStepMethod v1.1.2 2025-03-23
 ### Added
 - The function `install_examples()` which allows to easily install the examples without using `git`
 - The function `solve!` returns a struct now. The function `solve`that returns a dict is still available.
