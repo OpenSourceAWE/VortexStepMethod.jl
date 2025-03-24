@@ -53,7 +53,7 @@ function init!(refined_section::Section, section::Section)
         refined_section.aero_data = section.aero_data
     else
         for i in eachindex(section.aero_data)
-            refined_section.aero_data[i] .= section.aero_data[i]
+            copyto!(refined_section.aero_data[i], section.aero_data[i])
         end
     end
 end

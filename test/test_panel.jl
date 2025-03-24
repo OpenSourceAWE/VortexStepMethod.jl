@@ -47,7 +47,8 @@ function create_panel(section1::Section, section2::Section)
         x_airf,
         y_airf,
         z_airf,
-        0.0
+        0.0,
+        zeros(MVec3)
     )
     return panel
 end

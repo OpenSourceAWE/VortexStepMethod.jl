@@ -113,7 +113,7 @@ nothing
 function init!(body_aero::BodyAerodynamics; init_aero=true)
     idx = 1
     vec = zeros(MVec3)
-    @time for wing in body_aero.wings
+    for wing in body_aero.wings
         init!(wing)
         panel_props = wing.panel_props
         
@@ -145,11 +145,11 @@ function init!(body_aero::BodyAerodynamics; init_aero=true)
     end
     
     # Initialize rest of the struct
-    @time body_aero.projected_area = sum(wing -> calculate_projected_area(wing), body_aero.wings)
-    @time body_aero.stall_angle_list .= calculate_stall_angle_list(body_aero.panels)
-    @time body_aero.alpha_array .= 0.0
-    @time body_aero.v_a_array .= 0.0 
-    @time body_aero.AIC .= 0.0
+    body_aero.projected_area = sum(wing -> calculate_projected_area(wing), body_aero.wings)
+    body_aero.stall_angle_list .= calculate_stall_angle_list(body_aero.panels)
+    body_aero.alpha_array .= 0.0
+    body_aero.v_a_array .= 0.0 
+    body_aero.AIC .= 0.0
     return nothing
 end
 

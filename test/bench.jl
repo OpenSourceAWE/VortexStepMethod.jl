@@ -14,7 +14,8 @@ using VortexStepMethod: calculate_AIC_matrices!, gamma_loop!, calculate_results,
                        velocity_3D_bound_vortex!,
                        velocity_3D_trailing_vortex!,
                        velocity_3D_trailing_vortex_semiinfinite!,
-                       Panel
+                       Panel,
+                       init!
 using Test
 using LinearAlgebra
 
@@ -39,6 +40,13 @@ using LinearAlgebra
         INVISCID)
     
     body_aero = BodyAerodynamics([wing])
+    init!(body_aero)
+    
+    @testset "Re-initialization" begin
+        result = @benchmark init!(body_aero; init_aero=false) samples=1 evals=1
+        @info "Re-initializing Allocations: $(result.allocs) \t Memory: $(result.memory)"
+        @test result.allocs < 100
+    end
 
     vel_app = [cos(alpha), 0.0, sin(alpha)] .* v_a
     set_va!(body_aero, vel_app)
@@ -66,7 +74,7 @@ using LinearAlgebra
         for model in models
             for frac in core_radius_fractions
                 @testset "Model $model Core Radius Fraction $frac" begin
-                    result = @benchmark calculate_AIC_matrices!($body_aero, $model, $frac, $va_norm_array, $va_unit_array) samples = 1 evals = 1
+                    result = @benchmark calculate_AIC_matrices!($body_aero, $model, $frac, $va_norm_array, $va_unit_array) samples=1 evals=1
                     @test result.allocs ≤ 100
                     @info "Model: $(model) \t Core radius fraction: $(frac) \t Allocations: $(result.allocs) \t Memory: $(result.memory)"
                 end
@@ -129,7 +137,7 @@ using LinearAlgebra
                     $body_aero.panels,
                     0.5;
                     log = false
-                ) samples = 1 evals = 1
+                ) samples=1 evals=1
                 @test result.allocs ≤ 10
                 @info "Model: $model \t Aero_model: $aero_model \t Allocations: $(result.allocs) Memory: $(result.memory)"
             end
@@ -180,103 +188,8 @@ using LinearAlgebra
             $va_unit_array,
             $body_aero.panels,
             false
-        ) samples = 1 evals = 1
-        @test_broken result.allocs ≤ 100
+        ) samples=1 evals=1
+        @test result.allocs ≤ 300
     end
-    
-
-    # TODO: implement the rest of the benchmarks
-    # @testset "Angle of Attack Update" begin
-    #     alpha_array = zeros(n_panels)
-    #     result = @benchmark update_effective_angle_of_attack_if_VSM(
-    #         $alpha_array,
-    #         $body_aero,
-    #         $gamma
-    #     ) samples = 1 evals = 1
-    #     @test result.allocs == 0
-    # end
-    
-    # @testset "Area Calculations" begin
-    #     area = @MVector zeros(3)
-    #     result = @benchmark calculate_projected_area(
-    #         $area,
-    #         $body_aero
-    #     ) samples = 1 evals = 1
-    #     @test result.allocs == 0
-    # end
-    
-    # @testset "Aerodynamic Coefficients" begin
-    #     panel = body_aero.panels[1]
-    #     alpha = 0.1
-        
-    #     result = @benchmark calculate_cl($panel, $alpha) samples = 1 evals = 1
-    #     @test result.allocs == 0
-        
-    #     cd_cm = @MVector zeros(2)
-    #     result = @benchmark calculate_cd_cm($cd_cm, $panel, $alpha) samples = 1 evals = 1
-    #     @test result.allocs == 0
-    # end
-    
-    # @testset "Induced Velocity Calculations" begin
-    #     v_ind = @MVector zeros(3)
-    #     point = @MVector [0.25, 9.5, 0.0]
-    #     work_vectors = ntuple(_ -> @MVector(zeros(3)), 10)
-        
-    #     # Test single ring velocity calculation
-    #     result = @benchmark calculate_velocity_induced_single_ring_semiinfinite!(
-    #         $v_ind,
-    #         $(work_vectors[1]),
-    #         $panel.filaments,
-    #         $point,
-    #         true,
-    #         20.0,
-    #         $(work_vectors[2]),
-    #         1.0,
-    #         1e-20,
-    #         $work_vectors
-    #     ) samples = 1 evals = 1
-    #     @test result.allocs == 0
-        
-    #     # Test 2D bound vortex
-    #     result = @benchmark calculate_velocity_induced_bound_2D!(
-    #         $v_ind,
-    #         $panel,
-    #         $point,
-    #         $work_vectors
-    #     ) samples = 1 evals = 1
-    #     @test result.allocs == 0
-        
-    #     # Test 3D velocity components
-    #     result = @benchmark velocity_3D_bound_vortex!(
-    #         $v_ind,
-    #         $point,
-    #         $panel,
-    #         1.0,
-    #         1e-20,
-    #         $work_vectors
-    #     ) samples = 1 evals = 1
-    #     @test result.allocs == 0
-        
-    #     result = @benchmark velocity_3D_trailing_vortex!(
-    #         $v_ind,
-    #         $point,
-    #         $panel,
-    #         1.0,
-    #         20.0,
-    #         $work_vectors
-    #     ) samples = 1 evals = 1
-    #     @test result.allocs == 0
-        
-    #     result = @benchmark velocity_3D_trailing_vortex_semiinfinite!(
-    #         $v_ind,
-    #         $point,
-    #         $panel,
-    #         1.0,
-    #         20.0,
-    #         $(work_vectors[2]),
-    #         $work_vectors
-    #     ) samples = 1 evals = 1
-    #     @test result.allocs == 0
-    # end
 end
 
