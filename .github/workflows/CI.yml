@@ -30,8 +30,10 @@ jobs:
         run: |
           if [ "${{ steps.versions.outputs.PRE }}" != "null" ] && [ "${{ steps.versions.outputs.PRE }}" != "${{ steps.versions.outputs.LATEST }}" ]; then
             echo "matrix={\"version\":[\"${{ steps.versions.outputs.STABLE }}\",\"${{ steps.versions.outputs.LATEST }}\",\"${{ steps.versions.outputs.PRE }}\"]}" >> $GITHUB_OUTPUT
+            cat $GITHUB_OUTPUT
           else
             echo "matrix={\"version\":[\"${{ steps.versions.outputs.STABLE }}\",\"${{ steps.versions.outputs.LATEST }}\"]}" >> $GITHUB_OUTPUT
+            cat $GITHUB_OUTPUT
           fi
   test:
     needs: check_versions
@@ -41,7 +43,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        version: ${{ fromJson(needs.check_versions.outputs.version_matrix).version }}
+        version:
+          - '1.10'
+          - '1'
+          - 'pre'
         os:
           - ubuntu-latest
         build_is_production_build:
