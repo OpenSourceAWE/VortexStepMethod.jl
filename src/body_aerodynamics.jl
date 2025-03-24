@@ -110,12 +110,11 @@ function init!(body_aero::BodyAerodynamics;
     idx = 1
     for wing in body_aero.wings
         println("init wing")
-        @time init!(wing; aero_center_location, control_point_location)
-        # @assert false
+        init!(wing; aero_center_location, control_point_location)
         panel_props = wing.panel_props
         
         # Create panels
-        @time for i in 1:wing.n_panels
+        for i in 1:wing.n_panels
             if wing isa RamAirWing
                 delta = wing.delta_dist[i]
             else

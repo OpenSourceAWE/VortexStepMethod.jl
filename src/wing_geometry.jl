@@ -121,14 +121,16 @@ function update_panel_properties!(panel_props::PanelProperties, section_list::Ve
     
     for i in 1:n_panels
         # Define panel points
-        p1 = coords[2i-1, :]     # LE_1
-        p2 = coords[2i+1, :]     # LE_2
-        p3 = coords[2i+2, :]     # TE_2
-        p4 = coords[2i, :]       # TE_1
+        @views begin
+            p1 = coords[2i-1, :]     # LE_1
+            p2 = coords[2i+1, :]     # LE_2
+            p3 = coords[2i+2, :]     # TE_2
+            p4 = coords[2i, :]       # TE_1
+        end
         
         # Calculate control point position
-        di = norm(coords[2i-1, :] * 0.75 + coords[2i, :] * 0.25 - 
-                 (coords[2i+1, :] * 0.75 + coords[2i+2, :] * 0.25))
+        di = norm(coords[2i-1, :] .* 0.75 .+ coords[2i, :] .* 0.25 .- 
+                 (coords[2i+1, :] .* 0.75 .+ coords[2i+2, :] .* 0.25))
         
         ncp = if i == 1
             diplus = norm(coords[2i+1, :] * 0.75 + coords[2i+2, :] * 0.25 - 
