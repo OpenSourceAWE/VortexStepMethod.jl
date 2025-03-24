@@ -77,13 +77,13 @@ function init_pos!(
     panel::Panel,
     section_1::Section,
     section_2::Section,
-    aero_center::PosVector,
-    control_point::PosVector,
-    bound_point_1::PosVector,
-    bound_point_2::PosVector,
-    x_airf::PosVector,
-    y_airf::PosVector,
-    z_airf::PosVector,
+    aero_center,
+    control_point,
+    bound_point_1,
+    bound_point_2,
+    x_airf,
+    y_airf,
+    z_airf,
     delta,
     vec::MVec3
 )
@@ -188,19 +188,19 @@ function init!(
     panel::Panel,
     section_1::Section,
     section_2::Section,
-    aero_center::PosVector,
-    control_point::PosVector,
-    bound_point_1::PosVector,
-    bound_point_2::PosVector,
-    x_airf::PosVector,
-    y_airf::PosVector,
-    z_airf::PosVector,
+    aero_center,
+    control_point,
+    bound_point_1,
+    bound_point_2,
+    x_airf,
+    y_airf,
+    z_airf,
     delta,
-    vec::MVec3;
+    vec;
     init_aero = true,
     remove_nan = true
 )
-    @time init_pos!(panel, section_1, section_2, aero_center, control_point, bound_point_1, bound_point_2,
+    init_pos!(panel, section_1, section_2, aero_center, control_point, bound_point_1, bound_point_2,
         x_airf, y_airf, z_airf, delta, vec)
     init_aero && init_aero!(panel, section_1, section_2; remove_nan)
     return nothing

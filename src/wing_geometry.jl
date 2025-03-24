@@ -767,6 +767,11 @@ function calculate_span(wing::AbstractWing)
     return maximum(projections) - minimum(projections)
 end
 
+# Project point onto plane
+function project_onto_plane(point::PosVector, normal::Vector{Float64})
+    return point .- dot(point, normal) .* normal
+end
+
 """
     calculate_projected_area(wing::AbstractWing, z_plane_vector::Vector{Float64}=[0.0, 0.0, 1.0])
 
@@ -779,11 +784,6 @@ function calculate_projected_area(wing::AbstractWing,
                                 z_plane_vector::Vector{Float64}=[0.0, 0.0, 1.0])
     # Normalize plane normal vector
     z_plane_vector = z_plane_vector ./ norm(z_plane_vector)
-    
-    # Project point onto plane
-    function project_onto_plane(point::PosVector, normal::Vector{Float64})
-        return point .- dot(point, normal) .* normal
-    end
     
     # Calculate area by summing trapezoid areas
     projected_area = 0.0

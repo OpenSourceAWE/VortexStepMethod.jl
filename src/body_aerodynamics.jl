@@ -81,6 +81,21 @@ function BodyAerodynamics(
     return body_aero
 end
 
+function Base.getproperty(obj::BodyAerodynamics, sym::Symbol)
+    if sym === :va
+        return getfield(obj, :_va)
+    end
+    return getfield(obj, sym)
+end
+
+function Base.setproperty!(obj::BodyAerodynamics, sym::Symbol, val)
+    if sym === :va || sym === :omega
+        set_va!(obj, val)
+    else
+        setfield!(obj, sym, val)
+    end
+end
+
 """
     init!(body_aero::BodyAerodynamics)
 
@@ -98,7 +113,7 @@ nothing
 function init!(body_aero::BodyAerodynamics; init_aero=true)
     idx = 1
     vec = zeros(MVec3)
-    for wing in body_aero.wings
+    @time for wing in body_aero.wings
         init!(wing)
         panel_props = wing.panel_props
         
@@ -109,7 +124,7 @@ function init!(body_aero::BodyAerodynamics; init_aero=true)
             else
                 delta = 0.0
             end
-            init!(
+            @views init!(
                 body_aero.panels[idx], 
                 wing.refined_sections[i],
                 wing.refined_sections[i+1],
@@ -130,27 +145,12 @@ function init!(body_aero::BodyAerodynamics; init_aero=true)
     end
     
     # Initialize rest of the struct
-    body_aero.projected_area = sum(wing -> calculate_projected_area(wing), body_aero.wings)
-    body_aero.stall_angle_list .= calculate_stall_angle_list(body_aero.panels)
-    body_aero.alpha_array .= 0.0
-    body_aero.v_a_array .= 0.0 
-    body_aero.AIC .= 0.0
+    @time body_aero.projected_area = sum(wing -> calculate_projected_area(wing), body_aero.wings)
+    @time body_aero.stall_angle_list .= calculate_stall_angle_list(body_aero.panels)
+    @time body_aero.alpha_array .= 0.0
+    @time body_aero.v_a_array .= 0.0 
+    @time body_aero.AIC .= 0.0
     return nothing
-end
-
-function Base.getproperty(obj::BodyAerodynamics, sym::Symbol)
-    if sym === :va
-        return getfield(obj, :_va)
-    end
-    return getfield(obj, sym)
-end
-
-function Base.setproperty!(obj::BodyAerodynamics, sym::Symbol, val)
-    if sym === :va || sym === :omega
-        set_va!(obj, val)
-    else
-        setfield!(obj, sym, val)
-    end
 end
 
 """

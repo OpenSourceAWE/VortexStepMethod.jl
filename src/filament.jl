@@ -28,7 +28,7 @@ Represents a bound vortex filament defined by two points.
     initialized::Bool = false
 end
 
-function init!(filament::BoundFilament, x1::PosVector, x2::PosVector, vec=zeros(MVec3))
+function init!(filament::BoundFilament, x1, x2, vec=zeros(MVec3))
     filament.x1 .= x1
     filament.x2 .= x2
     vec .= x2 .- x1
