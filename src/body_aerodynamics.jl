@@ -89,14 +89,16 @@ Initialize a BodyAerodynamics struct in-place by setting up panels and coefficie
 # Arguments
 - `body_aero::BodyAerodynamics`: The structure to initialize
 
+# Keyword Arguments
+- `init_aero::Bool`: Wether to initialize the aero data or not
+
 # Returns
 nothing
 """
-function init!(body_aero::BodyAerodynamics)
-
+function init!(body_aero::BodyAerodynamics; init_aero=true)
     idx = 1
+    vec = zeros(MVec3)
     for wing in body_aero.wings
-        println("init wing")
         init!(wing)
         panel_props = wing.panel_props
         
@@ -118,8 +120,10 @@ function init!(body_aero::BodyAerodynamics)
                 panel_props.x_airf[i, :],
                 panel_props.y_airf[i, :],
                 panel_props.z_airf[i, :],
-                delta;
-                remove_nan=wing.remove_nan
+                delta,
+                vec;
+                remove_nan=wing.remove_nan,
+                init_aero
             )
             idx += 1
         end

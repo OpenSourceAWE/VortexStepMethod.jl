@@ -233,7 +233,7 @@ function init!(wing::AbstractWing)
     refine_aerodynamic_mesh!(wing)
     
     # Calculate panel properties
-    @time update_panel_properties!(
+    update_panel_properties!(
         wing.panel_props,
         wing.refined_sections,
         wing.n_panels
