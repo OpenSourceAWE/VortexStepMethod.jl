@@ -35,6 +35,10 @@ using LinearAlgebra
         [chord, span/2, 0.0],  # Left tip TE
         INVISCID)
     add_section!(wing, 
+        [0.0, 0.0, 0.0],    # Left tip LE 
+        [chord, 0.0, 0.0],  # Left tip TE
+        INVISCID)
+    add_section!(wing, 
         [0.0, -span/2, 0.0],   # Right tip LE
         [chord, -span/2, 0.0], # Right tip TE
         INVISCID)
