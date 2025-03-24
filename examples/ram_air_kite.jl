@@ -2,9 +2,9 @@ using ControlPlots
 using VortexStepMethod
 using LinearAlgebra
 
-PLOT = false
+PLOT = true
 USE_TEX = false
-DEFORM = true
+DEFORM = false
 
 # Create wing geometry
 wing = RamAirWing("data/ram_air_kite_body.obj", "data/ram_air_kite_foil.dat")
@@ -14,15 +14,8 @@ println("First init")
 
 if DEFORM
     # Linear interpolation of alpha from 10° at one tip to 0° at the other
-    n_panels = wing.n_panels
-    theta_start = deg2rad(10)
-    theta_end = deg2rad(0)
-    delta_start = deg2rad(10)
-    delta_end = deg2rad(0)
-    theta_dist = [theta_start - i * (theta_start - theta_end)/(n_panels-1) for i in 0:(n_panels-1)]
-    delta_dist = [delta_start - i * (delta_start - delta_end)/(n_panels-1) for i in 0:(n_panels-1)]
     println("Deform")
-    @time VortexStepMethod.deform!(wing, theta_dist, delta_dist)
+    @time VortexStepMethod.smooth_deform!(wing, deg2rad.([10,20,10,0]), deg2rad.([-10,0,-10,0]))
     println("Deform init")
     @time VortexStepMethod.init!(body_aero; init_aero=false)
 end

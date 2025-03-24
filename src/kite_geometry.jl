@@ -519,29 +519,29 @@ end
 
 function smooth_deform!(wing::RamAirWing, theta_angles::AbstractVector, delta_angles::AbstractVector)
     !(wing.n_panels % length(theta_angles) == 0) && throw(ArgumentError("Number of angles has to be a multiple of number of panels"))
-    panels = wing.panels
+    n_panels = wing.n_panels
     theta_dist = wing.theta_dist
     delta_dist = wing.delta_dist
 
-    dist_idx = 1
+    dist_idx = 0
     for angle_idx in eachindex(theta_angles)
         for _ in 1:(wing.n_panels ÷ length(theta_angles))
+            dist_idx += 1
             theta_dist[dist_idx] = theta_angles[angle_idx]
             delta_dist[dist_idx] = delta_angles[angle_idx]
-            dist_idx += 1
         end
     end
     @assert (dist_idx == wing.n_panels)
 
     window_size = wing.n_panels ÷ length(theta_angles)
-    if length(panels) > window_size
+    if n_panels > window_size
         smoothed = copy(theta_dist)
-        for i in (window_size÷2 + 1):(length(panels) - window_size÷2)
-            smoothed[i] = mean(theta_dist[(i - window_size÷2):(i + window_size÷2)])
+        for i in (window_size÷2 + 1):(n_panels - window_size÷2)
+            @views smoothed[i] = mean(theta_dist[(i - window_size÷2):(i + window_size÷2)])
         end
         theta_dist .= smoothed
-        for i in (window_size÷2 + 1):(length(panels) - window_size÷2)
-            smoothed[i] = mean(delta_dist[(i - window_size÷2):(i + window_size÷2)])
+        for i in (window_size÷2 + 1):(n_panels - window_size÷2)
+            @views smoothed[i] = mean(delta_dist[(i - window_size÷2):(i + window_size÷2)])
         end
         delta_dist .= smoothed
     end
