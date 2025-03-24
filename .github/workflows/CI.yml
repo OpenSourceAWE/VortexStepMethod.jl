@@ -41,10 +41,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        version:
-          - '1.10'
-          - '1'
-          - 'pre'
+        version: ${{ fromJson(needs.check_versions.outputs.version_matrix).version }}
         os:
           - ubuntu-latest
         build_is_production_build:
