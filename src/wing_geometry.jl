@@ -53,10 +53,131 @@ function init!(refined_section::Section, section::Section)
         refined_section.aero_data = section.aero_data
     else
         for i in eachindex(section.aero_data)
-            refined_section.aero_data[i] .= section.aero_data[i]
+            copyto!(refined_section.aero_data[i], section.aero_data[i])
         end
     end
 end
+
+"""
+    PanelProperties
+
+Structure to hold calculated panel properties.
+
+# Fields
+- `aero_centers`::Matrix{Float64}
+- `control_points`::Matrix{Float64}
+- `bound_points_1`::Matrix{Float64}
+- `bound_points_2`::Matrix{Float64}
+- `x_airf`::Matrix{Float64}: Vector of unit vectors tangential to chord line
+- `y_airf`::Matrix{Float64}: Vector of unit vectors in spanwise direction
+- `z_airf`::Matrix{Float64}: Vector of unit vectors pointing up (cross of x_airf and y_airf)
+"""
+@with_kw mutable struct PanelProperties{P}
+    aero_centers::Matrix{Float64} = zeros(P, 3)
+    control_points::Matrix{Float64} = zeros(P, 3)
+    bound_points_1::Matrix{Float64} = zeros(P, 3)
+    bound_points_2::Matrix{Float64} = zeros(P, 3)
+    x_airf::Matrix{Float64} = zeros(P, 3)
+    y_airf::Matrix{Float64} = zeros(P, 3)
+    z_airf::Matrix{Float64} = zeros(P, 3)
+    coords::Matrix{Float64} = zeros(2(P+1), 3)
+end
+
+"""
+    update_panel_properties!(section_list::Vector{Section}, n_panels::Int)
+
+Calculate geometric properties for each panel.
+
+# Arguments
+- section_list::Vector{Section}: List of [Section](@ref)s
+- `n_panels`::Int: Number of [Panel](@ref)s
+
+# Returns:
+[PanelProperties](@ref) containing vectors for each property
+"""
+function update_panel_properties!(panel_props::PanelProperties, section_list::Vector{Section}, n_panels::Int)
+    coords = panel_props.coords
+    aero_centers = panel_props.aero_centers
+    control_points = panel_props.control_points
+    bound_points_1 = panel_props.bound_points_1
+    bound_points_2 = panel_props.bound_points_2
+    x_airf = panel_props.x_airf
+    y_airf = panel_props.y_airf
+    z_airf = panel_props.z_airf
+    vec = zeros(MVec3)
+    vec2 = zeros(MVec3)
+    @debug "Shape of coordinates: $(size(coords))"
+    
+    for i in 1:n_panels
+        coords[2i-1, :] .= section_list[i].LE_point
+        coords[2i, :]   .= section_list[i].TE_point
+        coords[2i+1, :] .= section_list[i+1].LE_point
+        coords[2i+2, :] .= section_list[i+1].TE_point
+    end
+    
+    @debug "Coordinates: $coords"
+    
+    for i in 1:n_panels
+        # Define panel points
+        @views begin
+            LE_1 = coords[2i-1, :]     # LE_1
+            LE_2 = coords[2i+1, :]     # LE_2
+            TE_2 = coords[2i+2, :]     # TE_2
+            TE_1 = coords[2i, :]       # TE_1
+        end
+        
+        # Calculate control point position
+        @views @. vec = coords[2i-1, :] * 0.75 + coords[2i, :] * 0.25 - 
+            (coords[2i+1, :] * 0.75 + coords[2i+2, :] * 0.25)
+        di = norm(vec)
+        
+        ncp = if i == 1
+            @views @. vec = coords[2i+1, :] * 0.75 + coords[2i+2, :] * 0.25 - 
+                            (coords[2i+3, :] * 0.75 + coords[2i+4, :] * 0.25)
+            diplus = norm(vec)
+            di / (di + diplus)
+        elseif i == n_panels
+            @views @. vec = coords[2i-3, :] * 0.75 + coords[2i-2, :] * 0.25 - 
+                            (coords[2i-1, :] * 0.75 + coords[2i, :] * 0.25)
+            dimin = norm(vec)
+            dimin / (dimin + di)
+        else
+            @views @. vec = coords[2i-3, :] * 0.75 + coords[2i-2, :] * 0.25 - 
+                            (coords[2i-1, :] * 0.75 + coords[2i, :] * 0.25)
+            dimin = norm(vec)
+            @views @. vec = coords[2i+1, :] * 0.75 + coords[2i+2, :] * 0.25 - 
+                            (coords[2i+3, :] * 0.75 + coords[2i+4, :] * 0.25)
+            diplus = norm(vec)
+            0.25 * (dimin / (dimin + di) + di / (di + diplus) + 1)
+        end
+        ncp = 1 - ncp
+        
+        # Calculate points
+        @. begin
+            aero_centers[i, :] = (LE_2 * (1 - ncp) + LE_1 * ncp) * 0.75 +
+                    (TE_2 * (1 - ncp) + TE_1 * ncp) * 0.25        
+            control_points[i, :] = (LE_2 * (1 - ncp) + LE_1 * ncp) * 0.25 +
+                        (TE_2 * (1 - ncp) + TE_1 * ncp) * 0.75
+            
+            bound_points_1[i, :] = LE_1 * 0.75 + TE_1 * 0.25
+            bound_points_2[i, :] = LE_2 * 0.75 + TE_2 * 0.25
+        end
+        
+        # Calculate reference frame vectors
+        @views begin
+            @. vec = (control_points[i, :] - aero_centers[i, :])
+            @. vec2 = (LE_1 - LE_2)
+            vec .= vec × vec2 
+            z_airf[i, :] .= normalize(vec)
+            @. vec = control_points[i, :] .- aero_centers[i, :]
+            x_airf[i, :] .= normalize(vec)
+            @. vec = bound_points_1[i, :] - bound_points_2[i, :]
+            y_airf[i, :] .= normalize(vec)
+        end
+    end
+    return nothing
+end
+
 
 """
     Wing
@@ -65,7 +186,7 @@ Represents a wing composed of multiple sections with aerodynamic properties.
 
 # Fields
 - `n_panels::Int64`: Number of panels in aerodynamic mesh
-- `spanwise_panel_distribution`::PanelDistribution: [PanelDistribution](@ref)
+- `spanwise_distribution`::PanelDistribution: [PanelDistribution](@ref)
 - `spanwise_direction::MVec3`: Wing span direction vector
 - `sections::Vector{Section}`: Vector of wing sections, see: [Section](@ref)
 - `refined_sections::Vector{Section}`: Vector of refined wing sections, see: [Section](@ref)
@@ -74,7 +195,8 @@ Represents a wing composed of multiple sections with aerodynamic properties.
 """
 mutable struct Wing <: AbstractWing
     n_panels::Int64
-    spanwise_panel_distribution::PanelDistribution
+    spanwise_distribution::PanelDistribution
+    panel_props::PanelProperties
     spanwise_direction::MVec3
     sections::Vector{Section}
     refined_sections::Vector{Section}
@@ -83,7 +205,7 @@ end
 
 """
     Wing(n_panels::Int;
-         spanwise_panel_distribution::PanelDistribution=LINEAR,
+         spanwise_distribution::PanelDistribution=LINEAR,
          spanwise_direction::PosVector=MVec3([0.0, 1.0, 0.0]),
          remove_nan::Bool=true)
 
@@ -92,28 +214,28 @@ and refined sections as empty arrays.
 
 # Parameters
 - `n_panels::Int64`: Number of panels in aerodynamic mesh
-- `spanwise_panel_distribution`::PanelDistribution = LINEAR: [PanelDistribution](@ref)
+- `spanwise_distribution`::PanelDistribution = LINEAR: [PanelDistribution](@ref)
 - `spanwise_direction::MVec3` = MVec3([0.0, 1.0, 0.0]): Wing span direction vector
 - `remove_nan::Bool`: Wether to remove the NaNs from interpolations or not
 """
 function Wing(n_panels::Int;
-    spanwise_panel_distribution::PanelDistribution=LINEAR,
-    spanwise_direction::PosVector=MVec3([0.0, 1.0, 0.0]),
-    remove_nan=true)
-    Wing(n_panels, spanwise_panel_distribution, spanwise_direction, Section[], Section[], remove_nan)
+        spanwise_distribution::PanelDistribution=LINEAR,
+        spanwise_direction::PosVector=MVec3([0.0, 1.0, 0.0]),
+        remove_nan=true)
+    panel_props = PanelProperties{n_panels}()
+    Wing(n_panels, spanwise_distribution, panel_props, spanwise_direction, Section[], Section[], remove_nan)
 end
 
-function init!(wing::AbstractWing; aero_center_location::Float64=0.25, control_point_location::Float64=0.75)
+function init!(wing::AbstractWing)
     refine_aerodynamic_mesh!(wing)
     
     # Calculate panel properties
-    panel_props = calculate_panel_properties(
+    update_panel_properties!(
+        wing.panel_props,
         wing.refined_sections,
-        wing.n_panels,
-        aero_center_location,
-        control_point_location
+        wing.n_panels
     )
-    return panel_props
+    return nothing
 end
 
 
@@ -201,7 +323,7 @@ function refine_aerodynamic_mesh!(wing::AbstractWing)
     sort!(wing.sections, by=s -> s.LE_point[2], rev=true)
     n_sections = wing.n_panels + 1
     if length(wing.refined_sections) == 0
-        if wing.spanwise_panel_distribution == UNCHANGED || length(wing.sections) == n_sections
+        if wing.spanwise_distribution == UNCHANGED || length(wing.sections) == n_sections
             wing.refined_sections = wing.sections
             return nothing
         else
@@ -229,7 +351,7 @@ function refine_aerodynamic_mesh!(wing::AbstractWing)
     end
     
     # Handle special cases
-    if wing.spanwise_panel_distribution == UNCHANGED || length(wing.sections) == n_sections
+    if wing.spanwise_distribution == UNCHANGED || length(wing.sections) == n_sections
         for i in eachindex(wing.sections)
             init!(wing.refined_sections[i], wing.sections[i])
         end
@@ -246,13 +368,13 @@ function refine_aerodynamic_mesh!(wing::AbstractWing)
     end
     
     # Handle different distribution types
-    if wing.spanwise_panel_distribution == SPLIT_PROVIDED
+    if wing.spanwise_distribution == SPLIT_PROVIDED
         return refine_mesh_by_splitting_provided_sections!(wing)
-    elseif wing.spanwise_panel_distribution in (LINEAR, COSINE, COSINE_VAN_GARREL)
+    elseif wing.spanwise_distribution in (LINEAR, COSINE, COSINE_VAN_GARREL)
         return refine_mesh_for_linear_cosine_distribution!(
             wing,
             1,
-            wing.spanwise_panel_distribution,
+            wing.spanwise_distribution,
             n_sections,
             LE,
             TE,
@@ -260,7 +382,7 @@ function refine_aerodynamic_mesh!(wing::AbstractWing)
             aero_data
         )
     else
-        throw(ArgumentError("Unsupported spanwise panel distribution: $(wing.spanwise_panel_distribution)"))
+        throw(ArgumentError("Unsupported spanwise panel distribution: $(wing.spanwise_distribution)"))
     end
 end
 
@@ -348,7 +470,7 @@ end
     refine_mesh_for_linear_cosine_distribution!(
         wing::AbstractWing,
         idx::Int,
-        spanwise_panel_distribution::PanelDistribution,
+        spanwise_distribution::PanelDistribution,
         n_sections::Int,
         LE::Matrix{Float64},
         TE::Matrix{Float64},
@@ -360,7 +482,7 @@ Refine wing mesh using linear or cosine spacing.
 # Arguments
 - `wing`: Wing object
 - `idx`: Section start index
-- `spanwise_panel_distribution`: [PanelDistribution](@ref)
+- `spanwise_distribution`: [PanelDistribution](@ref)
 - `n_sections`: Number of sections to generate
 - `LE`: Matrix of leading edge points
 - `TE`: Matrix of trailing edge points
@@ -376,7 +498,7 @@ Returns:
 function refine_mesh_for_linear_cosine_distribution!(
     wing::AbstractWing,
     idx,
-    spanwise_panel_distribution::PanelDistribution,
+    spanwise_distribution::PanelDistribution,
     n_sections::Int,
     LE,
     TE,
@@ -393,13 +515,13 @@ function refine_mesh_for_linear_cosine_distribution!(
     qc_cum_length = vcat(0, cumsum(qc_lengths))
 
     # 2. Define target lengths
-    target_lengths = if spanwise_panel_distribution == LINEAR
+    target_lengths = if spanwise_distribution == LINEAR
         range(0, qc_total_length, n_sections)
-    elseif spanwise_panel_distribution in (COSINE, COSINE_VAN_GARREL)
+    elseif spanwise_distribution in (COSINE, COSINE_VAN_GARREL)
         theta = range(0, π, n_sections)
         qc_total_length .* (1 .- cos.(theta)) ./ 2
     else
-        throw(ArgumentError("Unsupported distribution: $spanwise_panel_distribution"))
+        throw(ArgumentError("Unsupported distribution: $spanwise_distribution"))
     end
 
     # Initialize arrays
@@ -462,7 +584,7 @@ function refine_mesh_for_linear_cosine_distribution!(
     end
 
     # Apply van Garrel distribution if requested
-    if spanwise_panel_distribution == COSINE_VAN_GARREL
+    if spanwise_distribution == COSINE_VAN_GARREL
         idx = calculate_cosine_van_Garrel!(wing, idx)
     end
 
@@ -642,6 +764,12 @@ function calculate_span(wing::AbstractWing)
     return maximum(projections) - minimum(projections)
 end
 
+# Project point onto plane
+@inline function project_onto_plane!(point_proj, point, normal)
+    point_proj .= point .- (point ⋅ normal) .* normal
+    return nothing
+end
+
 """
     calculate_projected_area(wing::AbstractWing, z_plane_vector::Vector{Float64}=[0.0, 0.0, 1.0])
 
@@ -654,11 +782,11 @@ function calculate_projected_area(wing::AbstractWing,
                                 z_plane_vector::Vector{Float64}=[0.0, 0.0, 1.0])
     # Normalize plane normal vector
     z_plane_vector = z_plane_vector ./ norm(z_plane_vector)
-    
-    # Project point onto plane
-    function project_onto_plane(point::PosVector, normal::Vector{Float64})
-        return point .- dot(point, normal) .* normal
-    end
+
+    LE_current_proj = zeros(MVec3)
+    TE_current_proj = zeros(MVec3)
+    LE_next_proj = zeros(MVec3)
+    TE_next_proj = zeros(MVec3)
     
     # Calculate area by summing trapezoid areas
     projected_area = 0.0
@@ -670,10 +798,10 @@ function calculate_projected_area(wing::AbstractWing,
         TE_next = wing.sections[i+1].TE_point
         
         # Project points
-        LE_current_proj = project_onto_plane(LE_current, z_plane_vector)
-        TE_current_proj = project_onto_plane(TE_current, z_plane_vector)
-        LE_next_proj = project_onto_plane(LE_next, z_plane_vector)
-        TE_next_proj = project_onto_plane(TE_next, z_plane_vector)
+        project_onto_plane!(LE_current_proj, LE_current, z_plane_vector)
+        project_onto_plane!(TE_current_proj, TE_current, z_plane_vector)
+        project_onto_plane!(LE_next_proj, LE_next, z_plane_vector)
+        project_onto_plane!(TE_next_proj, TE_next, z_plane_vector)
         
         # Calculate projected dimensions
         chord_current = norm(TE_current_proj - LE_current_proj)

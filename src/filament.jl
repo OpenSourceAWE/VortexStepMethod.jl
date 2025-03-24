@@ -28,10 +28,11 @@ Represents a bound vortex filament defined by two points.
     initialized::Bool = false
 end
 
-function init!(filament::BoundFilament, x1::PosVector, x2::PosVector)
+function init!(filament::BoundFilament, x1, x2, vec=zeros(MVec3))
     filament.x1 .= x1
     filament.x2 .= x2
-    filament.length = norm(x2 - x1)
+    vec .= x2 .- x1
+    filament.length = norm(vec)
     filament.r0 .= x2 .- x1
     filament.initialized = true
     return nothing

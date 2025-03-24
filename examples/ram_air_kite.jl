@@ -2,13 +2,15 @@ using ControlPlots
 using VortexStepMethod
 using LinearAlgebra
 
-PLOT = true
+PLOT = false
 USE_TEX = false
-DEFORM = false
+DEFORM = true
 
 # Create wing geometry
 wing = RamAirWing("data/ram_air_kite_body.obj", "data/ram_air_kite_foil.dat")
 body_aero = BodyAerodynamics([wing];)
+println("First init")
+@time VortexStepMethod.init!(body_aero)
 
 if DEFORM
     # Linear interpolation of alpha from 10° at one tip to 0° at the other
@@ -19,8 +21,10 @@ if DEFORM
     delta_end = deg2rad(0)
     theta_dist = [theta_start - i * (theta_start - theta_end)/(n_panels-1) for i in 0:(n_panels-1)]
     delta_dist = [delta_start - i * (delta_start - delta_end)/(n_panels-1) for i in 0:(n_panels-1)]
+    println("Deform")
     @time VortexStepMethod.deform!(wing, theta_dist, delta_dist)
-    @time VortexStepMethod.init!(body_aero)
+    println("Deform init")
+    @time VortexStepMethod.init!(body_aero; init_aero=false)
 end
 
 # Create solvers
@@ -86,7 +90,7 @@ PLOT && plot_polars(
     angle_of_attack=0,
     side_slip=0,
     v_a=10,
-    title="ram_kite_panels_$(wing.n_panels)_distribution_$(wing.spanwise_panel_distribution)",
+    title="ram_kite_panels_$(wing.n_panels)_distribution_$(wing.spanwise_distribution)",
     data_type=".pdf",
     is_save=false,
     is_show=true,

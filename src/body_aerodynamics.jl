@@ -13,11 +13,11 @@ Main structure for calculating aerodynamic properties of bodies.
 - `alpha_uncorrected`::Vector{Float64}=zeros(Float64, P): angles of attack per panel
 - `alpha_corrected`::Vector{Float64}=zeros(Float64, P):   corrected angles of attack per panel
 - `stall_angle_list`::Vector{Float64}=zeros(Float64, P):  stall angle per panel
-- alpha_array::Vector{Float64} = zeros(Float64, P)
-- v_a_array::Vector{Float64} = zeros(Float64, P)
-- work_vectors::NTuple{10, MVec3} = ntuple(_ -> zeros(MVec3), 10)
+- `alpha_array`::Vector{Float64} = zeros(Float64, P)
+- `v_a_array`::Vector{Float64} = zeros(Float64, P)
+- `work_vectors`::NTuple{10, MVec3} = ntuple(_ -> zeros(MVec3), 10)
 - AIC::Array{Float64, 3} = zeros(3, P, P)
-- projected_area::Float64 = 1.0: The area projected onto the xy-plane of the kite body reference frame [m²]
+- `projected_area`::Float64 = 1.0: The area projected onto the xy-plane of the kite body reference frame [m²]
 """
 @with_kw mutable struct BodyAerodynamics{P}
     panels::Vector{Panel}
@@ -37,8 +37,7 @@ Main structure for calculating aerodynamic properties of bodies.
 end
 
 """
-    BodyAerodynamics(wings::Vector{T}; aero_center_location=0.25,
-                     control_point_location=0.75,
+    BodyAerodynamics(wings::Vector{T}; 
                      kite_body_origin=zeros(MVec3)) where T <: AbstractWing
 
 Construct a [BodyAerodynamics](@ref) object for aerodynamic calculations.
@@ -47,8 +46,6 @@ Construct a [BodyAerodynamics](@ref) object for aerodynamic calculations.
 - `wings::Vector{T}`: Vector of wings to analyze, where T is an AbstractWing type
 
 # Keyword Arguments
-- `aero_center_location=0.25`: Chordwise location of aerodynamic center (0-1)
-- `control_point_location=0.75`: Chordwise location of control point (0-1) 
 - `kite_body_origin=zeros(MVec3)`: Origin point of kite body reference frame in CAD reference frame
 
 # Returns
@@ -56,8 +53,6 @@ Construct a [BodyAerodynamics](@ref) object for aerodynamic calculations.
 """
 function BodyAerodynamics(
     wings::Vector{T};
-    aero_center_location=0.25,
-    control_point_location=0.75,
     kite_body_origin=zeros(MVec3)
 ) where T <: AbstractWing
     # Initialize panels
@@ -67,7 +62,7 @@ function BodyAerodynamics(
             section.LE_point .-= kite_body_origin
             section.TE_point .-= kite_body_origin
         end
-        if wing.spanwise_panel_distribution == UNCHANGED
+        if wing.spanwise_distribution == UNCHANGED
             wing.n_panels = length(wing.sections) - 1
             wing.refined_sections = wing.sections
         else
@@ -82,67 +77,8 @@ function BodyAerodynamics(
     end
 
     body_aero = BodyAerodynamics{length(panels)}(; panels, wings)
-    init!(body_aero; aero_center_location, control_point_location)
+    init!(body_aero)
     return body_aero
-end
-
-"""
-    init!(body_aero::BodyAerodynamics; 
-         aero_center_location=0.25,
-         control_point_location=0.75)
-
-Initialize a BodyAerodynamics struct in-place by setting up panels and coefficients.
-
-# Arguments
-- `body_aero::BodyAerodynamics`: The structure to initialize
-
-# Keyword Arguments
-- `aero_center_location=0.25`: Chordwise location of aerodynamic center (0-1)
-- `control_point_location=0.75`: Chordwise location of control point (0-1)
-
-# Returns
-nothing
-"""
-function init!(body_aero::BodyAerodynamics; 
-    aero_center_location=0.25,
-    control_point_location=0.75)
-
-    idx = 1
-    for wing in body_aero.wings
-        panel_props = init!(wing; aero_center_location, control_point_location)
-        
-        # Create panels
-        for i in 1:wing.n_panels
-            if wing isa RamAirWing
-                delta = wing.delta_dist[i]
-            else
-                delta = 0.0
-            end
-            init!(
-                body_aero.panels[idx], 
-                wing.refined_sections[i],
-                wing.refined_sections[i+1],
-                panel_props.aero_centers[i],
-                panel_props.control_points[i],
-                panel_props.bound_points_1[i],
-                panel_props.bound_points_2[i],
-                panel_props.x_airf[i],
-                panel_props.y_airf[i],
-                panel_props.z_airf[i],
-                delta;
-                remove_nan=wing.remove_nan
-            )
-            idx += 1
-        end
-    end
-    
-    # Initialize rest of the struct
-    body_aero.projected_area = sum(wing -> calculate_projected_area(wing), body_aero.wings)
-    body_aero.stall_angle_list .= calculate_stall_angle_list(body_aero.panels)
-    body_aero.alpha_array .= 0.0
-    body_aero.v_a_array .= 0.0 
-    body_aero.AIC .= 0.0
-    return nothing
 end
 
 function Base.getproperty(obj::BodyAerodynamics, sym::Symbol)
@@ -161,131 +97,60 @@ function Base.setproperty!(obj::BodyAerodynamics, sym::Symbol, val)
 end
 
 """
-    PanelProperties
+    init!(body_aero::BodyAerodynamics)
 
-Structure to hold calculated panel properties.
-
-# Fields
-- `aero_centers`::Vector{MVec3}
-- `control_points`::Vector{MVec3}
-- `bound_points_1`::Vector{MVec3}
-- `bound_points_2`::Vector{MVec3}
-- `x_airf`::Vector{MVec3}: Vector of unit vectors tangential to chord line
-- `y_airf`::Vector{MVec3}: Vector of unit vectors in spanwise direction
-- `z_airf`::Vector{MVec3}: Vector of unit vectors pointing up (cross of x_airf and y_airf)
-"""
-struct PanelProperties
-    aero_centers::Vector{MVec3}
-    control_points::Vector{MVec3}
-    bound_points_1::Vector{MVec3}
-    bound_points_2::Vector{MVec3}
-    x_airf::Vector{MVec3}
-    y_airf::Vector{MVec3}
-    z_airf::Vector{MVec3}
-end
-
-"""
-    calculate_panel_properties(section_list::Vector{Section}, n_panels::Int,
-                             aero_center_loc::Float64, control_point_loc::Float64)
-
-Calculate geometric properties for each panel.
+Initialize a BodyAerodynamics struct in-place by setting up panels and coefficients.
 
 # Arguments
-- section_list::Vector{Section}: List of [Section](@ref)s
-- `n_panels`::Int: Number of [Panel](@ref)s
-- `aero_center_loc`::Float64: Location of the aerodynamic center
-- `control_point_loc`::Float64: Location of the control point
+- `body_aero::BodyAerodynamics`: The structure to initialize
 
-# Returns:
-[PanelProperties](@ref) containing vectors for each property
+# Keyword Arguments
+- `init_aero::Bool`: Wether to initialize the aero data or not
+
+# Returns
+nothing
 """
-function calculate_panel_properties(section_list::Vector{Section}, n_panels::Int,
-                                  aero_center_loc::Float64, control_point_loc::Float64)
-    # Initialize arrays
-    aero_centers = MVec3[]
-    control_points = MVec3[]
-    bound_points_1 = MVec3[]
-    bound_points_2 = MVec3[]
-    x_airf = MVec3[]
-    y_airf = MVec3[]
-    z_airf = MVec3[]
-    
-    # Define coordinates matrix
-    coords = zeros(2 * (n_panels + 1), 3)
-    @debug "Shape of coordinates: $(size(coords))"
-    
-    for i in 1:n_panels
-        coords[2i-1, :] .= section_list[i].LE_point
-        coords[2i, :]   .= section_list[i].TE_point
-        coords[2i+1, :] .= section_list[i+1].LE_point
-        coords[2i+2, :] .= section_list[i+1].TE_point
-    end
-    
-    @debug "Coordinates: $coords"
-    
-    for i in 1:n_panels
-        # Define panel points
-        section = Dict(
-            "p1" => coords[2i-1, :],     # LE_1
-            "p2" => coords[2i+1, :],     # LE_2
-            "p3" => coords[2i+2, :],     # TE_2
-            "p4" => coords[2i, :]        # TE_1
-        )
+function init!(body_aero::BodyAerodynamics; init_aero=true)
+    idx = 1
+    vec = zeros(MVec3)
+    for wing in body_aero.wings
+        init!(wing)
+        panel_props = wing.panel_props
         
-        # Calculate control point position
-        di = norm(coords[2i-1, :] * 0.75 + coords[2i, :] * 0.25 - 
-                 (coords[2i+1, :] * 0.75 + coords[2i+2, :] * 0.25))
-        
-        ncp = if i == 1
-            diplus = norm(coords[2i+1, :] * 0.75 + coords[2i+2, :] * 0.25 - 
-                         (coords[2i+3, :] * 0.75 + coords[2i+4, :] * 0.25))
-            di / (di + diplus)
-        elseif i == n_panels
-            dimin = norm(coords[2i-3, :] * 0.75 + coords[2i-2, :] * 0.25 - 
-                        (coords[2i-1, :] * 0.75 + coords[2i, :] * 0.25))
-            dimin / (dimin + di)
-        else
-            dimin = norm(coords[2i-3, :] * 0.75 + coords[2i-2, :] * 0.25 - 
-                        (coords[2i-1, :] * 0.75 + coords[2i, :] * 0.25))
-            diplus = norm(coords[2i+1, :] * 0.75 + coords[2i+2, :] * 0.25 - 
-                         (coords[2i+3, :] * 0.75 + coords[2i+4, :] * 0.25))
-            0.25 * (dimin / (dimin + di) + di / (di + diplus) + 1)
+        # Create panels
+        for i in 1:wing.n_panels
+            if wing isa RamAirWing
+                delta = wing.delta_dist[i]
+            else
+                delta = 0.0
+            end
+            @views init!(
+                body_aero.panels[idx], 
+                wing.refined_sections[i],
+                wing.refined_sections[i+1],
+                panel_props.aero_centers[i, :],
+                panel_props.control_points[i, :],
+                panel_props.bound_points_1[i, :],
+                panel_props.bound_points_2[i, :],
+                panel_props.x_airf[i, :],
+                panel_props.y_airf[i, :],
+                panel_props.z_airf[i, :],
+                delta,
+                vec;
+                remove_nan=wing.remove_nan,
+                init_aero
+            )
+            idx += 1
         end
-        
-        ncp = 1 - ncp
-        
-        # Calculate points
-        LL_point = (section["p2"] * (1 - ncp) + section["p1"] * ncp) * 0.75 +
-                   (section["p3"] * (1 - ncp) + section["p4"] * ncp) * 0.25
-        
-        VSM_point = (section["p2"] * (1 - ncp) + section["p1"] * ncp) * 0.25 +
-                    (section["p3"] * (1 - ncp) + section["p4"] * ncp) * 0.75
-        
-        bound_1 = section["p1"] * 0.75 + section["p4"] * 0.25
-        bound_2 = section["p2"] * 0.75 + section["p3"] * 0.25
-        
-        # Calculate reference frame vectors
-        z_airf_vec = cross(VSM_point - LL_point, section["p1"] - section["p2"])
-        z_airf_vec = z_airf_vec / norm(z_airf_vec)
-        
-        x_airf_vec = VSM_point - LL_point
-        x_airf_vec = x_airf_vec / norm(x_airf_vec)
-        
-        y_airf_vec = bound_1 - bound_2
-        y_airf_vec = y_airf_vec / norm(y_airf_vec)
-        
-        # Store results
-        push!(aero_centers, LL_point)
-        push!(control_points, VSM_point)
-        push!(bound_points_1, bound_1)
-        push!(bound_points_2, bound_2)
-        push!(x_airf, x_airf_vec)
-        push!(y_airf, y_airf_vec)
-        push!(z_airf, z_airf_vec)
     end
     
-    return PanelProperties(aero_centers, control_points, bound_points_1, 
-                          bound_points_2, x_airf, y_airf, z_airf)
+    # Initialize rest of the struct
+    body_aero.projected_area = sum(wing -> calculate_projected_area(wing), body_aero.wings)
+    body_aero.stall_angle_list .= calculate_stall_angle_list(body_aero.panels)
+    body_aero.alpha_array .= 0.0
+    body_aero.v_a_array .= 0.0 
+    body_aero.AIC .= 0.0
+    return nothing
 end
 
 """

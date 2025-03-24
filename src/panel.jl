@@ -77,14 +77,15 @@ function init_pos!(
     panel::Panel,
     section_1::Section,
     section_2::Section,
-    aero_center::PosVector,
-    control_point::PosVector,
-    bound_point_1::PosVector,
-    bound_point_2::PosVector,
-    x_airf::PosVector,
-    y_airf::PosVector,
-    z_airf::PosVector,
-    delta
+    aero_center,
+    control_point,
+    bound_point_1,
+    bound_point_2,
+    x_airf,
+    y_airf,
+    z_airf,
+    delta,
+    vec::MVec3
 )
     # Initialize basic geometry
     panel.TE_point_1 .= section_1.TE_point
@@ -95,11 +96,15 @@ function init_pos!(
         norm(panel.TE_point_1 - panel.LE_point_1) +
         norm(panel.TE_point_2 - panel.LE_point_2)
     ) / 2
-    panel.corner_points .= hcat(panel.LE_point_1, panel.TE_point_1, panel.TE_point_2, panel.LE_point_2)
-    panel.width = norm(bound_point_2 - bound_point_1)
-    init!(panel.filaments[1], bound_point_2, bound_point_1)
-    init!(panel.filaments[2], bound_point_1, panel.TE_point_1)
-    init!(panel.filaments[3], panel.TE_point_2, bound_point_2)
+    panel.corner_points[:, 1] = panel.LE_point_1
+    panel.corner_points[:, 2] = panel.TE_point_1
+    panel.corner_points[:, 3] = panel.TE_point_2
+    panel.corner_points[:, 4] = panel.LE_point_2
+    vec .= bound_point_2 .- bound_point_1
+    panel.width = norm(vec)
+    init!(panel.filaments[1], bound_point_2, bound_point_1, vec)
+    init!(panel.filaments[2], bound_point_1, panel.TE_point_1, vec)
+    init!(panel.filaments[3], panel.TE_point_2, bound_point_2, vec)
 
     panel.bound_point_1 .= bound_point_1
     panel.bound_point_2 .= bound_point_2
@@ -183,19 +188,20 @@ function init!(
     panel::Panel,
     section_1::Section,
     section_2::Section,
-    aero_center::PosVector,
-    control_point::PosVector,
-    bound_point_1::PosVector,
-    bound_point_2::PosVector,
-    x_airf::PosVector,
-    y_airf::PosVector,
-    z_airf::PosVector,
-    delta;
+    aero_center,
+    control_point,
+    bound_point_1,
+    bound_point_2,
+    x_airf,
+    y_airf,
+    z_airf,
+    delta,
+    vec;
     init_aero = true,
     remove_nan = true
 )
     init_pos!(panel, section_1, section_2, aero_center, control_point, bound_point_1, bound_point_2,
-        x_airf, y_airf, z_airf, delta)
+        x_airf, y_airf, z_airf, delta, vec)
     init_aero && init_aero!(panel, section_1, section_2; remove_nan)
     return nothing
 end
