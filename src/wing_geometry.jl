@@ -108,6 +108,8 @@ function update_panel_properties!(panel_props::PanelProperties, section_list::Ve
     x_airf = panel_props.x_airf
     y_airf = panel_props.y_airf
     z_airf = panel_props.z_airf
+    vec = zeros(MVec3)
+    vec2 = zeros(MVec3)
     @debug "Shape of coordinates: $(size(coords))"
     
     for i in 1:n_panels
@@ -122,48 +124,60 @@ function update_panel_properties!(panel_props::PanelProperties, section_list::Ve
     for i in 1:n_panels
         # Define panel points
         @views begin
-            p1 = coords[2i-1, :]     # LE_1
-            p2 = coords[2i+1, :]     # LE_2
-            p3 = coords[2i+2, :]     # TE_2
-            p4 = coords[2i, :]       # TE_1
+            LE_1 = coords[2i-1, :]     # LE_1
+            LE_2 = coords[2i+1, :]     # LE_2
+            TE_2 = coords[2i+2, :]     # TE_2
+            TE_1 = coords[2i, :]       # TE_1
         end
         
         # Calculate control point position
-        di = norm(coords[2i-1, :] .* 0.75 .+ coords[2i, :] .* 0.25 .- 
-                 (coords[2i+1, :] .* 0.75 .+ coords[2i+2, :] .* 0.25))
+        @views @. vec = coords[2i-1, :] * 0.75 + coords[2i, :] * 0.25 - 
+            (coords[2i+1, :] * 0.75 + coords[2i+2, :] * 0.25)
+        di = norm(vec)
         
         ncp = if i == 1
-            diplus = norm(coords[2i+1, :] * 0.75 + coords[2i+2, :] * 0.25 - 
-                         (coords[2i+3, :] * 0.75 + coords[2i+4, :] * 0.25))
+            @views @. vec = coords[2i+1, :] * 0.75 + coords[2i+2, :] * 0.25 - 
+                            (coords[2i+3, :] * 0.75 + coords[2i+4, :] * 0.25)
+            diplus = norm(vec)
             di / (di + diplus)
         elseif i == n_panels
-            dimin = norm(coords[2i-3, :] * 0.75 + coords[2i-2, :] * 0.25 - 
-                        (coords[2i-1, :] * 0.75 + coords[2i, :] * 0.25))
+            @views @. vec = coords[2i-3, :] * 0.75 + coords[2i-2, :] * 0.25 - 
+                            (coords[2i-1, :] * 0.75 + coords[2i, :] * 0.25)
+            dimin = norm(vec)
             dimin / (dimin + di)
         else
-            dimin = norm(coords[2i-3, :] * 0.75 + coords[2i-2, :] * 0.25 - 
-                        (coords[2i-1, :] * 0.75 + coords[2i, :] * 0.25))
-            diplus = norm(coords[2i+1, :] * 0.75 + coords[2i+2, :] * 0.25 - 
-                         (coords[2i+3, :] * 0.75 + coords[2i+4, :] * 0.25))
+            @views @. vec = coords[2i-3, :] * 0.75 + coords[2i-2, :] * 0.25 - 
+                            (coords[2i-1, :] * 0.75 + coords[2i, :] * 0.25)
+            dimin = norm(vec)
+            @views @. vec = coords[2i+1, :] * 0.75 + coords[2i+2, :] * 0.25 - 
+                            (coords[2i+3, :] * 0.75 + coords[2i+4, :] * 0.25)
+            diplus = norm(vec)
             0.25 * (dimin / (dimin + di) + di / (di + diplus) + 1)
         end
-        
         ncp = 1 - ncp
         
         # Calculate points
-        @. aero_centers[i, :] = (p2 * (1 - ncp) + p1 * ncp) * 0.75 +
-                   (p3 * (1 - ncp) + p4 * ncp) * 0.25
-        
-        @. control_points[i, :] = (p2 * (1 - ncp) + p1 * ncp) * 0.25 +
-                    (p3 * (1 - ncp) + p4 * ncp) * 0.75
-        
-        @. bound_points_1[i, :] = p1 * 0.75 + p4 * 0.25
-        @. bound_points_2[i, :] = p2 * 0.75 + p3 * 0.25
+        @. begin
+            aero_centers[i, :] = (LE_2 * (1 - ncp) + LE_1 * ncp) * 0.75 +
+                    (TE_2 * (1 - ncp) + TE_1 * ncp) * 0.25        
+            control_points[i, :] = (LE_2 * (1 - ncp) + LE_1 * ncp) * 0.25 +
+                        (TE_2 * (1 - ncp) + TE_1 * ncp) * 0.75
+            
+            bound_points_1[i, :] = LE_1 * 0.75 + TE_1 * 0.25
+            bound_points_2[i, :] = LE_2 * 0.75 + TE_2 * 0.25
+        end
         
         # Calculate reference frame vectors
-        z_airf[i, :] .= normalize((control_points[i, :] .- aero_centers[i, :]) × (p1 .- p2))
-        x_airf[i, :] .= normalize(control_points[i, :] .- aero_centers[i, :])
-        y_airf[i, :] .= normalize(bound_points_1[i, :] .- bound_points_2[i, :])
+        @views begin
+            @. vec = (control_points[i, :] - aero_centers[i, :])
+            @. vec2 = (LE_1 - LE_2)
+            vec .= vec × vec2 
+            z_airf[i, :] .= normalize(vec)
+            @. vec = control_points[i, :] .- aero_centers[i, :]
+            x_airf[i, :] .= normalize(vec)
+            @. vec = bound_points_1[i, :] - bound_points_2[i, :]
+            y_airf[i, :] .= normalize(vec)
+        end
     end
     return nothing
 end
