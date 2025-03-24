@@ -369,7 +369,7 @@ Represents a curved wing that inherits from Wing with additional geometric prope
 # Fields
 - All fields from Wing:
   - `n_panels::Int64`: Number of panels in aerodynamic mesh
-  - `spanwise_panel_distribution`::PanelDistribution: see: [PanelDistribution](@ref)
+  - `spanwise_distribution`::PanelDistribution: see: [PanelDistribution](@ref)
   - `spanwise_direction::MVec3`: Wing span direction vector
   - `sections::Vector{Section}`: List of wing sections, see: [Section](@ref)
   -  refined_sections::Vector{Section}
@@ -386,7 +386,8 @@ Represents a curved wing that inherits from Wing with additional geometric prope
 """
 mutable struct RamAirWing <: AbstractWing
     n_panels::Int64
-    spanwise_panel_distribution::PanelDistribution
+    spanwise_distribution::PanelDistribution
+    panel_props::PanelProperties
     spanwise_direction::MVec3
     sections::Vector{Section}
     refined_sections::Vector{Section}
@@ -408,7 +409,7 @@ end
 
 """
     RamAirWing(obj_path, dat_path; alpha=0.0, crease_frac=0.75, wind_vel=10., mass=1.0, 
-             n_panels=54, n_sections=n_panels+1, spanwise_panel_distribution=UNCHANGED, 
+             n_panels=54, n_sections=n_panels+1, spanwise_distribution=UNCHANGED, 
              spanwise_direction=[0.0, 1.0, 0.0], remove_nan::Bool=true)
 
 Constructor for a [RamAirWing](@ref) that allows to use an `.obj` and a `.dat` file as input.
@@ -425,12 +426,12 @@ Constructor for a [RamAirWing](@ref) that allows to use an `.obj` and a `.dat` f
 - mass=1.0: Mass of the wing in kg, used for the inertia calculations 
 - `n_panels`=54: Number of panels.
 - `n_sections`=n_panels+1: Number of sections (there is a section on each side of each panel.)
-- `spanwise_panel_distribution`=UNCHANGED: see: [PanelDistribution](@ref)
+- `spanwise_distribution`=UNCHANGED: see: [PanelDistribution](@ref)
 - `spanwise_direction`=[0.0, 1.0, 0.0]
 - `remove_nan::Bool`: Wether to remove the NaNs from interpolations or not
 """
 function RamAirWing(obj_path, dat_path; alpha=0.0, crease_frac=0.75, wind_vel=10., mass=1.0, 
-                  n_panels=54, n_sections=n_panels+1, spanwise_panel_distribution=UNCHANGED, 
+                  n_panels=54, n_sections=n_panels+1, spanwise_distribution=UNCHANGED, 
                   spanwise_direction=[0.0, 1.0, 0.0], remove_nan=true, align_to_principal=false,
                   alpha_range=deg2rad.(-5:1:20), delta_range=deg2rad.(-5:1:20), interp_steps=40
                   )
@@ -501,7 +502,9 @@ function RamAirWing(obj_path, dat_path; alpha=0.0, crease_frac=0.75, wind_vel=10
             push!(non_deformed_sections, Section(LE_point, TE_point, POLAR_MATRICES, aero_data))
         end
 
-        RamAirWing(n_panels, spanwise_panel_distribution, spanwise_direction, sections, 
+        panel_props = PanelProperties{n_panels}()
+
+        RamAirWing(n_panels, spanwise_distribution, panel_props, spanwise_direction, sections, 
             refined_sections, remove_nan, non_deformed_sections,
             mass, gamma_tip, inertia_tensor, center_of_mass, radius,
             le_interp, te_interp, area_interp, zeros(n_panels), zeros(n_panels))

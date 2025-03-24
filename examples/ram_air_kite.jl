@@ -2,9 +2,9 @@ using ControlPlots
 using VortexStepMethod
 using LinearAlgebra
 
-PLOT = true
+PLOT = false
 USE_TEX = false
-DEFORM = false
+DEFORM = true
 
 # Create wing geometry
 wing = RamAirWing("data/ram_air_kite_body.obj", "data/ram_air_kite_foil.dat")
@@ -86,7 +86,7 @@ PLOT && plot_polars(
     angle_of_attack=0,
     side_slip=0,
     v_a=10,
-    title="ram_kite_panels_$(wing.n_panels)_distribution_$(wing.spanwise_panel_distribution)",
+    title="ram_kite_panels_$(wing.n_panels)_distribution_$(wing.spanwise_distribution)",
     data_type=".pdf",
     is_save=false,
     is_show=true,

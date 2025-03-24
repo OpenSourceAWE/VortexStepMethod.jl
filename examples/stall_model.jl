@@ -19,7 +19,7 @@ mkpath(save_folder)
 
 # Defining discretisation
 n_panels = 54
-spanwise_panel_distribution = SPLIT_PROVIDED
+spanwise_distribution = SPLIT_PROVIDED
 
 # Load rib data from CSV
 csv_file_path = joinpath(
@@ -38,7 +38,7 @@ for row in eachrow(df)
 end
 
 # Create wing geometry
-CAD_wing = Wing(n_panels; spanwise_panel_distribution)
+CAD_wing = Wing(n_panels; spanwise_distribution)
 for rib in rib_list
     add_section!(CAD_wing, rib[1], rib[2], rib[3], rib[4])
 end
@@ -124,7 +124,7 @@ PLOT && plot_polars(
     angle_of_attack=0,
     side_slip=0,
     v_a=10,
-    title="tutorial_testing_stall_model_n_panels_$(n_panels)_distribution_$(spanwise_panel_distribution)",
+    title="tutorial_testing_stall_model_n_panels_$(n_panels)_distribution_$(spanwise_distribution)",
     data_type=".pdf",
     save_path=joinpath(save_folder, "polars"),
     is_save=true,

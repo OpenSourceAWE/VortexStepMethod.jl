@@ -65,7 +65,7 @@ Represents a wing composed of multiple sections with aerodynamic properties.
 
 # Fields
 - `n_panels::Int64`: Number of panels in aerodynamic mesh
-- `spanwise_panel_distribution`::PanelDistribution: [PanelDistribution](@ref)
+- `spanwise_distribution`::PanelDistribution: [PanelDistribution](@ref)
 - `spanwise_direction::MVec3`: Wing span direction vector
 - `sections::Vector{Section}`: Vector of wing sections, see: [Section](@ref)
 - `refined_sections::Vector{Section}`: Vector of refined wing sections, see: [Section](@ref)
@@ -74,7 +74,8 @@ Represents a wing composed of multiple sections with aerodynamic properties.
 """
 mutable struct Wing <: AbstractWing
     n_panels::Int64
-    spanwise_panel_distribution::PanelDistribution
+    spanwise_distribution::PanelDistribution
+    panel_props::PanelProperties
     spanwise_direction::MVec3
     sections::Vector{Section}
     refined_sections::Vector{Section}
@@ -83,7 +84,7 @@ end
 
 """
     Wing(n_panels::Int;
-         spanwise_panel_distribution::PanelDistribution=LINEAR,
+         spanwise_distribution::PanelDistribution=LINEAR,
          spanwise_direction::PosVector=MVec3([0.0, 1.0, 0.0]),
          remove_nan::Bool=true)
 
@@ -92,22 +93,24 @@ and refined sections as empty arrays.
 
 # Parameters
 - `n_panels::Int64`: Number of panels in aerodynamic mesh
-- `spanwise_panel_distribution`::PanelDistribution = LINEAR: [PanelDistribution](@ref)
+- `spanwise_distribution`::PanelDistribution = LINEAR: [PanelDistribution](@ref)
 - `spanwise_direction::MVec3` = MVec3([0.0, 1.0, 0.0]): Wing span direction vector
 - `remove_nan::Bool`: Wether to remove the NaNs from interpolations or not
 """
 function Wing(n_panels::Int;
-    spanwise_panel_distribution::PanelDistribution=LINEAR,
-    spanwise_direction::PosVector=MVec3([0.0, 1.0, 0.0]),
-    remove_nan=true)
-    Wing(n_panels, spanwise_panel_distribution, spanwise_direction, Section[], Section[], remove_nan)
+        spanwise_distribution::PanelDistribution=LINEAR,
+        spanwise_direction::PosVector=MVec3([0.0, 1.0, 0.0]),
+        remove_nan=true)
+    panel_props = PanelProperties{n_panels}()
+    Wing(n_panels, spanwise_distribution, panel_props, spanwise_direction, Section[], Section[], remove_nan)
 end
 
 function init!(wing::AbstractWing; aero_center_location::Float64=0.25, control_point_location::Float64=0.75)
     refine_aerodynamic_mesh!(wing)
     
     # Calculate panel properties
-    panel_props = calculate_panel_properties(
+    update_panel_properties!(
+        wing.panel_props,
         wing.refined_sections,
         wing.n_panels,
         aero_center_location,
@@ -201,7 +204,7 @@ function refine_aerodynamic_mesh!(wing::AbstractWing)
     sort!(wing.sections, by=s -> s.LE_point[2], rev=true)
     n_sections = wing.n_panels + 1
     if length(wing.refined_sections) == 0
-        if wing.spanwise_panel_distribution == UNCHANGED || length(wing.sections) == n_sections
+        if wing.spanwise_distribution == UNCHANGED || length(wing.sections) == n_sections
             wing.refined_sections = wing.sections
             return nothing
         else
@@ -229,7 +232,7 @@ function refine_aerodynamic_mesh!(wing::AbstractWing)
     end
     
     # Handle special cases
-    if wing.spanwise_panel_distribution == UNCHANGED || length(wing.sections) == n_sections
+    if wing.spanwise_distribution == UNCHANGED || length(wing.sections) == n_sections
         for i in eachindex(wing.sections)
             init!(wing.refined_sections[i], wing.sections[i])
         end
@@ -246,13 +249,13 @@ function refine_aerodynamic_mesh!(wing::AbstractWing)
     end
     
     # Handle different distribution types
-    if wing.spanwise_panel_distribution == SPLIT_PROVIDED
+    if wing.spanwise_distribution == SPLIT_PROVIDED
         return refine_mesh_by_splitting_provided_sections!(wing)
-    elseif wing.spanwise_panel_distribution in (LINEAR, COSINE, COSINE_VAN_GARREL)
+    elseif wing.spanwise_distribution in (LINEAR, COSINE, COSINE_VAN_GARREL)
         return refine_mesh_for_linear_cosine_distribution!(
             wing,
             1,
-            wing.spanwise_panel_distribution,
+            wing.spanwise_distribution,
             n_sections,
             LE,
             TE,
@@ -260,7 +263,7 @@ function refine_aerodynamic_mesh!(wing::AbstractWing)
             aero_data
         )
     else
-        throw(ArgumentError("Unsupported spanwise panel distribution: $(wing.spanwise_panel_distribution)"))
+        throw(ArgumentError("Unsupported spanwise panel distribution: $(wing.spanwise_distribution)"))
     end
 end
 
@@ -348,7 +351,7 @@ end
     refine_mesh_for_linear_cosine_distribution!(
         wing::AbstractWing,
         idx::Int,
-        spanwise_panel_distribution::PanelDistribution,
+        spanwise_distribution::PanelDistribution,
         n_sections::Int,
         LE::Matrix{Float64},
         TE::Matrix{Float64},
@@ -360,7 +363,7 @@ Refine wing mesh using linear or cosine spacing.
 # Arguments
 - `wing`: Wing object
 - `idx`: Section start index
-- `spanwise_panel_distribution`: [PanelDistribution](@ref)
+- `spanwise_distribution`: [PanelDistribution](@ref)
 - `n_sections`: Number of sections to generate
 - `LE`: Matrix of leading edge points
 - `TE`: Matrix of trailing edge points
@@ -376,7 +379,7 @@ Returns:
 function refine_mesh_for_linear_cosine_distribution!(
     wing::AbstractWing,
     idx,
-    spanwise_panel_distribution::PanelDistribution,
+    spanwise_distribution::PanelDistribution,
     n_sections::Int,
     LE,
     TE,
@@ -393,13 +396,13 @@ function refine_mesh_for_linear_cosine_distribution!(
     qc_cum_length = vcat(0, cumsum(qc_lengths))
 
     # 2. Define target lengths
-    target_lengths = if spanwise_panel_distribution == LINEAR
+    target_lengths = if spanwise_distribution == LINEAR
         range(0, qc_total_length, n_sections)
-    elseif spanwise_panel_distribution in (COSINE, COSINE_VAN_GARREL)
+    elseif spanwise_distribution in (COSINE, COSINE_VAN_GARREL)
         theta = range(0, π, n_sections)
         qc_total_length .* (1 .- cos.(theta)) ./ 2
     else
-        throw(ArgumentError("Unsupported distribution: $spanwise_panel_distribution"))
+        throw(ArgumentError("Unsupported distribution: $spanwise_distribution"))
     end
 
     # Initialize arrays
@@ -462,7 +465,7 @@ function refine_mesh_for_linear_cosine_distribution!(
     end
 
     # Apply van Garrel distribution if requested
-    if spanwise_panel_distribution == COSINE_VAN_GARREL
+    if spanwise_distribution == COSINE_VAN_GARREL
         idx = calculate_cosine_van_Garrel!(wing, idx)
     end
 
