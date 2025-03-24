@@ -98,8 +98,7 @@ Calculate geometric properties for each panel.
 # Returns:
 [PanelProperties](@ref) containing vectors for each property
 """
-function update_panel_properties!(panel_props::PanelProperties, section_list::Vector{Section}, n_panels::Int,
-                                  aero_center_loc::Float64, control_point_loc::Float64)
+function update_panel_properties!(panel_props::PanelProperties, section_list::Vector{Section}, n_panels::Int)
     coords = panel_props.coords
     aero_centers = panel_props.aero_centers
     control_points = panel_props.control_points
@@ -230,16 +229,14 @@ function Wing(n_panels::Int;
     Wing(n_panels, spanwise_distribution, panel_props, spanwise_direction, Section[], Section[], remove_nan)
 end
 
-function init!(wing::AbstractWing; aero_center_location::Float64=0.25, control_point_location::Float64=0.75)
+function init!(wing::AbstractWing)
     refine_aerodynamic_mesh!(wing)
     
     # Calculate panel properties
-    update_panel_properties!(
+    @time update_panel_properties!(
         wing.panel_props,
         wing.refined_sections,
-        wing.n_panels,
-        aero_center_location,
-        control_point_location
+        wing.n_panels
     )
     return nothing
 end

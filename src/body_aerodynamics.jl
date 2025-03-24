@@ -37,8 +37,7 @@ Main structure for calculating aerodynamic properties of bodies.
 end
 
 """
-    BodyAerodynamics(wings::Vector{T}; aero_center_location=0.25,
-                     control_point_location=0.75,
+    BodyAerodynamics(wings::Vector{T}; 
                      kite_body_origin=zeros(MVec3)) where T <: AbstractWing
 
 Construct a [BodyAerodynamics](@ref) object for aerodynamic calculations.
@@ -47,8 +46,6 @@ Construct a [BodyAerodynamics](@ref) object for aerodynamic calculations.
 - `wings::Vector{T}`: Vector of wings to analyze, where T is an AbstractWing type
 
 # Keyword Arguments
-- `aero_center_location=0.25`: Chordwise location of aerodynamic center (0-1)
-- `control_point_location=0.75`: Chordwise location of control point (0-1) 
 - `kite_body_origin=zeros(MVec3)`: Origin point of kite body reference frame in CAD reference frame
 
 # Returns
@@ -56,8 +53,6 @@ Construct a [BodyAerodynamics](@ref) object for aerodynamic calculations.
 """
 function BodyAerodynamics(
     wings::Vector{T};
-    aero_center_location=0.25,
-    control_point_location=0.75,
     kite_body_origin=zeros(MVec3)
 ) where T <: AbstractWing
     # Initialize panels
@@ -82,35 +77,27 @@ function BodyAerodynamics(
     end
 
     body_aero = BodyAerodynamics{length(panels)}(; panels, wings)
-    init!(body_aero; aero_center_location, control_point_location)
+    init!(body_aero)
     return body_aero
 end
 
 """
-    init!(body_aero::BodyAerodynamics; 
-         aero_center_location=0.25,
-         control_point_location=0.75)
+    init!(body_aero::BodyAerodynamics)
 
 Initialize a BodyAerodynamics struct in-place by setting up panels and coefficients.
 
 # Arguments
 - `body_aero::BodyAerodynamics`: The structure to initialize
 
-# Keyword Arguments
-- `aero_center_location=0.25`: Chordwise location of aerodynamic center (0-1)
-- `control_point_location=0.75`: Chordwise location of control point (0-1)
-
 # Returns
 nothing
 """
-function init!(body_aero::BodyAerodynamics; 
-    aero_center_location=0.25,
-    control_point_location=0.75)
+function init!(body_aero::BodyAerodynamics)
 
     idx = 1
     for wing in body_aero.wings
         println("init wing")
-        init!(wing; aero_center_location, control_point_location)
+        init!(wing)
         panel_props = wing.panel_props
         
         # Create panels
