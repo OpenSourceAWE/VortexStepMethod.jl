@@ -424,16 +424,16 @@ Constructor for a [RamAirWing](@ref) that allows to use an `.obj` and a `.dat` f
                     used in the xfoil polar generation
 - wind_vel=10.0: Apparent wind speed in m/s, used in the xfoil polar generation
 - mass=1.0: Mass of the wing in kg, used for the inertia calculations 
-- `n_panels`=54: Number of panels.
+- `n_panels`=56: Number of panels.
 - `n_sections`=n_panels+1: Number of sections (there is a section on each side of each panel.)
 - `spanwise_distribution`=UNCHANGED: see: [PanelDistribution](@ref)
 - `spanwise_direction`=[0.0, 1.0, 0.0]
 - `remove_nan::Bool`: Wether to remove the NaNs from interpolations or not
 """
 function RamAirWing(obj_path, dat_path; alpha=0.0, crease_frac=0.75, wind_vel=10., mass=1.0, 
-                  n_panels=54, n_sections=n_panels+1, spanwise_distribution=UNCHANGED, 
+                  n_panels=56, n_sections=n_panels+1, spanwise_distribution=UNCHANGED, 
                   spanwise_direction=[0.0, 1.0, 0.0], remove_nan=true, align_to_principal=false,
-                  alpha_range=deg2rad.(-5:1:20), delta_range=deg2rad.(-5:1:20), interp_steps=40
+                  alpha_range=deg2rad.(-5:1:20), delta_range=deg2rad.(-5:1:20), interp_steps=n_sections
                   )
 
     !isapprox(spanwise_direction, [0.0, 1.0, 0.0]) && throw(ArgumentError("Spanwise direction has to be [0.0, 1.0, 0.0], not $spanwise_direction"))
@@ -517,6 +517,38 @@ function RamAirWing(obj_path, dat_path; alpha=0.0, crease_frac=0.75, wind_vel=10
     end
 end
 
+function smooth_deform!(wing::RamAirWing, theta_angles::AbstractVector, delta_angles::AbstractVector)
+    !(wing.n_panels % length(theta_angles) == 0) && throw(ArgumentError("Number of angles has to be a multiple of number of panels"))
+    panels = wing.panels
+    theta_dist = wing.theta_dist
+    delta_dist = wing.delta_dist
+
+    dist_idx = 1
+    for angle_idx in eachindex(theta_angles)
+        for _ in 1:(wing.n_panels ÷ length(theta_angles))
+            theta_dist[dist_idx] = theta_angles[angle_idx]
+            delta_dist[dist_idx] = delta_angles[angle_idx]
+            dist_idx += 1
+        end
+    end
+    @assert (dist_idx == wing.n_panels)
+
+    window_size = wing.n_panels ÷ length(theta_angles)
+    if length(panels) > window_size
+        smoothed = copy(theta_dist)
+        for i in (window_size÷2 + 1):(length(panels) - window_size÷2)
+            smoothed[i] = mean(theta_dist[(i - window_size÷2):(i + window_size÷2)])
+        end
+        theta_dist .= smoothed
+        for i in (window_size÷2 + 1):(length(panels) - window_size÷2)
+            smoothed[i] = mean(delta_dist[(i - window_size÷2):(i + window_size÷2)])
+        end
+        delta_dist .= smoothed
+    end
+    deform!(wing)
+    return nothing
+end
+
 """
     deform!(wing::RamAirWing, theta_dist::AbstractVector, delta_dist::AbstractVector; width)
 
@@ -536,6 +568,10 @@ function deform!(wing::RamAirWing, theta_dist::AbstractVector, delta_dist::Abstr
     wing.theta_dist .= theta_dist
     wing.delta_dist .= delta_dist
 
+    deform!(wing)
+end
+
+function deform!(wing::RamAirWing)
     local_y = zeros(MVec3)
     chord = zeros(MVec3)
     normal = zeros(MVec3)
