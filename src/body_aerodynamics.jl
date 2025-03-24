@@ -13,11 +13,11 @@ Main structure for calculating aerodynamic properties of bodies.
 - `alpha_uncorrected`::Vector{Float64}=zeros(Float64, P): angles of attack per panel
 - `alpha_corrected`::Vector{Float64}=zeros(Float64, P):   corrected angles of attack per panel
 - `stall_angle_list`::Vector{Float64}=zeros(Float64, P):  stall angle per panel
-- alpha_array::Vector{Float64} = zeros(Float64, P)
-- v_a_array::Vector{Float64} = zeros(Float64, P)
-- work_vectors::NTuple{10, MVec3} = ntuple(_ -> zeros(MVec3), 10)
+- `alpha_array`::Vector{Float64} = zeros(Float64, P)
+- `v_a_array`::Vector{Float64} = zeros(Float64, P)
+- `work_vectors`::NTuple{10, MVec3} = ntuple(_ -> zeros(MVec3), 10)
 - AIC::Array{Float64, 3} = zeros(3, P, P)
-- projected_area::Float64 = 1.0: The area projected onto the xy-plane of the kite body reference frame [m²]
+- `projected_area`::Float64 = 1.0: The area projected onto the xy-plane of the kite body reference frame [m²]
 """
 @with_kw mutable struct BodyAerodynamics{P}
     panels::Vector{Panel}

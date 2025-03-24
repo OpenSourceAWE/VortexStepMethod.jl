@@ -29,7 +29,7 @@ using LinearAlgebra
     alpha_deg = 30.0       # Angle of attack [degrees]
     alpha = deg2rad(alpha_deg)
     
-    wing = Wing(n_panels, spanwise_distribution=LINEAR)
+    wing = Wing(n_panels, spanwise_distribution=UNCHANGED)
     add_section!(wing, 
         [0.0, span/2, 0.0],    # Left tip LE 
         [chord, span/2, 0.0],  # Left tip TE
@@ -43,7 +43,8 @@ using LinearAlgebra
     init!(body_aero)
     
     @testset "Re-initialization" begin
-        result = @benchmark init!(body_aero; init_aero=false) samples=1 evals=1
+        init_aero=false
+        result = @benchmark init!($body_aero; init_aero=$init_aero) samples=1 evals=1
         @info "Re-initializing Allocations: $(result.allocs) \t Memory: $(result.memory)"
         @test result.allocs < 100
     end
