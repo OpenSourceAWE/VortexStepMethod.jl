@@ -1,6 +1,7 @@
 using LinearAlgebra
 using VortexStepMethod
 using BenchmarkTools
+using Test
 
 using Pkg
 
@@ -42,11 +43,13 @@ set_va!(wa, vel_app)
 P = length(wa.panels)
 vsm_solver = Solver{P}(aerodynamic_model_type=VSM)
 
-# Step 5: Solve using both methods
-println("Rectangular wing, solve_base!:")
-@btime solve_base!($vsm_solver, $wa, nothing)  # 51 allocations
-# time Python: 32.0 ms  Ryzen 7950x
-# time Julia:   0.45 ms Ryzen 7950x
-println("Rectangular wing, solve!:")
-@btime sol = solve!($vsm_solver, $wa, nothing) # 85 allocations
+@testset "Allocation Tests for solve() and solve!()" begin
+    # Step 5: Solve using both methods
+    result = @benchmark  solve_base!($vsm_solver, $wa, nothing)  # 51 allocations
+    @test result.allocs <= 55
+    # time Python: 32.0 ms  Ryzen 7950x
+    # time Julia:   0.45 ms Ryzen 7950x
+    result = @benchmark  sol = solve!($vsm_solver, $wa, nothing) # 85 allocations
+    @test result.allocs <= 89
+end
 nothing

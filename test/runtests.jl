@@ -21,6 +21,7 @@ println("Running tests...")
 @testset verbose = true "Testing VortexStepMethod..." begin
     if build_is_production_build
         include("bench.jl")
+        include("bench2.jl")
     end
     include("test_bound_filament.jl")
     include("test_panel.jl")
