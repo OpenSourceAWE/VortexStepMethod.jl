@@ -768,8 +768,9 @@ function calculate_span(wing::AbstractWing)
 end
 
 # Project point onto plane
-function project_onto_plane(point::PosVector, normal::Vector{Float64})
-    return point .- dot(point, normal) .* normal
+@inline function project_onto_plane!(point_proj, point, normal)
+    point_proj .= point .- (point ⋅ normal) .* normal
+    return nothing
 end
 
 """
@@ -784,6 +785,11 @@ function calculate_projected_area(wing::AbstractWing,
                                 z_plane_vector::Vector{Float64}=[0.0, 0.0, 1.0])
     # Normalize plane normal vector
     z_plane_vector = z_plane_vector ./ norm(z_plane_vector)
+
+    LE_current_proj = zeros(MVec3)
+    TE_current_proj = zeros(MVec3)
+    LE_next_proj = zeros(MVec3)
+    TE_next_proj = zeros(MVec3)
     
     # Calculate area by summing trapezoid areas
     projected_area = 0.0
@@ -795,10 +801,10 @@ function calculate_projected_area(wing::AbstractWing,
         TE_next = wing.sections[i+1].TE_point
         
         # Project points
-        LE_current_proj = project_onto_plane(LE_current, z_plane_vector)
-        TE_current_proj = project_onto_plane(TE_current, z_plane_vector)
-        LE_next_proj = project_onto_plane(LE_next, z_plane_vector)
-        TE_next_proj = project_onto_plane(TE_next, z_plane_vector)
+        project_onto_plane!(LE_current_proj, LE_current, z_plane_vector)
+        project_onto_plane!(TE_current_proj, TE_current, z_plane_vector)
+        project_onto_plane!(LE_next_proj, LE_next, z_plane_vector)
+        project_onto_plane!(TE_next_proj, TE_next, z_plane_vector)
         
         # Calculate projected dimensions
         chord_current = norm(TE_current_proj - LE_current_proj)
