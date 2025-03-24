@@ -59,6 +59,115 @@ function init!(refined_section::Section, section::Section)
 end
 
 """
+    PanelProperties
+
+Structure to hold calculated panel properties.
+
+# Fields
+- `aero_centers`::Matrix{Float64}
+- `control_points`::Matrix{Float64}
+- `bound_points_1`::Matrix{Float64}
+- `bound_points_2`::Matrix{Float64}
+- `x_airf`::Matrix{Float64}: Vector of unit vectors tangential to chord line
+- `y_airf`::Matrix{Float64}: Vector of unit vectors in spanwise direction
+- `z_airf`::Matrix{Float64}: Vector of unit vectors pointing up (cross of x_airf and y_airf)
+"""
+@with_kw mutable struct PanelProperties{P}
+    aero_centers::Matrix{Float64} = zeros(P, 3)
+    control_points::Matrix{Float64} = zeros(P, 3)
+    bound_points_1::Matrix{Float64} = zeros(P, 3)
+    bound_points_2::Matrix{Float64} = zeros(P, 3)
+    x_airf::Matrix{Float64} = zeros(P, 3)
+    y_airf::Matrix{Float64} = zeros(P, 3)
+    z_airf::Matrix{Float64} = zeros(P, 3)
+    coords::Matrix{Float64} = zeros(2(P+1), 3)
+end
+
+"""
+    update_panel_properties!(section_list::Vector{Section}, n_panels::Int,
+                             aero_center_loc::Float64, control_point_loc::Float64)
+
+Calculate geometric properties for each panel.
+
+# Arguments
+- section_list::Vector{Section}: List of [Section](@ref)s
+- `n_panels`::Int: Number of [Panel](@ref)s
+- `aero_center_loc`::Float64: Location of the aerodynamic center
+- `control_point_loc`::Float64: Location of the control point
+
+# Returns:
+[PanelProperties](@ref) containing vectors for each property
+"""
+function update_panel_properties!(panel_props::PanelProperties, section_list::Vector{Section}, n_panels::Int,
+                                  aero_center_loc::Float64, control_point_loc::Float64)
+    coords = panel_props.coords
+    aero_centers = panel_props.aero_centers
+    control_points = panel_props.control_points
+    bound_points_1 = panel_props.bound_points_1
+    bound_points_2 = panel_props.bound_points_2
+    x_airf = panel_props.x_airf
+    y_airf = panel_props.y_airf
+    z_airf = panel_props.z_airf
+    @debug "Shape of coordinates: $(size(coords))"
+    
+    for i in 1:n_panels
+        coords[2i-1, :] .= section_list[i].LE_point
+        coords[2i, :]   .= section_list[i].TE_point
+        coords[2i+1, :] .= section_list[i+1].LE_point
+        coords[2i+2, :] .= section_list[i+1].TE_point
+    end
+    
+    @debug "Coordinates: $coords"
+    
+    for i in 1:n_panels
+        # Define panel points
+        p1 = coords[2i-1, :]     # LE_1
+        p2 = coords[2i+1, :]     # LE_2
+        p3 = coords[2i+2, :]     # TE_2
+        p4 = coords[2i, :]       # TE_1
+        
+        # Calculate control point position
+        di = norm(coords[2i-1, :] * 0.75 + coords[2i, :] * 0.25 - 
+                 (coords[2i+1, :] * 0.75 + coords[2i+2, :] * 0.25))
+        
+        ncp = if i == 1
+            diplus = norm(coords[2i+1, :] * 0.75 + coords[2i+2, :] * 0.25 - 
+                         (coords[2i+3, :] * 0.75 + coords[2i+4, :] * 0.25))
+            di / (di + diplus)
+        elseif i == n_panels
+            dimin = norm(coords[2i-3, :] * 0.75 + coords[2i-2, :] * 0.25 - 
+                        (coords[2i-1, :] * 0.75 + coords[2i, :] * 0.25))
+            dimin / (dimin + di)
+        else
+            dimin = norm(coords[2i-3, :] * 0.75 + coords[2i-2, :] * 0.25 - 
+                        (coords[2i-1, :] * 0.75 + coords[2i, :] * 0.25))
+            diplus = norm(coords[2i+1, :] * 0.75 + coords[2i+2, :] * 0.25 - 
+                         (coords[2i+3, :] * 0.75 + coords[2i+4, :] * 0.25))
+            0.25 * (dimin / (dimin + di) + di / (di + diplus) + 1)
+        end
+        
+        ncp = 1 - ncp
+        
+        # Calculate points
+        @. aero_centers[i, :] = (p2 * (1 - ncp) + p1 * ncp) * 0.75 +
+                   (p3 * (1 - ncp) + p4 * ncp) * 0.25
+        
+        @. control_points[i, :] = (p2 * (1 - ncp) + p1 * ncp) * 0.25 +
+                    (p3 * (1 - ncp) + p4 * ncp) * 0.75
+        
+        @. bound_points_1[i, :] = p1 * 0.75 + p4 * 0.25
+        @. bound_points_2[i, :] = p2 * 0.75 + p3 * 0.25
+        
+        # Calculate reference frame vectors
+        z_airf[i, :] .= normalize((control_points[i, :] .- aero_centers[i, :]) × (p1 .- p2))
+        x_airf[i, :] .= normalize(control_points[i, :] .- aero_centers[i, :])
+        y_airf[i, :] .= normalize(bound_points_1[i, :] .- bound_points_2[i, :])
+    end
+    return nothing
+end
+
+
+"""
     Wing
 
 Represents a wing composed of multiple sections with aerodynamic properties.
@@ -116,7 +225,7 @@ function init!(wing::AbstractWing; aero_center_location::Float64=0.25, control_p
         aero_center_location,
         control_point_location
     )
-    return panel_props
+    return nothing
 end
 
 

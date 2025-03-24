@@ -109,7 +109,10 @@ function init!(body_aero::BodyAerodynamics;
 
     idx = 1
     for wing in body_aero.wings
-        @time panel_props = init!(wing; aero_center_location, control_point_location)
+        println("init wing")
+        @time init!(wing; aero_center_location, control_point_location)
+        # @assert false
+        panel_props = wing.panel_props
         
         # Create panels
         @time for i in 1:wing.n_panels
@@ -122,19 +125,18 @@ function init!(body_aero::BodyAerodynamics;
                 body_aero.panels[idx], 
                 wing.refined_sections[i],
                 wing.refined_sections[i+1],
-                panel_props.aero_centers[i],
-                panel_props.control_points[i],
-                panel_props.bound_points_1[i],
-                panel_props.bound_points_2[i],
-                panel_props.x_airf[i],
-                panel_props.y_airf[i],
-                panel_props.z_airf[i],
+                panel_props.aero_centers[i, :],
+                panel_props.control_points[i, :],
+                panel_props.bound_points_1[i, :],
+                panel_props.bound_points_2[i, :],
+                panel_props.x_airf[i, :],
+                panel_props.y_airf[i, :],
+                panel_props.z_airf[i, :],
                 delta;
                 remove_nan=wing.remove_nan
             )
             idx += 1
         end
-        @assert false
     end
     
     # Initialize rest of the struct
@@ -159,116 +161,6 @@ function Base.setproperty!(obj::BodyAerodynamics, sym::Symbol, val)
     else
         setfield!(obj, sym, val)
     end
-end
-
-"""
-    PanelProperties
-
-Structure to hold calculated panel properties.
-
-# Fields
-- `aero_centers`::Matrix{Float64}
-- `control_points`::Matrix{Float64}
-- `bound_points_1`::Matrix{Float64}
-- `bound_points_2`::Matrix{Float64}
-- `x_airf`::Matrix{Float64}: Vector of unit vectors tangential to chord line
-- `y_airf`::Matrix{Float64}: Vector of unit vectors in spanwise direction
-- `z_airf`::Matrix{Float64}: Vector of unit vectors pointing up (cross of x_airf and y_airf)
-"""
-@with_kw mutable struct PanelProperties{P}
-    aero_centers::Matrix{Float64} = zeros(P, 3)
-    control_points::Matrix{Float64} = zeros(P, 3)
-    bound_points_1::Matrix{Float64} = zeros(P, 3)
-    bound_points_2::Matrix{Float64} = zeros(P, 3)
-    x_airf::Matrix{Float64} = zeros(P, 3)
-    y_airf::Matrix{Float64} = zeros(P, 3)
-    z_airf::Matrix{Float64} = zeros(P, 3)
-    coords::Matrix{Float64} = zeros(2(P+1), 3)
-end
-
-"""
-    update_panel_properties!(section_list::Vector{Section}, n_panels::Int,
-                             aero_center_loc::Float64, control_point_loc::Float64)
-
-Calculate geometric properties for each panel.
-
-# Arguments
-- section_list::Vector{Section}: List of [Section](@ref)s
-- `n_panels`::Int: Number of [Panel](@ref)s
-- `aero_center_loc`::Float64: Location of the aerodynamic center
-- `control_point_loc`::Float64: Location of the control point
-
-# Returns:
-[PanelProperties](@ref) containing vectors for each property
-"""
-function update_panel_properties!(panel_props::PanelProperties, section_list::Vector{Section}, n_panels::Int,
-                                  aero_center_loc::Float64, control_point_loc::Float64)
-    coords = panel_props.coords
-    aero_centers = panel_props.aero_centers
-    control_points = panel_props.control_points
-    bound_points_1 = panel_props.bound_points_1
-    bound_points_2 = panel_props.bound_points_2
-    x_airf = panel_props.x_airf
-    y_airf = panel_props.y_airf
-    z_airf = panel_props.z_airf
-    @debug "Shape of coordinates: $(size(coords))"
-    
-    for i in 1:n_panels
-        coords[2i-1, :] .= section_list[i].LE_point
-        coords[2i, :]   .= section_list[i].TE_point
-        coords[2i+1, :] .= section_list[i+1].LE_point
-        coords[2i+2, :] .= section_list[i+1].TE_point
-    end
-    
-    @debug "Coordinates: $coords"
-    
-    for i in 1:n_panels
-        # Define panel points
-        section = Dict(
-            "p1" => coords[2i-1, :],     # LE_1
-            "p2" => coords[2i+1, :],     # LE_2
-            "p3" => coords[2i+2, :],     # TE_2
-            "p4" => coords[2i, :]        # TE_1
-        )
-        
-        # Calculate control point position
-        di = norm(coords[2i-1, :] * 0.75 + coords[2i, :] * 0.25 - 
-                 (coords[2i+1, :] * 0.75 + coords[2i+2, :] * 0.25))
-        
-        ncp = if i == 1
-            diplus = norm(coords[2i+1, :] * 0.75 + coords[2i+2, :] * 0.25 - 
-                         (coords[2i+3, :] * 0.75 + coords[2i+4, :] * 0.25))
-            di / (di + diplus)
-        elseif i == n_panels
-            dimin = norm(coords[2i-3, :] * 0.75 + coords[2i-2, :] * 0.25 - 
-                        (coords[2i-1, :] * 0.75 + coords[2i, :] * 0.25))
-            dimin / (dimin + di)
-        else
-            dimin = norm(coords[2i-3, :] * 0.75 + coords[2i-2, :] * 0.25 - 
-                        (coords[2i-1, :] * 0.75 + coords[2i, :] * 0.25))
-            diplus = norm(coords[2i+1, :] * 0.75 + coords[2i+2, :] * 0.25 - 
-                         (coords[2i+3, :] * 0.75 + coords[2i+4, :] * 0.25))
-            0.25 * (dimin / (dimin + di) + di / (di + diplus) + 1)
-        end
-        
-        ncp = 1 - ncp
-        
-        # Calculate points
-        @. aero_centers[i, :] = (section["p2"] * (1 - ncp) + section["p1"] * ncp) * 0.75 +
-                   (section["p3"] * (1 - ncp) + section["p4"] * ncp) * 0.25
-        
-        @. control_points[i, :] = (section["p2"] * (1 - ncp) + section["p1"] * ncp) * 0.25 +
-                    (section["p3"] * (1 - ncp) + section["p4"] * ncp) * 0.75
-        
-        @. bound_points_1[i, :] = section["p1"] * 0.75 + section["p4"] * 0.25
-        bound_points_2[i, :] = section["p2"] * 0.75 + section["p3"] * 0.25
-        
-        # Calculate reference frame vectors
-        @. z_airf[i, :] = normalize(cross(control_points[i, :] - aero_centers[i, :], section["p1"] - section["p2"]))
-        @. x_airf[i, :] = normalize(control_points[i, :] - aero_centers[i, :])
-        @. y_airf[i, :] = normalize(bound_points_1[i, :] - bound_points_2[i, :])
-    end
-    return nothing
 end
 
 """
