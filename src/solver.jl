@@ -92,6 +92,7 @@ sol::VSMSolution = VSMSolution(): The result of calling [solve!](@ref)
 """
 @with_kw struct Solver{P}
     # General settings
+    solver_type::SolverType = LOOP
     aerodynamic_model_type::Model = VSM
     density::Float64 = 1.225
     max_iterations::Int64 = 1500
@@ -433,8 +434,8 @@ function gamma_loop!(
     n_panels    = length(body_aero.panels)
     solver.lr.alpha_array .= body_aero.alpha_array
     solver.lr.v_a_array   .= body_aero.v_a_array
-    va_magw_array = cache[1][solver.lr.v_a_array]
-
+    
+    va_magw_array            = cache[1][solver.lr.v_a_array]
     gamma                    = cache[2][solver.lr.gamma_new]
     abs_gamma_new            = cache[3][solver.lr.gamma_new]
     induced_velocity_all     = cache[4][va_array]
@@ -452,10 +453,8 @@ function gamma_loop!(
     velocity_view_y = @view induced_velocity_all[:, 2]
     velocity_view_z = @view induced_velocity_all[:, 3]
 
-    iters = 0
-    for i in 1:solver.max_iterations
-        iters += 1
-        gamma .= solver.lr.gamma_new
+    function calc_gamma_new!(gamma_new, gamma)
+        gamma .= gamma_new
         
         # Calculate induced velocities
         mul!(velocity_view_x, AIC_x, gamma)
@@ -484,40 +483,66 @@ function gamma_loop!(
         for (i, (panel, alpha)) in enumerate(zip(panels, solver.lr.alpha_array))
             cl_array[i] = calculate_cl(panel, alpha)
         end
-        solver.lr.gamma_new .= 0.5 .* solver.lr.v_a_array.^2 ./ va_magw_array .* cl_array .* chord_array
-
-        # Apply damping if needed
-        if solver.is_with_artificial_damping
-            damp, is_damping_applied = smooth_circulation(gamma, 0.1, 0.5)
-            @debug "damp: $damp"
-        else
-            damp .= 0.0
-            is_damping_applied = false
-        end
-        # Update gamma with relaxation and damping
-        solver.lr.gamma_new .= (1 - relaxation_factor) .* gamma .+ 
-                    relaxation_factor .* solver.lr.gamma_new .+ damp
-
-        # Check convergence
-        abs_gamma_new .= abs.(solver.lr.gamma_new)
-        reference_error = maximum(abs_gamma_new)
-        reference_error = max(reference_error, solver.tol_reference_error)
-        abs_gamma_new .= abs.(solver.lr.gamma_new .- gamma)
-        error = maximum(abs_gamma_new)
-        normalized_error = error / reference_error
-
-        @debug "Iteration: $i, normalized_error: $normalized_error, is_damping_applied: $is_damping_applied"
-
-        if normalized_error < solver.allowed_error
-            solver.lr.converged = true
-            break
-        end
+        gamma_new .= 0.5 .* solver.lr.v_a_array.^2 ./ va_magw_array .* cl_array .* chord_array
+        nothing
     end
 
-    if log && solver.lr.converged
-        @info "Converged after $iters iterations"
-    elseif log
-        @warn "NO convergence after $(solver.max_iterations) iterations"
+    if solver.solver_type == NONLIN
+        function f_nonlin!(d_gamma, gamma, p)
+            calc_gamma_new!(solver.lr.gamma_new, gamma)
+            d_gamma .= solver.lr.gamma_new .- gamma
+            nothing
+        end
+        d_gamma = abs_gamma_new
+        prob = NonlinearProblem(f_nonlin!, d_gamma, solver.lr.gamma_new, p)
+        sol = solve(prob, NewtonRaphson())
+        gamma .= sol.u
+        solver.lr.gamma_new .= sol.u
+    end
+
+    if solver.solver_type == LOOP
+        function f_loop!(gamma_new, gamma)
+            calc_gamma_new!(gamma_new, gamma)
+            # Update gamma with relaxation and damping
+            gamma_new .= (1 - relaxation_factor) .* gamma .+ 
+                    relaxation_factor .* gamma_new .+ damp
+            
+            # Apply damping if needed
+            if solver.is_with_artificial_damping
+                damp, is_damping_applied = smooth_circulation(gamma, 0.1, 0.5)
+                @debug "damp: $damp"
+            else
+                damp .= 0.0
+                is_damping_applied = false
+            end
+        end
+        iters = 0
+        for i in 1:solver.max_iterations
+            iters += 1
+
+            f_loop!(solver.lr.gamma_new, gamma)
+
+            # Check convergence
+            abs_gamma_new .= abs.(solver.lr.gamma_new)
+            reference_error = maximum(abs_gamma_new)
+            reference_error = max(reference_error, solver.tol_reference_error)
+            abs_gamma_new .= abs.(solver.lr.gamma_new .- gamma)
+            error = maximum(abs_gamma_new)
+            normalized_error = error / reference_error
+
+            @debug "Iteration: $i, normalized_error: $normalized_error, is_damping_applied: $is_damping_applied"
+
+            if normalized_error < solver.allowed_error
+                solver.lr.converged = true
+                break
+            end
+        end
+    
+        if log && solver.lr.converged
+            @info "Converged after $iters iterations"
+        elseif log
+            @warn "NO convergence after $(solver.max_iterations) iterations"
+        end
     end
 
     nothing
@@ -573,3 +598,61 @@ function smooth_circulation(
     damp = smoothed - circulation
     return damp, true
 end
+
+"""
+    linearize(wing::RamAirWing, op_point; va=15.0)
+
+Linearize the ram air wing aero model around an operating point using automatic differentiation.
+
+# Arguments
+- `wing`: RamAirWing model to linearize
+- `op_point`: Operating point tuple (alpha_values, delta_values) in radians
+- `va`: Airspeed magnitude in m/s (default: 15.0)
+
+# Returns
+- `J`: Jacobian matrix (∂forces/∂inputs)
+- `forces_op`: Forces at the operating point [Fx, Fy, Fz, Mx, My, Mz]
+"""
+function linearize(solver::Solver, body_aero::BodyAerodynamics, wing::RamAirWing, y; 
+        alpha_idxs=1:4, 
+        delta_idxs=nothing,
+        va_idxs=nothing,
+        omega_idxs=nothing,
+        kwargs...)
+
+    init_va = copy(body_aero.va)
+    # Function to compute forces for given control inputs
+    function calc_results!(results, y)
+        if !isnothing(alpha_idxs) && isnothing(delta_idxs)
+            VortexStepMethod.smooth_deform!(wing, y[alpha_idxs], zeros(alpha_idxs))
+        elseif !isnothing(alpha_idxs) && !isnothing(delta_idxs)
+            VortexStepMethod.smooth_deform!(wing, y[alpha_idxs], y[delta_idxs])
+        end
+
+        VortexStepMethod.init!(body_aero; init_aero=false)
+
+        if !isnothing(va_idxs) && isnothing(omega_idxs)
+            set_va!(body_aero, y[va_idxs])
+        elseif !isnothing(va_idxs) && isnothing(omega_idxs)
+            set_va!(body_aero, y[va_idxs], y[omega_idxs])
+        elseif isnothing(va_idxs) && isnothing(omega_idxs)
+            set_va!(body_aero, init_va)
+        end
+
+        solve!(solver, body_aero; kwargs...)
+        results[1:3] .= solver.sol.force_coefficients
+        results[4:6] .= solver.sol.moment_coefficients
+        results[7:end] .= solver.sol.moment_coeff_dist
+        return nothing
+    end
+
+    results = zeros(3+3+length(solver.sol.moment_coeff_dist))
+    jac = zeros(length(results), length(y))
+    backend = AutoFiniteDiff(absstep=1e-3, relstep=1e-3)
+    prep = prepare_jacobian(calc_results!, results, backend, y)
+    @time jacobian!(calc_results!, results, jac, prep, backend, y)
+
+    calc_results!(results, y)
+    return jac, results
+end
+

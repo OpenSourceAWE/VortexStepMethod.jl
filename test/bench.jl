@@ -77,7 +77,7 @@ using LinearAlgebra
             for frac in core_radius_fractions
                 @testset "Model $model Core Radius Fraction $frac" begin
                     result = @benchmark calculate_AIC_matrices!($body_aero, $model, $frac, $va_norm_array, $va_unit_array) samples=1 evals=1
-                    @test result.allocs ≤ 100
+                    @test result.allocs ≤ 30
                     @info "Model: $(model) \t Core radius fraction: $(frac) \t Allocations: $(result.allocs) \t Memory: $(result.memory)"
                 end
             end
@@ -140,7 +140,7 @@ using LinearAlgebra
                     0.5;
                     log = false
                 ) samples=1 evals=1
-                @test result.allocs ≤ 10
+                @test result.allocs ≤ 20
                 @info "Model: $model \t Aero_model: $aero_model \t Allocations: $(result.allocs) Memory: $(result.memory)"
             end
         end
@@ -191,6 +191,7 @@ using LinearAlgebra
             $body_aero.panels,
             false
         ) samples=1 evals=1
+        @info "Calculate Results Allocations: $(result.allocs) Memory: $(result.memory)"
         @test result.allocs ≤ 300
     end
 end

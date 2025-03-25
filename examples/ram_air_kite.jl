@@ -24,7 +24,8 @@ end
 # Create solvers
 vsm_solver = Solver(body_aero;
     aerodynamic_model_type=VSM,
-    is_with_artificial_damping=false
+    is_with_artificial_damping=false,
+    allowed_error=1e-8
 )
 
 # Setting velocity conditions
