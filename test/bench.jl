@@ -140,7 +140,7 @@ using LinearAlgebra
                     0.5;
                     log = false
                 ) samples=1 evals=1
-                @test result.allocs ≤ 20
+                @test result.allocs ≤ 10
                 @info "Model: $model \t Aero_model: $aero_model \t Allocations: $(result.allocs) Memory: $(result.memory)"
             end
         end

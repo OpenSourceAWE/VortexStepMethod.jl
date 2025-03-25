@@ -402,7 +402,7 @@ function solve_base!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribu
     # Run main iteration loop
     gamma_loop!(solver, body_aero, panels, relaxation_factor; log)
     # Try again with reduced relaxation factor if not converged
-    if ! solver.lr.converged && relaxation_factor > 1e-3
+    if solver.solver_type == LOOP && !solver.lr.converged && relaxation_factor > 1e-3
         log && @warn "Running again with half the relaxation_factor = $(relaxation_factor/2)"
         solver.lr.gamma_new .= gamma_initial
         gamma_loop!(solver, body_aero, panels, relaxation_factor/2; log)
@@ -453,9 +453,7 @@ function gamma_loop!(
     velocity_view_y = @view induced_velocity_all[:, 2]
     velocity_view_z = @view induced_velocity_all[:, 3]
 
-    function calc_gamma_new!(gamma_new, gamma)
-        gamma .= gamma_new
-        
+    function calc_gamma_new!(gamma_new, gamma)     
         # Calculate induced velocities
         mul!(velocity_view_x, AIC_x, gamma)
         mul!(velocity_view_y, AIC_y, gamma)
@@ -493,15 +491,16 @@ function gamma_loop!(
             d_gamma .= solver.lr.gamma_new .- gamma
             nothing
         end
-        d_gamma = abs_gamma_new
-        prob = NonlinearProblem(f_nonlin!, d_gamma, solver.lr.gamma_new, p)
-        sol = solve(prob, NewtonRaphson())
+        prob = NonlinearProblem(f_nonlin!, solver.lr.gamma_new, nothing)
+        sol = NonlinearSolve.solve(prob, NewtonRaphson(autodiff=AutoFiniteDiff()))
         gamma .= sol.u
         solver.lr.gamma_new .= sol.u
+        solver.lr.converged = succesful_retcode(sol)
     end
 
     if solver.solver_type == LOOP
         function f_loop!(gamma_new, gamma, damp)
+            gamma .= gamma_new
             calc_gamma_new!(gamma_new, gamma)
             # Update gamma with relaxation and damping
             @. gamma_new = (1 - relaxation_factor) * gamma + 
