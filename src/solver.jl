@@ -48,9 +48,9 @@ end
 # Output of the function gamma_loop!
 @with_kw mutable struct LoopResult{P}
     converged::Bool              = false
-    gamma_new::Vector{Float64}   = zeros(P)
-    alpha_array::Vector{Float64} = zeros(P) # TODO: Is this different from BodyAerodynamics.alpha_array ?
-    v_a_array::Vector{Float64}   = zeros(P)
+    gamma_new::MVector{P, Float64}   = zeros(MVector{P, Float64})
+    alpha_array::MVector{P, Float64} = zeros(MVector{P, Float64}) # TODO: Is this different from BodyAerodynamics.alpha_array ?
+    v_a_array::MVector{P, Float64}   = zeros(MVector{P, Float64})
 end
 
 function LoopResult(P)
@@ -90,16 +90,19 @@ Main solver structure for the Vortex Step Method.See also: [solve](@ref)
 ## Solution
 sol::VSMSolution = VSMSolution(): The result of calling [solve!](@ref) 
 """
-@with_kw struct Solver{P}
+@with_kw mutable struct Solver{P}
     # General settings
     solver_type::SolverType = LOOP
     aerodynamic_model_type::Model = VSM
     density::Float64 = 1.225
     max_iterations::Int64 = 1500
-    atol::Float64 = 1e-5
     rtol::Float64 = 1e-5
     tol_reference_error::Float64 = 0.001
     relaxation_factor::Float64 = 0.03
+
+    # Nonlin solver fields
+    prob::Union{NonlinearProblem, Nothing} = nothing
+    atol::Float64 = 1e-5
     
     # Damping settings
     is_with_artificial_damping::Bool = false
@@ -487,16 +490,20 @@ function gamma_loop!(
     end
 
     if solver.solver_type == NONLIN
-        function f_nonlin!(d_gamma, gamma, p)
-            calc_gamma_new!(solver.lr.gamma_new, gamma)
-            d_gamma .= solver.lr.gamma_new .- gamma
-            nothing
+        if isnothing(solver.prob)
+            function f_nonlin!(d_gamma, gamma, p)
+                calc_gamma_new!(solver.lr.gamma_new, gamma)
+                d_gamma .= solver.lr.gamma_new .- gamma
+                nothing
+            end
+            solver.prob = NonlinearProblem(f_nonlin!, solver.lr.gamma_new, nothing)
         end
-        prob = NonlinearProblem(f_nonlin!, solver.lr.gamma_new, nothing)
-        sol = NonlinearSolve.solve(prob, NewtonRaphson(autodiff=AutoFiniteDiff()); abstol=solver.atol, reltol=solver.rtol)
+        
+        sol = NonlinearSolve.solve(solver.prob, NewtonRaphson(autodiff=AutoFiniteDiff()); abstol=solver.atol, reltol=solver.rtol)
         gamma .= sol.u
         solver.lr.gamma_new .= sol.u
         solver.lr.converged = SciMLBase.successful_retcode(sol)
+        return nothing
     end
 
     if solver.solver_type == LOOP
@@ -544,9 +551,8 @@ function gamma_loop!(
         elseif log
             @warn "NO convergence after $(solver.max_iterations) iterations"
         end
+        return nothing
     end
-
-    nothing
 end
 
 """
