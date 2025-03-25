@@ -301,11 +301,11 @@ function compute_lei_coeffs(section_1::Section, section_2::Section)
 end
 
 """
-    calculate_relative_alpha_and_velocity(panel::Panel, induced_velocity::Vector{Float64})
+    calculate_relative_alpha_and_velocity(panel::Panel, induced_velocity)
 
 Calculate relative angle of attack and relative velocity of the panel.
 """
-function calculate_relative_alpha_and_velocity(panel::Panel, induced_velocity::Vector{Float64})
+function calculate_relative_alpha_and_velocity(panel::Panel, induced_velocity)
     relative_velocity = panel.va + induced_velocity
     v_normal = dot(panel.z_airf, relative_velocity)
     v_tangential = dot(panel.x_airf, relative_velocity)

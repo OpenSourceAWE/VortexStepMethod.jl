@@ -18,10 +18,10 @@ end
 Generate 3D coordinates of a rectangular wing with twist and dihedral.
 
 # Arguments
-- `chord::Vector{Float64}`: Chord lengths of wing panels
+- `chord`: Chord lengths of wing panels
 - `span::Float64`: Total wing span
-- `theta::Vector{Float64}`: Twist angles in radians
-- `beta::Vector{Float64}`: Dihedral angles in radians
+- `theta`: Twist angles in radians
+- `beta`: Dihedral angles in radians
 - `N::Int`: Number of spanwise panels
 - `dist::String`: Distribution type ("cos" or "lin")
 

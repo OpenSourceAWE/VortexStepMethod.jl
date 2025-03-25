@@ -20,12 +20,12 @@ Struct for storing the solution of the [solve!](@ref) function. Must contain all
     y_airf_array::Matrix{Float64} = zeros(P, 3)
     z_airf_array::Matrix{Float64} = zeros(P, 3)
     va_array::Matrix{Float64} = zeros(P, 3)
-    chord_array::Vector{Float64} = zeros(P)
+    chord_array::MVector{P, Float64} = zeros(MVector{P, Float64})
     ###
-    panel_width_array::Vector{Float64} = zeros(P)
-    cl_array::Vector{Float64} = zeros(P)
-    cd_array::Vector{Float64} = zeros(P)
-    cm_array::Vector{Float64} = zeros(P)
+    panel_width_array::MVector{P, Float64} = zeros(MVector{P, Float64})
+    cl_array::MVector{P, Float64} = zeros(MVector{P, Float64})
+    cd_array::MVector{P, Float64} = zeros(MVector{P, Float64})
+    cm_array::MVector{P, Float64} = zeros(MVector{P, Float64})
     panel_lift::Matrix{Float64} = zeros(P,1)
     panel_drag::Matrix{Float64} = zeros(P,1)
     panel_moment::Matrix{Float64} = zeros(P,1)
@@ -36,8 +36,8 @@ Struct for storing the solution of the [solve!](@ref) function. Must contain all
     moment::MVec3 = zeros(MVec3)       
     force_coefficients::MVec3 = zeros(MVec3)  
     moment_coefficients::MVec3 = zeros(MVec3)  
-    moment_distribution::Vector{Float64} = zeros(P)
-    moment_coeff_dist::Vector{Float64} = zeros(P)
+    moment_distribution::MVector{P, Float64} = zeros(MVector{P, Float64})
+    moment_coeff_dist::MVector{P, Float64} = zeros(MVector{P, Float64})
     solver_status::SolverStatus = FAILURE
 end
 
@@ -58,7 +58,7 @@ function LoopResult(P)
 end
 
 @with_kw struct BaseResult{P}
-    va_norm_array::Vector{Float64} = zeros(P)
+    va_norm_array::MVector{P, Float64} = zeros(MVector{P, Float64})
     va_unit_array::Matrix{Float64} = zeros(P, 3)
 end
 
@@ -556,7 +556,7 @@ function gamma_loop!(
 end
 
 """
-    smooth_circulation(circulation::Vector{Float64}, 
+    smooth_circulation(circulation, 
                       smoothness_factor::Float64, 
                       damping_factor::Float64)
 
@@ -566,7 +566,7 @@ Returns:
 - Tuple of smoothed circulation and boolean indicating if smoothing was applied
 """
 function smooth_circulation(
-    circulation::Vector{Float64},
+    circulation,
     smoothness_factor::Float64,
     damping_factor::Float64
 )

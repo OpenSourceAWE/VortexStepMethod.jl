@@ -375,7 +375,7 @@ Represents a curved wing that inherits from Wing with additional geometric prope
   -  refined_sections::Vector{Section}
   - `remove_nan::Bool`: Wether to remove the NaNs from interpolations or not
 - Additional fields:
-  - `circle_center_z::Vector{Float64}`: Center of circle coordinates
+  - `circle_center_z`: Center of circle coordinates
   - gamma_tip::Float64: Angle between the body frame z axis and the vector going from the kite circular shape center to the wing tip.
   - `inertia_tensor`::Matrix{Float64}: see: [`calculate_inertia_tensor`](@ref)
   - radius::Float64: Radius of curvature
@@ -398,13 +398,13 @@ mutable struct RamAirWing <: AbstractWing
     mass::Float64
     gamma_tip::Float64
     inertia_tensor::Matrix{Float64}
-    center_of_mass::Vector{Float64}
+    center_of_mass
     radius::Float64
     le_interp::NTuple{3, Extrapolation}
     te_interp::NTuple{3, Extrapolation}
     area_interp::Extrapolation
-    theta_dist::Vector{Float64}
-    delta_dist::Vector{Float64}
+    theta_dist
+    delta_dist
 end
 
 """

@@ -24,16 +24,16 @@ Main structure for calculating aerodynamic properties of bodies.
     wings::Union{Vector{Wing}, Vector{RamAirWing}}
     _va::MVec3 = zeros(MVec3)
     omega::MVec3 = zeros(MVec3)
-    gamma_distribution::Vector{Float64} = zeros(Float64, P)
-    alpha_uncorrected::Vector{Float64} = zeros(Float64, P)
-    alpha_corrected::Vector{Float64} = zeros(Float64, P)
-    stall_angle_list::Vector{Float64} = zeros(Float64, P)
-    alpha_array::Vector{Float64} = zeros(Float64, P)
-    v_a_array::Vector{Float64} = zeros(Float64, P)
+    gamma_distribution::MVector{P, Float64} = zeros(MVector{P, Float64})
+    alpha_uncorrected::MVector{P, Float64} = zeros(MVector{P, Float64})
+    alpha_corrected::MVector{P, Float64} = zeros(MVector{P, Float64})
+    stall_angle_list::MVector{P, Float64} = zeros(MVector{P, Float64})
+    alpha_array::MVector{P, Float64} = zeros(MVector{P, Float64})
+    v_a_array::MVector{P, Float64} = zeros(MVector{P, Float64})
     work_vectors::NTuple{10,MVec3} = ntuple(_ -> zeros(MVec3), 10)
     AIC::Array{Float64, 3} = zeros(3, P, P)
     projected_area::Float64 = one(Float64)
-    y::Vector{Float64} = zeros(Float64, P)
+    y::MVector{P, Float64} = zeros(MVector{P, Float64})
 end
 
 """

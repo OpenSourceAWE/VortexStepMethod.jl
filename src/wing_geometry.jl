@@ -16,22 +16,13 @@ Represents a wing section with leading edge, trailing edge, and aerodynamic prop
     aero_model::AeroModel = INVISCID
     aero_data::AeroData = nothing
 end
-"""
-    Section(LE_point::Vector{Float64}, TE_point::Vector{Float64}, 
-            aero_model=INVISCID, aero_data=nothing)
-
-Constructor for [Section](@ref) that allows to pass Vectors of Float64 as point coordinates.
-"""
-function Section(LE_point::Vector{Float64}, TE_point::Vector{Float64}, aero_model=INVISCID, aero_data=nothing)
-    Section(MVec3(LE_point), MVec3(TE_point), aero_model, aero_data)
-end
 
 """
     init!(section::Section, LE_point, TE_point, aero_model=nothing, aero_data=nothing)
 
 Function to update a [Section](@ref) in place.
 """
-function init!(section::Section, LE_point, TE_point, aero_model=nothing, aero_data=nothing)
+function init!(section::Section, LE_point::AbstractVector, TE_point::AbstractVector, aero_model=nothing, aero_data=nothing)
     section.LE_point .= LE_point
     section.TE_point .= TE_point
     (!isnothing(aero_model)) && (section.aero_model = aero_model)
@@ -281,8 +272,8 @@ Add a new section to the wing.
 - `aero_model`::AeroModel: [AeroModel](@ref)
 - `aero_data`::AeroData: See [AeroData](@ref)  
 """
-function add_section!(wing::Wing, LE_point::Vector{Float64}, 
-                     TE_point::Vector{Float64}, aero_model::AeroModel, aero_data::AeroData=nothing)
+function add_section!(wing::Wing, LE_point, 
+                     TE_point, aero_model::AeroModel, aero_data::AeroData=nothing)
     if aero_model == POLAR_VECTORS && wing.remove_nan
         aero_data = remove_vector_nans(aero_data)
     elseif aero_model == POLAR_MATRICES && wing.remove_nan
@@ -771,7 +762,7 @@ end
 end
 
 """
-    calculate_projected_area(wing::AbstractWing, z_plane_vector::Vector{Float64}=[0.0, 0.0, 1.0])
+    calculate_projected_area(wing::AbstractWing, z_plane_vector=[0.0, 0.0, 1.0])
 
 Calculate projected wing area onto plane defined by normal vector.
 
@@ -779,7 +770,7 @@ Returns:
     Float64: Projected area
 """
 function calculate_projected_area(wing::AbstractWing, 
-                                z_plane_vector::Vector{Float64}=[0.0, 0.0, 1.0])
+                                z_plane_vector=[0.0, 0.0, 1.0])
     # Normalize plane normal vector
     z_plane_vector = z_plane_vector ./ norm(z_plane_vector)
 
