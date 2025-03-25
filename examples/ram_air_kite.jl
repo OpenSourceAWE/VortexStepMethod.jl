@@ -2,7 +2,7 @@ using ControlPlots
 using VortexStepMethod
 using LinearAlgebra
 
-PLOT = false
+PLOT = true
 USE_TEX = false
 DEFORM = false
 LINEARIZE = true

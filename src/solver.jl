@@ -660,8 +660,7 @@ function linearize(solver::Solver, body_aero::BodyAerodynamics, wing::RamAirWing
     jac = zeros(length(results), length(y))
     backend = AutoFiniteDiff(absstep=1e-3, relstep=1e-3)
     prep = prepare_jacobian(calc_results!, results, backend, y)
-    println("jac")
-    @time jacobian!(calc_results!, results, jac, prep, backend, y)
+    jacobian!(calc_results!, results, jac, prep, backend, y)
 
     calc_results!(results, y)
     return jac, results
