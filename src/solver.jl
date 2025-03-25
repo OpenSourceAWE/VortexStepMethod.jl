@@ -102,6 +102,7 @@ sol::VSMSolution = VSMSolution(): The result of calling [solve!](@ref)
 
     # Nonlin solver fields
     prob::Union{NonlinearProblem, Nothing} = nothing
+    cache::Union{NonlinearSolve.AbstractNonlinearSolveCache, Nothing} = nothing
     atol::Float64 = 1e-5
     
     # Damping settings
@@ -153,7 +154,7 @@ a dictionary.
 The solution of type [VSMSolution](@ref)
 """
 function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=solver.sol.gamma_distribution; 
-    log=false, reference_point=zeros(MVec3), moment_frac=0.1)
+        log=false, reference_point=zeros(MVec3), moment_frac=0.1)
 
     # calculate intermediate result
     solve_base!(solver, body_aero, gamma_distribution; log, reference_point)
@@ -446,10 +447,10 @@ function gamma_loop!(
     relative_velocity_array  = cache[5][va_array]
     relative_velocity_crossz = cache[6][va_array]
     v_acrossz_array          = cache[7][va_array]
-    cl_array                 = cache[8][gamma]
-    damp                     = cache[9][cl_array]
-    v_normal_array           = cache[10][cl_array]
-    v_tangential_array       = cache[11][cl_array]
+    cl_array                 = cache[8][solver.lr.gamma_new]
+    damp                     = cache[9][solver.lr.gamma_new]
+    v_normal_array           = cache[10][solver.lr.gamma_new]
+    v_tangential_array       = cache[11][solver.lr.gamma_new]
 
     AIC_x, AIC_y, AIC_z = body_aero.AIC[1, :, :], body_aero.AIC[2, :, :], body_aero.AIC[3, :, :]
 
@@ -457,7 +458,9 @@ function gamma_loop!(
     velocity_view_y = @view induced_velocity_all[:, 2]
     velocity_view_z = @view induced_velocity_all[:, 3]
 
-    function calc_gamma_new!(gamma_new, gamma)     
+    function calc_gamma_new!(gamma_new, gamma, p)
+        # (AIC_x, AIC_y, AIC_z, va_array, induced_velocity_all, 
+        #     x_airf_array, y_airf_array, z_airf_array, panels, chord_array) = p
         # Calculate induced velocities
         mul!(velocity_view_x, AIC_x, gamma)
         mul!(velocity_view_y, AIC_y, gamma)
@@ -466,9 +469,9 @@ function gamma_loop!(
         relative_velocity_array .= va_array .+ induced_velocity_all
         for i in 1:n_panels
             relative_velocity_crossz[i, :] .=  MVec3(view(relative_velocity_array, i, :)) ×
-                                               MVec3(view(y_airf_array, i, :))
+                                            MVec3(view(y_airf_array, i, :))
             v_acrossz_array[i, :]          .=  MVec3(view(va_array, i, :)) ×
-                                               MVec3(view(y_airf_array, i, :))
+                                            MVec3(view(y_airf_array, i, :))
         end
 
         for i in 1:n_panels
@@ -492,14 +495,15 @@ function gamma_loop!(
     if solver.solver_type == NONLIN
         if isnothing(solver.prob)
             function f_nonlin!(d_gamma, gamma, p)
-                calc_gamma_new!(solver.lr.gamma_new, gamma)
+                calc_gamma_new!(solver.lr.gamma_new, gamma, p)
                 d_gamma .= solver.lr.gamma_new .- gamma
                 nothing
             end
             solver.prob = NonlinearProblem(f_nonlin!, solver.lr.gamma_new, nothing)
+            solver.cache = init(solver.prob, NewtonRaphson(autodiff=AutoFiniteDiff()); abstol=solver.atol, reltol=solver.rtol)
         end
         
-        sol = NonlinearSolve.solve(solver.prob, NewtonRaphson(autodiff=AutoFiniteDiff()); abstol=solver.atol, reltol=solver.rtol)
+        sol = NonlinearSolve.solve!(solver.cache)
         gamma .= sol.u
         solver.lr.gamma_new .= sol.u
         solver.lr.converged = SciMLBase.successful_retcode(sol)
@@ -509,7 +513,7 @@ function gamma_loop!(
     if solver.solver_type == LOOP
         function f_loop!(gamma_new, gamma, damp)
             gamma .= gamma_new
-            calc_gamma_new!(gamma_new, gamma)
+            calc_gamma_new!(gamma_new, gamma, nothing)
             # Update gamma with relaxation and damping
             @. gamma_new = (1 - relaxation_factor) * gamma + 
                     relaxation_factor * gamma_new + damp
@@ -640,7 +644,7 @@ function linearize(solver::Solver, body_aero::BodyAerodynamics, wing::RamAirWing
 
         if !isnothing(va_idxs) && isnothing(omega_idxs)
             set_va!(body_aero, y[va_idxs])
-        elseif !isnothing(va_idxs) && isnothing(omega_idxs)
+        elseif !isnothing(va_idxs) && !isnothing(omega_idxs)
             set_va!(body_aero, y[va_idxs], y[omega_idxs])
         elseif isnothing(va_idxs) && isnothing(omega_idxs)
             set_va!(body_aero, init_va)
@@ -657,7 +661,7 @@ function linearize(solver::Solver, body_aero::BodyAerodynamics, wing::RamAirWing
     jac = zeros(length(results), length(y))
     backend = AutoFiniteDiff(absstep=1e-3, relstep=1e-3)
     prep = prepare_jacobian(calc_results!, results, backend, y)
-    @time jacobian!(calc_results!, results, jac, prep, backend, y)
+    jacobian!(calc_results!, results, jac, prep, backend, y)
 
     calc_results!(results, y)
     return jac, results

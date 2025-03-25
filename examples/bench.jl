@@ -64,7 +64,8 @@ body_aero = BodyAerodynamics([wing])
 vsm_solver = Solver(
     body_aero;
     aerodynamic_model_type=VSM,
-    is_with_artificial_damping=false
+    is_with_artificial_damping=false,
+    solver_type=NONLIN,
 )
 
 # Setting velocity conditions
@@ -82,8 +83,8 @@ set_va!(body_aero, vel_app)
 
 # Solving and plotting distributions
 results = solve(vsm_solver, body_aero)
-results_base = solve_base!(vsm_solver, body_aero)
+solve_base!(vsm_solver, body_aero)
 println("RAM-air kite:")
-@time results_base = solve_base!(vsm_solver, body_aero)
+@time solve_base!(vsm_solver, body_aero)
 
 nothing

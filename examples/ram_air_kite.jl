@@ -25,7 +25,7 @@ end
 vsm_solver = Solver(body_aero;
     aerodynamic_model_type=VSM,
     is_with_artificial_damping=false,
-    rtol=1e-8,
+    rtol=1e-5,
     solver_type=NONLIN
 )
 
@@ -44,6 +44,15 @@ set_va!(body_aero, vel_app)
 
 if LINEARIZE
     println("Linearize")
+    jac, res = VortexStepMethod.linearize(
+        vsm_solver, 
+        body_aero, 
+        wing, 
+        [zeros(4); vel_app; zeros(3)]; 
+        alpha_idxs=1:4, 
+        va_idxs=5:7, 
+        omega_idxs=8:10,
+        moment_frac=0.1)
     @time jac, res = VortexStepMethod.linearize(
         vsm_solver, 
         body_aero, 
@@ -72,7 +81,7 @@ PLOT && plot_geometry(
 )
 
 # Solving and plotting distributions
-results = solve(vsm_solver, body_aero; log=true)
+results = VortexStepMethod.solve(vsm_solver, body_aero; log=true)
 @time results = solve(vsm_solver, body_aero; log=true)
 
 body_y_coordinates = [panel.aero_center[2] for panel in body_aero.panels]

@@ -17,6 +17,10 @@ Represents a wing section with leading edge, trailing edge, and aerodynamic prop
     aero_data::AeroData = nothing
 end
 
+function Section(LE_point, TE_point, aero_model)
+    return Section(LE_point, TE_point, aero_model, nothing)
+end
+
 """
     init!(section::Section, LE_point, TE_point, aero_model=nothing, aero_data=nothing)
 

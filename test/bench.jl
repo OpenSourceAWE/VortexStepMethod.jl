@@ -56,6 +56,7 @@ using LinearAlgebra
     # Initialize solvers for both LLT and VSM methods
     P = length(body_aero.panels)
     solver = Solver{P}()
+    nonlin_solver = Solver{P}(; solver_type=NONLIN)
 
     # Pre-allocate arrays
     gamma = rand(n_panels)
@@ -196,12 +197,17 @@ using LinearAlgebra
     end
 
     @testset "Allocation Tests for solve() and solve!()" begin
-        # Step 5: Solve using both methods
         result = @benchmark  solve_base!($solver, $body_aero, nothing) samples=1 evals=1  # 51 allocations
         @test result.allocs <= 55
         # time Python: 32.0 ms  Ryzen 7950x
         # time Julia:   0.45 ms Ryzen 7950x
         result = @benchmark  sol = solve!($solver, $body_aero, nothing) samples=1 evals=1 # 85 allocations
+        @test result.allocs <= 89
+
+        # Step 5: Solve using both methods
+        result = @benchmark  solve_base!($nonlin_solver, $body_aero, nothing) samples=1 evals=1  # 51 allocations
+        @test result.allocs <= 55
+        result = @benchmark  sol = solve!($nonlin_solver, $body_aero, nothing) samples=1 evals=1 # 85 allocations
         @test result.allocs <= 89
     end
 end
