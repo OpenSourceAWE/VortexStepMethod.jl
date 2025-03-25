@@ -644,3 +644,63 @@ function set_va!(body_aero::BodyAerodynamics, va_distribution::AbstractVector{Ab
     body_aero._va = va
     return nothing
 end
+
+
+"""
+    linearize(wing::RamAirWing, op_point; va=15.0)
+
+Linearize the ram air wing aero model around an operating point using automatic differentiation.
+
+# Arguments
+- `wing`: RamAirWing model to linearize
+- `op_point`: Operating point tuple (alpha_values, delta_values) in radians
+- `va`: Airspeed magnitude in m/s (default: 15.0)
+
+# Returns
+- `J`: Jacobian matrix (∂forces/∂inputs)
+- `forces_op`: Forces at the operating point [Fx, Fy, Fz, Mx, My, Mz]
+"""
+function linearize(solver::Solver, body_aero::BodyAerodynamics, wing::RamAirWing, y; 
+        alpha_idxs=1:4, 
+        delta_idxs=nothing,
+        va_idxs=nothing,
+        omega_idxs=nothing,
+        kwargs...)
+
+    init_va = copy(body_aero.va)
+    # Function to compute forces for given control inputs
+    function calc_results!(results, y)
+        if !isnothing(alpha_idxs) && isnothing(delta_idxs)
+            VortexStepMethod.smooth_deform!(wing, y[alpha_idxs], zeros(alpha_idxs))
+        elseif !isnothing(alpha_idxs) && !isnothing(delta_idxs)
+            VortexStepMethod.smooth_deform!(wing, y[alpha_idxs], y[delta_idxs])
+        end
+
+        VortexStepMethod.init!(body_aero; init_aero=false)
+
+        if !isnothing(va_idxs) && isnothing(omega_idxs)
+            set_va!(body_aero, y[va_idxs])
+        elseif !isnothing(va_idxs) && isnothing(omega_idxs)
+            set_va!(body_aero, y[va_idxs], y[omega_idxs])
+        elseif isnothing(va_idxs) && isnothing(omega_idxs)
+            set_va!(body_aero, init_va)
+        end
+
+        solve!(solver, body_aero; kwargs...)
+        results[1:3] .= solver.sol.force_coefficients
+        results[4:6] .= solver.sol.moment_coefficients
+        results[7:end] .= solver.sol.moment_coeff_dist
+        return nothing
+    end
+
+    results = zeros(3+3+length(solver.sol.moment_coeff_dist))
+    jac = zeros(length(results), length(y))
+    backend = AutoFiniteDiff(absstep=0.1, relstep=0.1)
+    prep = prepare_jacobian(calc_results!, results, backend, y)
+    @time jacobian!(calc_results!, results, jac, prep, backend, y)
+
+    calc_results!(results, y)
+    return jac, results
+end
+
+

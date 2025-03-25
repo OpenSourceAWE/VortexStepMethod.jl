@@ -21,11 +21,6 @@ if DEFORM
     @time VortexStepMethod.init!(body_aero; init_aero=false)
 end
 
-if LINEARIZE
-    println("Linearize")
-    @time jac, res = VortexStepMethod.linearize(wing, zeros(4); moment_frac=0.1)
-end
-
 # Create solvers
 vsm_solver = Solver(body_aero;
     aerodynamic_model_type=VSM,
@@ -44,6 +39,19 @@ vel_app = [
     sin(aoa_rad)
 ] * v_a
 set_va!(body_aero, vel_app)
+
+if LINEARIZE
+    println("Linearize")
+    @time jac, res = VortexStepMethod.linearize(
+        vsm_solver, 
+        body_aero, 
+        wing, 
+        [zeros(4); vel_app; zeros(3)]; 
+        alpha_idxs=1:4, 
+        va_idxs=5:7, 
+        omega_idxs=8:10,
+        moment_frac=0.1)
+end
 
 # Plotting polar data
 PLOT && plot_polar_data(body_aero)

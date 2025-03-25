@@ -494,7 +494,8 @@ Calculate the velocity induced by a vortex ring at a control point.
             end
             velind .+= tempvel
         else
-            throw(ArgumentError("Filament not initialized: $i, $([filaments[j].initialized for j in 1:5])"))
+            throw(ArgumentError("Filament not initialized: $i, $([filaments[j].initialized for j in 1:5]). 
+                Maybe you forgot to call set_va! before running solve."))
         end
     end
     return nothing
