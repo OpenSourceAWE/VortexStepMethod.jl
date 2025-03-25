@@ -517,6 +517,26 @@ function RamAirWing(obj_path, dat_path; alpha=0.0, crease_frac=0.75, wind_vel=10
     end
 end
 
+"""
+    smooth_deform!(wing::RamAirWing, theta_angles::AbstractVector, delta_angles::AbstractVector)
+
+Distribute control angles across wing panels and apply smoothing using a moving average filter.
+
+# Arguments
+- `wing::RamAirWing`: The wing to deform
+- `theta_angles::AbstractVector`: Twist angles in radians for each control section
+- `delta_angles::AbstractVector`: Trailing edge deflection angles in radians for each control section
+
+# Algorithm
+1. Distributes each control input to its corresponding group of panels
+2. Applies moving average smoothing with window size based on control group size
+
+# Errors
+- Throws `ArgumentError` if panel count is not divisible by the number of control inputs
+
+# Returns
+- `nothing` (modifies wing in-place)
+"""
 function smooth_deform!(wing::RamAirWing, theta_angles::AbstractVector, delta_angles::AbstractVector)
     !(wing.n_panels % length(theta_angles) == 0) && throw(ArgumentError("Number of angles has to be a multiple of number of panels"))
     n_panels = wing.n_panels
@@ -585,4 +605,52 @@ function deform!(wing::RamAirWing)
         @. wing.sections[i].TE_point = section1.LE_point + cos(wing.theta_dist[i]) * chord - sin(wing.theta_dist[i]) * normal
     end
     return nothing
+end
+
+"""
+    linearize(wing::RamAirWing, op_point; va=15.0)
+
+Linearize the ram air wing aero model around an operating point using automatic differentiation.
+
+# Arguments
+- `wing`: RamAirWing model to linearize
+- `op_point`: Operating point tuple (alpha_values, delta_values) in radians
+- `va`: Airspeed magnitude in m/s (default: 15.0)
+
+# Returns
+- `J`: Jacobian matrix (∂forces/∂inputs)
+- `forces_op`: Forces at the operating point [Fx, Fy, Fz, Mx, My, Mz]
+"""
+function linearize(wing::RamAirWing, alpha_op; va=[15.0, 0, 0], omega=zeros(MVec3), kwargs...)
+    # Create body aerodynamics
+    body_aero = BodyAerodynamics([wing])
+    VortexStepMethod.init!(body_aero)
+    
+    # Create VSM solver
+    vsm_solver = Solver(body_aero;
+        aerodynamic_model_type=VSM,
+        is_with_artificial_damping=false
+    )
+    
+    set_va!(body_aero, va, omega)
+    
+    # Function to compute forces for given control inputs
+    function calc_results!(results, alpha_values)
+        VortexStepMethod.smooth_deform!(wing, alpha_values, zeros(length(alpha_values)))
+        VortexStepMethod.init!(body_aero; init_aero=false)
+        solve!(vsm_solver, body_aero; kwargs...)
+        results[1:3] .= vsm_solver.sol.force_coefficients
+        results[4:6] .= vsm_solver.sol.moment_coefficients
+        results[7:end] .= vsm_solver.sol.moment_coeff_dist
+        return nothing
+    end
+    
+    results = zeros(6+length(vsm_solver.sol.moment_coeff_dist))
+    jac = zeros(length(results), length(alpha_op))
+    backend = AutoFiniteDiff(absstep=deg2rad(1), relstep=deg2rad(1))
+    prep = prepare_jacobian(calc_results!, results, backend, alpha_op)
+    @time jacobian!(calc_results!, results, jac, prep, backend, alpha_op)
+
+    calc_results!(results, alpha_op)
+    return jac, results
 end

@@ -2,9 +2,10 @@ using ControlPlots
 using VortexStepMethod
 using LinearAlgebra
 
-PLOT = true
+PLOT = false
 USE_TEX = false
 DEFORM = false
+LINEARIZE = true
 
 # Create wing geometry
 wing = RamAirWing("data/ram_air_kite_body.obj", "data/ram_air_kite_foil.dat")
@@ -18,6 +19,11 @@ if DEFORM
     @time VortexStepMethod.smooth_deform!(wing, deg2rad.([10,20,10,0]), deg2rad.([-10,0,-10,0]))
     println("Deform init")
     @time VortexStepMethod.init!(body_aero; init_aero=false)
+end
+
+if LINEARIZE
+    println("Linearize")
+    @time jac, res = VortexStepMethod.linearize(wing, zeros(4); moment_frac=0.1)
 end
 
 # Create solvers

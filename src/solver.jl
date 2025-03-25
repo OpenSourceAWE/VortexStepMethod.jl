@@ -11,7 +11,7 @@ Struct for storing the solution of the [solve!](@ref) function. Must contain all
 - force_coefficients::MVec3: Aerodynamic force coefficients [CFx, CFy, CFz] [-]
 - moment_coefficients::MVec3: Aerodynamic moment coefficients [CMx, CMy, CMz] [-]
 - moment_distribution::Vector{Float64}: Pitching moments around the spanwise vector of each panel. [Nm]
-- moment_coefficient_distribution::Vector{Float64}: Pitching moment coefficient around the spanwise vector of each panel. [-]
+- moment_coeff_dist::Vector{Float64}: Pitching moment coefficient around the spanwise vector of each panel. [-]
 - solver_status::SolverStatus: enum, see [SolverStatus](@ref)
 """
 @with_kw mutable struct VSMSolution{P}
@@ -37,7 +37,7 @@ Struct for storing the solution of the [solve!](@ref) function. Must contain all
     force_coefficients::MVec3 = zeros(MVec3)  
     moment_coefficients::MVec3 = zeros(MVec3)  
     moment_distribution::Vector{Float64} = zeros(P)
-    moment_coefficient_distribution::Vector{Float64} = zeros(P)
+    moment_coeff_dist::Vector{Float64} = zeros(P)
     solver_status::SolverStatus = FAILURE
 end
 
@@ -171,9 +171,9 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
    
     panel_width_array = solver.sol.panel_width_array
     solver.sol.moment_distribution .= 0
-    solver.sol.moment_coefficient_distribution .= 0
+    solver.sol.moment_coeff_dist .= 0
     moment_distribution = solver.sol.moment_distribution
-    moment_coefficient_distribution = solver.sol.moment_coefficient_distribution
+    moment_coeff_dist = solver.sol.moment_coeff_dist
     density = solver.density
     aerodynamic_model_type = solver.aerodynamic_model_type
 
@@ -267,7 +267,7 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
         # Calculate the moment distribution (moment on each panel)
         arm = (moment_frac - 0.25) * panel.chord
         moment_distribution[i] = ((ftotal_induced_va ⋅ panel.z_airf) * arm + panel_moment[i]) * panel.width
-        moment_coefficient_distribution[i] = moment_distribution[i] / (q_inf * projected_area)
+        moment_coeff_dist[i] = moment_distribution[i] / (q_inf * projected_area)
     end
 
     # update the result struct

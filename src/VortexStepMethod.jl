@@ -18,6 +18,7 @@ using SharedArrays
 using PreallocationTools
 using PrecompileTools
 using Pkg
+using DifferentiationInterface
 
 # Export public interface
 export Wing, Section, RamAirWing
