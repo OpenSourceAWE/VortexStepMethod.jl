@@ -19,7 +19,7 @@ using PreallocationTools
 using PrecompileTools
 using Pkg
 using DifferentiationInterface
-import SciMLBase: succesful_retcode
+import SciMLBase: successful_retcode
 
 # Export public interface
 export Wing, Section, RamAirWing

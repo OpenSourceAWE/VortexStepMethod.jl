@@ -146,34 +146,49 @@ end
 
     # Run analysis
     P = length(body_aero.panels)
-    solver_object = Solver{P}(
+    loop_solver = Solver{P}(
         aerodynamic_model_type=model, 
-        core_radius_fraction=core_radius_fraction
+        core_radius_fraction=core_radius_fraction,
+        solver_type=LOOP,
+        atol=1e-8,
+        rtol=1e-8
     )
-    results_NEW = solve(solver_object, body_aero; reference_point=[0,1,0])
+    nonlin_solver = Solver{P}(
+        aerodynamic_model_type=model, 
+        core_radius_fraction=core_radius_fraction,
+        solver_type=NONLIN,
+        atol=1e-8,
+        rtol=1e-8
+    )
+    results_NEW = solve(loop_solver, body_aero; reference_point=[0,1,0])
     # println(results_NEW)
 
     @test results_NEW isa Dict
 
-    sol = solve!(solver_object, body_aero; reference_point=[0,1,0])
+    @testset "Loop and nonlin solve!" begin
+        loop_sol = solve!(loop_solver, body_aero; reference_point=[0,1,0])
+        nonlin_sol = solve!(nonlin_solver, body_aero; reference_point=[0,1,0])
 
-    @test sol.force.x ≈ -117.97225244011436 atol=1e-4
-    @test sol.force.y ≈ 0.0 atol=1e-10
-    @test sol.force.z ≈ 1481.996390329679 atol=1e-4 rtol= 1e-4
+        @test all(isapprox.(nonlin_sol.gamma_distribution, loop_sol.gamma_distribution; atol=1e-4))
 
-    @test sol.moment.x ≈ -1481.996390329678 atol=1e-4 rtol= 1e-4
-    @test sol.moment.y ≈ 0.0 atol=1e-10
-    @test sol.moment.z ≈ -117.97225244011435 atol=1e-4
+        @test loop_sol.force.x ≈ -117.96518414816444 atol=1e-4
+        @test loop_sol.force.y ≈ 0.0 atol=1e-10
+        @test loop_sol.force.z ≈ 1481.996390329679 atol=1e-4 rtol= 1e-4
 
-    @test sol.force_coefficients[1] ≈ -0.039050322560956294 atol=1e-4 # CFx
-    @test sol.force_coefficients[2] ≈ 0.0                   atol=1e-4 # CFy
-    @test sol.force_coefficients[3] ≈ 0.49055973654418716   atol=1e-4 # CFz
-    @test sol.force_coefficients[3] / sol.force_coefficients[1] ≈ sol.force[3] / sol.force[1]
-    @test sol.moment_distribution[1] ≈ -0.0006683746751654071 atol=1e-8
-    @test sol.moment_coeff_dist[1] ≈ -2.212405554436003e-7 atol=1e-10
-    @test sol.moment_distribution[1] / sol.moment_distribution[2] ≈ sol.moment_coeff_dist[1] / sol.moment_coeff_dist[2]
+        @test loop_sol.moment.x ≈ -1481.996390329678 atol=1e-4 rtol= 1e-4
+        @test loop_sol.moment.y ≈ 0.0 atol=1e-10
+        @test loop_sol.moment.z ≈ -117.9651841481644 atol=1e-4
 
-    @test sol.solver_status == FEASIBLE
+        @test loop_sol.force_coefficients[1] ≈ -0.039050322560956294 atol=1e-4 # CFx
+        @test loop_sol.force_coefficients[2] ≈ 0.0                   atol=1e-4 # CFy
+        @test loop_sol.force_coefficients[3] ≈ 0.49055973654418716   atol=1e-4 # CFz
+        @test loop_sol.force_coefficients[3] / loop_sol.force_coefficients[1] ≈ loop_sol.force[3] / loop_sol.force[1]
+        @test loop_sol.moment_distribution[1] ≈ -0.0006683569356186426 atol=1e-8
+        @test loop_sol.moment_coeff_dist[1] ≈ -2.212405554436003e-7 atol=1e-10
+        @test loop_sol.moment_distribution[1] / loop_sol.moment_distribution[2] ≈ loop_sol.moment_coeff_dist[1] / loop_sol.moment_coeff_dist[2]
+
+        @test loop_sol.solver_status == FEASIBLE
+    end
 
     # Calculate forces using uncorrected alpha
     alpha = results_NEW["alpha_uncorrected"]

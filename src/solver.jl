@@ -73,7 +73,7 @@ Main solver structure for the Vortex Step Method.See also: [solve](@ref)
 - `aerodynamic_model_type`::Model = VSM: The model type, see: [Model](@ref)
 - density::Float64 = 1.225: Air density [kg/m³] 
 - `max_iterations`::Int64 = 1500
-- `allowed_error`::Float64 = 1e-5: relative error
+- `rtol`::Float64 = 1e-5: relative error
 - `tol_reference_error`::Float64 = 0.001
 - `relaxation_factor`::Float64 = 0.03: Relaxation factor for convergence 
 
@@ -96,7 +96,8 @@ sol::VSMSolution = VSMSolution(): The result of calling [solve!](@ref)
     aerodynamic_model_type::Model = VSM
     density::Float64 = 1.225
     max_iterations::Int64 = 1500
-    allowed_error::Float64 = 1e-5
+    atol::Float64 = 1e-5
+    rtol::Float64 = 1e-5
     tol_reference_error::Float64 = 0.001
     relaxation_factor::Float64 = 0.03
     
@@ -492,10 +493,10 @@ function gamma_loop!(
             nothing
         end
         prob = NonlinearProblem(f_nonlin!, solver.lr.gamma_new, nothing)
-        sol = NonlinearSolve.solve(prob, NewtonRaphson(autodiff=AutoFiniteDiff()))
+        sol = NonlinearSolve.solve(prob, NewtonRaphson(autodiff=AutoFiniteDiff()); abstol=solver.atol, reltol=solver.rtol)
         gamma .= sol.u
         solver.lr.gamma_new .= sol.u
-        solver.lr.converged = succesful_retcode(sol)
+        solver.lr.converged = SciMLBase.successful_retcode(sol)
     end
 
     if solver.solver_type == LOOP
@@ -532,7 +533,7 @@ function gamma_loop!(
 
             @debug "Iteration: $i, normalized_error: $normalized_error, is_damping_applied: $is_damping_applied"
 
-            if normalized_error < solver.allowed_error
+            if normalized_error < solver.rtol
                 solver.lr.converged = true
                 break
             end
