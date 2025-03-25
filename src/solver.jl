@@ -102,7 +102,7 @@ sol::VSMSolution = VSMSolution(): The result of calling [solve!](@ref)
 
     # Nonlin solver fields
     prob::Union{NonlinearProblem, Nothing} = nothing
-    cache::Union{NonlinearSolve.AbstractNonlinearSolveCache, Nothing} = nothing
+    nonlin_cache::Union{NonlinearSolve.AbstractNonlinearSolveCache, Nothing} = nothing
     atol::Float64 = 1e-5
     
     # Damping settings
@@ -118,7 +118,10 @@ sol::VSMSolution = VSMSolution(): The result of calling [solve!](@ref)
     # Intermediate results
     lr::LoopResult{P} = LoopResult(P)
     br::BaseResult{P} = BaseResult{P}()
-
+    cache::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}} = [LazyBufferCache() for _ in 1:11]
+    cache_base::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}}  = [LazyBufferCache()]
+    cache_solve::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}} = [LazyBufferCache()]
+    
     # Solution
     sol::VSMSolution{P} = VSMSolution(P)
 end
@@ -127,10 +130,6 @@ function Solver(body_aero; kwargs...)
     P = length(body_aero.panels)
     return Solver{P}(; kwargs...)
 end
-
-const cache = [LazyBufferCache() for _ in 1:11]
-const cache_base  = [LazyBufferCache()]
-const cache_solve = [LazyBufferCache()]
 
 """
     solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=solver.sol.gamma_distribution; 
@@ -171,7 +170,7 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
     cm_array = solver.sol.cm_array
     converged = solver.lr.converged
     alpha_array = solver.lr.alpha_array
-    alpha_corrected = cache_solve[1][alpha_array]
+    alpha_corrected = solver.cache_solve[1][alpha_array]
     v_a_array = solver.lr.v_a_array
     panels = body_aero.panels
    
@@ -389,7 +388,7 @@ function solve_base!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribu
                             solver.br.va_unit_array)
 
     # Initialize gamma distribution
-    gamma_initial = cache_base[1][solver.sol.chord_array]
+    gamma_initial = solver.cache_base[1][solver.sol.chord_array]
     if isnothing(gamma_distribution)
         if solver.type_initial_gamma_distribution == ELLIPTIC
             calculate_circulation_distribution_elliptical_wing(gamma_initial, body_aero)
@@ -440,17 +439,17 @@ function gamma_loop!(
     solver.lr.alpha_array .= body_aero.alpha_array
     solver.lr.v_a_array   .= body_aero.v_a_array
     
-    va_magw_array            = cache[1][solver.lr.v_a_array]
-    gamma                    = cache[2][solver.lr.gamma_new]
-    abs_gamma_new            = cache[3][solver.lr.gamma_new]
-    induced_velocity_all     = cache[4][va_array]
-    relative_velocity_array  = cache[5][va_array]
-    relative_velocity_crossz = cache[6][va_array]
-    v_acrossz_array          = cache[7][va_array]
-    cl_array                 = cache[8][solver.lr.gamma_new]
-    damp                     = cache[9][solver.lr.gamma_new]
-    v_normal_array           = cache[10][solver.lr.gamma_new]
-    v_tangential_array       = cache[11][solver.lr.gamma_new]
+    va_magw_array            = solver.cache[1][solver.lr.v_a_array]
+    gamma                    = solver.cache[2][solver.lr.gamma_new]
+    abs_gamma_new            = solver.cache[3][solver.lr.gamma_new]
+    induced_velocity_all     = solver.cache[4][va_array]
+    relative_velocity_array  = solver.cache[5][va_array]
+    relative_velocity_crossz = solver.cache[6][va_array]
+    v_acrossz_array          = solver.cache[7][va_array]
+    cl_array                 = solver.cache[8][solver.lr.gamma_new]
+    damp                     = solver.cache[9][solver.lr.gamma_new]
+    v_normal_array           = solver.cache[10][solver.lr.gamma_new]
+    v_tangential_array       = solver.cache[11][solver.lr.gamma_new]
 
     AIC_x, AIC_y, AIC_z = body_aero.AIC[1, :, :], body_aero.AIC[2, :, :], body_aero.AIC[3, :, :]
 
@@ -500,10 +499,10 @@ function gamma_loop!(
                 nothing
             end
             solver.prob = NonlinearProblem(f_nonlin!, solver.lr.gamma_new, nothing)
-            solver.cache = init(solver.prob, NewtonRaphson(autodiff=AutoFiniteDiff()); abstol=solver.atol, reltol=solver.rtol)
+            solver.nonlin_cache = init(solver.prob, NewtonRaphson(autodiff=AutoFiniteDiff()); abstol=solver.atol, reltol=solver.rtol)
         end
         
-        sol = NonlinearSolve.solve!(solver.cache)
+        sol = NonlinearSolve.solve!(solver.nonlin_cache)
         gamma .= sol.u
         solver.lr.gamma_new .= sol.u
         solver.lr.converged = SciMLBase.successful_retcode(sol)
@@ -661,7 +660,8 @@ function linearize(solver::Solver, body_aero::BodyAerodynamics, wing::RamAirWing
     jac = zeros(length(results), length(y))
     backend = AutoFiniteDiff(absstep=1e-3, relstep=1e-3)
     prep = prepare_jacobian(calc_results!, results, backend, y)
-    jacobian!(calc_results!, results, jac, prep, backend, y)
+    println("jac")
+    @time jacobian!(calc_results!, results, jac, prep, backend, y)
 
     calc_results!(results, y)
     return jac, results

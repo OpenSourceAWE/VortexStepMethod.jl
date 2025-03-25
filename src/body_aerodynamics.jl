@@ -34,6 +34,7 @@ Main structure for calculating aerodynamic properties of bodies.
     AIC::Array{Float64, 3} = zeros(3, P, P)
     projected_area::Float64 = one(Float64)
     y::MVector{P, Float64} = zeros(MVector{P, Float64})
+    cache::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}} = [LazyBufferCache() for _ in 1:5]
 end
 
 """
@@ -279,8 +280,6 @@ function calculate_stall_angle_list(panels::Vector{Panel};
     return stall_angles
 end
 
-const cache_body = [LazyBufferCache() for _ in 1:5]
-
 """
     update_effective_angle_of_attack_if_VSM(body_aero::BodyAerodynamics, gamma,
                                           core_radius_fraction,
@@ -313,7 +312,7 @@ function update_effective_angle_of_attack!(alpha_corrected,
     n_cols = size(body_aero.AIC, 3)
 
     # Preallocate induced velocity array
-    induced_velocity = cache_body[1][va_array]
+    induced_velocity = body_aero.cache[1][va_array]
 
     # Calculate each component with explicit loops
     for j in 1:3  # For each x/y/z component
@@ -327,13 +326,13 @@ function update_effective_angle_of_attack!(alpha_corrected,
     end
 
     # In-place relative velocity calculation
-    relative_velocity = cache_body[2][va_array]
+    relative_velocity = body_aero.cache[2][va_array]
     relative_velocity .= va_array .+ induced_velocity
 
     # Preallocate and compute dot products manually
     n = size(relative_velocity, 1)
-    v_normal     = cache_body[3][relative_velocity]
-    v_tangential = cache_body[4][relative_velocity]
+    v_normal     = body_aero.cache[3][relative_velocity]
+    v_tangential = body_aero.cache[4][relative_velocity]
     
     @inbounds for i in 1:n
         vn = 0.0
