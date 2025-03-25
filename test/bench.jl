@@ -194,5 +194,15 @@ using LinearAlgebra
         @info "Calculate Results Allocations: $(result.allocs) Memory: $(result.memory)"
         @test result.allocs ≤ 300
     end
+
+    @testset "Allocation Tests for solve() and solve!()" begin
+        # Step 5: Solve using both methods
+        result = @benchmark  solve_base!($solver, $body_aero, nothing) samples=1 evals=1  # 51 allocations
+        @test result.allocs <= 55
+        # time Python: 32.0 ms  Ryzen 7950x
+        # time Julia:   0.45 ms Ryzen 7950x
+        result = @benchmark  sol = solve!($solver, $body_aero, nothing) samples=1 evals=1 # 85 allocations
+        @test result.allocs <= 89
+    end
 end
 
