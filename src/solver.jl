@@ -445,7 +445,7 @@ function gamma_loop!(
     cl_array                 = cache[8][gamma]
     damp                     = cache[9][cl_array]
     v_normal_array           = cache[10][cl_array]
-    v_tangential_array       = cache[11][v_normal_array]
+    v_tangential_array       = cache[11][cl_array]
 
     AIC_x, AIC_y, AIC_z = body_aero.AIC[1, :, :], body_aero.AIC[2, :, :], body_aero.AIC[3, :, :]
 
@@ -501,11 +501,11 @@ function gamma_loop!(
     end
 
     if solver.solver_type == LOOP
-        function f_loop!(gamma_new, gamma)
+        function f_loop!(gamma_new, gamma, damp)
             calc_gamma_new!(gamma_new, gamma)
             # Update gamma with relaxation and damping
-            gamma_new .= (1 - relaxation_factor) .* gamma .+ 
-                    relaxation_factor .* gamma_new .+ damp
+            @. gamma_new = (1 - relaxation_factor) * gamma + 
+                    relaxation_factor * gamma_new + damp
             
             # Apply damping if needed
             if solver.is_with_artificial_damping
@@ -515,12 +515,13 @@ function gamma_loop!(
                 damp .= 0.0
                 is_damping_applied = false
             end
+            nothing
         end
         iters = 0
         for i in 1:solver.max_iterations
             iters += 1
 
-            f_loop!(solver.lr.gamma_new, gamma)
+            f_loop!(solver.lr.gamma_new, gamma, damp)
 
             # Check convergence
             abs_gamma_new .= abs.(solver.lr.gamma_new)
