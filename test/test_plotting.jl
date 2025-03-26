@@ -64,8 +64,8 @@ plt.ioff()
 
         # Step 5: Initialize the solvers
         P = length(body_aero.panels)
-        vsm_solver = Solver{P}(aerodynamic_model_type=VSM)
-        llt_solver = Solver{P}(aerodynamic_model_type=LLT)
+        vsm_solver = Solver(body_aero; aerodynamic_model_type=VSM)
+        llt_solver = Solver(body_aero; aerodynamic_model_type=LLT)
 
         # Step 6: Solve the VSM and LLT
         results_vsm = solve(vsm_solver, body_aero)

@@ -17,13 +17,13 @@ Struct for storing the solution of the [solve!](@ref) function. Must contain all
 - `gamma_distribution`::Union{Nothing, Vector{Float64}}: Vector containing the panel circulations.
 - force::MVec3: Aerodynamic force vector in KB reference frame [N]
 - moment::MVec3: Aerodynamic moments [Mx, My, Mz] around the reference point [Nm]
-- force_coefficients::MVec3: Aerodynamic force coefficients [CFx, CFy, CFz] [-]
-- `moment_coefficients`::MVec3: Aerodynamic moment coefficients [CMx, CMy, CMz] [-]
-- `moment_distribution`::Vector{Float64}: Pitching moments around the spanwise vector of each panel. [Nm]
-- `moment_coefficient_distribution`::Vector{Float64}: Pitching moment coefficient around the spanwise vector of each panel. [-]
+- force_coeffs::MVec3: Aerodynamic force coefficients [CFx, CFy, CFz] [-]
+- `moment_coeffs`::MVec3: Aerodynamic moment coefficients [CMx, CMy, CMz] [-]
+- `moment_dist`::Vector{Float64}: Pitching moments around the spanwise vector of each panel. [Nm]
+- `moment_coeff_dist`::Vector{Float64}: Pitching moment coefficient around the spanwise vector of each panel. [-]
 - `solver_status`::SolverStatus: enum, see [SolverStatus](@ref)
 """
-@with_kw mutable struct VSMSolution{P}
+@with_kw mutable struct VSMSolution{P,G}
     ### private vectors of solve_base!
     _x_airf_array::Matrix{Float64} = zeros(P, 3)
     _y_airf_array::Matrix{Float64} = zeros(P, 3)
@@ -43,15 +43,13 @@ Struct for storing the solution of the [solve!](@ref) function. Must contain all
     gamma_distribution::Union{Nothing, Vector{Float64}} = nothing
     force::MVec3 = zeros(MVec3)          
     moment::MVec3 = zeros(MVec3)       
-    force_coefficients::MVec3 = zeros(MVec3)  
-    moment_coefficients::MVec3 = zeros(MVec3)  
-    moment_distribution::MVector{P, Float64} = zeros(MVector{P, Float64})
+    force_coeffs::MVec3 = zeros(MVec3)  
+    moment_coeffs::MVec3 = zeros(MVec3)  
+    moment_dist::MVector{P, Float64} = zeros(MVector{P, Float64})
     moment_coeff_dist::MVector{P, Float64} = zeros(MVector{P, Float64})
+    group_moment_dist::MVector{G, Float64} = zeros(MVector{G, Float64})
+    group_moment_coeff_dist::MVector{G, Float64} = zeros(MVector{G, Float64})
     solver_status::SolverStatus = FAILURE
-end
-
-function VSMSolution(P)
-    VSMSolution{P}()
 end
 
 # Output of the function gamma_loop!
@@ -60,10 +58,6 @@ end
     gamma_new::MVector{P, Float64}   = zeros(MVector{P, Float64})
     alpha_array::MVector{P, Float64} = zeros(MVector{P, Float64}) # TODO: Is this different from BodyAerodynamics.alpha_array ?
     v_a_array::MVector{P, Float64}   = zeros(MVector{P, Float64})
-end
-
-function LoopResult(P)
-    LoopResult{P}()
 end
 
 @with_kw struct BaseResult{P}
@@ -99,7 +93,7 @@ Main solver structure for the Vortex Step Method.See also: [solve](@ref)
 ## Solution
 sol::VSMSolution = VSMSolution(): The result of calling [solve!](@ref) 
 """
-@with_kw mutable struct Solver{P}
+@with_kw mutable struct Solver{P,G}
     # General settings
     solver_type::SolverType = LOOP
     aerodynamic_model_type::Model = VSM
@@ -125,7 +119,7 @@ sol::VSMSolution = VSMSolution(): The result of calling [solve!](@ref)
     is_only_f_and_gamma_output::Bool = false
 
     # Intermediate results
-    lr::LoopResult{P} = LoopResult(P)
+    lr::LoopResult{P} = LoopResult{P}()
     br::BaseResult{P} = BaseResult{P}()
     cache::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}} = [LazyBufferCache() for _ in 1:11]
     cache_base::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}}  = [LazyBufferCache()]
@@ -133,12 +127,13 @@ sol::VSMSolution = VSMSolution(): The result of calling [solve!](@ref)
     cache_lin::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}} = [LazyBufferCache() for _ in 1:4]
     
     # Solution
-    sol::VSMSolution{P} = VSMSolution(P)
+    sol::VSMSolution{P,G} = VSMSolution{P,G}()
 end
 
 function Solver(body_aero; kwargs...)
     P = length(body_aero.panels)
-    return Solver{P}(; kwargs...)
+    G = sum([wing.n_groups for wing in body_aero.wings])
+    return Solver{P,G}(; kwargs...)
 end
 
 """
@@ -185,9 +180,9 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
     panels = body_aero.panels
    
     panel_width_array = solver.sol.panel_width_array
-    solver.sol.moment_distribution .= 0
+    solver.sol.moment_dist .= 0
     solver.sol.moment_coeff_dist .= 0
-    moment_distribution = solver.sol.moment_distribution
+    moment_dist = solver.sol.moment_dist
     moment_coeff_dist = solver.sol.moment_coeff_dist
     density = solver.density
     aerodynamic_model_type = solver.aerodynamic_model_type
@@ -281,8 +276,26 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
 
         # Calculate the moment distribution (moment on each panel)
         arm = (moment_frac - 0.25) * panel.chord
-        moment_distribution[i] = ((ftotal_induced_va ⋅ panel.z_airf) * arm + panel_moment[i]) * panel.width
-        moment_coeff_dist[i] = moment_distribution[i] / (q_inf * projected_area)
+        moment_dist[i] = ((ftotal_induced_va ⋅ panel.z_airf) * arm + panel_moment[i]) * panel.width
+        moment_coeff_dist[i] = moment_dist[i] / (q_inf * projected_area)
+    end
+
+    group_moment_dist = solver.sol.group_moment_dist
+    group_moment_coeff_dist = solver.sol.group_moment_coeff_dist
+    group_moment_dist .= 0.0
+    group_moment_coeff_dist .= 0.0
+    panel_idx = 1
+    group_idx = 1
+    for wing in body_aero.wings
+        panels_per_group = wing.n_panels ÷ wing.n_groups
+        for _ in 1:wing.n_groups
+            for _ in 1:panels_per_group
+                group_moment_dist[group_idx] += moment_dist[panel_idx]
+                group_moment_coeff_dist[group_idx] += moment_coeff_dist[panel_idx]
+                panel_idx += 1
+            end
+            group_idx += 1
+        end
     end
 
     # update the result struct
@@ -296,8 +309,8 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
         sum(solver.sol.m_body_3D[2,:]),
         sum(solver.sol.m_body_3D[3,:])
     )
-    solver.sol.force_coefficients .= solver.sol.force ./ (q_inf * projected_area)
-    solver.sol.moment_coefficients .= solver.sol.moment ./ (q_inf * projected_area)
+    solver.sol.force_coeffs .= solver.sol.force ./ (q_inf * projected_area)
+    solver.sol.moment_coeffs .= solver.sol.moment ./ (q_inf * projected_area)
     if converged
         # TODO: Check if the result if feasible if converged
         solver.sol.solver_status = FEASIBLE
@@ -640,6 +653,8 @@ function linearize(solver::Solver, body_aero::BodyAerodynamics, wing::RamAirWing
         omega_idxs=nothing,
         kwargs...) where T
 
+    !(length(body_aero.wings) == 1) && throw(ArgumentError("Linearization only works for a body_aero with one wing"))
+
     init_va = body_aero.cache[1][body_aero.va]
     init_va .= body_aero.va
     if !isnothing(theta_idxs)
@@ -680,9 +695,12 @@ function linearize(solver::Solver, body_aero::BodyAerodynamics, wing::RamAirWing
         end
 
         solve!(solver, body_aero; kwargs...)
-        results[1:3] .= solver.sol.force_coefficients
-        results[4:6] .= solver.sol.moment_coefficients
-        results[7:end] .= solver.sol.moment_coeff_dist
+        results[1:3] .= solver.sol.force
+        results[4:6] .= solver.sol.moment
+
+
+
+        results[7:end] .= solver.sol.moment_dist
         return nothing
     end
 

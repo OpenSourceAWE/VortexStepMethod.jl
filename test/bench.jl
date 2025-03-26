@@ -55,8 +55,8 @@ using LinearAlgebra
 
     # Initialize solvers for both LLT and VSM methods
     P = length(body_aero.panels)
-    solver = Solver{P}()
-    nonlin_solver = Solver{P}(; solver_type=NONLIN)
+    solver = Solver(body_aero)
+    nonlin_solver = Solver(body_aero; solver_type=NONLIN)
 
     # Pre-allocate arrays
     gamma = rand(n_panels)
@@ -126,7 +126,7 @@ using LinearAlgebra
                 body_aero = BodyAerodynamics([wing])
                 
                 P = length(body_aero.panels)
-                solver = Solver{P}(
+                solver = Solver(body_aero;
                     aerodynamic_model_type=model
                 )
                 solver.sol._va_array .= va_array

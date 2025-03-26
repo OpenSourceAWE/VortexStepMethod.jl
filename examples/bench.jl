@@ -32,29 +32,29 @@ add_section!(wing,
     INVISCID)
 
 # Step 3: Initialize aerodynamics
-wa = BodyAerodynamics([wing])
+body_aero = BodyAerodynamics([wing])
 
 # Set inflow conditions
 vel_app = [cos(alpha), 0.0, sin(alpha)] .* v_a
-set_va!(wa, vel_app)
+set_va!(body_aero, vel_app)
 
 # Step 4: Initialize solvers for both LLT and VSM methods
-P = length(wa.panels)
-llt_solver = Solver{P}(aerodynamic_model_type=LLT)
-vsm_solver = Solver{P}(aerodynamic_model_type=VSM)
+P = length(body_aero.panels)
+llt_solver = Solver(body_aero; aerodynamic_model_type=LLT)
+vsm_solver = Solver(body_aero; aerodynamic_model_type=VSM)
 
 # Step 5: Solve using both methods
-results_vsm = solve(vsm_solver, wa)
-sol = solve!(vsm_solver, wa)
-results_vsm_base = solve_base!(vsm_solver, wa)
+results_vsm = solve(vsm_solver, body_aero)
+sol = solve!(vsm_solver, body_aero)
+results_vsm_base = solve_base!(vsm_solver, body_aero)
 println("Rectangular wing, solve_base!:")
-@time results_vsm_base = solve_base!(vsm_solver, wa)
+@time results_vsm_base = solve_base!(vsm_solver, body_aero)
 # time Python: 32.0  ms Ryzen 7950x
 # time Julia:   0.42 ms Ryzen 7950x
 println("Rectangular wing, solve!:")
-@time sol = solve!(vsm_solver, wa)
+@time sol = solve!(vsm_solver, body_aero)
 println("Rectangular wing, solve:")
-@time solve(vsm_solver, wa)
+@time solve(vsm_solver, body_aero)
 
 # Create wing geometry
 wing = RamAirWing("data/ram_air_kite_body.obj", "data/ram_air_kite_foil.dat")

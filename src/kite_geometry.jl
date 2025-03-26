@@ -435,12 +435,15 @@ Constructor for a [RamAirWing](@ref) that allows to use an `.obj` and a `.dat` f
 - `spanwise_direction`=[0.0, 1.0, 0.0]
 - `remove_nan::Bool`: Wether to remove the NaNs from interpolations or not
 """
-function RamAirWing(obj_path, dat_path; crease_frac=0.9, wind_vel=10., mass=1.0, 
-                  n_panels=56, n_sections=n_panels+1, n_groups=n_panels÷4, spanwise_distribution=UNCHANGED, 
-                  spanwise_direction=[0.0, 1.0, 0.0], remove_nan=true, align_to_principal=false,
-                  alpha_range=deg2rad.(-5:1:20), delta_range=deg2rad.(-5:1:20), interp_steps=n_sections
-                  )
+function RamAirWing(
+    obj_path, dat_path; 
+    crease_frac=0.9, wind_vel=10., mass=1.0, 
+    n_panels=56, n_sections=n_panels+1, n_groups=4, spanwise_distribution=UNCHANGED, 
+    spanwise_direction=[0.0, 1.0, 0.0], remove_nan=true, align_to_principal=false,
+    alpha_range=deg2rad.(-5:1:20), delta_range=deg2rad.(-5:1:20), interp_steps=n_sections # TODO: check if interpolations are still needed
+)
 
+    !(n_panels % n_groups == 0) && throw(ArgumentError("Number of panels should be divisible by number of groups"))
     !isapprox(spanwise_direction, [0.0, 1.0, 0.0]) && throw(ArgumentError("Spanwise direction has to be [0.0, 1.0, 0.0], not $spanwise_direction"))
 
     # Load or create polars

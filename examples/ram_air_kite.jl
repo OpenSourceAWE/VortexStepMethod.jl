@@ -22,7 +22,7 @@ if DEFORM
 end
 
 # Create solvers
-vsm_solver = Solver(body_aero;
+solver = Solver(body_aero;
     aerodynamic_model_type=VSM,
     is_with_artificial_damping=false,
     rtol=1e-5,
@@ -45,7 +45,7 @@ set_va!(body_aero, vel_app)
 if LINEARIZE
     println("Linearize")
     jac, res = VortexStepMethod.linearize(
-        vsm_solver, 
+        solver, 
         body_aero, 
         wing, 
         [zeros(4); vel_app; zeros(3)]; 
@@ -54,7 +54,7 @@ if LINEARIZE
         omega_idxs=8:10,
         moment_frac=0.1)
     @time jac, res = VortexStepMethod.linearize(
-        vsm_solver, 
+        solver, 
         body_aero, 
         wing, 
         [zeros(4); vel_app; zeros(3)]; 
@@ -82,8 +82,8 @@ PLOT && plot_geometry(
 
 # Solving and plotting distributions
 println("Solve")
-results = VortexStepMethod.solve(vsm_solver, body_aero; log=true)
-@time results = solve(vsm_solver, body_aero; log=true)
+results = VortexStepMethod.solve(solver, body_aero; log=true)
+@time results = solve(solver, body_aero; log=true)
 
 body_y_coordinates = [panel.aero_center[2] for panel in body_aero.panels]
 
@@ -99,7 +99,7 @@ PLOT && plot_distribution(
 )
 
 PLOT && plot_polars(
-    [vsm_solver],
+    [solver],
     [body_aero],
     [
         "VSM from Ram Air Kite OBJ and DAT file",
