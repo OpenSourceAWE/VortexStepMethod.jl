@@ -128,11 +128,11 @@ using LinearAlgebra
                 solver = Solver{P}(
                     aerodynamic_model_type=model
                 )
-                solver.sol.va_array .= va_array
-                solver.sol.chord_array .= chord_array
-                solver.sol.x_airf_array .= x_airf_array
-                solver.sol.y_airf_array .= y_airf_array
-                solver.sol.z_airf_array .= z_airf_array
+                solver.sol._va_array .= va_array
+                solver.sol._chord_array .= chord_array
+                solver.sol._x_airf_array .= x_airf_array
+                solver.sol._y_airf_array .= y_airf_array
+                solver.sol._z_airf_array .= z_airf_array
                 result = @benchmark gamma_loop!(
                     $solver,
                     $body_aero,
