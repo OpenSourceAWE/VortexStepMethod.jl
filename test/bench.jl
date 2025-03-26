@@ -29,13 +29,26 @@ using LinearAlgebra
     alpha_deg = 30.0       # Angle of attack [degrees]
     alpha = deg2rad(alpha_deg)
     
-    unchanged_wing = Wing(n_panels, spanwise_distribution=UNCHANGED)
     wing = Wing(n_panels, spanwise_distribution=LINEAR)
     add_section!(wing, 
         [0.0, span/2, 0.0],    # Left tip LE 
         [chord, span/2, 0.0],  # Left tip TE
         INVISCID)
     add_section!(wing, 
+        [0.0, -span/2, 0.0],   # Right tip LE
+        [chord, -span/2, 0.0], # Right tip TE
+        INVISCID)
+
+    unchanged_wing = Wing(2, spanwise_distribution=UNCHANGED)
+    add_section!(unchanged_wing, 
+        [0.0, span/2, 0.0],    # Left tip LE 
+        [chord, span/2, 0.0],  # Left tip TE
+        INVISCID)
+    add_section!(unchanged_wing, 
+        [0.0, 0.0, 0.0],    # Left tip LE 
+        [chord, 0.0, 0.0],  # Left tip TE
+        INVISCID)
+    add_section!(unchanged_wing, 
         [0.0, -span/2, 0.0],   # Right tip LE
         [chord, -span/2, 0.0], # Right tip TE
         INVISCID)

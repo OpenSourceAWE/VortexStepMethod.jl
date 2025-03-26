@@ -67,10 +67,10 @@ function BodyAerodynamics(
             section.LE_point .-= kite_body_origin
             section.TE_point .-= kite_body_origin
         end
-        if wing.spanwise_distribution == UNCHANGED && !(wing.n_panels == length(wing.sections) - 1)
-            @warn "Changing wing.n_panels from $(wing.n_panels) to $(length(wing.sections) - 1)"
-            wing.n_panels = length(wing.sections) - 1
+        if wing.spanwise_distribution == UNCHANGED
             wing.refined_sections = wing.sections
+            !(wing.n_panels == length(wing.sections) - 1) && 
+                throw(ArgumentError("(wing.n_panels = $(wing.n_panels)) != (length(wing.sections) - 1 = $(length(wing.sections) - 1))"))
         else
             wing.refined_sections = Section[Section() for _ in 1:wing.n_panels+1]
         end
