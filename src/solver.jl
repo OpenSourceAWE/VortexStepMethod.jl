@@ -29,8 +29,8 @@ Struct for storing the solution of the [solve!](@ref) function. Must contain all
     _y_airf_array::Matrix{Float64} = zeros(P, 3)
     _z_airf_array::Matrix{Float64} = zeros(P, 3)
     _va_array::Matrix{Float64} = zeros(P, 3)
-    chord_array::Vector{Float64} = zeros(P)
-    ###
+    _chord_array::Vector{Float64} = zeros(P)
+    ### end of private vectors
     panel_width_array::Vector{Float64} = zeros(P)
     cl_array::Vector{Float64} = zeros(P)
     cd_array::Vector{Float64} = zeros(P)
@@ -199,9 +199,9 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
     panel_moment = solver.sol.panel_moment
 
     # Compute using fused broadcasting (no intermediate allocations)
-    @. lift = cl_array * 0.5 * density * v_a_array^2 * solver.sol.chord_array
-    @. drag = cd_array * 0.5 * density * v_a_array^2 * solver.sol.chord_array
-    @. panel_moment = cm_array * 0.5 * density * v_a_array^2 * solver.sol.chord_array
+    @. lift = cl_array * 0.5 * density * v_a_array^2 * solver.sol._chord_array
+    @. drag = cd_array * 0.5 * density * v_a_array^2 * solver.sol._chord_array
+    @. panel_moment = cm_array * 0.5 * density * v_a_array^2 * solver.sol._chord_array
 
     # Calculate alpha corrections based on model type
     if aerodynamic_model_type == VSM                             # 64 bytes
@@ -337,7 +337,7 @@ function solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=n
         solver.mu,
         solver.lr.alpha_array,
         solver.lr.v_a_array,
-        solver.sol.chord_array,
+        solver.sol._chord_array,
         solver.sol._x_airf_array,
         solver.sol._y_airf_array,
         solver.sol._z_airf_array,
@@ -372,7 +372,7 @@ function solve_base!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribu
     solver.sol._y_airf_array .= 0
     solver.sol._z_airf_array .= 0
     solver.sol._va_array .= 0
-    solver.sol.chord_array .= 0
+    solver.sol._chord_array .= 0
 
     # Fill arrays from panels
     for (i, panel) in enumerate(panels)
@@ -380,7 +380,7 @@ function solve_base!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribu
         solver.sol._y_airf_array[i, :] .= panel.y_airf
         solver.sol._z_airf_array[i, :] .= panel.z_airf
         solver.sol._va_array[i, :] .= panel.va
-        solver.sol.chord_array[i] = panel.chord
+        solver.sol._chord_array[i] = panel.chord
     end
 
     # Calculate unit vectors
@@ -392,7 +392,7 @@ function solve_base!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribu
                             solver.br.va_unit_array)
 
     # Initialize gamma distribution
-    gamma_initial = cache_base[1][solver.sol.chord_array]
+    gamma_initial = cache_base[1][solver.sol._chord_array]
     if isnothing(gamma_distribution)
         if solver.type_initial_gamma_distribution == ELLIPTIC
             calculate_circulation_distribution_elliptical_wing(gamma_initial, body_aero)
@@ -434,7 +434,7 @@ function gamma_loop!(
     log::Bool = true
 )
     va_array = solver.sol._va_array
-    chord_array = solver.sol.chord_array
+    chord_array = solver.sol._chord_array
     x_airf_array = solver.sol._x_airf_array
     y_airf_array = solver.sol._y_airf_array
     z_airf_array = solver.sol._z_airf_array
