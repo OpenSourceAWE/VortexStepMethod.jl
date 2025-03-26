@@ -24,7 +24,7 @@ import SciMLBase: successful_retcode
 # Export public interface
 export Wing, Section, RamAirWing
 export BodyAerodynamics
-export Solver, solve, solve_base!, solve!, VSMSolution
+export Solver, solve, solve_base!, solve!, VSMSolution, linearize
 export calculate_results
 export add_section!, set_va!
 export calculate_span, calculate_projected_area
