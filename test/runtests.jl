@@ -20,9 +20,11 @@ cd("..")
 println("Running tests...")
 @testset verbose = true "Testing VortexStepMethod..." begin
 
-    cp("data/ram_air_kite_body.obj", "/tmp/ram_air_kite_body.obj"; force=true)
-    cp("data/ram_air_kite_foil.dat", "/tmp/ram_air_kite_foil.dat"; force=true)
-    ram_wing = RamAirWing("/tmp/ram_air_kite_body.obj", "/tmp/ram_air_kite_foil.dat"; alpha_range=deg2rad.(-1:1), delta_range=deg2rad.(-1:1))
+    body_path = joinpath(tempdir(), "ram_air_kite_body.obj")
+    foil_path = joinpath(tempdir(), "ram_air_kite_foil.dat")
+    cp("data/ram_air_kite_body.obj", body_path; force=true)
+    cp("data/ram_air_kite_foil.dat", foil_path; force=true)
+    ram_wing = RamAirWing(body_path, foil_path; alpha_range=deg2rad.(-1:1), delta_range=deg2rad.(-1:1))
 
     if build_is_production_build
         include("bench.jl")
