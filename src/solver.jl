@@ -624,22 +624,22 @@ Linearize the ram air wing aero model around an operating point using automatic 
 - `J`: Jacobian matrix (∂forces/∂inputs)
 - `forces_op`: Forces at the operating point [Fx, Fy, Fz, Mx, My, Mz]
 """
-function linearize(solver::Solver, body_aero::BodyAerodynamics, wing::RamAirWing, y; 
+function linearize(solver::Solver, body_aero::BodyAerodynamics, wing::RamAirWing, y::Vector{T}; 
         theta_idxs=1:4, 
         delta_idxs=nothing,
         va_idxs=nothing,
         omega_idxs=nothing,
-        kwargs...)
+        kwargs...) where T
 
-    init_va           = solver.cache_lin[1][body_aero.va]
+    init_va = body_aero.cache[1][body_aero.va]
     init_va .= body_aero.va
     if !isnothing(theta_idxs)
-        last_theta = solver.cache_lin[2][y[theta_idxs]]
-        last_theta .= y[theta_idxs]
+        @views last_theta::Vector{T} = body_aero.cache[2][y[theta_idxs]]
+        @views last_theta .= y[theta_idxs]
     end
     if !isnothing(delta_idxs)
-        last_delta = solver.cache_lin[3][y[delta_idxs]]
-        last_delta .= y[delta_idxs]
+        @views last_delta::Vector{T} = body_aero.cache[3][y[delta_idxs]]
+        @views last_delta .= y[delta_idxs]
     end
 
     # Function to compute forces for given control inputs
