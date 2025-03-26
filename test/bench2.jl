@@ -53,3 +53,4 @@ vsm_solver = Solver{P}(aerodynamic_model_type=VSM)
     @test result.allocs <= 89
 end
 nothing
+sol = solve!(vsm_solver, wa, nothing) # 85 allocations

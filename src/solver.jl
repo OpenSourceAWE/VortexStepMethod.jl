@@ -9,9 +9,9 @@ Struct for storing the solution of the [solve!](@ref) function. Must contain all
 - cl_array::Vector{Float64}: Lift coefficients of the panels [-]
 - cd_array::Vector{Float64}: Drag coefficients of the panels [-]
 - cm_array::Vector{Float64}: Pitching moment coefficients of the panels [-]
-- panel_lift::Matrix{Float64}: Lift force of the panels [N]
-- panel_drag::Matrix{Float64}: Drag force of the panels [N]
-- panel_moment::Matrix{Float64}: Pitching moment around the spanwise vector of the panels [Nm]
+- panel_lift::Vector{Float64}: Lift force of the panels [N]
+- panel_drag::Vector{Float64}: Drag force of the panels [N]
+- panel_moment::Vector{Float64}: Pitching moment around the spanwise vector of the panels [Nm]
 - `f_body_3D`::Matrix{Float64}: Matrix of the aerodynamic forces (x, y, z vectors) [N]
 - `m_body_3D`::Matrix{Float64}: Matrix of the aerodynamic moments [Nm]
 - `gamma_distribution`::Union{Nothing, Vector{Float64}}: Vector containing the panel circulations.
@@ -35,9 +35,9 @@ Struct for storing the solution of the [solve!](@ref) function. Must contain all
     cl_array::Vector{Float64} = zeros(P)
     cd_array::Vector{Float64} = zeros(P)
     cm_array::Vector{Float64} = zeros(P)
-    panel_lift::Matrix{Float64} = zeros(P,1)
-    panel_drag::Matrix{Float64} = zeros(P,1)
-    panel_moment::Matrix{Float64} = zeros(P,1)
+    panel_lift::Vector{Float64} = zeros(P)
+    panel_drag::Vector{Float64} = zeros(P)
+    panel_moment::Vector{Float64} = zeros(P)
     f_body_3D::Matrix{Float64} = zeros(3, P)
     m_body_3D::Matrix{Float64} = zeros(3, P)
     gamma_distribution::Union{Nothing, Vector{Float64}} = nothing
