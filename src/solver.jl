@@ -28,7 +28,7 @@ Struct for storing the solution of the [solve!](@ref) function. Must contain all
     _x_airf_array::Matrix{Float64} = zeros(P, 3)
     _y_airf_array::Matrix{Float64} = zeros(P, 3)
     _z_airf_array::Matrix{Float64} = zeros(P, 3)
-    va_array::Matrix{Float64} = zeros(P, 3)
+    _va_array::Matrix{Float64} = zeros(P, 3)
     chord_array::Vector{Float64} = zeros(P)
     ###
     panel_width_array::Vector{Float64} = zeros(P)
@@ -212,7 +212,7 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
             solver.core_radius_fraction,
             solver.sol._z_airf_array,
             solver.sol._x_airf_array,
-            solver.sol.va_array,
+            solver.sol._va_array,
             solver.br.va_norm_array,
             solver.br.va_unit_array
         )
@@ -341,7 +341,7 @@ function solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=n
         solver.sol._x_airf_array,
         solver.sol._y_airf_array,
         solver.sol._z_airf_array,
-        solver.sol.va_array,
+        solver.sol._va_array,
         solver.br.va_norm_array,
         solver.br.va_unit_array,
         body_aero.panels,
@@ -371,7 +371,7 @@ function solve_base!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribu
     solver.sol._x_airf_array .= 0
     solver.sol._y_airf_array .= 0
     solver.sol._z_airf_array .= 0
-    solver.sol.va_array .= 0
+    solver.sol._va_array .= 0
     solver.sol.chord_array .= 0
 
     # Fill arrays from panels
@@ -379,13 +379,13 @@ function solve_base!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribu
         solver.sol._x_airf_array[i, :] .= panel.x_airf
         solver.sol._y_airf_array[i, :] .= panel.y_airf
         solver.sol._z_airf_array[i, :] .= panel.z_airf
-        solver.sol.va_array[i, :] .= panel.va
+        solver.sol._va_array[i, :] .= panel.va
         solver.sol.chord_array[i] = panel.chord
     end
 
     # Calculate unit vectors
-    calc_norm_array!(solver.br.va_norm_array, solver.sol.va_array)
-    solver.br.va_unit_array .= solver.sol.va_array ./ solver.br.va_norm_array
+    calc_norm_array!(solver.br.va_norm_array, solver.sol._va_array)
+    solver.br.va_unit_array .= solver.sol._va_array ./ solver.br.va_norm_array
 
     # Calculate AIC matrices
     calculate_AIC_matrices!(body_aero, solver.aerodynamic_model_type, solver.core_radius_fraction, solver.br.va_norm_array,
@@ -433,7 +433,7 @@ function gamma_loop!(
     relaxation_factor::Float64;
     log::Bool = true
 )
-    va_array = solver.sol.va_array
+    va_array = solver.sol._va_array
     chord_array = solver.sol.chord_array
     x_airf_array = solver.sol._x_airf_array
     y_airf_array = solver.sol._y_airf_array
