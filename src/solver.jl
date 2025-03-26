@@ -5,14 +5,14 @@
 Struct for storing the solution of the [solve!](@ref) function. Must contain all info needed by `KiteModels.jl`.
 
 # Attributes
-- gamma_distribution::Union{Nothing, Vector{Float64}}: Vector containing the panel circulations
+- `gamma_distribution`::Union{Nothing, Vector{Float64}}: Vector containing the panel circulations.
 - force::MVec3: Aerodynamic force vector in KB reference frame [N]
 - moment::MVec3: Aerodynamic moments [Mx, My, Mz] around the reference point [Nm]
 - force_coefficients::MVec3: Aerodynamic force coefficients [CFx, CFy, CFz] [-]
-- moment_coefficients::MVec3: Aerodynamic moment coefficients [CMx, CMy, CMz] [-]
-- moment_distribution::Vector{Float64}: Pitching moments around the spanwise vector of each panel. [Nm]
-- moment_coefficient_distribution::Vector{Float64}: Pitching moment coefficient around the spanwise vector of each panel. [-]
-- solver_status::SolverStatus: enum, see [SolverStatus](@ref)
+- `moment_coefficients`::MVec3: Aerodynamic moment coefficients [CMx, CMy, CMz] [-]
+- `moment_distribution`::Vector{Float64}: Pitching moments around the spanwise vector of each panel. [Nm]
+- `moment_coefficient_distribution`::Vector{Float64}: Pitching moment coefficient around the spanwise vector of each panel. [-]
+- `solver_status`::SolverStatus: enum, see [SolverStatus](@ref)
 """
 @with_kw mutable struct VSMSolution{P}
     ### private vectors of solve_base!
