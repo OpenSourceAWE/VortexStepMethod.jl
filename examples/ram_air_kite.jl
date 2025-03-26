@@ -2,10 +2,10 @@ using ControlPlots
 using VortexStepMethod
 using LinearAlgebra
 
-PLOT = false
+PLOT = true
 USE_TEX = false
 DEFORM = false
-LINEARIZE = true
+LINEARIZE = false
 
 # Create wing geometry
 wing = RamAirWing("data/ram_air_kite_body.obj", "data/ram_air_kite_foil.dat")
@@ -47,16 +47,14 @@ if LINEARIZE
     jac, res = VortexStepMethod.linearize(
         solver, 
         body_aero, 
-        wing, 
-        [zeros(4); vel_app; zeros(3)]; 
-        theta_idxs=1:4, 
-        va_idxs=5:7, 
+        [zeros(4); vel_app; zeros(3)];
+        theta_idxs=1:4,
+        va_idxs=5:7,
         omega_idxs=8:10,
         moment_frac=0.1)
     @time jac, res = VortexStepMethod.linearize(
         solver, 
         body_aero, 
-        wing, 
         [zeros(4); vel_app; zeros(3)]; 
         theta_idxs=1:4, 
         va_idxs=5:7, 
@@ -68,7 +66,7 @@ end
 PLOT && plot_polar_data(body_aero)
 
 # Plotting geometry
-plot_geometry(
+PLOT && plot_geometry(
     body_aero,
     "";
     data_type=".svg",

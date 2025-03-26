@@ -676,7 +676,7 @@ jac, results = linearize(
 )
 ```
 """
-function linearize(solver::Solver, body_aero::BodyAerodynamics, wing::RamAirWing, y::Vector{T}; 
+function linearize(solver::Solver, body_aero::BodyAerodynamics, y::Vector{T}; 
         theta_idxs=1:4, 
         delta_idxs=nothing,
         va_idxs=nothing,
@@ -684,6 +684,7 @@ function linearize(solver::Solver, body_aero::BodyAerodynamics, wing::RamAirWing
         kwargs...) where T
 
     !(length(body_aero.wings) == 1) && throw(ArgumentError("Linearization only works for a body_aero with one wing"))
+    wing = body_aero.wings[1]
 
     init_va = body_aero.cache[1][body_aero.va]
     init_va .= body_aero.va

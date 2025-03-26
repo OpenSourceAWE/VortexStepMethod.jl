@@ -60,7 +60,7 @@ using LinearAlgebra
     @testset "Re-initialization" begin
         result = @benchmark init!($unchanged_body_aero; init_aero=false) samples=1 evals=1
         @info "Re-initializing Allocations: $(result.allocs) \t Memory: $(result.memory)"
-        @test result.allocs < 100
+        @test result.allocs ≤ 50
     end
 
     vel_app = [cos(alpha), 0.0, sin(alpha)] .* v_a

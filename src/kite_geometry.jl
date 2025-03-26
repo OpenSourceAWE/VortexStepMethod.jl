@@ -455,7 +455,7 @@ function RamAirWing(
     (!isfile(obj_path)) && error("OBJ file not found: $obj_path")
     info_path = obj_path[1:end-4] * "_info.bin"
 
-    if true || !ispath(info_path)
+    if !ispath(info_path)
         @info "Reading $obj_path"
         vertices, faces = read_faces(obj_path)
         center_of_mass = center_to_com!(vertices, faces)
@@ -467,7 +467,6 @@ function RamAirWing(
             le_interp, te_interp, area_interp = create_interpolations(vertices, circle_center_z, radius, gamma_tip, R_b_p; interp_steps)
         else
             circle_center_z, radius, gamma_tip = find_circle_center_and_radius(vertices)
-            @show circle_center_z radius gamma_tip interp_steps
             le_interp, te_interp, area_interp = create_interpolations(vertices, circle_center_z, radius, gamma_tip, I(3); interp_steps)
         end
 
