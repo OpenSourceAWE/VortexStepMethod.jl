@@ -26,7 +26,7 @@ Struct for storing the solution of the [solve!](@ref) function. Must contain all
 @with_kw mutable struct VSMSolution{P}
     ### private vectors of solve_base!
     _x_airf_array::Matrix{Float64} = zeros(P, 3)
-    y_airf_array::Matrix{Float64} = zeros(P, 3)
+    _y_airf_array::Matrix{Float64} = zeros(P, 3)
     z_airf_array::Matrix{Float64} = zeros(P, 3)
     va_array::Matrix{Float64} = zeros(P, 3)
     chord_array::Vector{Float64} = zeros(P)
@@ -339,7 +339,7 @@ function solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=n
         solver.lr.v_a_array,
         solver.sol.chord_array,
         solver.sol._x_airf_array,
-        solver.sol.y_airf_array,
+        solver.sol._y_airf_array,
         solver.sol.z_airf_array,
         solver.sol.va_array,
         solver.br.va_norm_array,
@@ -369,7 +369,7 @@ function solve_base!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribu
     
     # Clear arrays
     solver.sol._x_airf_array .= 0
-    solver.sol.y_airf_array .= 0
+    solver.sol._y_airf_array .= 0
     solver.sol.z_airf_array .= 0
     solver.sol.va_array .= 0
     solver.sol.chord_array .= 0
@@ -377,7 +377,7 @@ function solve_base!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribu
     # Fill arrays from panels
     for (i, panel) in enumerate(panels)
         solver.sol._x_airf_array[i, :] .= panel.x_airf
-        solver.sol.y_airf_array[i, :] .= panel.y_airf
+        solver.sol._y_airf_array[i, :] .= panel.y_airf
         solver.sol.z_airf_array[i, :] .= panel.z_airf
         solver.sol.va_array[i, :] .= panel.va
         solver.sol.chord_array[i] = panel.chord
@@ -436,7 +436,7 @@ function gamma_loop!(
     va_array = solver.sol.va_array
     chord_array = solver.sol.chord_array
     x_airf_array = solver.sol._x_airf_array
-    y_airf_array = solver.sol.y_airf_array
+    y_airf_array = solver.sol._y_airf_array
     z_airf_array = solver.sol.z_airf_array
     solver.lr.converged   = false
     n_panels    = length(body_aero.panels)
