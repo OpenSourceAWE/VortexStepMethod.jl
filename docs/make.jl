@@ -28,6 +28,7 @@ makedocs(;
         "Private Functions" => "private_functions.md",
         "Private Types" => "private_types.md",
         "Reference Frames" => "reference_frames.md",
+        "Tips and tricks" => "tips_and_tricks.md",
         "Glossary" => "glossary.md"
     ],
 )

@@ -5,30 +5,39 @@
 Struct for storing the solution of the [solve!](@ref) function. Must contain all info needed by `KiteModels.jl`.
 
 # Attributes
-- gamma_distribution::Union{Nothing, Vector{Float64}}: Vector containing the panel circulations
+- `panel_width_array`::Vector{Float64}: Width of the panels [m]
+- cl_array::Vector{Float64}: Lift coefficients of the panels [-]
+- cd_array::Vector{Float64}: Drag coefficients of the panels [-]
+- cm_array::Vector{Float64}: Pitching moment coefficients of the panels [-]
+- panel_lift::Vector{Float64}: Lift force of the panels [N]
+- panel_drag::Vector{Float64}: Drag force of the panels [N]
+- panel_moment::Vector{Float64}: Pitching moment around the spanwise vector of the panels [Nm]
+- `f_body_3D`::Matrix{Float64}: Matrix of the aerodynamic forces (x, y, z vectors) [N]
+- `m_body_3D`::Matrix{Float64}: Matrix of the aerodynamic moments [Nm]
+- `gamma_distribution`::Union{Nothing, Vector{Float64}}: Vector containing the panel circulations.
 - force::MVec3: Aerodynamic force vector in KB reference frame [N]
 - moment::MVec3: Aerodynamic moments [Mx, My, Mz] around the reference point [Nm]
 - force_coefficients::MVec3: Aerodynamic force coefficients [CFx, CFy, CFz] [-]
-- moment_coefficients::MVec3: Aerodynamic moment coefficients [CMx, CMy, CMz] [-]
-- moment_distribution::Vector{Float64}: Pitching moments around the spanwise vector of each panel. [Nm]
-- moment_coeff_dist::Vector{Float64}: Pitching moment coefficient around the spanwise vector of each panel. [-]
-- solver_status::SolverStatus: enum, see [SolverStatus](@ref)
+- `moment_coefficients`::MVec3: Aerodynamic moment coefficients [CMx, CMy, CMz] [-]
+- `moment_distribution`::Vector{Float64}: Pitching moments around the spanwise vector of each panel. [Nm]
+- `moment_coefficient_distribution`::Vector{Float64}: Pitching moment coefficient around the spanwise vector of each panel. [-]
+- `solver_status`::SolverStatus: enum, see [SolverStatus](@ref)
 """
 @with_kw mutable struct VSMSolution{P}
     ### private vectors of solve_base!
-    x_airf_array::Matrix{Float64} = zeros(P, 3)
-    y_airf_array::Matrix{Float64} = zeros(P, 3)
-    z_airf_array::Matrix{Float64} = zeros(P, 3)
-    va_array::Matrix{Float64} = zeros(P, 3)
-    chord_array::MVector{P, Float64} = zeros(MVector{P, Float64})
-    ###
-    panel_width_array::MVector{P, Float64} = zeros(MVector{P, Float64})
-    cl_array::MVector{P, Float64} = zeros(MVector{P, Float64})
-    cd_array::MVector{P, Float64} = zeros(MVector{P, Float64})
-    cm_array::MVector{P, Float64} = zeros(MVector{P, Float64})
-    panel_lift::Matrix{Float64} = zeros(P,1)
-    panel_drag::Matrix{Float64} = zeros(P,1)
-    panel_moment::Matrix{Float64} = zeros(P,1)
+    _x_airf_array::Matrix{Float64} = zeros(P, 3)
+    _y_airf_array::Matrix{Float64} = zeros(P, 3)
+    _z_airf_array::Matrix{Float64} = zeros(P, 3)
+    _va_array::Matrix{Float64} = zeros(P, 3)
+    _chord_array::Vector{Float64} = zeros(P)
+    ### end of private vectors
+    panel_width_array::Vector{Float64} = zeros(P)
+    cl_array::Vector{Float64} = zeros(P)
+    cd_array::Vector{Float64} = zeros(P)
+    cm_array::Vector{Float64} = zeros(P)
+    panel_lift::Vector{Float64} = zeros(P)
+    panel_drag::Vector{Float64} = zeros(P)
+    panel_moment::Vector{Float64} = zeros(P)
     f_body_3D::Matrix{Float64} = zeros(3, P)
     m_body_3D::Matrix{Float64} = zeros(3, P)
     gamma_distribution::Union{Nothing, Vector{Float64}} = nothing
@@ -196,9 +205,9 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
     panel_moment = solver.sol.panel_moment
 
     # Compute using fused broadcasting (no intermediate allocations)
-    @. lift = cl_array * 0.5 * density * v_a_array^2 * solver.sol.chord_array
-    @. drag = cd_array * 0.5 * density * v_a_array^2 * solver.sol.chord_array
-    @. panel_moment = cm_array * 0.5 * density * v_a_array^2 * solver.sol.chord_array
+    @. lift = cl_array * 0.5 * density * v_a_array^2 * solver.sol._chord_array
+    @. drag = cd_array * 0.5 * density * v_a_array^2 * solver.sol._chord_array
+    @. panel_moment = cm_array * 0.5 * density * v_a_array^2 * solver.sol._chord_array
 
     # Calculate alpha corrections based on model type
     if aerodynamic_model_type == VSM                             # 64 bytes
@@ -207,9 +216,9 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
             body_aero,
             gamma_new,
             solver.core_radius_fraction,
-            solver.sol.z_airf_array,
-            solver.sol.x_airf_array,
-            solver.sol.va_array,
+            solver.sol._z_airf_array,
+            solver.sol._x_airf_array,
+            solver.sol._va_array,
             solver.br.va_norm_array,
             solver.br.va_unit_array
         )
@@ -334,11 +343,11 @@ function solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=n
         solver.mu,
         solver.lr.alpha_array,
         solver.lr.v_a_array,
-        solver.sol.chord_array,
-        solver.sol.x_airf_array,
-        solver.sol.y_airf_array,
-        solver.sol.z_airf_array,
-        solver.sol.va_array,
+        solver.sol._chord_array,
+        solver.sol._x_airf_array,
+        solver.sol._y_airf_array,
+        solver.sol._z_airf_array,
+        solver.sol._va_array,
         solver.br.va_norm_array,
         solver.br.va_unit_array,
         body_aero.panels,
@@ -365,31 +374,31 @@ function solve_base!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribu
     relaxation_factor = solver.relaxation_factor
     
     # Clear arrays
-    solver.sol.x_airf_array .= 0
-    solver.sol.y_airf_array .= 0
-    solver.sol.z_airf_array .= 0
-    solver.sol.va_array .= 0
-    solver.sol.chord_array .= 0
+    solver.sol._x_airf_array .= 0
+    solver.sol._y_airf_array .= 0
+    solver.sol._z_airf_array .= 0
+    solver.sol._va_array .= 0
+    solver.sol._chord_array .= 0
 
     # Fill arrays from panels
     for (i, panel) in enumerate(panels)
-        solver.sol.x_airf_array[i, :] .= panel.x_airf
-        solver.sol.y_airf_array[i, :] .= panel.y_airf
-        solver.sol.z_airf_array[i, :] .= panel.z_airf
-        solver.sol.va_array[i, :] .= panel.va
-        solver.sol.chord_array[i] = panel.chord
+        solver.sol._x_airf_array[i, :] .= panel.x_airf
+        solver.sol._y_airf_array[i, :] .= panel.y_airf
+        solver.sol._z_airf_array[i, :] .= panel.z_airf
+        solver.sol._va_array[i, :] .= panel.va
+        solver.sol._chord_array[i] = panel.chord
     end
 
     # Calculate unit vectors
-    calc_norm_array!(solver.br.va_norm_array, solver.sol.va_array)
-    solver.br.va_unit_array .= solver.sol.va_array ./ solver.br.va_norm_array
+    calc_norm_array!(solver.br.va_norm_array, solver.sol._va_array)
+    solver.br.va_unit_array .= solver.sol._va_array ./ solver.br.va_norm_array
 
     # Calculate AIC matrices
     calculate_AIC_matrices!(body_aero, solver.aerodynamic_model_type, solver.core_radius_fraction, solver.br.va_norm_array,
                             solver.br.va_unit_array)
 
     # Initialize gamma distribution
-    gamma_initial = solver.cache_base[1][solver.sol.chord_array]
+    gamma_initial = solver.cache_base[1][solver.sol._chord_array]
     if isnothing(gamma_distribution)
         if solver.type_initial_gamma_distribution == ELLIPTIC
             calculate_circulation_distribution_elliptical_wing(gamma_initial, body_aero)
@@ -430,11 +439,11 @@ function gamma_loop!(
     relaxation_factor::Float64;
     log::Bool = true
 )
-    va_array = solver.sol.va_array
-    chord_array = solver.sol.chord_array
-    x_airf_array = solver.sol.x_airf_array
-    y_airf_array = solver.sol.y_airf_array
-    z_airf_array = solver.sol.z_airf_array
+    va_array = solver.sol._va_array
+    chord_array = solver.sol._chord_array
+    x_airf_array = solver.sol._x_airf_array
+    y_airf_array = solver.sol._y_airf_array
+    z_airf_array = solver.sol._z_airf_array
     solver.lr.converged   = false
     n_panels    = length(body_aero.panels)
     solver.lr.alpha_array .= body_aero.alpha_array
