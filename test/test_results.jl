@@ -4,11 +4,13 @@ using LinearAlgebra
 using Test
 using Logging
 
-if !@isdefined ram_wing
+# if !@isdefined ram_wing
     cp("data/ram_air_kite_body.obj", "/tmp/ram_air_kite_body.obj"; force=true)
     cp("data/ram_air_kite_foil.dat", "/tmp/ram_air_kite_foil.dat"; force=true)
-    ram_wing = RamAirWing("/tmp/ram_air_kite_body.obj", "/tmp/ram_air_kite_foil.dat"; alpha_range=deg2rad.(-1:1), delta_range=deg2rad.(-1:1))
-end
+    ram_wing = RamAirWing("/tmp/ram_air_kite_body.obj", "/tmp/ram_air_kite_foil.dat")
+# end
+
+# ram_wing = RamAirWing("data/ram_air_kite_body.obj", "data/ram_air_kite_foil.dat")
 
 @testset "Nonlinear vs Linear" begin
     va = [15.0, 0.0, 0.0]
@@ -26,7 +28,7 @@ end
     jac, res = VortexStepMethod.linearize(
         solver, 
         body_aero, 
-        wing, 
+        ram_wing, 
         [theta; va; omega; delta]; 
         theta_idxs=1:4, 
         va_idxs=5:7, 
@@ -36,6 +38,6 @@ end
     )
     results = VortexStepMethod.solve!(solver, body_aero; log=true)
 
-    
+    @show jac res
 
 end

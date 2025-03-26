@@ -68,7 +68,7 @@ end
 PLOT && plot_polar_data(body_aero)
 
 # Plotting geometry
-PLOT && plot_geometry(
+plot_geometry(
     body_aero,
     "";
     data_type=".svg",

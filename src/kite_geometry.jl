@@ -129,7 +129,7 @@ function create_interpolations(vertices, circle_center_z, radius, gamma_tip, R; 
             # Rotate y coordinate to check box containment
             # rotated_y = v[2] * cos(-gamma) - vz_centered[i] * sin(-gamma)
             gamma_v = atan(-v[2], vz_centered[i])
-            if gamma < 0 && gamma - stepsize ≤ gamma_v ≤ gamma
+            if gamma ≤ 0 && gamma - stepsize ≤ gamma_v ≤ gamma
                 if v[1] > trailing_edges[1, j]
                     trailing_edges[:, j] .= v
                     te_gammas[j] = gamma_v
@@ -455,7 +455,7 @@ function RamAirWing(
     (!isfile(obj_path)) && error("OBJ file not found: $obj_path")
     info_path = obj_path[1:end-4] * "_info.bin"
 
-    if !ispath(info_path)
+    if true || !ispath(info_path)
         @info "Reading $obj_path"
         vertices, faces = read_faces(obj_path)
         center_of_mass = center_to_com!(vertices, faces)
@@ -467,6 +467,7 @@ function RamAirWing(
             le_interp, te_interp, area_interp = create_interpolations(vertices, circle_center_z, radius, gamma_tip, R_b_p; interp_steps)
         else
             circle_center_z, radius, gamma_tip = find_circle_center_and_radius(vertices)
+            @show circle_center_z radius gamma_tip interp_steps
             le_interp, te_interp, area_interp = create_interpolations(vertices, circle_center_z, radius, gamma_tip, I(3); interp_steps)
         end
 
