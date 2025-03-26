@@ -1,3 +1,10 @@
+## Unreleased
+### Changed
+- The fields that had as type a `Matrix of size Px1` have now the type `Vector` 
+- Many new fields of the type `VSMSolution` documented
+### Added
+- New page `Tips and tricks` added to the documentation
+
 ## VortexStepMethod v1.1.2 2025-03-23
 ### Added
 - The function `install_examples()` which allows to easily install the examples without using `git`
