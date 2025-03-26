@@ -632,13 +632,14 @@ function linearize(solver::Solver, body_aero::BodyAerodynamics, wing::RamAirWing
 
     init_va = copy(body_aero.va)
     init_alpha_beta = copy(y[alpha_idxs])
+    zero_delta = zeros(alpha_idxs)
 
     # Function to compute forces for given control inputs
     function calc_results!(results, y)
         if !isnothing(alpha_idxs) && isnothing(delta_idxs)
-            VortexStepMethod.smooth_deform!(wing, y[alpha_idxs], zeros(alpha_idxs))
+            @views VortexStepMethod.smooth_deform!(wing, y[alpha_idxs], zero_delta)
         elseif !isnothing(alpha_idxs) && !isnothing(delta_idxs)
-            VortexStepMethod.smooth_deform!(wing, y[alpha_idxs], y[delta_idxs])
+            @views VortexStepMethod.smooth_deform!(wing, y[alpha_idxs], y[delta_idxs])
         end
 
         VortexStepMethod.init!(body_aero; init_aero=false)

@@ -407,6 +407,7 @@ mutable struct RamAirWing <: AbstractWing
     area_interp::Extrapolation
     theta_dist::Vector{Float64}
     delta_dist::Vector{Float64}
+    cache::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}}
 end
 
 """
@@ -505,11 +506,12 @@ function RamAirWing(obj_path, dat_path; alpha=0.0, crease_frac=0.75, wind_vel=10
         end
 
         panel_props = PanelProperties{n_panels}()
+        cache = [LazyBufferCache()]
 
         RamAirWing(n_panels, spanwise_distribution, panel_props, spanwise_direction, sections, 
             refined_sections, remove_nan, non_deformed_sections,
             mass, gamma_tip, inertia_tensor, center_of_mass, radius,
-            le_interp, te_interp, area_interp, zeros(n_panels), zeros(n_panels))
+            le_interp, te_interp, area_interp, zeros(n_panels), zeros(n_panels), cache)
 
     catch e
         if e isa BoundsError
@@ -557,7 +559,7 @@ function smooth_deform!(wing::RamAirWing, theta_angles::AbstractVector, delta_an
 
     window_size = wing.n_panels ÷ length(theta_angles)
     if n_panels > window_size
-        smoothed = copy(theta_dist)
+        smoothed = wing.cache[1][theta_dist]
         for i in (window_size÷2 + 1):(n_panels - window_size÷2)
             @views smoothed[i] = mean(theta_dist[(i - window_size÷2):(i + window_size÷2)])
         end
