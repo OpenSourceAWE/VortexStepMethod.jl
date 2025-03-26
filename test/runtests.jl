@@ -19,6 +19,11 @@ end::Bool
 cd("..")
 println("Running tests...")
 @testset verbose = true "Testing VortexStepMethod..." begin
+
+    cp("data/ram_air_kite_body.obj", "/tmp/ram_air_kite_body.obj"; force=true)
+    cp("data/ram_air_kite_foil.dat", "/tmp/ram_air_kite_foil.dat"; force=true)
+    ram_wing = RamAirWing("/tmp/ram_air_kite_body.obj", "/tmp/ram_air_kite_foil.dat"; alpha_range=deg2rad.(-1:1), delta_range=deg2rad.(-1:1))
+
     if build_is_production_build
         include("bench.jl")
     end
@@ -26,6 +31,7 @@ println("Running tests...")
     include("test_panel.jl")
     include("test_semi_infinite_filament.jl")
     include("test_body_aerodynamics.jl")
+    include("test_results.jl")
     include("test_kite_geometry.jl")
     include("test_wing_geometry.jl")
     include("test_plotting.jl")

@@ -48,13 +48,17 @@ Construct a [BodyAerodynamics](@ref) object for aerodynamic calculations.
 
 # Keyword Arguments
 - `kite_body_origin=zeros(MVec3)`: Origin point of kite body reference frame in CAD reference frame
+- `va=[15.0, 0.0, 0.0]`: Apparent wind vector
+- `omega=zeros(3)`: Turn rate in kite body frame x y and z
 
 # Returns
 - [BodyAerodynamics](@ref) object initialized with panels and wings
 """
 function BodyAerodynamics(
     wings::Vector{T};
-    kite_body_origin=zeros(MVec3)
+    kite_body_origin=zeros(MVec3),
+    va=[15.0, 0.0, 0.0],
+    omega=zeros(MVec3)
 ) where T <: AbstractWing
     # Initialize panels
     panels = Panel[]
@@ -78,7 +82,7 @@ function BodyAerodynamics(
     end
 
     body_aero = BodyAerodynamics{length(panels)}(; panels, wings)
-    init!(body_aero)
+    init!(body_aero; va, omega)
     return body_aero
 end
 
@@ -107,11 +111,17 @@ Initialize a BodyAerodynamics struct in-place by setting up panels and coefficie
 
 # Keyword Arguments
 - `init_aero::Bool`: Wether to initialize the aero data or not
+- `va=[15.0, 0.0, 0.0]`: Apparent wind vector
+- `omega=zeros(3)`: Turn rate in kite body frame x y and z
 
 # Returns
 nothing
 """
-function init!(body_aero::BodyAerodynamics; init_aero=true)
+function init!(body_aero::BodyAerodynamics; 
+    init_aero=true,
+    va=[15.0, 0.0, 0.0],
+    omega=zeros(MVec3)
+)
     idx = 1
     vec = zeros(MVec3)
     for wing in body_aero.wings
@@ -151,6 +161,7 @@ function init!(body_aero::BodyAerodynamics; init_aero=true)
     body_aero.alpha_array .= 0.0
     body_aero.v_a_array .= 0.0 
     body_aero.AIC .= 0.0
+    set_va!(body_aero, va, omega)
     return nothing
 end
 

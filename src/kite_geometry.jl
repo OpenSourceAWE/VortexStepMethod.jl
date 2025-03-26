@@ -368,7 +368,8 @@ Represents a curved wing that inherits from Wing with additional geometric prope
 
 # Fields
 - All fields from Wing:
-  - `n_panels::Int64`: Number of panels in aerodynamic mesh
+  - `n_panels::Int16`: Number of panels in aerodynamic mesh
+  - `n_groups::Int16`: Number of panel groups, each panel group has it's own twisting moment
   - `spanwise_distribution`::PanelDistribution: see: [PanelDistribution](@ref)
   - `spanwise_direction::MVec3`: Wing span direction vector
   - `sections::Vector{Section}`: List of wing sections, see: [Section](@ref)
@@ -387,7 +388,8 @@ Represents a curved wing that inherits from Wing with additional geometric prope
 
 """
 mutable struct RamAirWing <: AbstractWing
-    n_panels::Int64
+    n_panels::Int16
+    n_groups::Int16
     spanwise_distribution::PanelDistribution
     panel_props::PanelProperties
     spanwise_direction::MVec3
@@ -422,19 +424,19 @@ Constructor for a [RamAirWing](@ref) that allows to use an `.obj` and a `.dat` f
 - dat_path: Path to the `.dat` file, a standard format for 2d foil geometry
 
 # Keyword Parameters
-- alpha=0.0: Angle of attack of each segment relative to the x axis [rad]
-- crease_frac=0.75: The x coordinate around which the trailing edge rotates on a normalized 2d foil, 
+- crease_frac=0.9: The x coordinate around which the trailing edge rotates on a normalized 2d foil, 
                     used in the xfoil polar generation
 - wind_vel=10.0: Apparent wind speed in m/s, used in the xfoil polar generation
 - mass=1.0: Mass of the wing in kg, used for the inertia calculations 
 - `n_panels`=56: Number of panels.
-- `n_sections`=n_panels+1: Number of sections (there is a section on each side of each panel.)
+- `n_sections=n_panels+1`: Number of sections (there is a section on each side of each panel.)
+- `n_groups=n_panels ÷ 4`: Number of panel groups
 - `spanwise_distribution`=UNCHANGED: see: [PanelDistribution](@ref)
 - `spanwise_direction`=[0.0, 1.0, 0.0]
 - `remove_nan::Bool`: Wether to remove the NaNs from interpolations or not
 """
-function RamAirWing(obj_path, dat_path; alpha=0.0, crease_frac=0.75, wind_vel=10., mass=1.0, 
-                  n_panels=56, n_sections=n_panels+1, spanwise_distribution=UNCHANGED, 
+function RamAirWing(obj_path, dat_path; crease_frac=0.9, wind_vel=10., mass=1.0, 
+                  n_panels=56, n_sections=n_panels+1, n_groups=n_panels÷4, spanwise_distribution=UNCHANGED, 
                   spanwise_direction=[0.0, 1.0, 0.0], remove_nan=true, align_to_principal=false,
                   alpha_range=deg2rad.(-5:1:20), delta_range=deg2rad.(-5:1:20), interp_steps=n_sections
                   )
@@ -508,7 +510,7 @@ function RamAirWing(obj_path, dat_path; alpha=0.0, crease_frac=0.75, wind_vel=10
         panel_props = PanelProperties{n_panels}()
         cache = [LazyBufferCache()]
 
-        RamAirWing(n_panels, spanwise_distribution, panel_props, spanwise_direction, sections, 
+        RamAirWing(n_panels, n_groups, spanwise_distribution, panel_props, spanwise_direction, sections, 
             refined_sections, remove_nan, non_deformed_sections,
             mass, gamma_tip, inertia_tensor, center_of_mass, radius,
             le_interp, te_interp, area_interp, zeros(n_panels), zeros(n_panels), cache)

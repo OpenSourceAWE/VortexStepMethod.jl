@@ -49,7 +49,7 @@ if LINEARIZE
         body_aero, 
         wing, 
         [zeros(4); vel_app; zeros(3)]; 
-        alpha_idxs=1:4, 
+        theta_idxs=1:4, 
         va_idxs=5:7, 
         omega_idxs=8:10,
         moment_frac=0.1)
@@ -58,7 +58,7 @@ if LINEARIZE
         body_aero, 
         wing, 
         [zeros(4); vel_app; zeros(3)]; 
-        alpha_idxs=1:4, 
+        theta_idxs=1:4, 
         va_idxs=5:7, 
         omega_idxs=8:10,
         moment_frac=0.1)

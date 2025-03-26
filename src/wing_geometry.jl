@@ -194,7 +194,8 @@ end
 Represents a wing composed of multiple sections with aerodynamic properties.
 
 # Fields
-- `n_panels::Int64`: Number of panels in aerodynamic mesh
+- `n_panels::Int16`: Number of panels in aerodynamic mesh
+- `n_groups::Int16`: Number of panel groups
 - `spanwise_distribution`::PanelDistribution: [PanelDistribution](@ref)
 - `spanwise_direction::MVec3`: Wing span direction vector
 - `sections::Vector{Section}`: Vector of wing sections, see: [Section](@ref)
@@ -203,7 +204,8 @@ Represents a wing composed of multiple sections with aerodynamic properties.
 
 """
 mutable struct Wing <: AbstractWing
-    n_panels::Int64
+    n_panels::Int16
+    n_groups::Int16
     spanwise_distribution::PanelDistribution
     panel_props::PanelProperties
     spanwise_direction::MVec3
@@ -214,6 +216,7 @@ end
 
 """
     Wing(n_panels::Int;
+         n_groups=n_panels,
          spanwise_distribution::PanelDistribution=LINEAR,
          spanwise_direction::PosVector=MVec3([0.0, 1.0, 0.0]),
          remove_nan::Bool=true)
@@ -222,17 +225,19 @@ Constructor for a [Wing](@ref) struct with default values that initializes the s
 and refined sections as empty arrays.
 
 # Parameters
-- `n_panels::Int64`: Number of panels in aerodynamic mesh
+- `n_panels::Int`: Number of panels in aerodynamic mesh
+- `n_groups::Int`: Number of panel groups in aerodynamic mesh
 - `spanwise_distribution`::PanelDistribution = LINEAR: [PanelDistribution](@ref)
 - `spanwise_direction::MVec3` = MVec3([0.0, 1.0, 0.0]): Wing span direction vector
 - `remove_nan::Bool`: Wether to remove the NaNs from interpolations or not
 """
 function Wing(n_panels::Int;
+        n_groups = n_panels,
         spanwise_distribution::PanelDistribution=LINEAR,
         spanwise_direction::PosVector=MVec3([0.0, 1.0, 0.0]),
         remove_nan=true)
     panel_props = PanelProperties{n_panels}()
-    Wing(n_panels, spanwise_distribution, panel_props, spanwise_direction, Section[], Section[], remove_nan)
+    Wing(n_panels, n_groups, spanwise_distribution, panel_props, spanwise_direction, Section[], Section[], remove_nan)
 end
 
 function init!(wing::AbstractWing)
