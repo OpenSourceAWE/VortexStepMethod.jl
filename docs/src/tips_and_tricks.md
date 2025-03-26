@@ -10,6 +10,9 @@ The following bodies can be simulated:
 To build the geometry of a RAM-air kite, a 3D .obj file can be used as input. In addition a `.dat` file is needed.
 It should have two columns, one for the `x` and one for the `y` coordinate of the 2D polar that is used.
 
+### RAM-air kite model
+If running the example `ram_air_kite.jl` fails, try to run the `cleanup.jl` script and then try again. Background: this example caches the calculated polars. Reading cached polars can fail after an update.
+
 ### Output formats
 Currently, the `solve!()` function returns the results as [VSMSolution](@ref) struct. The function solve() returns a
 dictionary with the results. The `solve!()` function is faster, and the `solve()` contains many more entries, therefore
