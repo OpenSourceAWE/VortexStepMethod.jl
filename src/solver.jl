@@ -110,7 +110,7 @@ sol::VSMSolution = VSMSolution(): The result of calling [solve!](@ref)
     artificial_damping::NamedTuple{(:k2, :k4), Tuple{Float64, Float64}} =(k2=0.1, k4=0.0)
     
     # Additional settings
-    type_initial_gamma_distribution::InitialGammaDistribution = ELLIPTIC
+    type_initial_gamma_distribution::InitialGammaDistribution = ZEROS
     core_radius_fraction::Float64 = 1e-20
     mu::Float64 = 1.81e-5
     is_only_f_and_gamma_output::Bool = false
@@ -121,6 +121,7 @@ sol::VSMSolution = VSMSolution(): The result of calling [solve!](@ref)
     cache::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}} = [LazyBufferCache() for _ in 1:11]
     cache_base::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}}  = [LazyBufferCache()]
     cache_solve::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}} = [LazyBufferCache()]
+    cache_lin::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}} = [LazyBufferCache() for _ in 1:4]
     
     # Solution
     sol::VSMSolution{P} = VSMSolution(P)
@@ -624,25 +625,42 @@ Linearize the ram air wing aero model around an operating point using automatic 
 - `forces_op`: Forces at the operating point [Fx, Fy, Fz, Mx, My, Mz]
 """
 function linearize(solver::Solver, body_aero::BodyAerodynamics, wing::RamAirWing, y; 
-        alpha_idxs=1:4, 
+        theta_idxs=1:4, 
         delta_idxs=nothing,
         va_idxs=nothing,
         omega_idxs=nothing,
         kwargs...)
 
-    init_va = copy(body_aero.va)
-    init_alpha_beta = copy(y[alpha_idxs])
-    zero_delta = zeros(alpha_idxs)
+    init_va           = solver.cache_lin[1][body_aero.va]
+    init_va .= body_aero.va
+    if !isnothing(theta_idxs)
+        last_theta = solver.cache_lin[2][y[theta_idxs]]
+        last_theta .= y[theta_idxs]
+    end
+    if !isnothing(delta_idxs)
+        last_delta = solver.cache_lin[3][y[delta_idxs]]
+        last_delta .= y[delta_idxs]
+    end
 
     # Function to compute forces for given control inputs
     function calc_results!(results, y)
-        if !isnothing(alpha_idxs) && isnothing(delta_idxs)
-            @views VortexStepMethod.smooth_deform!(wing, y[alpha_idxs], zero_delta)
-        elseif !isnothing(alpha_idxs) && !isnothing(delta_idxs)
-            @views VortexStepMethod.smooth_deform!(wing, y[alpha_idxs], y[delta_idxs])
-        end
+        @views theta_angles = isnothing(theta_idxs) ? nothing : y[theta_idxs]
+        @views delta_angles = isnothing(delta_idxs) ? nothing : y[delta_idxs]
 
-        VortexStepMethod.init!(body_aero; init_aero=false)
+        if !isnothing(theta_angles)
+            if isnothing(delta_angles)
+                if !all(theta_angles .== last_theta)
+                    VortexStepMethod.group_deform!(wing, theta_angles; smooth=false)
+                    VortexStepMethod.init!(body_aero; init_aero=false)
+                    last_theta .= theta_angles
+                end
+            elseif !all(delta_angles .== last_delta) || !all(theta_angles .== last_theta)
+                VortexStepMethod.group_deform!(wing, theta_angles, delta_angles; smooth=false)
+                VortexStepMethod.init!(body_aero; init_aero=false)
+                last_theta .= theta_angles
+                last_delta .= delta_angles
+            end
+        end
 
         if !isnothing(va_idxs) && isnothing(omega_idxs)
             set_va!(body_aero, y[va_idxs])
@@ -661,7 +679,7 @@ function linearize(solver::Solver, body_aero::BodyAerodynamics, wing::RamAirWing
 
     results = zeros(3+3+length(solver.sol.moment_coeff_dist))
     jac = zeros(length(results), length(y))
-    backend = AutoFiniteDiff(absstep=1e-3, relstep=1e-3)
+    backend = AutoFiniteDiff(absstep=1e2solver.atol, relstep=1e2solver.rtol)
     prep = prepare_jacobian(calc_results!, results, backend, y)
     jacobian!(calc_results!, results, jac, prep, backend, y)
 

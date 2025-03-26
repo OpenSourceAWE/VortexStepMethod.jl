@@ -522,7 +522,7 @@ function RamAirWing(obj_path, dat_path; alpha=0.0, crease_frac=0.75, wind_vel=10
 end
 
 """
-    smooth_deform!(wing::RamAirWing, theta_angles::AbstractVector, delta_angles::AbstractVector)
+    group_deform!(wing::RamAirWing, theta_angles::AbstractVector, delta_angles::AbstractVector)
 
 Distribute control angles across wing panels and apply smoothing using a moving average filter.
 
@@ -530,6 +530,7 @@ Distribute control angles across wing panels and apply smoothing using a moving 
 - `wing::RamAirWing`: The wing to deform
 - `theta_angles::AbstractVector`: Twist angles in radians for each control section
 - `delta_angles::AbstractVector`: Trailing edge deflection angles in radians for each control section
+- `smooth::Bool`: Wether to apply smoothing or not
 
 # Algorithm
 1. Distributes each control input to its corresponding group of panels
@@ -541,7 +542,7 @@ Distribute control angles across wing panels and apply smoothing using a moving 
 # Returns
 - `nothing` (modifies wing in-place)
 """
-function smooth_deform!(wing::RamAirWing, theta_angles::AbstractVector, delta_angles::AbstractVector)
+function group_deform!(wing::RamAirWing, theta_angles::AbstractVector, delta_angles=nothing; smooth=false)
     !(wing.n_panels % length(theta_angles) == 0) && throw(ArgumentError("Number of angles has to be a multiple of number of panels"))
     n_panels = wing.n_panels
     theta_dist = wing.theta_dist
@@ -552,22 +553,29 @@ function smooth_deform!(wing::RamAirWing, theta_angles::AbstractVector, delta_an
         for _ in 1:(wing.n_panels ÷ length(theta_angles))
             dist_idx += 1
             theta_dist[dist_idx] = theta_angles[angle_idx]
-            delta_dist[dist_idx] = delta_angles[angle_idx]
+            !isnothing(delta_angles) && (delta_dist[dist_idx] = delta_angles[angle_idx])
         end
     end
     @assert (dist_idx == wing.n_panels)
 
-    window_size = wing.n_panels ÷ length(theta_angles)
-    if n_panels > window_size
-        smoothed = wing.cache[1][theta_dist]
-        for i in (window_size÷2 + 1):(n_panels - window_size÷2)
-            @views smoothed[i] = mean(theta_dist[(i - window_size÷2):(i + window_size÷2)])
+    if smooth
+        window_size = wing.n_panels ÷ length(theta_angles)
+        if n_panels > window_size
+            smoothed = wing.cache[1][theta_dist]
+            smoothed .= theta_dist
+            for i in (window_size÷2 + 1):(n_panels - window_size÷2)
+                @views smoothed[i] = mean(theta_dist[(i - window_size÷2):(i + window_size÷2)])
+            end
+            theta_dist .= smoothed
+            
+            if !isnothing(delta_angles)
+                smoothed .= delta_dist
+                for i in (window_size÷2 + 1):(n_panels - window_size÷2)
+                    @views smoothed[i] = mean(delta_dist[(i - window_size÷2):(i + window_size÷2)])
+                end
+                delta_dist .= smoothed
+            end
         end
-        theta_dist .= smoothed
-        for i in (window_size÷2 + 1):(n_panels - window_size÷2)
-            @views smoothed[i] = mean(delta_dist[(i - window_size÷2):(i + window_size÷2)])
-        end
-        delta_dist .= smoothed
     end
     deform!(wing)
     return nothing
