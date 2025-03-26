@@ -372,16 +372,18 @@ Represents a curved wing that inherits from Wing with additional geometric prope
   - `spanwise_distribution`::PanelDistribution: see: [PanelDistribution](@ref)
   - `spanwise_direction::MVec3`: Wing span direction vector
   - `sections::Vector{Section}`: List of wing sections, see: [Section](@ref)
-  -  refined_sections::Vector{Section}
+  -  `refined_sections::Vector{Section}`
   - `remove_nan::Bool`: Wether to remove the NaNs from interpolations or not
 - Additional fields:
-  - `circle_center_z`: Center of circle coordinates
-  - gamma_tip::Float64: Angle between the body frame z axis and the vector going from the kite circular shape center to the wing tip.
-  - `inertia_tensor`::Matrix{Float64}: see: [`calculate_inertia_tensor`](@ref)
-  - radius::Float64: Radius of curvature
-  - le_interp::NTuple{3, Extrapolation}: see: [Extrapolation](https://juliamath.github.io/Interpolations.jl/stable/extrapolation/)
-  - te_interp::NTuple{3, Extrapolation}
-  - area_interp::Extrapolation
+  - `circle_center_z::MVec3`: Center of circle coordinates
+  - `gamma_tip::Float64`: Angle between the body frame z axis and the vector going from the kite circular shape center to the wing tip.
+  - `inertia_tensor::Matrix{Float64}`: see: [`calculate_inertia_tensor`](@ref)
+  - `radius::Float64`: Radius of curvature
+  - `le_interp::NTuple{3, Extrapolation}`: see: [Extrapolation](https://juliamath.github.io/Interpolations.jl/stable/extrapolation/)
+  - `te_interp::NTuple{3, Extrapolation}`
+  - `area_interp::Extrapolation`
+  - `theta_dist::Vector{Float64}`
+  - `delta_dist::Vector{Float64}`
 
 """
 mutable struct RamAirWing <: AbstractWing
@@ -398,13 +400,13 @@ mutable struct RamAirWing <: AbstractWing
     mass::Float64
     gamma_tip::Float64
     inertia_tensor::Matrix{Float64}
-    center_of_mass
+    center_of_mass::MVec3
     radius::Float64
     le_interp::NTuple{3, Extrapolation}
     te_interp::NTuple{3, Extrapolation}
     area_interp::Extrapolation
-    theta_dist
-    delta_dist
+    theta_dist::Vector{Float64}
+    delta_dist::Vector{Float64}
 end
 
 """

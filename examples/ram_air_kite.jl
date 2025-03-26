@@ -2,7 +2,7 @@ using ControlPlots
 using VortexStepMethod
 using LinearAlgebra
 
-PLOT = true
+PLOT = false
 USE_TEX = false
 DEFORM = false
 LINEARIZE = true
@@ -81,6 +81,7 @@ PLOT && plot_geometry(
 )
 
 # Solving and plotting distributions
+println("Solve")
 results = VortexStepMethod.solve(vsm_solver, body_aero; log=true)
 @time results = solve(vsm_solver, body_aero; log=true)
 

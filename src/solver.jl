@@ -631,6 +631,8 @@ function linearize(solver::Solver, body_aero::BodyAerodynamics, wing::RamAirWing
         kwargs...)
 
     init_va = copy(body_aero.va)
+    init_alpha_beta = copy(y[alpha_idxs])
+
     # Function to compute forces for given control inputs
     function calc_results!(results, y)
         if !isnothing(alpha_idxs) && isnothing(delta_idxs)
