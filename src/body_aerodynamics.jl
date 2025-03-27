@@ -1,23 +1,25 @@
 """
     @with_kw mutable struct BodyAerodynamics{P}
 
-Main structure for calculating aerodynamic properties of bodies.
+Main structure for calculating aerodynamic properties of bodies. Use the constructor to initialize.
 
 # Fields
 - panels::Vector{Panel}: Vector of [Panel](@ref) structs
 - wings::Union{Vector{Wing}, Vector{RamAirWing}}: A vector of wings; a body can have multiple wings
-- `_va`::MVec3 = zeros(MVec3):   A vector of the apparent wind speed, see: [MVec3](@ref)
+- `va::MVec3` = zeros(MVec3):   A vector of the apparent wind speed, see: [MVec3](@ref)
 - `omega`::MVec3 = zeros(MVec3): A vector of the turn rates around the kite body axes
 - `gamma_distribution`=zeros(Float64, P): A vector of the circulation 
                         of the velocity field; Length: Number of segments. [m²/s]
 - `alpha_uncorrected`=zeros(Float64, P): angles of attack per panel
 - `alpha_corrected`=zeros(Float64, P):   corrected angles of attack per panel
 - `stall_angle_list`=zeros(Float64, P):  stall angle per panel
-- `alpha_array` = zeros(Float64, P)
-- `v_a_array` = zeros(Float64, P)
+- `alpha_array::MVector{P, Float64}` = zeros(Float64, P)
+- `v_a_array::MVector{P, Float64}` = zeros(Float64, P)
 - `work_vectors`::NTuple{10, MVec3} = ntuple(_ -> zeros(MVec3), 10)
-- AIC::Array{Float64, 3} = zeros(3, P, P)
-- `projected_area`::Float64 = 1.0: The area projected onto the xy-plane of the kite body reference frame [m²]
+- `AIC::Array{Float64, 3}` = zeros(3, P, P)
+- `projected_area::Float64` = 1.0: The area projected onto the xy-plane of the kite body reference frame [m²]
+- `y::MVector{P, Float64}` = zeros(MVector{P, Float64})
+- `cache::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}}` = [LazyBufferCache() for _ in 1:5]
 """
 @with_kw mutable struct BodyAerodynamics{P}
     panels::Vector{Panel}
@@ -43,6 +45,9 @@ end
 
 Construct a [BodyAerodynamics](@ref) object for aerodynamic calculations.
 
+This constructor handles initialization of panels, coordinate transformations, and
+aerodynamic properties, returning a fully initialized structure ready for simulation.
+
 # Arguments
 - `wings::Vector{T}`: Vector of wings to analyze, where T is an AbstractWing type
 
@@ -53,6 +58,12 @@ Construct a [BodyAerodynamics](@ref) object for aerodynamic calculations.
 
 # Returns
 - [BodyAerodynamics](@ref) object initialized with panels and wings
+
+# Example
+```julia
+wing = RamAirWing("body.obj", "foil.dat")
+body_aero = BodyAerodynamics([wing], va=[15.0, 0.0, 0.0], omega=zeros(3))
+```
 """
 function BodyAerodynamics(
     wings::Vector{T};
@@ -304,7 +315,7 @@ end
 Update angle of attack at aerodynamic center for VSM method.
 
 Returns:
-    Vector{Float64}: Updated angles of attack
+    nothing
 """
 function update_effective_angle_of_attack!(alpha_corrected,
     body_aero::BodyAerodynamics, 

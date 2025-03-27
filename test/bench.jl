@@ -116,7 +116,7 @@ using LinearAlgebra
             z_airf_array[i, :] .= panel.z_airf
         end
 
-        alphas = collect(-20:30)
+        alphas = collect(-20.0:30.0)
         cls = [2π * α for α in alphas]
         cds = [0.01 + 0.05 * α^2 for α in alphas]
         cms = [-0.1 * α for α in alphas]

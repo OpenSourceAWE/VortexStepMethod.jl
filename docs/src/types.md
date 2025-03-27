@@ -28,7 +28,7 @@ A body is constructed of one or more abstract wings. An abstract wing can be a W
 A Wing/ RamAirWing has one or more sections.
 ```@docs
 Section
-Section(LE_point, TE_point, aero_model)
+Section(LE_point::PosVector, TE_point::PosVector, aero_model)
 Wing
 Wing(n_panels::Int; spanwise_distribution::PanelDistribution=LINEAR,
      spanwise_direction::PosVector=MVec3([0.0, 1.0, 0.0]))

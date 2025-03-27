@@ -18,14 +18,14 @@ Represents a wing section with leading edge, trailing edge, and aerodynamic prop
 end
 
 """
-    Section(LE_point, TE_point, aero_model)
+    Section(LE_point::PosVector, TE_point::PosVector, aero_model)
 
 Create a new wing section with the specified leading edge point, trailing edge point, 
 and aerodynamic model.
 
 # Arguments
-- `LE_point::MVec3`: Leading edge point coordinates
-- `TE_point::MVec3`: Trailing edge point coordinates  
+- `LE_point::PosVector`: Leading edge point coordinates
+- `TE_point::PosVector`: Trailing edge point coordinates  
 - `aero_model::AeroModel`: Aerodynamic model type (e.g., INVISCID, POLAR_VECTORS)
 
 # Returns
@@ -36,11 +36,11 @@ function Section(LE_point, TE_point, aero_model)
 end
 
 """
-    init!(section::Section, LE_point, TE_point, aero_model=nothing, aero_data=nothing)
+    init!(section::Section, LE_point::PosVector, TE_point::PosVector, aero_model=nothing, aero_data=nothing)
 
 Function to update a [Section](@ref) in place.
 """
-function init!(section::Section, LE_point::AbstractVector, TE_point::AbstractVector, aero_model=nothing, aero_data=nothing)
+function init!(section::Section, LE_point, TE_point, aero_model=nothing, aero_data=nothing)
     section.LE_point .= LE_point
     section.TE_point .= TE_point
     (!isnothing(aero_model)) && (section.aero_model = aero_model)
