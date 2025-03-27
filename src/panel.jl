@@ -326,6 +326,7 @@ Calculate lift coefficient for given angle of attack.
 - `Float64`: Lift coefficient (Cl)
 """
 function calculate_cl(panel::Panel, alpha::Float64)::Float64
+    isnan(alpha) && return NaN
     cl = 0.0
     if panel.aero_model == LEI_AIRFOIL_BREUKELS
         cl = evalpoly(rad2deg(alpha), reverse(panel.cl_coeffs))
@@ -351,6 +352,7 @@ end
 Calculate drag and moment coefficients for given angle of attack.
 """
 function calculate_cd_cm(panel::Panel, alpha::Float64)
+    isnan(alpha) && return NaN, NaN
     cd, cm = 0.0, 0.0
     if panel.aero_model == LEI_AIRFOIL_BREUKELS
         cd = evalpoly(rad2deg(alpha), reverse(panel.cd_coeffs))
