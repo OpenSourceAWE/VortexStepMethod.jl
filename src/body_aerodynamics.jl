@@ -622,7 +622,7 @@ Set velocity array and update wake filaments.
 - `va::VelVector`: Velocity vector of the apparent wind speed           [m/s]
 - `omega::VelVector`: Turn rate vector around x y and z axis            [rad/s]
 """
-function set_va!(body_aero::BodyAerodynamics, va, omega=zeros(MVec3))
+function set_va!(body_aero::BodyAerodynamics, va::VelVector, omega=zeros(MVec3))
     
     # Calculate va_distribution based on input type
     va_distribution = if all(omega .== 0.0)
@@ -654,7 +654,7 @@ function set_va!(body_aero::BodyAerodynamics, va, omega=zeros(MVec3))
     return nothing
 end
 
-function set_va!(body_aero::BodyAerodynamics, va_distribution::AbstractVector{AbstractVector}, omega=zeros(MVec3))
+function set_va!(body_aero::BodyAerodynamics, va_distribution::Vector{VelVector}, omega=zeros(MVec3))
     length(va) != length(body_aero.panels) && throw(ArgumentError("Length of va distribution should be equal to number of panels."))
     
     for (i, panel) in enumerate(body_aero.panels)
