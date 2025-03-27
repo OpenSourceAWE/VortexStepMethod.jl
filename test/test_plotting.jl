@@ -2,6 +2,14 @@ using VortexStepMethod
 using ControlPlots
 using Test
 
+if !@isdefined ram_wing
+    body_path = joinpath(tempdir(), "ram_air_kite_body.obj")
+    foil_path = joinpath(tempdir(), "ram_air_kite_foil.dat")
+    cp("data/ram_air_kite_body.obj", body_path; force=true)
+    cp("data/ram_air_kite_foil.dat", foil_path; force=true)
+    ram_wing = RamAirWing(body_path, foil_path; alpha_range=deg2rad.(-1:1), delta_range=deg2rad.(-1:1))
+end
+
 function create_body_aero()
     # Step 1: Define wing parameters
     n_panels = 20          # Number of panels

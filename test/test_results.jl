@@ -5,50 +5,12 @@ using Test
 using Logging
 
 if !@isdefined ram_wing
-    cp("data/ram_air_kite_body.obj", "/tmp/ram_air_kite_body.obj"; force=true)
-    cp("data/ram_air_kite_foil.dat", "/tmp/ram_air_kite_foil.dat"; force=true)
-    ram_wing = RamAirWing("/tmp/ram_air_kite_body.obj", "/tmp/ram_air_kite_foil.dat"; alpha_range=deg2rad.(-1:1), delta_range=deg2rad.(-1:1))
+    body_path = joinpath(tempdir(), "ram_air_kite_body.obj")
+    foil_path = joinpath(tempdir(), "ram_air_kite_foil.dat")
+    cp("data/ram_air_kite_body.obj", body_path; force=true)
+    cp("data/ram_air_kite_foil.dat", foil_path; force=true)
+    ram_wing = RamAirWing(body_path, foil_path; alpha_range=deg2rad.(-1:1), delta_range=deg2rad.(-1:1))
 end
-
-# @testset "Nonlinear vs Linear" begin
-#     va = [15.0, 0.0, 0.0]
-#     theta = zeros(4)
-#     delta = zeros(4)
-#     omega = zeros(3)
-
-#     body_aero = BodyAerodynamics([ram_wing]; va)
-#     solver = Solver(body_aero;
-#         aerodynamic_model_type=VSM,
-#         is_with_artificial_damping=false,
-#         solver_type=NONLIN
-#     )
-
-#     jac, lin_res = VortexStepMethod.linearize(
-#         solver, 
-#         body_aero, 
-#         ram_wing, 
-#         [theta; va; omega; delta]; 
-#         theta_idxs=1:4, 
-#         va_idxs=5:7, 
-#         omega_idxs=8:10,
-#         delta_idxs=11:14,
-#         moment_frac=0.1
-#     )
-#     nonlin_res = VortexStepMethod.solve!(solver, body_aero; log=true)
-#     nonlin_res = [solver.sol.force; solver.sol.moment; solver.sol.group_moment_dist]
-
-#     @test nonlin_res ≈ lin_res
-
-#     dva = [0.01, 0.01, 0.01]
-#     init!(body_aero; init_aero=false, va=va+dva)
-#     nonlin_res = VortexStepMethod.solve!(solver, body_aero; log=true)
-#     nonlin_res = [solver.sol.force; solver.sol.moment; solver.sol.group_moment_dist]
-#     @test lin_res ≉ nonlin_res atol=1e-2
-#     @test lin_res + jac * [zeros(4); dva; zeros(3); zeros(4)] ≈ nonlin_res atol=1e-2
-#     # Test accuracy
-#     @test norm(lin_res + jac * [zeros(4); dva; zeros(3); zeros(4)] - nonlin_res) /
-#         norm(lin_res - nonlin_res) < 2e-3
-# end
 
 @testset "Nonlinear vs Linear - Comprehensive Input Testing" begin
     # Initialize with base parameters
