@@ -39,7 +39,6 @@ vel_app = [cos(alpha), 0.0, sin(alpha)] .* v_a
 set_va!(body_aero, vel_app)
 
 # Step 4: Initialize solvers for both LLT and VSM methods
-P = length(body_aero.panels)
 llt_solver = Solver(body_aero; aerodynamic_model_type=LLT)
 vsm_solver = Solver(body_aero; aerodynamic_model_type=VSM)
 

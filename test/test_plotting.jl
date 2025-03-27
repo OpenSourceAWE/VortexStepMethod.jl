@@ -71,7 +71,6 @@ plt.ioff()
         rm("/tmp/Rectangular_wing_geometry_top_view.pdf")
 
         # Step 5: Initialize the solvers
-        P = length(body_aero.panels)
         vsm_solver = Solver(body_aero; aerodynamic_model_type=VSM)
         llt_solver = Solver(body_aero; aerodynamic_model_type=LLT)
 

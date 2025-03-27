@@ -308,7 +308,6 @@ end
     set_va!(body_aero, v_a)
 
     # Run analysis
-    P = length(body_aero.panels)
     loop_solver = Solver(body_aero; 
         aerodynamic_model_type=model, 
         core_radius_fraction=core_radius_fraction,

@@ -67,7 +67,6 @@ using LinearAlgebra
     set_va!(body_aero, vel_app)
 
     # Initialize solvers for both LLT and VSM methods
-    P = length(body_aero.panels)
     solver = Solver(body_aero)
     nonlin_solver = Solver(body_aero; solver_type=NONLIN)
 
@@ -117,8 +116,7 @@ using LinearAlgebra
             z_airf_array[i, :] .= panel.z_airf
         end
 
-        n_angles = 5
-        alphas = collect(range(-deg2rad(10), deg2rad(10), n_angles))
+        alphas = collect(-20:30)
         cls = [2π * α for α in alphas]
         cds = [0.01 + 0.05 * α^2 for α in alphas]
         cms = [-0.1 * α for α in alphas]
@@ -138,7 +136,6 @@ using LinearAlgebra
                     aero_data)
                 body_aero = BodyAerodynamics([wing])
                 
-                P = length(body_aero.panels)
                 solver = Solver(body_aero;
                     aerodynamic_model_type=model
                 )
