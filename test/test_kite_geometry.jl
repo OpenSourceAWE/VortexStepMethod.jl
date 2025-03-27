@@ -36,7 +36,7 @@ using Serialization
         faces = [[1, 2, 3]]
         
         com = center_to_com!(vertices, faces)
-        expected_com = [1/3, 0.0, 1/3]
+        expected_com = [-1/3, 0.0, -1/3]
         
         @test isapprox(com, expected_com, rtol=1e-5)
     end
@@ -130,7 +130,7 @@ using Serialization
         center_of_mass = center_to_com!(vertices, faces)
         inertia_tensor = calculate_inertia_tensor(vertices, faces, 1.0, zeros(3))
         
-        serialize(info_path, (inertia_tensor, center_of_mass, r, π/4, 
+        serialize(info_path, (inertia_tensor, center_of_mass, I(3), r, π/4, 
             le_interp, te_interp, area_interp))
         
         # Test interpolation at middle point

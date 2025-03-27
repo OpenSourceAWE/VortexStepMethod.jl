@@ -111,7 +111,7 @@ Create interpolation functions for leading/trailing edges and area.
 - Tuple of (le_interp, te_interp, area_interp) interpolation functions
 - Where le_interp and te_interp are tuples themselves, containing the x, y and z interpolations
 """
-function create_interpolations(vertices, circle_center_z, radius, gamma_tip, R; interp_steps=40)
+function create_interpolations(vertices, circle_center_z, radius, gamma_tip, R=I(3); interp_steps=40)
     gamma_range = range(-gamma_tip+1e-6, gamma_tip-1e-6, interp_steps)
     stepsize = gamma_range.step.hi
     vz_centered = [v[3] - circle_center_z for v in vertices]
@@ -201,7 +201,7 @@ function center_to_com!(vertices, faces)
             centroid = (v1 + v2 + v3) / 3
             
             area_total += area
-            com += area * centroid
+            com -= area * centroid
         else
             throw(ArgumentError("Triangulate faces in a CAD program first"))
         end
@@ -212,7 +212,7 @@ function center_to_com!(vertices, faces)
     @info "Centering vertices of .obj file to the center of mass: $com"
     com[2] = 0.0
     for v in vertices
-        v .-= com
+        v .+= com
     end
     return com
 end
@@ -362,30 +362,29 @@ end
 
 
 """
-    RamAirWing
+    RamAirWing <: AbstractWing
 
-Represents a curved wing that inherits from Wing with additional geometric properties.
+A ram-air wing model that represents a curved parafoil with deformable aerodynamic surfaces.
 
-# Fields
-- All fields from Wing:
-  - `n_panels::Int16`: Number of panels in aerodynamic mesh
-  - `n_groups::Int16`: Number of panel groups, each panel group has it's own twisting moment
-  - `spanwise_distribution`::PanelDistribution: see: [PanelDistribution](@ref)
-  - `spanwise_direction::MVec3`: Wing span direction vector
-  - `sections::Vector{Section}`: List of wing sections, see: [Section](@ref)
-  -  `refined_sections::Vector{Section}`
-  - `remove_nan::Bool`: Wether to remove the NaNs from interpolations or not
-- Additional fields:
-  - `circle_center_z::MVec3`: Center of circle coordinates
-  - `gamma_tip::Float64`: Angle between the body frame z axis and the vector going from the kite circular shape center to the wing tip.
-  - `inertia_tensor::Matrix{Float64}`: see: [`calculate_inertia_tensor`](@ref)
-  - `radius::Float64`: Radius of curvature
-  - `le_interp::NTuple{3, Extrapolation}`: see: [Extrapolation](https://juliamath.github.io/Interpolations.jl/stable/extrapolation/)
-  - `te_interp::NTuple{3, Extrapolation}`
-  - `area_interp::Extrapolation`
-  - `theta_dist::Vector{Float64}`
-  - `delta_dist::Vector{Float64}`
+## Core Features
+- Curved wing geometry derived from 3D mesh (.obj file)
+- Aerodynamic properties based on 2D airfoil data (.dat file)
+- Support for control inputs (twist angles and trailing edge deflections)
+- Inertial and geometric properties calculation
 
+## Notable Fields
+- `n_panels::Int16`: Number of panels in aerodynamic mesh
+- `n_groups::Int16`: Number of control groups for distributed deformation
+- `mass::Float64`: Total wing mass in kg
+- `gamma_tip::Float64`: Angular extent from center to wing tip
+- `inertia_tensor::Matrix{Float64}`: Full 3x3 inertia tensor in the kite body frame
+- `T_cad_body::MVec3`: Translation vector from CAD frame to body frame
+- `R_cad_body::MMat3`: Rotation matrix from CAD frame to body frame
+- `radius::Float64`: Wing curvature radius
+- `theta_dist::Vector{Float64}`: Panel twist angle distribution
+- `delta_dist::Vector{Float64}`: Trailing edge deflection distribution
+
+See constructor `RamAirWing(obj_path, dat_path; kwargs...)` for usage details.
 """
 mutable struct RamAirWing <: AbstractWing
     n_panels::Int16
@@ -402,7 +401,8 @@ mutable struct RamAirWing <: AbstractWing
     mass::Float64
     gamma_tip::Float64
     inertia_tensor::Matrix{Float64}
-    center_of_mass::MVec3
+    T_cad_body::MVec3
+    R_cad_body::MMat3
     radius::Float64
     le_interp::NTuple{3, Extrapolation}
     te_interp::NTuple{3, Extrapolation}
@@ -413,27 +413,47 @@ mutable struct RamAirWing <: AbstractWing
 end
 
 """
-    RamAirWing(obj_path, dat_path; alpha=0.0, crease_frac=0.75, wind_vel=10., mass=1.0, 
-             n_panels=54, n_sections=n_panels+1, spanwise_distribution=UNCHANGED, 
-             spanwise_direction=[0.0, 1.0, 0.0], remove_nan::Bool=true)
+    RamAirWing(obj_path, dat_path; kwargs...)
 
-Constructor for a [RamAirWing](@ref) that allows to use an `.obj` and a `.dat` file as input.
+Create a ram-air wing model from 3D geometry and airfoil data files.
 
-# Parameters
-- obj_path: Path to the `.obj` file used for creating the geometry
-- dat_path: Path to the `.dat` file, a standard format for 2d foil geometry
+This constructor builds a complete aerodynamic model by:
+1. Loading or generating wing geometry from the .obj file
+2. Creating aerodynamic polars from the airfoil .dat file
+3. Computing inertial properties and coordinate transformations
+4. Setting up control surfaces and panel distribution
 
-# Keyword Parameters
-- crease_frac=0.9: The x coordinate around which the trailing edge rotates on a normalized 2d foil, 
-                    used in the xfoil polar generation
-- wind_vel=10.0: Apparent wind speed in m/s, used in the xfoil polar generation
-- mass=1.0: Mass of the wing in kg, used for the inertia calculations 
-- `n_panels`=56: Number of panels.
-- `n_sections=n_panels+1`: Number of sections (there is a section on each side of each panel.)
-- `n_groups=n_panels ÷ 4`: Number of panel groups
-- `spanwise_distribution`=UNCHANGED: see: [PanelDistribution](@ref)
-- `spanwise_direction`=[0.0, 1.0, 0.0]
-- `remove_nan::Bool`: Wether to remove the NaNs from interpolations or not
+# Arguments
+- `obj_path`: Path to .obj file containing 3D wing geometry
+- `dat_path`: Path to .dat file containing 2D airfoil profile
+
+# Keyword Arguments
+- `crease_frac=0.9`: Normalized trailing edge hinge location (0-1)
+- `wind_vel=10.0`: Reference wind velocity for XFoil analysis (m/s)
+- `mass=1.0`: Wing mass (kg)
+- `n_panels=56`: Number of aerodynamic panels across wingspan
+- `n_groups=4`: Number of control groups for deformation
+- `n_sections=n_panels+1`: Number of spanwise cross-sections
+- `align_to_principal=false`: Align body frame to principal axes of inertia
+- `spanwise_distribution=UNCHANGED`: Panel distribution type
+- `remove_nan=true`: Interpolate NaN values in aerodynamic data
+- `alpha_range=deg2rad.(-5:1:20)`: Angle of attack range for polars (rad)
+- `delta_range=deg2rad.(-5:1:20)`: Trailing edge deflection range for polars (rad)
+
+# Returns
+A fully initialized `RamAirWing` instance ready for aerodynamic simulation.
+
+# Example
+```julia
+# Create a ram-air wing from geometry files
+wing = RamAirWing(
+    "path/to/wing.obj",
+    "path/to/airfoil.dat";
+    mass=1.5,
+    n_panels=40,
+    n_groups=4
+)
+```
 """
 function RamAirWing(
     obj_path, dat_path; 
@@ -458,27 +478,28 @@ function RamAirWing(
     if !ispath(info_path)
         @info "Reading $obj_path"
         vertices, faces = read_faces(obj_path)
-        center_of_mass = center_to_com!(vertices, faces)
+        T_cad_body = center_to_com!(vertices, faces)
         inertia_tensor = calculate_inertia_tensor(vertices, faces, mass, zeros(3))
 
         if align_to_principal
-            inertia_tensor, R_b_p = calc_inertia_y_rotation(inertia_tensor)
-            circle_center_z, radius, gamma_tip = find_circle_center_and_radius(vertices)
-            le_interp, te_interp, area_interp = create_interpolations(vertices, circle_center_z, radius, gamma_tip, R_b_p; interp_steps)
+            inertia_tensor, R_cad_body = calc_inertia_y_rotation(inertia_tensor)
         else
-            circle_center_z, radius, gamma_tip = find_circle_center_and_radius(vertices)
-            le_interp, te_interp, area_interp = create_interpolations(vertices, circle_center_z, radius, gamma_tip, I(3); interp_steps)
+            R_cad_body = I(3)
         end
+        circle_center_z, radius, gamma_tip = find_circle_center_and_radius(vertices)
+        le_interp, te_interp, area_interp = create_interpolations(vertices, circle_center_z, radius, gamma_tip, R_cad_body; interp_steps)
 
         @info "Writing $info_path"
-        serialize(info_path, (inertia_tensor, center_of_mass, radius, gamma_tip, 
+        serialize(info_path, (inertia_tensor, T_cad_body, R_cad_body, radius, gamma_tip, 
             le_interp, te_interp, area_interp))
     end
 
     @info "Loading kite info from $info_path and polars from $polar_path"
     try
-        (inertia_tensor::Matrix, center_of_mass::Vector,
+        (inertia_tensor::Matrix, T_cad_body::Vector, R_cad_body::Matrix,
             radius::Real, gamma_tip::Real, le_interp, te_interp, area_interp) = deserialize(info_path)
+
+        ((R_cad_body == I(3)) == align_to_principal) && throw(ArgumentError("Delete $info_path and try again."))
 
         if !ispath(polar_path)
             width = 2gamma_tip * radius
@@ -515,7 +536,7 @@ function RamAirWing(
 
         RamAirWing(n_panels, n_groups, spanwise_distribution, panel_props, spanwise_direction, sections, 
             refined_sections, remove_nan, non_deformed_sections,
-            mass, gamma_tip, inertia_tensor, center_of_mass, radius,
+            mass, gamma_tip, inertia_tensor, T_cad_body, R_cad_body, radius,
             le_interp, te_interp, area_interp, zeros(n_panels), zeros(n_panels), cache)
 
     catch e
