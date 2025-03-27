@@ -18,11 +18,13 @@ using SharedArrays
 using PreallocationTools
 using PrecompileTools
 using Pkg
+using DifferentiationInterface
+import SciMLBase: successful_retcode
 
 # Export public interface
 export Wing, Section, RamAirWing
 export BodyAerodynamics
-export Solver, solve, solve_base!, solve!, VSMSolution
+export Solver, solve, solve_base!, solve!, VSMSolution, linearize
 export calculate_results
 export add_section!, set_va!
 export calculate_span, calculate_projected_area
@@ -32,6 +34,7 @@ export AeroModel, LEI_AIRFOIL_BREUKELS, POLAR_VECTORS, POLAR_MATRICES, INVISCID
 export PanelDistribution, LINEAR, COSINE, COSINE_VAN_GARREL, SPLIT_PROVIDED, UNCHANGED
 export InitialGammaDistribution, ELLIPTIC, ZEROS
 export SolverStatus, FEASIBLE, INFEASIBLE, FAILURE
+export SolverType, LOOP, NONLIN
 
 export plot_geometry, plot_distribution, plot_circulation_distribution, plot_geometry, plot_polars, save_plot, show_plot, plot_polar_data
 
@@ -152,6 +155,17 @@ Used in the [VSMSolution](@ref) struct.
 - FAILURE: The result did not converge within the maximal number of iterations
 """
 @enum SolverStatus FEASIBLE INFEASIBLE FAILURE
+
+"""
+    SolverType
+
+Enumeration specifying the method used to solve for circulation distribution.
+
+# Values
+- `LOOP`: Converging gamma loop - iterative approach that repeatedly updates circulation values until convergence
+- `NONLIN`: Nonlinear solver - uses a numerical solver to solve the circulation equations
+"""
+@enum SolverType LOOP NONLIN
 
 abstract type AbstractWing end
 

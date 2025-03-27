@@ -1,39 +1,42 @@
 """
     @with_kw mutable struct BodyAerodynamics{P}
 
-Main structure for calculating aerodynamic properties of bodies.
+Main structure for calculating aerodynamic properties of bodies. Use the constructor to initialize.
 
 # Fields
 - panels::Vector{Panel}: Vector of [Panel](@ref) structs
 - wings::Union{Vector{Wing}, Vector{RamAirWing}}: A vector of wings; a body can have multiple wings
-- `_va`::MVec3 = zeros(MVec3):   A vector of the apparent wind speed, see: [MVec3](@ref)
+- `va::MVec3` = zeros(MVec3):   A vector of the apparent wind speed, see: [MVec3](@ref)
 - `omega`::MVec3 = zeros(MVec3): A vector of the turn rates around the kite body axes
-- `gamma_distribution`::Vector{Float64}=zeros(Float64, P): A vector of the circulation 
+- `gamma_distribution`=zeros(Float64, P): A vector of the circulation 
                         of the velocity field; Length: Number of segments. [m²/s]
-- `alpha_uncorrected`::Vector{Float64}=zeros(Float64, P): angles of attack per panel
-- `alpha_corrected`::Vector{Float64}=zeros(Float64, P):   corrected angles of attack per panel
-- `stall_angle_list`::Vector{Float64}=zeros(Float64, P):  stall angle per panel
-- `alpha_array`::Vector{Float64} = zeros(Float64, P)
-- `v_a_array`::Vector{Float64} = zeros(Float64, P)
+- `alpha_uncorrected`=zeros(Float64, P): angles of attack per panel
+- `alpha_corrected`=zeros(Float64, P):   corrected angles of attack per panel
+- `stall_angle_list`=zeros(Float64, P):  stall angle per panel
+- `alpha_array::MVector{P, Float64}` = zeros(Float64, P)
+- `v_a_array::MVector{P, Float64}` = zeros(Float64, P)
 - `work_vectors`::NTuple{10, MVec3} = ntuple(_ -> zeros(MVec3), 10)
-- AIC::Array{Float64, 3} = zeros(3, P, P)
-- `projected_area`::Float64 = 1.0: The area projected onto the xy-plane of the kite body reference frame [m²]
+- `AIC::Array{Float64, 3}` = zeros(3, P, P)
+- `projected_area::Float64` = 1.0: The area projected onto the xy-plane of the kite body reference frame [m²]
+- `y::MVector{P, Float64}` = zeros(MVector{P, Float64})
+- `cache::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}}` = [LazyBufferCache() for _ in 1:5]
 """
 @with_kw mutable struct BodyAerodynamics{P}
     panels::Vector{Panel}
     wings::Union{Vector{Wing}, Vector{RamAirWing}}
     _va::MVec3 = zeros(MVec3)
     omega::MVec3 = zeros(MVec3)
-    gamma_distribution::Vector{Float64} = zeros(Float64, P)
-    alpha_uncorrected::Vector{Float64} = zeros(Float64, P)
-    alpha_corrected::Vector{Float64} = zeros(Float64, P)
-    stall_angle_list::Vector{Float64} = zeros(Float64, P)
-    alpha_array::Vector{Float64} = zeros(Float64, P)
-    v_a_array::Vector{Float64} = zeros(Float64, P)
+    gamma_distribution::MVector{P, Float64} = zeros(MVector{P, Float64})
+    alpha_uncorrected::MVector{P, Float64} = zeros(MVector{P, Float64})
+    alpha_corrected::MVector{P, Float64} = zeros(MVector{P, Float64})
+    stall_angle_list::MVector{P, Float64} = zeros(MVector{P, Float64})
+    alpha_array::MVector{P, Float64} = zeros(MVector{P, Float64})
+    v_a_array::MVector{P, Float64} = zeros(MVector{P, Float64})
     work_vectors::NTuple{10,MVec3} = ntuple(_ -> zeros(MVec3), 10)
     AIC::Array{Float64, 3} = zeros(3, P, P)
     projected_area::Float64 = one(Float64)
-    y::Vector{Float64} = zeros(Float64, P)
+    y::MVector{P, Float64} = zeros(MVector{P, Float64})
+    cache::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}} = [LazyBufferCache() for _ in 1:5]
 end
 
 """
@@ -42,18 +45,31 @@ end
 
 Construct a [BodyAerodynamics](@ref) object for aerodynamic calculations.
 
+This constructor handles initialization of panels, coordinate transformations, and
+aerodynamic properties, returning a fully initialized structure ready for simulation.
+
 # Arguments
 - `wings::Vector{T}`: Vector of wings to analyze, where T is an AbstractWing type
 
 # Keyword Arguments
 - `kite_body_origin=zeros(MVec3)`: Origin point of kite body reference frame in CAD reference frame
+- `va=[15.0, 0.0, 0.0]`: Apparent wind vector
+- `omega=zeros(3)`: Turn rate in kite body frame x y and z
 
 # Returns
 - [BodyAerodynamics](@ref) object initialized with panels and wings
+
+# Example
+```julia
+wing = RamAirWing("body.obj", "foil.dat")
+body_aero = BodyAerodynamics([wing], va=[15.0, 0.0, 0.0], omega=zeros(3))
+```
 """
 function BodyAerodynamics(
     wings::Vector{T};
-    kite_body_origin=zeros(MVec3)
+    kite_body_origin=zeros(MVec3),
+    va=[15.0, 0.0, 0.0],
+    omega=zeros(MVec3)
 ) where T <: AbstractWing
     # Initialize panels
     panels = Panel[]
@@ -63,8 +79,9 @@ function BodyAerodynamics(
             section.TE_point .-= kite_body_origin
         end
         if wing.spanwise_distribution == UNCHANGED
-            wing.n_panels = length(wing.sections) - 1
             wing.refined_sections = wing.sections
+            !(wing.n_panels == length(wing.sections) - 1) && 
+                throw(ArgumentError("(wing.n_panels = $(wing.n_panels)) != (length(wing.sections) - 1 = $(length(wing.sections) - 1))"))
         else
             wing.refined_sections = Section[Section() for _ in 1:wing.n_panels+1]
         end
@@ -77,7 +94,7 @@ function BodyAerodynamics(
     end
 
     body_aero = BodyAerodynamics{length(panels)}(; panels, wings)
-    init!(body_aero)
+    init!(body_aero; va, omega)
     return body_aero
 end
 
@@ -106,11 +123,17 @@ Initialize a BodyAerodynamics struct in-place by setting up panels and coefficie
 
 # Keyword Arguments
 - `init_aero::Bool`: Wether to initialize the aero data or not
+- `va=[15.0, 0.0, 0.0]`: Apparent wind vector
+- `omega=zeros(3)`: Turn rate in kite body frame x y and z
 
 # Returns
 nothing
 """
-function init!(body_aero::BodyAerodynamics; init_aero=true)
+function init!(body_aero::BodyAerodynamics; 
+    init_aero=true,
+    va=[15.0, 0.0, 0.0],
+    omega=zeros(MVec3)
+)
     idx = 1
     vec = zeros(MVec3)
     for wing in body_aero.wings
@@ -150,14 +173,15 @@ function init!(body_aero::BodyAerodynamics; init_aero=true)
     body_aero.alpha_array .= 0.0
     body_aero.v_a_array .= 0.0 
     body_aero.AIC .= 0.0
+    set_va!(body_aero, va, omega)
     return nothing
 end
 
 """
     calculate_AIC_matrices!(body_aero::BodyAerodynamics, model::Model, 
-                         core_radius_fraction::Float64,
-                         va_norm_array::Vector{Float64}, 
-                         va_unit_array::Matrix{Float64})
+                         core_radius_fraction,
+                         va_norm_array, 
+                         va_unit_array)
 
 Calculate Aerodynamic Influence Coefficient matrices.
 
@@ -166,9 +190,9 @@ See also: [BodyAerodynamics](@ref), [Model](@ref)
 Returns: nothing
 """
 @inline function calculate_AIC_matrices!(body_aero::BodyAerodynamics, model::Model,
-                              core_radius_fraction::Float64,
-                              va_norm_array::Vector{Float64}, 
-                              va_unit_array::Matrix{Float64})
+                              core_radius_fraction,
+                              va_norm_array, 
+                              va_unit_array)
     # Determine evaluation point based on model
     evaluation_point = model == VSM ? :control_point : :aero_center
     evaluation_point_on_bound = model == LLT
@@ -208,13 +232,13 @@ Returns: nothing
 end
 
 """
-    calculate_circulation_distribution_elliptical_wing(body_aero::BodyAerodynamics, gamma_0::Float64=1.0)
+    calculate_circulation_distribution_elliptical_wing(body_aero::BodyAerodynamics, gamma_0=1.0)
 
 Calculate circulation distribution for an elliptical wing.
 
 Returns: nothing
 """
-function calculate_circulation_distribution_elliptical_wing(gamma_i, body_aero::BodyAerodynamics, gamma_0::Float64=1.0)
+function calculate_circulation_distribution_elliptical_wing(gamma_i, body_aero::BodyAerodynamics, gamma_0=1.0)
     length(body_aero.wings) == 1 || throw(ArgumentError("Multiple wings not yet implemented"))
     
     wing_span = body_aero.wings[1].span
@@ -235,11 +259,11 @@ end
 
 """
     calculate_stall_angle_list(panels::Vector{Panel};
-                             begin_aoa::Float64=9.0,
-                             end_aoa::Float64=22.0,
-                             step_aoa::Float64=1.0,
-                             stall_angle_if_none_detected::Float64=50.0,
-                             cl_initial::Float64=-10.0)
+                             begin_aoa=9.0,
+                             end_aoa=22.0,
+                             step_aoa=1.0,
+                             stall_angle_if_none_detected=50.0,
+                             cl_initial=-10.0)
 
 Calculate stall angles for each panel.
 
@@ -247,11 +271,11 @@ Returns:
     Vector{Float64}: Stall angles in radians
 """
 function calculate_stall_angle_list(panels::Vector{Panel};
-                                  begin_aoa::Float64=9.0,
-                                  end_aoa::Float64=22.0,
-                                  step_aoa::Float64=1.0,
-                                  stall_angle_if_none_detected::Float64=50.0,
-                                  cl_initial::Float64=-10.0)
+                                  begin_aoa=9.0,
+                                  end_aoa=22.0,
+                                  step_aoa=1.0,
+                                  stall_angle_if_none_detected=50.0,
+                                  cl_initial=-10.0)
     
     aoa_range = deg2rad.(range(begin_aoa, end_aoa, step=step_aoa))
     stall_angles = Float64[]
@@ -279,31 +303,29 @@ function calculate_stall_angle_list(panels::Vector{Panel};
     return stall_angles
 end
 
-const cache_body = [LazyBufferCache() for _ in 1:5]
-
 """
-    update_effective_angle_of_attack_if_VSM(body_aero::BodyAerodynamics, gamma::Vector{Float64},
-                                          core_radius_fraction::Float64,
-                                          z_airf_array::Matrix{Float64},
-                                          x_airf_array::Matrix{Float64},
-                                          va_array::Matrix{Float64},
-                                          va_norm_array::Vector{Float64},
-                                          va_unit_array::Matrix{Float64})
+    update_effective_angle_of_attack_if_VSM(body_aero::BodyAerodynamics, gamma,
+                                          core_radius_fraction,
+                                          z_airf_array,
+                                          x_airf_array,
+                                          va_array,
+                                          va_norm_array,
+                                          va_unit_array)
 
 Update angle of attack at aerodynamic center for VSM method.
 
 Returns:
-    Vector{Float64}: Updated angles of attack
+    nothing
 """
 function update_effective_angle_of_attack!(alpha_corrected,
     body_aero::BodyAerodynamics, 
-    gamma::Vector{Float64},
-    core_radius_fraction::Float64,
-    z_airf_array::Matrix{Float64},
-    x_airf_array::Matrix{Float64},
-    va_array::Matrix{Float64},
-    va_norm_array::Vector{Float64},
-    va_unit_array::Matrix{Float64})
+    gamma,
+    core_radius_fraction,
+    z_airf_array,
+    x_airf_array,
+    va_array,
+    va_norm_array,
+    va_unit_array)
 
     # Calculate AIC matrices (keep existing optimized view)
     calculate_AIC_matrices!(body_aero, LLT, core_radius_fraction, va_norm_array, va_unit_array)
@@ -313,7 +335,7 @@ function update_effective_angle_of_attack!(alpha_corrected,
     n_cols = size(body_aero.AIC, 3)
 
     # Preallocate induced velocity array
-    induced_velocity = cache_body[1][va_array]
+    induced_velocity = body_aero.cache[1][va_array]
 
     # Calculate each component with explicit loops
     for j in 1:3  # For each x/y/z component
@@ -327,13 +349,13 @@ function update_effective_angle_of_attack!(alpha_corrected,
     end
 
     # In-place relative velocity calculation
-    relative_velocity = cache_body[2][va_array]
+    relative_velocity = body_aero.cache[2][va_array]
     relative_velocity .= va_array .+ induced_velocity
 
     # Preallocate and compute dot products manually
     n = size(relative_velocity, 1)
-    v_normal     = cache_body[3][relative_velocity]
-    v_tangential = cache_body[4][relative_velocity]
+    v_normal     = body_aero.cache[3][relative_velocity]
+    v_tangential = body_aero.cache[4][relative_velocity]
     
     @inbounds for i in 1:n
         vn = 0.0
@@ -355,14 +377,14 @@ function update_effective_angle_of_attack!(alpha_corrected,
 end
 
 """
-    calculate_results(body_aero::BodyAerodynamics, gamma_new::Vector{Float64}, 
-                     density::Float64, aerodynamic_model_type::Model,
-                     core_radius_fraction::Float64, mu::Float64,
-                     alpha_array::Vector{Float64}, v_a_array::Vector{Float64},
-                     chord_array::Vector{Float64}, x_airf_array::Matrix{Float64},
-                     y_airf_array::Matrix{Float64}, z_airf_array::Matrix{Float64},
-                     va_array::Matrix{Float64}, va_norm_array::Vector{Float64},
-                     va_unit_array::Matrix{Float64}, panels::Vector{Panel},
+    calculate_results(body_aero::BodyAerodynamics, gamma_new, 
+                     density, aerodynamic_model_type::Model,
+                     core_radius_fraction, mu,
+                     alpha_array, v_a_array,
+                     chord_array, x_airf_array,
+                     y_airf_array, z_airf_array,
+                     va_array, va_norm_array,
+                     va_unit_array, panels::Vector{Panel},
                      is_only_f_and_gamma_output::Bool)
 
 Calculate final aerodynamic results. Reference point is in the kite body (KB) frame.
@@ -372,21 +394,21 @@ Returns:
 """
 function calculate_results(
     body_aero::BodyAerodynamics,
-    gamma_new::Vector{Float64},
-    reference_point::AbstractVector,
-    density::Float64,
+    gamma_new,
+    reference_point,
+    density,
     aerodynamic_model_type::Model,
-    core_radius_fraction::Float64,
-    mu::Float64,
-    alpha_array::Vector{Float64},
-    v_a_array::Vector{Float64},
-    chord_array::Vector{Float64},
-    x_airf_array::Matrix{Float64},
-    y_airf_array::Matrix{Float64},
-    z_airf_array::Matrix{Float64},
-    va_array::Matrix{Float64},
-    va_norm_array::Vector{Float64},
-    va_unit_array::Matrix{Float64},
+    core_radius_fraction,
+    mu,
+    alpha_array,
+    v_a_array,
+    chord_array,
+    x_airf_array,
+    y_airf_array,
+    z_airf_array,
+    va_array,
+    va_norm_array,
+    va_unit_array,
     panels::Vector{Panel},
     is_only_f_and_gamma_output::Bool,
 )
@@ -597,8 +619,8 @@ Set velocity array and update wake filaments.
 
 # Arguments
 - body_aero::BodyAerodynamics: The [BodyAerodynamics](@ref) struct to modify
-- `va`: Velocity vector of the apparent wind speed           [m/s]
-- `omega`: Turn rate vector around x y and z axis            [rad/s]
+- `va::VelVector`: Velocity vector of the apparent wind speed           [m/s]
+- `omega::VelVector`: Turn rate vector around x y and z axis            [rad/s]
 """
 function set_va!(body_aero::BodyAerodynamics, va::VelVector, omega=zeros(MVec3))
     
@@ -644,3 +666,4 @@ function set_va!(body_aero::BodyAerodynamics, va_distribution::Vector{VelVector}
     body_aero._va = va
     return nothing
 end
+

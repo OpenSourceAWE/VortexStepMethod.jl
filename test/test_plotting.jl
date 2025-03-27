@@ -2,6 +2,14 @@ using VortexStepMethod
 using ControlPlots
 using Test
 
+if !@isdefined ram_wing
+    body_path = joinpath(tempdir(), "ram_air_kite_body.obj")
+    foil_path = joinpath(tempdir(), "ram_air_kite_foil.dat")
+    cp("data/ram_air_kite_body.obj", body_path; force=true)
+    cp("data/ram_air_kite_foil.dat", foil_path; force=true)
+    ram_wing = RamAirWing(body_path, foil_path; alpha_range=deg2rad.(-1:1), delta_range=deg2rad.(-1:1))
+end
+
 function create_body_aero()
     # Step 1: Define wing parameters
     n_panels = 20          # Number of panels
@@ -63,9 +71,8 @@ plt.ioff()
         rm("/tmp/Rectangular_wing_geometry_top_view.pdf")
 
         # Step 5: Initialize the solvers
-        P = length(body_aero.panels)
-        vsm_solver = Solver{P}(aerodynamic_model_type=VSM)
-        llt_solver = Solver{P}(aerodynamic_model_type=LLT)
+        vsm_solver = Solver(body_aero; aerodynamic_model_type=VSM)
+        llt_solver = Solver(body_aero; aerodynamic_model_type=LLT)
 
         # Step 6: Solve the VSM and LLT
         results_vsm = solve(vsm_solver, body_aero)
@@ -103,10 +110,7 @@ plt.ioff()
         rm("/tmp/Rectangular_Wing_Polars.pdf")
 
         # Step 9: Test polar data plotting
-        cp("data/ram_air_kite_body.obj", "/tmp/ram_air_kite_body.obj"; force=true)
-        cp("data/ram_air_kite_foil.dat", "/tmp/ram_air_kite_foil.dat"; force=true)
-        wing = RamAirWing("/tmp/ram_air_kite_body.obj", "/tmp/ram_air_kite_foil.dat"; alpha_range=deg2rad.(-1:1), delta_range=deg2rad.(-1:1))
-        body_aero = BodyAerodynamics([wing])
+        body_aero = BodyAerodynamics([ram_wing])
         fig = plot_polar_data(body_aero; is_show=false)
         @test fig isa plt.PyPlot.Figure
     end

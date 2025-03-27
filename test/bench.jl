@@ -29,13 +29,26 @@ using LinearAlgebra
     alpha_deg = 30.0       # Angle of attack [degrees]
     alpha = deg2rad(alpha_deg)
     
-    unchanged_wing = Wing(n_panels, spanwise_distribution=UNCHANGED)
     wing = Wing(n_panels, spanwise_distribution=LINEAR)
     add_section!(wing, 
         [0.0, span/2, 0.0],    # Left tip LE 
         [chord, span/2, 0.0],  # Left tip TE
         INVISCID)
     add_section!(wing, 
+        [0.0, -span/2, 0.0],   # Right tip LE
+        [chord, -span/2, 0.0], # Right tip TE
+        INVISCID)
+
+    unchanged_wing = Wing(2, spanwise_distribution=UNCHANGED)
+    add_section!(unchanged_wing, 
+        [0.0, span/2, 0.0],    # Left tip LE 
+        [chord, span/2, 0.0],  # Left tip TE
+        INVISCID)
+    add_section!(unchanged_wing, 
+        [0.0, 0.0, 0.0],    # Left tip LE 
+        [chord, 0.0, 0.0],  # Left tip TE
+        INVISCID)
+    add_section!(unchanged_wing, 
         [0.0, -span/2, 0.0],   # Right tip LE
         [chord, -span/2, 0.0], # Right tip TE
         INVISCID)
@@ -47,15 +60,15 @@ using LinearAlgebra
     @testset "Re-initialization" begin
         result = @benchmark init!($unchanged_body_aero; init_aero=false) samples=1 evals=1
         @info "Re-initializing Allocations: $(result.allocs) \t Memory: $(result.memory)"
-        @test result.allocs < 100
+        @test result.allocs ≤ 50
     end
 
     vel_app = [cos(alpha), 0.0, sin(alpha)] .* v_a
     set_va!(body_aero, vel_app)
 
     # Initialize solvers for both LLT and VSM methods
-    P = length(body_aero.panels)
-    solver = Solver{P}()
+    solver = Solver(body_aero)
+    nonlin_solver = Solver(body_aero; solver_type=NONLIN)
 
     # Pre-allocate arrays
     gamma = rand(n_panels)
@@ -77,7 +90,7 @@ using LinearAlgebra
             for frac in core_radius_fractions
                 @testset "Model $model Core Radius Fraction $frac" begin
                     result = @benchmark calculate_AIC_matrices!($body_aero, $model, $frac, $va_norm_array, $va_unit_array) samples=1 evals=1
-                    @test result.allocs ≤ 100
+                    @test result.allocs ≤ 30
                     @info "Model: $(model) \t Core radius fraction: $(frac) \t Allocations: $(result.allocs) \t Memory: $(result.memory)"
                 end
             end
@@ -103,8 +116,7 @@ using LinearAlgebra
             z_airf_array[i, :] .= panel.z_airf
         end
 
-        n_angles = 5
-        alphas = collect(range(-deg2rad(10), deg2rad(10), n_angles))
+        alphas = collect(-20.0:30.0)
         cls = [2π * α for α in alphas]
         cds = [0.01 + 0.05 * α^2 for α in alphas]
         cms = [-0.1 * α for α in alphas]
@@ -124,8 +136,7 @@ using LinearAlgebra
                     aero_data)
                 body_aero = BodyAerodynamics([wing])
                 
-                P = length(body_aero.panels)
-                solver = Solver{P}(
+                solver = Solver(body_aero;
                     aerodynamic_model_type=model
                 )
                 solver.sol._va_array .= va_array
@@ -191,7 +202,23 @@ using LinearAlgebra
             $body_aero.panels,
             false
         ) samples=1 evals=1
+        @info "Calculate Results Allocations: $(result.allocs) Memory: $(result.memory)"
         @test result.allocs ≤ 300
+    end
+
+    @testset "Allocation Tests for solve() and solve!()" begin
+        result = @benchmark  solve_base!($solver, $body_aero, nothing) samples=1 evals=1  # 51 allocations
+        @test result.allocs <= 55
+        # time Python: 32.0 ms  Ryzen 7950x
+        # time Julia:   0.45 ms Ryzen 7950x
+        result = @benchmark  sol = solve!($solver, $body_aero, nothing) samples=1 evals=1 # 85 allocations
+        @test result.allocs <= 89
+
+        # Step 5: Solve using both methods
+        result = @benchmark  solve_base!($nonlin_solver, $body_aero, nothing) samples=1 evals=1  # 51 allocations
+        @test result.allocs <= 55
+        result = @benchmark  sol = solve!($nonlin_solver, $body_aero, nothing) samples=1 evals=1 # 85 allocations
+        @test result.allocs <= 89
     end
 end
 

@@ -1,6 +1,6 @@
 
 """
-    mutable struct Section
+    @with_kw mutable struct Section
 
 Represents a wing section with leading edge, trailing edge, and aerodynamic properties.
 
@@ -8,7 +8,7 @@ Represents a wing section with leading edge, trailing edge, and aerodynamic prop
 - `LE_point::MVec3` = zeros(MVec3): Leading edge point coordinates
 - `TE_point::MVec3` = zeros(MVec3): Trailing edge point coordinates
 - `aero_model`::AeroModel = INVISCID: [AeroModel](@ref)
-- `aero_data`::AeroData = nothing: See: [AeroData]    
+- `aero_data`::AeroData = nothing: See: [AeroData](@ref)
 """
 @with_kw mutable struct Section
     LE_point::MVec3 = zeros(MVec3)
@@ -16,18 +16,27 @@ Represents a wing section with leading edge, trailing edge, and aerodynamic prop
     aero_model::AeroModel = INVISCID
     aero_data::AeroData = nothing
 end
-"""
-    Section(LE_point::Vector{Float64}, TE_point::Vector{Float64}, 
-            aero_model=INVISCID, aero_data=nothing)
 
-Constructor for [Section](@ref) that allows to pass Vectors of Float64 as point coordinates.
 """
-function Section(LE_point::Vector{Float64}, TE_point::Vector{Float64}, aero_model=INVISCID, aero_data=nothing)
-    Section(MVec3(LE_point), MVec3(TE_point), aero_model, aero_data)
+    Section(LE_point::PosVector, TE_point::PosVector, aero_model)
+
+Create a new wing section with the specified leading edge point, trailing edge point, 
+and aerodynamic model.
+
+# Arguments
+- `LE_point::PosVector`: Leading edge point coordinates
+- `TE_point::PosVector`: Trailing edge point coordinates  
+- `aero_model::AeroModel`: Aerodynamic model type (e.g., INVISCID, POLAR_VECTORS)
+
+# Returns
+- `Section`: A new section with the specified parameters and no aerodynamic data
+"""
+function Section(LE_point, TE_point, aero_model)
+    return Section(LE_point, TE_point, aero_model, nothing)
 end
 
 """
-    init!(section::Section, LE_point, TE_point, aero_model=nothing, aero_data=nothing)
+    init!(section::Section, LE_point::PosVector, TE_point::PosVector, aero_model=nothing, aero_data=nothing)
 
 Function to update a [Section](@ref) in place.
 """
@@ -95,7 +104,7 @@ Calculate geometric properties for each panel.
 # Returns:
 [PanelProperties](@ref) containing vectors for each property
 """
-function update_panel_properties!(panel_props::PanelProperties, section_list::Vector{Section}, n_panels::Int)
+function update_panel_properties!(panel_props::PanelProperties, section_list::Vector{Section}, n_panels)
     coords = panel_props.coords
     aero_centers = panel_props.aero_centers
     control_points = panel_props.control_points
@@ -185,7 +194,8 @@ end
 Represents a wing composed of multiple sections with aerodynamic properties.
 
 # Fields
-- `n_panels::Int64`: Number of panels in aerodynamic mesh
+- `n_panels::Int16`: Number of panels in aerodynamic mesh
+- `n_groups::Int16`: Number of panel groups
 - `spanwise_distribution`::PanelDistribution: [PanelDistribution](@ref)
 - `spanwise_direction::MVec3`: Wing span direction vector
 - `sections::Vector{Section}`: Vector of wing sections, see: [Section](@ref)
@@ -194,7 +204,8 @@ Represents a wing composed of multiple sections with aerodynamic properties.
 
 """
 mutable struct Wing <: AbstractWing
-    n_panels::Int64
+    n_panels::Int16
+    n_groups::Int16
     spanwise_distribution::PanelDistribution
     panel_props::PanelProperties
     spanwise_direction::MVec3
@@ -205,6 +216,7 @@ end
 
 """
     Wing(n_panels::Int;
+         n_groups=n_panels,
          spanwise_distribution::PanelDistribution=LINEAR,
          spanwise_direction::PosVector=MVec3([0.0, 1.0, 0.0]),
          remove_nan::Bool=true)
@@ -213,17 +225,20 @@ Constructor for a [Wing](@ref) struct with default values that initializes the s
 and refined sections as empty arrays.
 
 # Parameters
-- `n_panels::Int64`: Number of panels in aerodynamic mesh
+- `n_panels::Int`: Number of panels in aerodynamic mesh
+- `n_groups::Int`: Number of panel groups in aerodynamic mesh
 - `spanwise_distribution`::PanelDistribution = LINEAR: [PanelDistribution](@ref)
 - `spanwise_direction::MVec3` = MVec3([0.0, 1.0, 0.0]): Wing span direction vector
 - `remove_nan::Bool`: Wether to remove the NaNs from interpolations or not
 """
 function Wing(n_panels::Int;
+        n_groups = n_panels,
         spanwise_distribution::PanelDistribution=LINEAR,
         spanwise_direction::PosVector=MVec3([0.0, 1.0, 0.0]),
         remove_nan=true)
+    !(n_panels % n_groups == 0) && throw(ArgumentError("Number of panels should be divisible by number of groups"))
     panel_props = PanelProperties{n_panels}()
-    Wing(n_panels, spanwise_distribution, panel_props, spanwise_direction, Section[], Section[], remove_nan)
+    Wing(n_panels, n_groups, spanwise_distribution, panel_props, spanwise_direction, Section[], Section[], remove_nan)
 end
 
 function init!(wing::AbstractWing)
@@ -281,8 +296,8 @@ Add a new section to the wing.
 - `aero_model`::AeroModel: [AeroModel](@ref)
 - `aero_data`::AeroData: See [AeroData](@ref)  
 """
-function add_section!(wing::Wing, LE_point::Vector{Float64}, 
-                     TE_point::Vector{Float64}, aero_model::AeroModel, aero_data::AeroData=nothing)
+function add_section!(wing::Wing, LE_point, 
+                     TE_point, aero_model::AeroModel, aero_data::AeroData=nothing)
     if aero_model == POLAR_VECTORS && wing.remove_nan
         aero_data = remove_vector_nans(aero_data)
     elseif aero_model == POLAR_MATRICES && wing.remove_nan
@@ -771,7 +786,7 @@ end
 end
 
 """
-    calculate_projected_area(wing::AbstractWing, z_plane_vector::Vector{Float64}=[0.0, 0.0, 1.0])
+    calculate_projected_area(wing::AbstractWing, z_plane_vector=[0.0, 0.0, 1.0])
 
 Calculate projected wing area onto plane defined by normal vector.
 
@@ -779,7 +794,7 @@ Returns:
     Float64: Projected area
 """
 function calculate_projected_area(wing::AbstractWing, 
-                                z_plane_vector::Vector{Float64}=[0.0, 0.0, 1.0])
+                                z_plane_vector=[0.0, 0.0, 1.0])
     # Normalize plane normal vector
     z_plane_vector = z_plane_vector ./ norm(z_plane_vector)
 

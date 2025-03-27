@@ -113,7 +113,7 @@ function init_pos!(
     panel.x_airf .= x_airf
     panel.y_airf .= y_airf
     panel.z_airf .= z_airf
-    panel.delta = Float64(delta)
+    panel.delta = delta
     return nothing
 end
 
@@ -301,11 +301,11 @@ function compute_lei_coeffs(section_1::Section, section_2::Section)
 end
 
 """
-    calculate_relative_alpha_and_velocity(panel::Panel, induced_velocity::Vector{Float64})
+    calculate_relative_alpha_and_velocity(panel::Panel, induced_velocity)
 
 Calculate relative angle of attack and relative velocity of the panel.
 """
-function calculate_relative_alpha_and_velocity(panel::Panel, induced_velocity::Vector{Float64})
+function calculate_relative_alpha_and_velocity(panel::Panel, induced_velocity)
     relative_velocity = panel.va + induced_velocity
     v_normal = dot(panel.z_airf, relative_velocity)
     v_tangential = dot(panel.x_airf, relative_velocity)
@@ -361,7 +361,7 @@ function calculate_cd_cm(panel::Panel, alpha::Float64)
     elseif panel.aero_model == POLAR_VECTORS
         cd = panel.cd_interp(alpha)::Float64
         cm = panel.cm_interp(alpha)::Float64
-    elseif panel.aero_model == POLAR_MATRICES    
+    elseif panel.aero_model == POLAR_MATRICES
         cd = panel.cd_interp(alpha, panel.delta)::Float64
         cm = panel.cm_interp(alpha, panel.delta)::Float64
     elseif !(panel.aero_model == INVISCID)
@@ -494,7 +494,8 @@ Calculate the velocity induced by a vortex ring at a control point.
             end
             velind .+= tempvel
         else
-            throw(ArgumentError("Filament not initialized: $i, $([filaments[j].initialized for j in 1:5])"))
+            throw(ArgumentError("Filament not initialized: $i, $([filaments[j].initialized for j in 1:5]). 
+                Maybe you forgot to call set_va! before running solve."))
         end
     end
     return nothing

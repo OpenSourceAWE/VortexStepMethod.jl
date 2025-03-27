@@ -42,15 +42,14 @@ CAD_wing = Wing(n_panels; spanwise_distribution)
 for rib in rib_list
     add_section!(CAD_wing, rib[1], rib[2], rib[3], rib[4])
 end
-body_aero_CAD_19ribs = BodyAerodynamics([CAD_wing])
+body_aero = BodyAerodynamics([CAD_wing])
 
 # Create solvers
-P = length(body_aero_CAD_19ribs.panels)
-vsm_solver = Solver{P}(
+vsm_solver = Solver(body_aero; 
     aerodynamic_model_type=VSM,
     is_with_artificial_damping=false
 )
-VSM_with_stall_correction = Solver{P}(
+VSM_with_stall_correction = Solver(body_aero; 
     aerodynamic_model_type=VSM,
     is_with_artificial_damping=true
 )
@@ -66,11 +65,11 @@ vel_app = [
     sin(side_slip),
     sin(aoa_rad)
 ] * v_a
-set_va!(body_aero_CAD_19ribs, vel_app)
+set_va!(body_aero, vel_app)
 
 # Plotting geometry
 PLOT && plot_geometry(
-    body_aero_CAD_19ribs,
+    body_aero,
     "";
     data_type=".svg",
     save_path="",
@@ -82,11 +81,11 @@ PLOT && plot_geometry(
 )
 
 # Solving and plotting distributions
-results = solve(vsm_solver, body_aero_CAD_19ribs)
-@time results_with_stall = solve(VSM_with_stall_correction, body_aero_CAD_19ribs)
-@time results_with_stall = solve(VSM_with_stall_correction, body_aero_CAD_19ribs)
+results = solve(vsm_solver, body_aero)
+@time results_with_stall = solve(VSM_with_stall_correction, body_aero)
+@time results_with_stall = solve(VSM_with_stall_correction, body_aero)
 
-CAD_y_coordinates = [panel.aero_center[2] for panel in body_aero_CAD_19ribs.panels]
+CAD_y_coordinates = [panel.aero_center[2] for panel in body_aero.panels]
 
 PLOT && plot_distribution(
     [CAD_y_coordinates, CAD_y_coordinates],
@@ -112,7 +111,7 @@ path_cfd_lebesque = joinpath(
 
 PLOT && plot_polars(
     [vsm_solver, VSM_with_stall_correction],
-    [body_aero_CAD_19ribs, body_aero_CAD_19ribs],
+    [body_aero, body_aero],
     [
         "VSM CAD 19ribs",
         "VSM CAD 19ribs , with stall correction",

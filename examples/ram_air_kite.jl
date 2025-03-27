@@ -2,9 +2,10 @@ using ControlPlots
 using VortexStepMethod
 using LinearAlgebra
 
-PLOT = false
+PLOT = true
 USE_TEX = false
-DEFORM = true
+DEFORM = false
+LINEARIZE = false
 
 # Create wing geometry
 wing = RamAirWing("data/ram_air_kite_body.obj", "data/ram_air_kite_foil.dat")
@@ -14,23 +15,18 @@ println("First init")
 
 if DEFORM
     # Linear interpolation of alpha from 10° at one tip to 0° at the other
-    n_panels = wing.n_panels
-    theta_start = deg2rad(10)
-    theta_end = deg2rad(0)
-    delta_start = deg2rad(10)
-    delta_end = deg2rad(0)
-    theta_dist = [theta_start - i * (theta_start - theta_end)/(n_panels-1) for i in 0:(n_panels-1)]
-    delta_dist = [delta_start - i * (delta_start - delta_end)/(n_panels-1) for i in 0:(n_panels-1)]
     println("Deform")
-    @time VortexStepMethod.deform!(wing, theta_dist, delta_dist)
+    @time VortexStepMethod.smooth_deform!(wing, deg2rad.([10,20,10,0]), deg2rad.([-10,0,-10,0]))
     println("Deform init")
     @time VortexStepMethod.init!(body_aero; init_aero=false)
 end
 
 # Create solvers
-vsm_solver = Solver(body_aero;
+solver = Solver(body_aero;
     aerodynamic_model_type=VSM,
-    is_with_artificial_damping=false
+    is_with_artificial_damping=false,
+    rtol=1e-5,
+    solver_type=NONLIN
 )
 
 # Setting velocity conditions
@@ -45,6 +41,26 @@ vel_app = [
     sin(aoa_rad)
 ] * v_a
 set_va!(body_aero, vel_app)
+
+if LINEARIZE
+    println("Linearize")
+    jac, res = VortexStepMethod.linearize(
+        solver, 
+        body_aero, 
+        [zeros(4); vel_app; zeros(3)];
+        theta_idxs=1:4,
+        va_idxs=5:7,
+        omega_idxs=8:10,
+        moment_frac=0.1)
+    @time jac, res = VortexStepMethod.linearize(
+        solver, 
+        body_aero, 
+        [zeros(4); vel_app; zeros(3)]; 
+        theta_idxs=1:4, 
+        va_idxs=5:7, 
+        omega_idxs=8:10,
+        moment_frac=0.1)
+end
 
 # Plotting polar data
 PLOT && plot_polar_data(body_aero)
@@ -63,8 +79,9 @@ PLOT && plot_geometry(
 )
 
 # Solving and plotting distributions
-results = solve(vsm_solver, body_aero; log=true)
-@time results = solve(vsm_solver, body_aero; log=true)
+println("Solve")
+results = VortexStepMethod.solve(solver, body_aero; log=true)
+@time results = solve(solver, body_aero; log=true)
 
 body_y_coordinates = [panel.aero_center[2] for panel in body_aero.panels]
 
@@ -80,7 +97,7 @@ PLOT && plot_distribution(
 )
 
 PLOT && plot_polars(
-    [vsm_solver],
+    [solver],
     [body_aero],
     [
         "VSM from Ram Air Kite OBJ and DAT file",

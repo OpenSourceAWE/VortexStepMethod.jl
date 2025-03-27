@@ -129,7 +129,7 @@ function create_interpolations(vertices, circle_center_z, radius, gamma_tip, R; 
             # Rotate y coordinate to check box containment
             # rotated_y = v[2] * cos(-gamma) - vz_centered[i] * sin(-gamma)
             gamma_v = atan(-v[2], vz_centered[i])
-            if gamma < 0 && gamma - stepsize ≤ gamma_v ≤ gamma
+            if gamma ≤ 0 && gamma - stepsize ≤ gamma_v ≤ gamma
                 if v[1] > trailing_edges[1, j]
                     trailing_edges[:, j] .= v
                     te_gammas[j] = gamma_v
@@ -368,24 +368,28 @@ Represents a curved wing that inherits from Wing with additional geometric prope
 
 # Fields
 - All fields from Wing:
-  - `n_panels::Int64`: Number of panels in aerodynamic mesh
+  - `n_panels::Int16`: Number of panels in aerodynamic mesh
+  - `n_groups::Int16`: Number of panel groups, each panel group has it's own twisting moment
   - `spanwise_distribution`::PanelDistribution: see: [PanelDistribution](@ref)
   - `spanwise_direction::MVec3`: Wing span direction vector
   - `sections::Vector{Section}`: List of wing sections, see: [Section](@ref)
-  -  refined_sections::Vector{Section}
+  -  `refined_sections::Vector{Section}`
   - `remove_nan::Bool`: Wether to remove the NaNs from interpolations or not
 - Additional fields:
-  - `circle_center_z::Vector{Float64}`: Center of circle coordinates
-  - gamma_tip::Float64: Angle between the body frame z axis and the vector going from the kite circular shape center to the wing tip.
-  - `inertia_tensor`::Matrix{Float64}: see: [`calculate_inertia_tensor`](@ref)
-  - radius::Float64: Radius of curvature
-  - le_interp::NTuple{3, Extrapolation}: see: [Extrapolation](https://juliamath.github.io/Interpolations.jl/stable/extrapolation/)
-  - te_interp::NTuple{3, Extrapolation}
-  - area_interp::Extrapolation
+  - `circle_center_z::MVec3`: Center of circle coordinates
+  - `gamma_tip::Float64`: Angle between the body frame z axis and the vector going from the kite circular shape center to the wing tip.
+  - `inertia_tensor::Matrix{Float64}`: see: [`calculate_inertia_tensor`](@ref)
+  - `radius::Float64`: Radius of curvature
+  - `le_interp::NTuple{3, Extrapolation}`: see: [Extrapolation](https://juliamath.github.io/Interpolations.jl/stable/extrapolation/)
+  - `te_interp::NTuple{3, Extrapolation}`
+  - `area_interp::Extrapolation`
+  - `theta_dist::Vector{Float64}`
+  - `delta_dist::Vector{Float64}`
 
 """
 mutable struct RamAirWing <: AbstractWing
-    n_panels::Int64
+    n_panels::Int16
+    n_groups::Int16
     spanwise_distribution::PanelDistribution
     panel_props::PanelProperties
     spanwise_direction::MVec3
@@ -398,13 +402,14 @@ mutable struct RamAirWing <: AbstractWing
     mass::Float64
     gamma_tip::Float64
     inertia_tensor::Matrix{Float64}
-    center_of_mass::Vector{Float64}
+    center_of_mass::MVec3
     radius::Float64
     le_interp::NTuple{3, Extrapolation}
     te_interp::NTuple{3, Extrapolation}
     area_interp::Extrapolation
     theta_dist::Vector{Float64}
     delta_dist::Vector{Float64}
+    cache::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}}
 end
 
 """
@@ -419,23 +424,26 @@ Constructor for a [RamAirWing](@ref) that allows to use an `.obj` and a `.dat` f
 - dat_path: Path to the `.dat` file, a standard format for 2d foil geometry
 
 # Keyword Parameters
-- alpha=0.0: Angle of attack of each segment relative to the x axis [rad]
-- crease_frac=0.75: The x coordinate around which the trailing edge rotates on a normalized 2d foil, 
+- crease_frac=0.9: The x coordinate around which the trailing edge rotates on a normalized 2d foil, 
                     used in the xfoil polar generation
 - wind_vel=10.0: Apparent wind speed in m/s, used in the xfoil polar generation
 - mass=1.0: Mass of the wing in kg, used for the inertia calculations 
-- `n_panels`=54: Number of panels.
-- `n_sections`=n_panels+1: Number of sections (there is a section on each side of each panel.)
+- `n_panels`=56: Number of panels.
+- `n_sections=n_panels+1`: Number of sections (there is a section on each side of each panel.)
+- `n_groups=n_panels ÷ 4`: Number of panel groups
 - `spanwise_distribution`=UNCHANGED: see: [PanelDistribution](@ref)
 - `spanwise_direction`=[0.0, 1.0, 0.0]
 - `remove_nan::Bool`: Wether to remove the NaNs from interpolations or not
 """
-function RamAirWing(obj_path, dat_path; alpha=0.0, crease_frac=0.75, wind_vel=10., mass=1.0, 
-                  n_panels=54, n_sections=n_panels+1, spanwise_distribution=UNCHANGED, 
-                  spanwise_direction=[0.0, 1.0, 0.0], remove_nan=true, align_to_principal=false,
-                  alpha_range=deg2rad.(-5:1:20), delta_range=deg2rad.(-5:1:20), interp_steps=40
-                  )
+function RamAirWing(
+    obj_path, dat_path; 
+    crease_frac=0.9, wind_vel=10., mass=1.0, 
+    n_panels=56, n_sections=n_panels+1, n_groups=4, spanwise_distribution=UNCHANGED, 
+    spanwise_direction=[0.0, 1.0, 0.0], remove_nan=true, align_to_principal=false,
+    alpha_range=deg2rad.(-5:1:20), delta_range=deg2rad.(-5:1:20), interp_steps=n_sections # TODO: check if interpolations are still needed
+)
 
+    !(n_panels % n_groups == 0) && throw(ArgumentError("Number of panels should be divisible by number of groups"))
     !isapprox(spanwise_direction, [0.0, 1.0, 0.0]) && throw(ArgumentError("Spanwise direction has to be [0.0, 1.0, 0.0], not $spanwise_direction"))
 
     # Load or create polars
@@ -503,11 +511,12 @@ function RamAirWing(obj_path, dat_path; alpha=0.0, crease_frac=0.75, wind_vel=10
         end
 
         panel_props = PanelProperties{n_panels}()
+        cache = [LazyBufferCache()]
 
-        RamAirWing(n_panels, spanwise_distribution, panel_props, spanwise_direction, sections, 
+        RamAirWing(n_panels, n_groups, spanwise_distribution, panel_props, spanwise_direction, sections, 
             refined_sections, remove_nan, non_deformed_sections,
             mass, gamma_tip, inertia_tensor, center_of_mass, radius,
-            le_interp, te_interp, area_interp, zeros(n_panels), zeros(n_panels))
+            le_interp, te_interp, area_interp, zeros(n_panels), zeros(n_panels), cache)
 
     catch e
         if e isa BoundsError
@@ -515,6 +524,66 @@ function RamAirWing(obj_path, dat_path; alpha=0.0, crease_frac=0.75, wind_vel=10
         end
         rethrow(e)
     end
+end
+
+"""
+    group_deform!(wing::RamAirWing, theta_angles::AbstractVector, delta_angles::AbstractVector)
+
+Distribute control angles across wing panels and apply smoothing using a moving average filter.
+
+# Arguments
+- `wing::RamAirWing`: The wing to deform
+- `theta_angles::AbstractVector`: Twist angles in radians for each control section
+- `delta_angles::AbstractVector`: Trailing edge deflection angles in radians for each control section
+- `smooth::Bool`: Wether to apply smoothing or not
+
+# Algorithm
+1. Distributes each control input to its corresponding group of panels
+2. Applies moving average smoothing with window size based on control group size
+
+# Errors
+- Throws `ArgumentError` if panel count is not divisible by the number of control inputs
+
+# Returns
+- `nothing` (modifies wing in-place)
+"""
+function group_deform!(wing::RamAirWing, theta_angles::AbstractVector, delta_angles=nothing; smooth=false)
+    !(wing.n_panels % length(theta_angles) == 0) && throw(ArgumentError("Number of angles has to be a multiple of number of panels"))
+    n_panels = wing.n_panels
+    theta_dist = wing.theta_dist
+    delta_dist = wing.delta_dist
+
+    dist_idx = 0
+    for angle_idx in eachindex(theta_angles)
+        for _ in 1:(wing.n_panels ÷ length(theta_angles))
+            dist_idx += 1
+            theta_dist[dist_idx] = theta_angles[angle_idx]
+            !isnothing(delta_angles) && (delta_dist[dist_idx] = delta_angles[angle_idx])
+        end
+    end
+    @assert (dist_idx == wing.n_panels)
+
+    if smooth
+        window_size = wing.n_panels ÷ length(theta_angles)
+        if n_panels > window_size
+            smoothed = wing.cache[1][theta_dist]
+            smoothed .= theta_dist
+            for i in (window_size÷2 + 1):(n_panels - window_size÷2)
+                @views smoothed[i] = mean(theta_dist[(i - window_size÷2):(i + window_size÷2)])
+            end
+            theta_dist .= smoothed
+            
+            if !isnothing(delta_angles)
+                smoothed .= delta_dist
+                for i in (window_size÷2 + 1):(n_panels - window_size÷2)
+                    @views smoothed[i] = mean(delta_dist[(i - window_size÷2):(i + window_size÷2)])
+                end
+                delta_dist .= smoothed
+            end
+        end
+    end
+    deform!(wing)
+    return nothing
 end
 
 """
@@ -536,6 +605,10 @@ function deform!(wing::RamAirWing, theta_dist::AbstractVector, delta_dist::Abstr
     wing.theta_dist .= theta_dist
     wing.delta_dist .= delta_dist
 
+    deform!(wing)
+end
+
+function deform!(wing::RamAirWing)
     local_y = zeros(MVec3)
     chord = zeros(MVec3)
     normal = zeros(MVec3)

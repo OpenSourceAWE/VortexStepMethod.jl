@@ -28,22 +28,21 @@ add_section!(wing,
     INVISCID)
 
 # Step 3: Initialize aerodynamics
-wa = BodyAerodynamics([wing])
+body_aero = BodyAerodynamics([wing])
 
 # Set inflow conditions
 vel_app = [cos(alpha), 0.0, sin(alpha)] .* v_a
-set_va!(wa, vel_app, [0, 0, 0.1])
+set_va!(body_aero, vel_app, [0, 0, 0.1])
 
 # Step 4: Initialize solvers for both LLT and VSM methods
-P = length(wa.panels)
-llt_solver = Solver{P}(aerodynamic_model_type=LLT)
-vsm_solver = Solver{P}(aerodynamic_model_type=VSM)
+llt_solver = Solver(body_aero; aerodynamic_model_type=LLT)
+vsm_solver = Solver(body_aero; aerodynamic_model_type=VSM)
 
 # Step 5: Solve using both methods
-results_llt = solve(llt_solver, wa)
-@time results_llt = solve(llt_solver, wa)
-results_vsm = solve(vsm_solver, wa)
-@time results_vsm = solve(vsm_solver, wa)
+results_llt = solve(llt_solver, body_aero)
+@time results_llt = solve(llt_solver, body_aero)
+results_vsm = solve(vsm_solver, body_aero)
+@time results_vsm = solve(vsm_solver, body_aero)
 
 # Print results comparison
 println("\nLifting Line Theory Results:")
@@ -56,7 +55,7 @@ println("Projected area = $(round(results_vsm["projected_area"], digits=4)) m²"
 
 # Step 6: Plot geometry
 PLOT && plot_geometry(
-      wa,
+      body_aero,
       "Rectangular_wing_geometry";
       data_type=".pdf",
       save_path=".",
@@ -66,7 +65,7 @@ PLOT && plot_geometry(
 )
 
 # Step 7: Plot spanwise distributions
-y_coordinates = [panel.aero_center[2] for panel in wa.panels]
+y_coordinates = [panel.aero_center[2] for panel in body_aero.panels]
 
 PLOT && plot_distribution(
     [y_coordinates, y_coordinates],
@@ -80,7 +79,7 @@ PLOT && plot_distribution(
 angle_range = range(0, 20, 20)
 PLOT && plot_polars(
     [llt_solver, vsm_solver],
-    [wa, wa],
+    [body_aero, body_aero],
     ["LLT", "VSM"];
     angle_range,
     angle_type="angle_of_attack",

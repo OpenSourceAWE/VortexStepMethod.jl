@@ -54,19 +54,19 @@ add_section!(wing,
 
 #### Step 4: Initialize aerodynamics
 ```
-wa = BodyAerodynamics([wing])
+body_aero = BodyAerodynamics([wing])
 ```
 We need to pass here an array of wing objects, because a body can have multiple wings.
 
 ###### Set inflow conditions
 ```julia
 vel_app = [cos(alpha), 0.0, sin(alpha)] .* v_a
-set_va!(wa, vel_app, [0, 0, 0.1])
+set_va!(body_aero, vel_app, [0, 0, 0.1])
 ```
 #### Step 5: Plot the geometry
 ```julia
 plot_geometry(
-      wa,
+      body_aero,
       "Rectangular_wing_geometry";
       data_type=".pdf",
       save_path=".",
@@ -86,8 +86,8 @@ vsm_solver = Solver(aerodynamic_model_type=VSM)
 
 #### Step 7: Solve using both methods
 ```
-results_llt = solve(llt_solver, wa)
-results_vsm = solve(vsm_solver, wa)
+results_llt = solve(llt_solver, body_aero)
+results_vsm = solve(vsm_solver, body_aero)
 ```
 
 ##### Print results comparison
@@ -103,7 +103,7 @@ println("Projected area = $(round(results_vsm["projected_area"], digits=4)) m²"
 
 #### Step 8: Plot spanwise distributions
 ```julia
-y_coordinates = [panel.aero_center[2] for panel in wa.panels]
+y_coordinates = [panel.aero_center[2] for panel in body_aero.panels]
 
 plot_distribution(
     [y_coordinates, y_coordinates],
@@ -121,7 +121,7 @@ You should see a plot like this:
 angle_range = range(0, 20, 20)
 plot_polars(
     [llt_solver, vsm_solver],
-    [wa, wa],
+    [body_aero, body_aero],
     ["LLT", "VSM"];
     angle_range,
     angle_type="angle_of_attack",
