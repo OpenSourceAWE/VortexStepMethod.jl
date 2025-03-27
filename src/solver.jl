@@ -647,8 +647,8 @@ Compute the Jacobian matrix for a ram air wing around an operating point using a
 # Keyword Arguments
 - `theta_idxs`: Indices of twist angles in input vector (default: 1:4)
 - `delta_idxs`: Indices of trailing edge deflection angles (default: nothing)
-- `va_idxs`: Indices of velocity components [vx, vy, vz] (default: nothing)
-- `omega_idxs`: Indices of angular velocity components [ωx, ωy, ωz] (default: nothing)
+- `va_idxs`: Indices of velocity components `[vx, vy, vz]` (default: nothing)
+- `omega_idxs`: Indices of angular velocity components `[ωx, ωy, ωz]` (default: nothing)
 - `kwargs...`: Additional arguments passed to the `solve!` function
 
 # Returns

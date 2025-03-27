@@ -22,7 +22,7 @@ using DifferentiationInterface
 import SciMLBase: successful_retcode
 
 # Export public interface
-export Wing, Section, RamAirWing
+export Wing, Section, RamAirWing, init!
 export BodyAerodynamics
 export Solver, solve, solve_base!, solve!, VSMSolution, linearize
 export calculate_results

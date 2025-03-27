@@ -114,7 +114,7 @@ function Base.setproperty!(obj::BodyAerodynamics, sym::Symbol, val)
 end
 
 """
-    init!(body_aero::BodyAerodynamics)
+    init!(body_aero::BodyAerodynamics; init_aero, va, omega)
 
 Initialize a BodyAerodynamics struct in-place by setting up panels and coefficients.
 

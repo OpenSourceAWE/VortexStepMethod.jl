@@ -11,6 +11,8 @@ add_section!
 set_va!
 solve
 solve!
+init!(body_aero::BodyAerodynamics)
+linearize
 ```
 
 ## Main Plotting Functions
