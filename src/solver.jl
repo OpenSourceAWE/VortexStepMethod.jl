@@ -542,7 +542,7 @@ function gamma_loop!(
             
             # Apply damping if needed
             if solver.is_with_artificial_damping
-                damp, is_damping_applied = smooth_circulation(gamma, 0.1, 0.5)
+                is_damping_applied = smooth_circulation!(damp, gamma, 0.1, 0.5)
                 @debug "damp: $damp"
             else
                 damp .= 0.0
@@ -582,7 +582,7 @@ function gamma_loop!(
 end
 
 """
-    smooth_circulation(circulation, 
+    smooth_circulation!(damp, circulation, 
                       smoothness_factor::Float64, 
                       damping_factor::Float64)
 
@@ -591,7 +591,8 @@ Smooth circulation distribution if needed.
 Returns:
 - Tuple of smoothed circulation and boolean indicating if smoothing was applied
 """
-function smooth_circulation(
+function smooth_circulation!(
+    damp,
     circulation,
     smoothness_factor::Float64,
     damping_factor::Float64
@@ -628,8 +629,8 @@ function smooth_circulation(
     total_smoothed = sum(smoothed)
     smoothed .*= total_original / total_smoothed
 
-    damp = smoothed - circulation
-    return damp, true
+    damp .= smoothed .- circulation
+    return true
 end
 
 """
