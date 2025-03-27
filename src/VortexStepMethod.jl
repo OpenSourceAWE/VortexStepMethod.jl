@@ -54,6 +54,7 @@ function plot_polar_data end
 Basic 3-dimensional vector, stack allocated, mutable.
 """
 const MVec3    = MVector{3, Float64}
+const MMat3    = MMatrix{3, 3, Float64}
 
 """
    const PosVector=Union{MVec3, Vector}
