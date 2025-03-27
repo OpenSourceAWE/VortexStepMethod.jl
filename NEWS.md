@@ -2,8 +2,11 @@
 ### Changed
 - The fields that had as type a `Matrix of size Px1` have now the type `Vector` 
 - Many new fields of the type `VSMSolution` documented
+- `init!(body_aero)` is now a public function
 ### Added
 - New page `Tips and tricks` added to the documentation
+- Fast and modular linearization added around an operating point #140
+- Added the option to use nonlinear solve to calculate the gamma distribution #140
 
 ## VortexStepMethod v1.1.2 2025-03-23
 ### Added
