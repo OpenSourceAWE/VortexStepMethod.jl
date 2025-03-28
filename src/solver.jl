@@ -643,7 +643,7 @@ Compute the Jacobian matrix for a ram air wing around an operating point using f
 - `solver`: VSM solver instance (must be initialized)
 - `body_aero`: Aerodynamic body representation
 - `wing`: RamAirWing model to linearize
-- `y`: Input vector at operating point [control angles, velocities, etc.]
+- `y`: Input vector at operating point, containing a combination of control angles and velocities
 
 # Keyword Arguments
 - `theta_idxs`: Indices of twist angles in input vector (default: 1:4)
