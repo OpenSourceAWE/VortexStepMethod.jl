@@ -43,17 +43,17 @@ llt_solver = Solver(body_aero; aerodynamic_model_type=LLT)
 vsm_solver = Solver(body_aero; aerodynamic_model_type=VSM)
 
 # Step 5: Solve using both methods
-results_vsm = solve(vsm_solver, body_aero)
-sol = solve!(vsm_solver, body_aero)
-results_vsm_base = solve_base!(vsm_solver, body_aero)
+results_vsm = solve(vsm_solver, body_aero, nothing)
+sol = solve!(vsm_solver, body_aero, nothing)
+results_vsm_base = solve_base!(vsm_solver, body_aero, nothing)
 println("Rectangular wing, solve_base!:")
-@time results_vsm_base = solve_base!(vsm_solver, body_aero)
+@time results_vsm_base = solve_base!(vsm_solver, body_aero, nothing)
 # time Python: 32.0  ms Ryzen 7950x
 # time Julia:   0.42 ms Ryzen 7950x
 println("Rectangular wing, solve!:")
-@time sol = solve!(vsm_solver, body_aero)
+@time sol = solve!(vsm_solver, body_aero, nothing)
 println("Rectangular wing, solve:")
-@time solve(vsm_solver, body_aero)
+@time solve(vsm_solver, body_aero, nothing)
 
 # Create wing geometry
 wing = RamAirWing("data/ram_air_kite_body.obj", "data/ram_air_kite_foil.dat")
@@ -81,9 +81,9 @@ vel_app = [
 set_va!(body_aero, vel_app)
 
 # Solving and plotting distributions
-results = solve(vsm_solver, body_aero)
-solve_base!(vsm_solver, body_aero)
+results = solve(vsm_solver, body_aero, nothing)
+solve_base!(vsm_solver, body_aero, nothing)
 println("RAM-air kite:")
-@time solve_base!(vsm_solver, body_aero)
+@time solve_base!(vsm_solver, body_aero, nothing)
 
 nothing
