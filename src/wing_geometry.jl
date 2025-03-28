@@ -93,16 +93,16 @@ Structure to hold calculated panel properties.
 end
 
 """
-    update_panel_properties!(section_list::Vector{Section}, n_panels::Int)
+    update_panel_properties!(panel_props::PanelProperties, section_list::Vector{Section}, n_panels::Int)
 
-Calculate geometric properties for each panel.
+Update geometric properties for each panel.
 
 # Arguments
 - section_list::Vector{Section}: List of [Section](@ref)s
 - `n_panels`::Int: Number of [Panel](@ref)s
 
 # Returns:
-[PanelProperties](@ref) containing vectors for each property
+`nothing`, updates the [PanelProperties](@ref) in-place
 """
 function update_panel_properties!(panel_props::PanelProperties, section_list::Vector{Section}, n_panels)
     coords = panel_props.coords
