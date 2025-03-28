@@ -637,7 +637,7 @@ end
     linearize(solver::Solver, body_aero::BodyAerodynamics, wing::RamAirWing, y::Vector{T}; 
         theta_idxs=1:4, delta_idxs=nothing, va_idxs=nothing, omega_idxs=nothing, kwargs...) where T
 
-Compute the Jacobian matrix for a ram air wing around an operating point using automatic differentiation.
+Compute the Jacobian matrix for a ram air wing around an operating point using finite differences.
 
 # Arguments
 - `solver`: VSM solver instance (must be initialized)
