@@ -691,11 +691,11 @@ function linearize(solver::Solver, body_aero::BodyAerodynamics, y::Vector{T};
     init_va .= body_aero.va
     if !isnothing(theta_idxs)
         @views last_theta::Vector{T} = body_aero.cache[2][y[theta_idxs]]
-        last_theta .= 0.0
+        last_theta .= NaN
     end
     if !isnothing(delta_idxs)
         @views last_delta::Vector{T} = body_aero.cache[3][y[delta_idxs]]
-        last_delta .= 0.0
+        last_delta .= NaN
     end
 
     # Function to compute forces for given control inputs
