@@ -1,8 +1,10 @@
 wings:
     - name: main_wing
       n_panels: 40
+      n_groups: 40
       spanwise_panel_distribution: "LINEAR"
       spanwise_direction: [0.0, 1.0, 0.0]
+      remove_nan: true
     - name: tail
       n_panels: 20
 solver_settings:
