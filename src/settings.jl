@@ -1,4 +1,5 @@
 filename = "vsm_settings.yaml"
+data = YAML.load_file(joinpath("data", filename))
 
 @with_kw mutable struct WingSettings
     name::String = "main_wing"
@@ -10,7 +11,7 @@ filename = "vsm_settings.yaml"
 end
 
 @with_kw mutable struct SolverSettings
-    aerodynamic_model_type::String = "VSM"
+    aerodynamic_model_type::Model = VSM
     max_iterations::Int64 = 1000
 end
 
@@ -21,9 +22,11 @@ end
 
 const VSM_SETTINGS = VSMSettings()
 
-function vs()
+function vs(filename=filename)
     res = VSM_SETTINGS
+    data = YAML.load_file(joinpath("data", filename))
     res.solver_settings.max_iterations = data["solver_settings"]["max_iterations"]
+    res.solver_settings.aerodynamic_model_type = eval(Symbol(data["solver_settings"]["aerodynamic_model_type"]))
     res
 end
 

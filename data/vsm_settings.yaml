@@ -1,3 +1,6 @@
+Model:
+    VSM: Vortex Step Method
+    LLT: Lifting Line Theory
 wings:
     - name: main_wing
       n_panels: 40
@@ -8,5 +11,5 @@ wings:
     - name: tail
       n_panels: 20
 solver_settings:
-    aerodynamic_model_type: "VSM"
+    aerodynamic_model_type: VSM
     max_iterations: 1000
