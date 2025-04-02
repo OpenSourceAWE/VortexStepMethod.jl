@@ -5,7 +5,7 @@ data = YAML.load_file(joinpath("data", filename))
     name::String = "main_wing"
     n_panels::Int64 = 40
     n_groups::Int64 = 40 
-    spanwise_panel_distribution::String = "LINEAR"
+    spanwise_panel_distribution::PanelDistribution = LINEAR
     spanwise_direction::MVec3 = [0.0, 1.0, 0.0]
     remove_nan = true
 end
