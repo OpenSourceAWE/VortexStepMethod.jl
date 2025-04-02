@@ -1,5 +1,4 @@
 filename = "vsm_settings.yaml"
-data = YAML.load_file(joinpath(dirname(dirname(pathof(VortexStepMethod))), "data", filename))
 
 @with_kw mutable struct WingSettings
     name::String = "main_wing"
@@ -23,7 +22,9 @@ end
 const VSM_SETTINGS = VSMSettings()
 
 function vs()
-    VSM_SETTINGS
+    res = VSM_SETTINGS
+    res.solver_settings.max_iterations = data["solver_settings"]["max_iterations"]
+    res
 end
 
 function Base.show(io::IO, vs::VSMSettings)
