@@ -1,7 +1,6 @@
 Model:
     VSM: Vortex Step Method
     LLT: Lifting Line Theory
-
 PanelDistribution:
    LINEAR:             Linear distribution
    COSINE:             Cosine distribution
