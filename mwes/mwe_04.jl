@@ -34,5 +34,5 @@ function Base.show(io::IO, vs::VSMSettings)
     end
     print(io, replace(repr(vs.solver_settings), "\n" => "\n    "))
 end
-vs = VSMSettings()
+# vs = VSMSettings()
 

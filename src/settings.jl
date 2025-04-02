@@ -1,7 +1,7 @@
 filename = "vsm_settings.yaml"
 data = YAML.load_file(joinpath(dirname(dirname(pathof(VortexStepMethod))), "data", filename))
 
-@Base.kwdef mutable struct WingSettings
+@with_kw mutable struct WingSettings
     name::String = "main_wing"
     n_panels::Int64 = 40
     n_groups::Int64 = 40 
@@ -10,7 +10,7 @@ data = YAML.load_file(joinpath(dirname(dirname(pathof(VortexStepMethod))), "data
     remove_nan = true
 end
 
-@Base.kwdef mutable struct SolverSettings
+@with_kw mutable struct SolverSettings
     aerodynamic_model_type::String = "VSM"
     max_iterations::Int64 = 1000
 end
@@ -18,6 +18,12 @@ end
 @Base.kwdef mutable struct VSMSettings
     wings::Vector{WingSettings} = [WingSettings()]
     solver_settings::SolverSettings = SolverSettings()
+end
+
+const VSM_SETTINGS = VSMSettings()
+
+function vs()
+    VSM_SETTINGS
 end
 
 function Base.show(io::IO, vs::VSMSettings)

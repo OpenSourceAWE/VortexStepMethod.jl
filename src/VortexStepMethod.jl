@@ -21,9 +21,9 @@ using Pkg
 using DifferentiationInterface
 import SciMLBase: successful_retcode
 import YAML
-import Base: show
 
 # Export public interface
+export VSMSettings, WingSettings, SolverSettings, vs
 export Wing, Section, RamAirWing, init!
 export BodyAerodynamics
 export Solver, solve, solve_base!, solve!, VSMSolution, linearize
