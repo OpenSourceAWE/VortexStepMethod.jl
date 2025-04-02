@@ -16,7 +16,7 @@ end
 end
 
 @Base.kwdef mutable struct VSMSettings
-    wings::Vector{WingSettings} = [WingSettings()]
+    wings::Vector{WingSettings} = [WingSettings(), WingSettings()]
     solver_settings::SolverSettings = SolverSettings()
 end
 
@@ -27,6 +27,14 @@ function vs(filename=filename)
     data = YAML.load_file(joinpath("data", filename))
     res.solver_settings.max_iterations = data["solver_settings"]["max_iterations"]
     res.solver_settings.aerodynamic_model_type = eval(Symbol(data["solver_settings"]["aerodynamic_model_type"]))
+    for (i, wing) in pairs(data["wings"])
+        println(i)
+        res.wings[i].n_panels = wing["n_panels"]
+        res.wings[i].n_groups = wing["n_groups"]
+        res.wings[i].spanwise_panel_distribution = eval(Symbol(wing["spanwise_panel_distribution"]))
+        res.wings[i].spanwise_direction = MVec3(wing["spanwise_direction"])
+        res.wings[i].remove_nan = wing["remove_nan"]
+    end
     res
 end
 

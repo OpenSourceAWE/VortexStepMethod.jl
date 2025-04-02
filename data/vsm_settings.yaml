@@ -17,6 +17,10 @@ wings:
       remove_nan: true
     - name: tail
       n_panels: 20
+      n_groups: 20
+      spanwise_panel_distribution: COSINE
+      spanwise_direction: [0.0, 1.1, 0.0]
+      remove_nan: false
 solver_settings:
     aerodynamic_model_type: VSM
     max_iterations: 1000
