@@ -27,3 +27,12 @@ end
     solver_settings::SolverSettings = SolverSettings()
 end
 
+function Base.show(io::IO, vs::VSMSettings)
+    println(io, "VSMSettings:")
+    for wing in vs.wings
+        print(io, "    ", replace(repr(wing), "\n" => "\n    "))
+    end
+    print(io, replace(repr(vs.solver_settings), "\n" => "\n    "))
+end
+vs = VSMSettings()
+
