@@ -20,6 +20,8 @@ using PrecompileTools
 using Pkg
 using DifferentiationInterface
 import SciMLBase: successful_retcode
+import YAML
+import Base: show
 
 # Export public interface
 export Wing, Section, RamAirWing, init!
@@ -262,6 +264,7 @@ function help(url)
 end
 
 # Include core functionality
+include("settings.jl")
 include("wing_geometry.jl")
 include("kite_geometry.jl")
 include("filament.jl")
