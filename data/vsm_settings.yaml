@@ -1,0 +1,9 @@
+wings:
+    - main_wing:
+        n_panels: 40
+        spanwise_panel_distribution: "uniform"
+    - tail:
+        n_panels: 20
+solver_settings:
+    aerodynamic_model_type:
+    max_iterations:
