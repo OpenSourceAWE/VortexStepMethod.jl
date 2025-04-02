@@ -1,9 +1,10 @@
 wings:
     - main_wing:
         n_panels: 40
-        spanwise_panel_distribution: "uniform"
+        spanwise_panel_distribution: "LINEAR"
+        spanwise_direction: [0.0, 1.0, 0.0]
     - tail:
         n_panels: 20
 solver_settings:
-    aerodynamic_model_type:
-    max_iterations:
+    aerodynamic_model_type: "VSM"
+    max_iterations: 1000
