@@ -8,8 +8,21 @@
 end
 
 @with_kw mutable struct SolverSettings
+    n_panels::Int64 = 40
+    n_groups::Int64 = 40 
     aerodynamic_model_type::Model = VSM
-    max_iterations::Int64 = 1000
+    density::Float64 = 1.225                # air density  [kg/m³] 
+    max_iterations::Int64 = 1500
+    rtol::Float64 = 1e-5                    # relative error   [-]
+    tol_reference_error::Float64 = 0.001
+    relaxation_factor::Float64 = 0.03       # relaxation factor for convergence
+    artificial_damping::Bool = false        # whether to apply artificial damping
+    k2::Float64 = 0.1                       # artificial damping parameter
+    k4::Float64 = 0.0                       # artificial damping parameter
+    type_initial_gamma_distribution::InitialGammaDistribution = ELLIPTIC # see: [InitialGammaDistribution](@ref)
+    core_radius_fraction::Float64 = 1e-20
+    mu::Float64 = 1.81e-5                   # dynamic viscosity [N·s/m²]
+    calc_only_f_and_gamma::Bool=false       # whether to only output f and gamma
 end
 
 @Base.kwdef mutable struct VSMSettings
