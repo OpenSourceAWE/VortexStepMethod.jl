@@ -1,6 +1,3 @@
-filename = "vsm_settings.yaml"
-data = YAML.load_file(joinpath("data", filename))
-
 @with_kw mutable struct WingSettings
     name::String = "main_wing"
     n_panels::Int64 = 40
@@ -16,22 +13,17 @@ end
 end
 
 @Base.kwdef mutable struct VSMSettings
-    wings::Vector{WingSettings} = [WingSettings()]
+    wings::Vector{WingSettings} = []
     solver_settings::SolverSettings = SolverSettings()
 end
 
-const VSM_SETTINGS = VSMSettings()
-
-function vs(filename=filename)
-    VSM_SETTINGS = VSMSettings()
-    res = VSM_SETTINGS
+function vs(filename)
+    res = VSMSettings()
     data = YAML.load_file(joinpath("data", filename))
     res.solver_settings.max_iterations = data["solver_settings"]["max_iterations"]
     res.solver_settings.aerodynamic_model_type = eval(Symbol(data["solver_settings"]["aerodynamic_model_type"]))
     for (i, wing) in pairs(data["wings"])
-        if i > length(res.wings)
-            push!(res.wings, WingSettings())
-        end
+        push!(res.wings, WingSettings())
         res.wings[i].name = wing["name"]
         res.wings[i].n_panels = wing["n_panels"]
         res.wings[i].n_groups = wing["n_groups"]
