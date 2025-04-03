@@ -33,8 +33,25 @@ end
 function vs(filename)
     res = VSMSettings()
     data = YAML.load_file(joinpath("data", filename))
-    res.solver_settings.max_iterations = data["solver_settings"]["max_iterations"]
-    res.solver_settings.aerodynamic_model_type = eval(Symbol(data["solver_settings"]["aerodynamic_model_type"]))
+    # update solver settings
+    solver = data["solver_settings"]
+    res.solver_settings.n_panels = solver["n_panels"]
+    res.solver_settings.n_groups = solver["n_groups"]
+    res.solver_settings.aerodynamic_model_type = eval(Symbol(solver["aerodynamic_model_type"]))
+    res.solver_settings.density = solver["density"]
+    res.solver_settings.max_iterations = solver["max_iterations"]
+    res.solver_settings.rtol = solver["rtol"]
+    res.solver_settings.tol_reference_error = solver["tol_reference_error"]
+    res.solver_settings.relaxation_factor = solver["relaxation_factor"]
+    res.solver_settings.artificial_damping = solver["artificial_damping"]
+    res.solver_settings.k2 = solver["k2"]
+    res.solver_settings.k4 = solver["k4"]
+    res.solver_settings.type_initial_gamma_distribution = eval(Symbol(solver["type_initial_gamma_distribution"]))
+    res.solver_settings.core_radius_fraction = solver["core_radius_fraction"]
+    res.solver_settings.mu = solver["mu"]
+    res.solver_settings.calc_only_f_and_gamma = solver["calc_only_f_and_gamma"]
+
+    # add and update wing settings
     for (i, wing) in pairs(data["wings"])
         push!(res.wings, WingSettings())
         res.wings[i].name = wing["name"]
