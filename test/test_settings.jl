@@ -12,5 +12,7 @@ using Test
     @test vss.solver_settings isa SolverSettings
     @test vss.wings isa Vector{WingSettings}
     @test length(vss.wings) == 2
+    io = IOBuffer(repr(vss))
+    @test countlines(io) == 32
 end
 nothing
