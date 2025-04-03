@@ -16,19 +16,23 @@ end
 end
 
 @Base.kwdef mutable struct VSMSettings
-    wings::Vector{WingSettings} = [WingSettings(), WingSettings()]
+    wings::Vector{WingSettings} = [WingSettings()]
     solver_settings::SolverSettings = SolverSettings()
 end
 
 const VSM_SETTINGS = VSMSettings()
 
 function vs(filename=filename)
+    VSM_SETTINGS = VSMSettings()
     res = VSM_SETTINGS
     data = YAML.load_file(joinpath("data", filename))
     res.solver_settings.max_iterations = data["solver_settings"]["max_iterations"]
     res.solver_settings.aerodynamic_model_type = eval(Symbol(data["solver_settings"]["aerodynamic_model_type"]))
     for (i, wing) in pairs(data["wings"])
-        println(i)
+        if i > length(res.wings)
+            push!(res.wings, WingSettings())
+        end
+        res.wings[i].name = wing["name"]
         res.wings[i].n_panels = wing["n_panels"]
         res.wings[i].n_groups = wing["n_groups"]
         res.wings[i].spanwise_panel_distribution = eval(Symbol(wing["spanwise_panel_distribution"]))
@@ -40,8 +44,11 @@ end
 
 function Base.show(io::IO, vs::VSMSettings)
     println(io, "VSMSettings:")
-    for wing in vs.wings
-        print(io, "    ", replace(repr(wing), "\n" => "\n    "))
+    for (i, wing) in pairs(vs.wings)
+        if i==1
+            print(io, "    ")
+        end
+        print(io, replace(repr(wing), "\n" => "\n    "))
     end
     print(io, replace(repr(vs.solver_settings), "\n" => "\n    "))
 end
