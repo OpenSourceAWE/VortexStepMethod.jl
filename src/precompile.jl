@@ -7,6 +7,7 @@
     @compile_workload begin
         # all calls in this block will be precompiled, regardless of whether
         # they belong to your package or not (on Julia 1.8 and higher)
+        vss = vs("vsm_settings_dual.yaml")
         # Step 1: Define wing parameters
         n_panels = 20          # Number of panels
         span = 20.0            # Wing span [m]
