@@ -9,7 +9,7 @@ PanelDistribution:
     UNCHANGED:          Keep original sections
 InitialGammaDistribution:
     ELLIPTIC:           Elliptic distribution
-    ZEROS:              Constant distribution
+    ZEROS:              Zero distribution (no initial circulation)
 
 wings:
     - name: main_wing
