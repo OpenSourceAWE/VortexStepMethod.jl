@@ -33,10 +33,24 @@ end
 function vs(filename)
     res = VSMSettings()
     data = YAML.load_file(joinpath("data", filename))
+    # add and update wing settings
+    n_panels = 0
+    n_groups = 0
+    for (i, wing) in pairs(data["wings"])
+        push!(res.wings, WingSettings())
+        res.wings[i].name = wing["name"]
+        res.wings[i].n_panels = wing["n_panels"]
+        n_panels += res.wings[i].n_panels
+        res.wings[i].n_groups = wing["n_groups"]
+        n_groups += res.wings[i].n_groups
+        res.wings[i].spanwise_panel_distribution = eval(Symbol(wing["spanwise_panel_distribution"]))
+        res.wings[i].spanwise_direction = MVec3(wing["spanwise_direction"])
+        res.wings[i].remove_nan = wing["remove_nan"]
+    end
     # update solver settings
     solver = data["solver_settings"]
-    res.solver_settings.n_panels = solver["n_panels"]
-    res.solver_settings.n_groups = solver["n_groups"]
+    res.solver_settings.n_panels = n_panels
+    res.solver_settings.n_groups = n_groups
     res.solver_settings.aerodynamic_model_type = eval(Symbol(solver["aerodynamic_model_type"]))
     res.solver_settings.density = solver["density"]
     res.solver_settings.max_iterations = solver["max_iterations"]
@@ -50,17 +64,7 @@ function vs(filename)
     res.solver_settings.core_radius_fraction = solver["core_radius_fraction"]
     res.solver_settings.mu = solver["mu"]
     res.solver_settings.calc_only_f_and_gamma = solver["calc_only_f_and_gamma"]
-
-    # add and update wing settings
-    for (i, wing) in pairs(data["wings"])
-        push!(res.wings, WingSettings())
-        res.wings[i].name = wing["name"]
-        res.wings[i].n_panels = wing["n_panels"]
-        res.wings[i].n_groups = wing["n_groups"]
-        res.wings[i].spanwise_panel_distribution = eval(Symbol(wing["spanwise_panel_distribution"]))
-        res.wings[i].spanwise_direction = MVec3(wing["spanwise_direction"])
-        res.wings[i].remove_nan = wing["remove_nan"]
-    end
+    
     res
 end
 
