@@ -23,7 +23,6 @@ jobs:
         version:
           - '1.10'
           - '1'
-          - 'pre'
         os:
           - ubuntu-latest
         build_is_production_build:
@@ -74,7 +73,6 @@ jobs:
         julia_version:
           - "1.10"
           - "1.11"
-          - "pre"
         julia_arch:
           - x64
         os:
