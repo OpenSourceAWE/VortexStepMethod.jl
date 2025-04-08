@@ -15,12 +15,14 @@ using Interpolations: Extrapolation
 using Parameters
 using Serialization
 using SharedArrays
+using Timers
 using PreallocationTools
 using PrecompileTools
 using Pkg
 using DifferentiationInterface
 import SciMLBase: successful_retcode
 import YAML
+using Xfoil
 
 # Export public interface
 export VSMSettings, WingSettings, SolverSettings, vs
@@ -266,7 +268,8 @@ end
 # Include core functionality
 include("settings.jl")
 include("wing_geometry.jl")
-include("kite_geometry.jl")
+include("polars.jl")
+include("ram_geometry.jl")
 include("filament.jl")
 include("panel.jl")
 include("body_aerodynamics.jl")
