@@ -506,11 +506,7 @@ function RamAirWing(
         if !ispath(polar_path)
             width = 2gamma_tip * radius
             area = area_interp(gamma_tip)
-            @eval Main begin
-                foil_path, polar_path, v_wind, area, width, x_turn, alpha_range, delta_range =
-                    $dat_path, $polar_path, $wind_vel, $gamma_tip, $width, $crease_frac, $alpha_range, $delta_range
-                include(joinpath(dirname(@__FILE__), "../scripts/polars.jl"))
-            end
+            create_polars(; dat_path, polar_path, wind_vel, area, width, crease_frac, alpha_range, delta_range)
         end
 
         (alpha_range, delta_range, cl_matrix::Matrix, cd_matrix::Matrix, cm_matrix::Matrix) = deserialize(polar_path)
