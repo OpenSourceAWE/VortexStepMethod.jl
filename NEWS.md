@@ -1,3 +1,9 @@
+## VortexStepMethod v1.2.1 2025-04-08
+### Added
+- Add back `bench2.jl` and rename it to `bench_solve.jl` #150
+### Removed
+- Remove problematic parallel Xfoil computing and use single thread instead #161
+
 ## VortexStepMethod v1.2.0 2025-03-27
 ### Changed
 - The fields that had as type a `Matrix of size Px1` have now the type `Vector` 
