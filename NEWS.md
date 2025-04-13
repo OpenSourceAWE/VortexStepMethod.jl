@@ -1,6 +1,6 @@
-## Unreleased
+## VortexStepMethod v1.2.3 2025-04-13
 ### Changed
-- expose the angle of attack `alpha_array` in the `VSMSolution`
+- expose the angle of attack `alpha_array` in the `VSMSolution` #167
 
 ## VortexStepMethod v1.2.2 2025-04-13
 ### Added
