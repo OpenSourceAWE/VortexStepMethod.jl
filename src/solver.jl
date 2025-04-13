@@ -6,6 +6,7 @@ Struct for storing the solution of the [solve!](@ref) function. Must contain all
 
 # Attributes
 - `panel_width_array`::Vector{Float64}: Width of the panels [m]
+- `alpha_array`::Vector{Float64}: Angle of attack of each panel relative to the apparent wind [rad]
 - cl_array::Vector{Float64}: Lift coefficients of the panels [-]
 - cd_array::Vector{Float64}: Drag coefficients of the panels [-]
 - cm_array::Vector{Float64}: Pitching moment coefficients of the panels [-]
@@ -32,6 +33,7 @@ Struct for storing the solution of the [solve!](@ref) function. Must contain all
     _chord_array::Vector{Float64} = zeros(P)
     ### end of private vectors
     panel_width_array::Vector{Float64} = zeros(P)
+    alpha_array::Vector{Float64} = zeros(P)
     cl_array::Vector{Float64} = zeros(P)
     cd_array::Vector{Float64} = zeros(P)
     cm_array::Vector{Float64} = zeros(P)
@@ -123,7 +125,6 @@ sol::VSMSolution = VSMSolution(): The result of calling [solve!](@ref)
     br::BaseResult{P} = BaseResult{P}()
     cache::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}} = [LazyBufferCache() for _ in 1:11]
     cache_base::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}}  = [LazyBufferCache()]
-    cache_solve::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}} = [LazyBufferCache()]
     cache_lin::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}} = [LazyBufferCache() for _ in 1:4]
     
     # Solution
@@ -175,7 +176,7 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
     cm_array = solver.sol.cm_array
     converged = solver.lr.converged
     alpha_array = solver.lr.alpha_array
-    alpha_corrected = solver.cache_solve[1][alpha_array]
+    alpha_corrected = solver.sol.alpha_array
     v_a_array = solver.lr.v_a_array
     panels = body_aero.panels
    
