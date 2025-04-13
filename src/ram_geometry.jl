@@ -311,7 +311,7 @@ function calc_inertia_y_rotation(I_b_tensor)
 end
 
 """
-    interpolate_matrix_nans!(matrix::Matrix{Float64})
+    interpolate_matrix_nans!(matrix::Matrix{Float64}; prn=true)
 
 Replace NaN values in a matrix by interpolating from nearest non-NaN neighbors.
 Uses an expanding search radius until valid neighbors are found.
@@ -319,7 +319,7 @@ Uses an expanding search radius until valid neighbors are found.
 # Arguments
 - `matrix`: Matrix containing NaN values to be interpolated
 """
-function interpolate_matrix_nans!(matrix::Matrix{Float64}; plt=true)
+function interpolate_matrix_nans!(matrix::Matrix{Float64}; prn=true)
     rows, cols = size(matrix)
     nans_found = 0
     while any(isnan, matrix)
