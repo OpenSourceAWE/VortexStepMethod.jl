@@ -441,6 +441,7 @@ This constructor builds a complete aerodynamic model by:
 - `remove_nan=true`: Interpolate NaN values in aerodynamic data
 - `alpha_range=deg2rad.(-5:1:20)`: Angle of attack range for polars (rad)
 - `delta_range=deg2rad.(-5:1:20)`: Trailing edge deflection range for polars (rad)
+- prn=true: if info messages shall be printed
 
 # Returns
 A fully initialized `RamAirWing` instance ready for aerodynamic simulation.
@@ -479,7 +480,7 @@ function RamAirWing(
     info_path = obj_path[1:end-4] * "_info.bin"
 
     if !ispath(info_path)
-        @info "Reading $obj_path"
+        ! prn || @info "Reading $obj_path"
         vertices, faces = read_faces(obj_path)
         T_cad_body = center_to_com!(vertices, faces)
         inertia_tensor = calculate_inertia_tensor(vertices, faces, mass, zeros(3))
@@ -492,12 +493,12 @@ function RamAirWing(
         circle_center_z, radius, gamma_tip = find_circle_center_and_radius(vertices)
         le_interp, te_interp, area_interp = create_interpolations(vertices, circle_center_z, radius, gamma_tip, R_cad_body; interp_steps)
 
-        @info "Writing $info_path"
+        ! prn || @info "Writing $info_path"
         serialize(info_path, (inertia_tensor, T_cad_body, R_cad_body, radius, gamma_tip, 
             le_interp, te_interp, area_interp))
     end
 
-    @info "Loading kite info from $info_path and polars from $polar_path"
+    ! prn || @info "Loading kite info from $info_path and polars from $polar_path"
     try
         (inertia_tensor::Matrix, T_cad_body::Vector, R_cad_body::Matrix,
             radius::Real, gamma_tip::Real, le_interp, te_interp, area_interp) = deserialize(info_path)
