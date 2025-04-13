@@ -1,6 +1,6 @@
-## Unreleased
+## VortexStepMethod v1.2.2 2025-04-13
 ### Added
-- the parameter `plt`to the constructor `RamAirWing` which allows it suppress info messages
+- the parameter `prn`to the constructor `RamAirWing` which allows it suppress info messages
 
 ## VortexStepMethod v1.2.1 2025-04-08
 ### Added
