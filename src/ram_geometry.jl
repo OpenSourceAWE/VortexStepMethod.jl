@@ -462,7 +462,7 @@ function RamAirWing(
     crease_frac=0.9, wind_vel=10., mass=1.0, 
     n_panels=56, n_sections=n_panels+1, n_groups=4, spanwise_distribution=UNCHANGED, 
     spanwise_direction=[0.0, 1.0, 0.0], remove_nan=true, align_to_principal=false,
-    alpha_range=deg2rad.(-5:1:20), delta_range=deg2rad.(-5:1:20), plt=true,
+    alpha_range=deg2rad.(-5:1:20), delta_range=deg2rad.(-5:1:20), prn=true,
     interp_steps=n_sections # TODO: check if interpolations are still needed
 )
 
@@ -512,9 +512,9 @@ function RamAirWing(
 
         (alpha_range, delta_range, cl_matrix::Matrix, cd_matrix::Matrix, cm_matrix::Matrix) = deserialize(polar_path)
         if remove_nan
-            interpolate_matrix_nans!(cl_matrix; plt)
-            interpolate_matrix_nans!(cd_matrix; plt)
-            interpolate_matrix_nans!(cm_matrix; plt)
+            interpolate_matrix_nans!(cl_matrix; prn)
+            interpolate_matrix_nans!(cd_matrix; prn)
+            interpolate_matrix_nans!(cm_matrix; prn)
         end
 
         # Create sections
