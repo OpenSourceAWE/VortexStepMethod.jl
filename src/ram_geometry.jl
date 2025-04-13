@@ -356,7 +356,7 @@ function interpolate_matrix_nans!(matrix::Matrix{Float64}; prn=true)
             end
         end
     end
-    if nans_found > 0 && plt
+    if nans_found > 0 && prn
         @info "Removed $nans_found NaNs from the matrix."
     end
     return matrix
