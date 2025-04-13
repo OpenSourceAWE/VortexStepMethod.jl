@@ -1,3 +1,7 @@
+## Unreleased
+### Changed
+- expose the angle of attack `alpha_array` in the `VSMSolution`
+
 ## VortexStepMethod v1.2.2 2025-04-13
 ### Added
 - the parameter `prn`to the constructor `RamAirWing` which allows it suppress info messages
