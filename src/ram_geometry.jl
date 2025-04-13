@@ -319,7 +319,7 @@ Uses an expanding search radius until valid neighbors are found.
 # Arguments
 - `matrix`: Matrix containing NaN values to be interpolated
 """
-function interpolate_matrix_nans!(matrix::Matrix{Float64})
+function interpolate_matrix_nans!(matrix::Matrix{Float64}; plt=true)
     rows, cols = size(matrix)
     nans_found = 0
     while any(isnan, matrix)
@@ -356,7 +356,7 @@ function interpolate_matrix_nans!(matrix::Matrix{Float64})
             end
         end
     end
-    if nans_found > 0
+    if nans_found > 0 && plt
         @info "Removed $nans_found NaNs from the matrix."
     end
     return matrix
@@ -462,7 +462,8 @@ function RamAirWing(
     crease_frac=0.9, wind_vel=10., mass=1.0, 
     n_panels=56, n_sections=n_panels+1, n_groups=4, spanwise_distribution=UNCHANGED, 
     spanwise_direction=[0.0, 1.0, 0.0], remove_nan=true, align_to_principal=false,
-    alpha_range=deg2rad.(-5:1:20), delta_range=deg2rad.(-5:1:20), interp_steps=n_sections # TODO: check if interpolations are still needed
+    alpha_range=deg2rad.(-5:1:20), delta_range=deg2rad.(-5:1:20), plt=true,
+    interp_steps=n_sections # TODO: check if interpolations are still needed
 )
 
     !(n_panels % n_groups == 0) && throw(ArgumentError("Number of panels should be divisible by number of groups"))
@@ -511,9 +512,9 @@ function RamAirWing(
 
         (alpha_range, delta_range, cl_matrix::Matrix, cd_matrix::Matrix, cm_matrix::Matrix) = deserialize(polar_path)
         if remove_nan
-            interpolate_matrix_nans!(cl_matrix)
-            interpolate_matrix_nans!(cd_matrix)
-            interpolate_matrix_nans!(cm_matrix)
+            interpolate_matrix_nans!(cl_matrix; plt)
+            interpolate_matrix_nans!(cd_matrix; plt)
+            interpolate_matrix_nans!(cm_matrix; plt)
         end
 
         # Create sections

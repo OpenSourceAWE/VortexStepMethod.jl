@@ -1,3 +1,7 @@
+## Unreleased
+### Added
+- the parameter `plt`to the constructor `RamAirWing` which allows it suppress info messages
+
 ## VortexStepMethod v1.2.1 2025-04-08
 ### Added
 - Add back `bench2.jl` and rename it to `bench_solve.jl` #150
