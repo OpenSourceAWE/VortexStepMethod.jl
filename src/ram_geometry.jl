@@ -450,10 +450,15 @@ function RamAirWing(
                 area, width, crease_frac, alpha_range, delta_range, remove_nan)
         end
 
-        # (alpha_range, delta_range, cl_matrix::Matrix, cd_matrix::Matrix, cm_matrix::Matrix) = deserialize(polar_path)
         cl_matrix, _, _ = read_aero_matrix(cl_polar_path)
         cd_matrix, _, _ = read_aero_matrix(cd_polar_path)
         cm_matrix, alpha_range, delta_range = read_aero_matrix(cm_polar_path)
+
+        if remove_nan
+            any(isnan.(cl_matrix)) && interpolate_matrix_nans!(cl_matrix; prn)
+            any(isnan.(cd_matrix)) && interpolate_matrix_nans!(cd_matrix; prn)
+            any(isnan.(cm_matrix)) && interpolate_matrix_nans!(cm_matrix; prn)
+        end
         
         # Create sections
         sections = Section[]

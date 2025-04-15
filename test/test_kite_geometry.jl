@@ -1,7 +1,8 @@
 
 using Test
 using VortexStepMethod
-using VortexStepMethod: create_interpolations, find_circle_center_and_radius, calculate_inertia_tensor, center_to_com!, read_faces, calc_inertia_y_rotation
+using VortexStepMethod: create_interpolations, find_circle_center_and_radius, calculate_inertia_tensor, 
+    center_to_com!, read_faces, calc_inertia_y_rotation, write_aero_matrix, read_aero_matrix
 using LinearAlgebra
 using Interpolations
 using Serialization
@@ -78,7 +79,7 @@ using Serialization
         Δθ = π/2 / 1000
         for θ in range(-π/4, π/4-Δθ, 1000)
             frac = 1.0 - abs(4θ/π)  # Goes from 0 to 1 to 0
-            x_le = 0.1 - 0.1 * frac      # Goes from 0.1 to 0.0 to 0.1
+            x_le = 0.1 - 0.1 * frac # Goes from 0.1 to 0.0 to 0.1
             x_te = 0.9 + 0.1 * frac # Goes from 0.9 to 1.0 to 0.9
         
             push!(vertices, [x_le, r*sin(θ), z_center + r*cos(θ)])
@@ -109,9 +110,14 @@ using Serialization
         cd_matrix[end] = NaN
         cm_matrix[end] = NaN
         
-        # Serialize polar data
-        polar_path = test_dat_path[1:end-4] * "_polar.bin"
-        serialize(polar_path, (alphas, d_trailing_edge_angles, cl_matrix, cd_matrix, cm_matrix))
+        cl_polar_path = joinpath(tempdir(), test_dat_path[1:end-4] * "_cl_polar.csv")
+        cd_polar_path = joinpath(tempdir(), test_dat_path[1:end-4] * "_cd_polar.csv")
+        cm_polar_path = joinpath(tempdir(), test_dat_path[1:end-4] * "_cm_polar.csv")
+        
+        # Write matrices to CSV
+        write_aero_matrix(cl_polar_path, cl_matrix, deg2rad.(alphas), deg2rad.(d_trailing_edge_angles), "C_l")
+        write_aero_matrix(cd_polar_path, cd_matrix, deg2rad.(alphas), deg2rad.(d_trailing_edge_angles), "C_d")
+        write_aero_matrix(cm_polar_path, cm_matrix, deg2rad.(alphas), deg2rad.(d_trailing_edge_angles), "C_m")
         
         # Create and serialize obj file
         faces = [[i, i+1, i+2] for i in 1:3:length(vertices)-2]
@@ -123,6 +129,13 @@ using Serialization
                 println(io, "f $(f[1]) $(f[2]) $(f[3])")
             end
         end
+        
+        # Test reading back the matrices
+        cl_read, alphas_read, deltas_read = read_aero_matrix(cl_polar_path)
+        @test cl_read[1:end-1,:] ≈ cl_matrix[1:end-1,:]
+        @test isnan(cl_read[end,end])
+        @test alphas_read ≈ deg2rad.(alphas)
+        @test deltas_read ≈ deg2rad.(d_trailing_edge_angles)
         
         # Create info file
         info_path = test_obj_path[1:end-4] * "_info.bin"

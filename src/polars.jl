@@ -232,7 +232,6 @@ function create_polars(; dat_path, cl_polar_path, cd_polar_path, cm_polar_path, 
         interpolate_matrix_nans!(cm_matrix)
     end
     
-    # serialize(polar_path, (alpha_range, delta_range, cl_matrix, cd_matrix, cm_matrix))
     write_aero_matrix(cl_polar_path, cl_matrix, alpha_range, delta_range, "C_l")
     write_aero_matrix(cd_polar_path, cd_matrix, alpha_range, delta_range, "C_d")
     write_aero_matrix(cm_polar_path, cm_matrix, alpha_range, delta_range, "C_m")
