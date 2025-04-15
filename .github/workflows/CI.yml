@@ -79,6 +79,9 @@ jobs:
           - ubuntu-latest
     runs-on: ${{ matrix.os }}
     steps:
+    - name: Build PyCall
+      run: julia --project -e 'ENV["PYTHON"]=""; using Pkg; Pkg.instantiate(); Pkg.add("PyCall"); Pkg.build("PyCall")'
+      shell: bash
     - name: Install matplotlib
       run: if [ "$RUNNER_OS" = "Linux" ]; then sudo apt-get install -y python3-matplotlib; fi
       shell: bash
