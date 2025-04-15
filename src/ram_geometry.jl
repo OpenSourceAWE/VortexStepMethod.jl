@@ -473,38 +473,26 @@ function RamAirWing(
     # Load or create polars
     (!endswith(dat_path, ".dat")) && (dat_path *= ".dat")
     (!isfile(dat_path)) && error("DAT file not found: $dat_path")
-    polar_path = dat_path[1:end-4] * "_polar.bin"
+    polar_path = dat_path[1:end-4] * "_polar.csv"
 
     (!endswith(obj_path, ".obj")) && (obj_path *= ".obj")
     (!isfile(obj_path)) && error("OBJ file not found: $obj_path")
-    info_path = obj_path[1:end-4] * "_info.bin"
 
-    if !ispath(info_path)
-        ! prn || @info "Reading $obj_path"
-        vertices, faces = read_faces(obj_path)
-        T_cad_body = center_to_com!(vertices, faces)
-        inertia_tensor = calculate_inertia_tensor(vertices, faces, mass, zeros(3))
+    ! prn || @info "Reading $obj_path"
+    vertices, faces = read_faces(obj_path)
+    T_cad_body = center_to_com!(vertices, faces)
+    inertia_tensor = calculate_inertia_tensor(vertices, faces, mass, zeros(3))
 
-        if align_to_principal
-            inertia_tensor, R_cad_body = calc_inertia_y_rotation(inertia_tensor)
-        else
-            R_cad_body = I(3)
-        end
-        circle_center_z, radius, gamma_tip = find_circle_center_and_radius(vertices)
-        le_interp, te_interp, area_interp = create_interpolations(vertices, circle_center_z, radius, gamma_tip, R_cad_body; interp_steps)
-
-        ! prn || @info "Writing $info_path"
-        serialize(info_path, (inertia_tensor, T_cad_body, R_cad_body, radius, gamma_tip, 
-            le_interp, te_interp, area_interp))
+    if align_to_principal
+        inertia_tensor, R_cad_body = calc_inertia_y_rotation(inertia_tensor)
+    else
+        R_cad_body = I(3)
     end
+    circle_center_z, radius, gamma_tip = find_circle_center_and_radius(vertices)
+    le_interp, te_interp, area_interp = create_interpolations(vertices, circle_center_z, radius, gamma_tip, R_cad_body; interp_steps)
 
-    ! prn || @info "Loading kite info from $info_path and polars from $polar_path"
+    ! prn || @info "Loading 2d polars from $polar_path"
     try
-        (inertia_tensor::Matrix, T_cad_body::Vector, R_cad_body::Matrix,
-            radius::Real, gamma_tip::Real, le_interp, te_interp, area_interp) = deserialize(info_path)
-
-        ((R_cad_body == I(3)) == align_to_principal) && throw(ArgumentError("Delete $info_path and try again."))
-
         if !ispath(polar_path)
             width = 2gamma_tip * radius
             area = area_interp(gamma_tip)

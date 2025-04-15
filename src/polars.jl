@@ -166,3 +166,76 @@ function create_polars(; dat_path, polar_path, wind_vel, area, width, crease_fra
         
     toc()
 end
+
+
+"""
+    write_aero_matrix(filepath::String, matrix::Matrix{Float64}, 
+                      alpha_range::Vector{Float64}, delta_range::Vector{Float64};
+                      label::String="C_l")
+
+Write an aerodynamic coefficient matrix to CSV with angle labels.
+The first row contains flap deflection angles, first column contains angles of attack.
+
+# Arguments
+- `filepath`: Path to output CSV file
+- `matrix`: Matrix of aerodynamic coefficients
+- `alpha_range`: Vector of angle of attack values in radians
+- `delta_range`: Vector of flap deflection angles in radians
+- `label`: Coefficient label for the header (default: "C_l")
+"""
+function write_aero_matrix(filepath::String, matrix::Matrix{Float64}, 
+                         alpha_range::Vector{Float64}, delta_range::Vector{Float64};
+                         label::String="C_l")
+    open(filepath, "w") do io
+        # Write header with delta values
+        println(io, "$label/delta," * join(["δ=$(round(rad2deg(δ), digits=1))°" for δ in delta_range], ","))
+        
+        # Write data rows with alpha values and coefficients
+        for i in eachindex(alpha_range)
+            row = "α=$(round(rad2deg(alpha_range[i]), digits=1))°," * join(matrix[i,:], ",")
+            println(io, row)
+        end
+    end
+end
+
+"""
+    read_aero_matrix(filepath::String) -> (Matrix{Float64}, Vector{Float64}, Vector{Float64})
+
+Read an aerodynamic coefficient matrix from CSV with angle labels.
+Returns the coefficient matrix and corresponding angle ranges.
+
+# Returns
+- `matrix`: Matrix of aerodynamic coefficients
+- `alpha_range`: Vector of angle of attack values in radians
+- `delta_range`: Vector of flap deflection angles in radians
+"""
+function read_aero_matrix(filepath::String)
+    lines = readlines(filepath)
+    
+    # Parse header to get delta values
+    header = split(lines[1], ',')
+    delta_values = map(header[2:end]) do δ_str
+        # Extract number between "δ=" and "°"
+        m = match(r"δ=(-?\d+\.?\d*)°", δ_str)
+        deg2rad(parse(Float64, m.captures[1]))
+    end
+    
+    # Initialize matrix
+    n_rows = length(lines) - 1  # Subtract header
+    n_cols = length(delta_values)
+    matrix = zeros(n_rows, n_cols)
+    alpha_values = zeros(n_rows)
+    
+    # Parse data rows
+    for (i, line) in enumerate(lines[2:end])
+        entries = split(line, ',')
+        # Extract alpha value
+        m = match(r"α=(-?\d+\.?\d*)°", entries[1])
+        alpha_values[i] = deg2rad(parse(Float64, m.captures[1]))
+        # Parse coefficient values
+        matrix[i,:] .= parse.(Float64, entries[2:end])
+    end
+    
+    return matrix, alpha_values, delta_values
+end
+
