@@ -473,7 +473,9 @@ function RamAirWing(
     # Load or create polars
     (!endswith(dat_path, ".dat")) && (dat_path *= ".dat")
     (!isfile(dat_path)) && error("DAT file not found: $dat_path")
-    polar_path = dat_path[1:end-4] * "_polar.csv"
+    cl_polar_path = dat_path[1:end-4] * "_cl_polar.csv"
+    cd_polar_path = dat_path[1:end-4] * "_cd_polar.csv"
+    cm_polar_path = dat_path[1:end-4] * "_cm_polar.csv"
 
     (!endswith(obj_path, ".obj")) && (obj_path *= ".obj")
     (!isfile(obj_path)) && error("OBJ file not found: $obj_path")
@@ -491,15 +493,19 @@ function RamAirWing(
     circle_center_z, radius, gamma_tip = find_circle_center_and_radius(vertices)
     le_interp, te_interp, area_interp = create_interpolations(vertices, circle_center_z, radius, gamma_tip, R_cad_body; interp_steps)
 
-    ! prn || @info "Loading 2d polars from $polar_path"
+    ! prn || @info "Loading 2d polars from $cl_polar_path, $cd_polar_path and $cm_polar_path"
     try
-        if !ispath(polar_path)
+        if !ispath(cl_polar_path) || !ispath(cd_polar_path) || !ispath(cm_polar_path)
             width = 2gamma_tip * radius
             area = area_interp(gamma_tip)
-            create_polars(; dat_path, polar_path, wind_vel, area, width, crease_frac, alpha_range, delta_range)
+            create_polars(; dat_path, cl_polar_path, cd_polar_path, cm_polar_path, wind_vel, area, width, crease_frac, alpha_range, delta_range)
         end
 
-        (alpha_range, delta_range, cl_matrix::Matrix, cd_matrix::Matrix, cm_matrix::Matrix) = deserialize(polar_path)
+        # (alpha_range, delta_range, cl_matrix::Matrix, cd_matrix::Matrix, cm_matrix::Matrix) = deserialize(polar_path)
+        cl_matrix, _, _ = read_aero_matrix(cl_polar_path)
+        cd_matrix, _, _ = read_aero_matrix(cd_polar_path)
+        cm_matrix, alpha_range, delta_range = read_aero_matrix(cm_polar_path)
+        
         if remove_nan
             interpolate_matrix_nans!(cl_matrix; prn)
             interpolate_matrix_nans!(cd_matrix; prn)
@@ -529,7 +535,7 @@ function RamAirWing(
 
     catch e
         if e isa BoundsError
-            @error "Delete $info_path and $polar_path and try again."
+            @error "Delete $cl_polar_path, $cd_polar_path and $cm_polar_path and try again."
         end
         rethrow(e)
     end

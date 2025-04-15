@@ -112,7 +112,7 @@ function get_lower_upper(x, y, crease_frac)
     return lower_trailing_edge, upper_trailing_edge
 end
 
-function create_polars(; dat_path, polar_path, wind_vel, area, width, crease_frac, alpha_range, delta_range)
+function create_polars(; dat_path, cl_polar_path, cd_polar_path, cm_polar_path, wind_vel, area, width, crease_frac, alpha_range, delta_range)
     @info "Creating polars. This can take several minutes."
     tic()
 
@@ -162,7 +162,10 @@ function create_polars(; dat_path, polar_path, wind_vel, area, width, crease_fra
     @info "Relative trailing_edge height: $(upper - lower)"
     @info "Reynolds number for flying speed of $kite_speed is $reynolds_number"
     
-    serialize(polar_path, (alpha_range, delta_range, cl_matrix, cd_matrix, cm_matrix))
+    # serialize(polar_path, (alpha_range, delta_range, cl_matrix, cd_matrix, cm_matrix))
+    write_aero_matrix(cl_polar_path, cl_matrix, alpha_range, delta_range, "C_l")
+    write_aero_matrix(cd_polar_path, cd_matrix, alpha_range, delta_range, "C_d")
+    write_aero_matrix(cm_polar_path, cm_matrix, alpha_range, delta_range, "C_m")
         
     toc()
 end
@@ -184,8 +187,8 @@ The first row contains flap deflection angles, first column contains angles of a
 - `label`: Coefficient label for the header (default: "C_l")
 """
 function write_aero_matrix(filepath::String, matrix::Matrix{Float64}, 
-                         alpha_range::Vector{Float64}, delta_range::Vector{Float64};
-                         label::String="C_l")
+                         alpha_range::Vector{Float64}, delta_range::Vector{Float64},
+                         label::String)
     open(filepath, "w") do io
         # Write header with delta values
         println(io, "$label/delta," * join(["δ=$(round(rad2deg(δ), digits=1))°" for δ in delta_range], ","))
