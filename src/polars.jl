@@ -184,7 +184,7 @@ The first row contains flap deflection angles, first column contains angles of a
 - `matrix`: Matrix of aerodynamic coefficients
 - `alpha_range`: Vector of angle of attack values in radians
 - `delta_range`: Vector of flap deflection angles in radians
-- `label`: Coefficient label for the header (default: "C_l")
+- `label`: Coefficient label for the header
 """
 function write_aero_matrix(filepath::String, matrix::Matrix{Float64}, 
                          alpha_range::Vector{Float64}, delta_range::Vector{Float64},
