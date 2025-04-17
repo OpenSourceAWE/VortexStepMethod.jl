@@ -310,58 +310,6 @@ function calc_inertia_y_rotation(I_b_tensor)
     return I_diag, R_b_p
 end
 
-"""
-    interpolate_matrix_nans!(matrix::Matrix{Float64}; prn=true)
-
-Replace NaN values in a matrix by interpolating from nearest non-NaN neighbors.
-Uses an expanding search radius until valid neighbors are found.
-
-# Arguments
-- `matrix`: Matrix containing NaN values to be interpolated
-"""
-function interpolate_matrix_nans!(matrix::Matrix{Float64}; prn=true)
-    rows, cols = size(matrix)
-    nans_found = 0
-    while any(isnan, matrix)
-        for i in 1:rows, j in 1:cols
-            if isnan(matrix[i,j])
-                # Search in expanding radius until we find valid neighbors
-                radius = 1
-                values = Float64[]
-                weights = Float64[]
-                
-                while isempty(values) && radius < max(rows, cols)
-                    # Check all points at current Manhattan distance
-                    for di in -radius:radius, dj in -radius:radius
-                        if abs(di) + abs(dj) == radius  # Points exactly at distance 'radius'
-                            ni, nj = i + di, j + dj
-                            if 1 ≤ ni ≤ rows && 1 ≤ nj ≤ cols && !isnan(matrix[ni,nj])
-                                # Weight by inverse distance
-                                dist = sqrt(di^2 + dj^2)
-                                push!(values, matrix[ni,nj])
-                                push!(weights, 1/dist)
-                            end
-                        end
-                    end
-                    radius += 1
-                end
-                
-                if !isempty(values)
-                    # Calculate weighted average of found values
-                    matrix[i,j] = sum(values .* weights) / sum(weights)
-                    nans_found += 1
-                else
-                    throw(ArgumentError("Could not remove NaN"))
-                end
-            end
-        end
-    end
-    if nans_found > 0 && prn
-        @info "Removed $nans_found NaNs from the matrix."
-    end
-    return matrix
-end
-
 
 """
     RamAirWing <: AbstractWing
@@ -473,51 +421,45 @@ function RamAirWing(
     # Load or create polars
     (!endswith(dat_path, ".dat")) && (dat_path *= ".dat")
     (!isfile(dat_path)) && error("DAT file not found: $dat_path")
-    polar_path = dat_path[1:end-4] * "_polar.bin"
+    cl_polar_path = dat_path[1:end-4] * "_cl_polar.csv"
+    cd_polar_path = dat_path[1:end-4] * "_cd_polar.csv"
+    cm_polar_path = dat_path[1:end-4] * "_cm_polar.csv"
 
     (!endswith(obj_path, ".obj")) && (obj_path *= ".obj")
     (!isfile(obj_path)) && error("OBJ file not found: $obj_path")
-    info_path = obj_path[1:end-4] * "_info.bin"
 
-    if !ispath(info_path)
-        ! prn || @info "Reading $obj_path"
-        vertices, faces = read_faces(obj_path)
-        T_cad_body = center_to_com!(vertices, faces)
-        inertia_tensor = calculate_inertia_tensor(vertices, faces, mass, zeros(3))
+    ! prn || @info "Reading $obj_path"
+    vertices, faces = read_faces(obj_path)
+    T_cad_body = center_to_com!(vertices, faces)
+    inertia_tensor = calculate_inertia_tensor(vertices, faces, mass, zeros(3))
 
-        if align_to_principal
-            inertia_tensor, R_cad_body = calc_inertia_y_rotation(inertia_tensor)
-        else
-            R_cad_body = I(3)
-        end
-        circle_center_z, radius, gamma_tip = find_circle_center_and_radius(vertices)
-        le_interp, te_interp, area_interp = create_interpolations(vertices, circle_center_z, radius, gamma_tip, R_cad_body; interp_steps)
-
-        ! prn || @info "Writing $info_path"
-        serialize(info_path, (inertia_tensor, T_cad_body, R_cad_body, radius, gamma_tip, 
-            le_interp, te_interp, area_interp))
+    if align_to_principal
+        inertia_tensor, R_cad_body = calc_inertia_y_rotation(inertia_tensor)
+    else
+        R_cad_body = I(3)
     end
+    circle_center_z, radius, gamma_tip = find_circle_center_and_radius(vertices)
+    le_interp, te_interp, area_interp = create_interpolations(vertices, circle_center_z, radius, gamma_tip, R_cad_body; interp_steps)
 
-    ! prn || @info "Loading kite info from $info_path and polars from $polar_path"
+    ! prn || @info "Loading 2d polars from $cl_polar_path, $cd_polar_path and $cm_polar_path"
     try
-        (inertia_tensor::Matrix, T_cad_body::Vector, R_cad_body::Matrix,
-            radius::Real, gamma_tip::Real, le_interp, te_interp, area_interp) = deserialize(info_path)
-
-        ((R_cad_body == I(3)) == align_to_principal) && throw(ArgumentError("Delete $info_path and try again."))
-
-        if !ispath(polar_path)
+        if !ispath(cl_polar_path) || !ispath(cd_polar_path) || !ispath(cm_polar_path)
             width = 2gamma_tip * radius
             area = area_interp(gamma_tip)
-            create_polars(; dat_path, polar_path, wind_vel, area, width, crease_frac, alpha_range, delta_range)
+            create_polars(; dat_path, cl_polar_path, cd_polar_path, cm_polar_path, wind_vel, 
+                area, width, crease_frac, alpha_range, delta_range, remove_nan)
         end
 
-        (alpha_range, delta_range, cl_matrix::Matrix, cd_matrix::Matrix, cm_matrix::Matrix) = deserialize(polar_path)
+        cl_matrix, _, _ = read_aero_matrix(cl_polar_path)
+        cd_matrix, _, _ = read_aero_matrix(cd_polar_path)
+        cm_matrix, alpha_range, delta_range = read_aero_matrix(cm_polar_path)
+
         if remove_nan
-            interpolate_matrix_nans!(cl_matrix; prn)
-            interpolate_matrix_nans!(cd_matrix; prn)
-            interpolate_matrix_nans!(cm_matrix; prn)
+            any(isnan.(cl_matrix)) && interpolate_matrix_nans!(cl_matrix; prn)
+            any(isnan.(cd_matrix)) && interpolate_matrix_nans!(cd_matrix; prn)
+            any(isnan.(cm_matrix)) && interpolate_matrix_nans!(cm_matrix; prn)
         end
-
+        
         # Create sections
         sections = Section[]
         refined_sections = Section[]
@@ -541,7 +483,7 @@ function RamAirWing(
 
     catch e
         if e isa BoundsError
-            @error "Delete $info_path and $polar_path and try again."
+            @error "Delete $cl_polar_path, $cd_polar_path and $cm_polar_path and try again."
         end
         rethrow(e)
     end
