@@ -3,6 +3,7 @@
 - implement export of `solve` and `solve!` correctly
 - do not export `menu()` because KiteUtils exports it
 - the polars of the ram air kite are now saved in `.csv` files
+- update CI.yml
 
 ## VortexStepMethod v1.2.3 2025-04-13
 ### Changed
