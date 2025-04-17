@@ -3,6 +3,6 @@ using Aqua
     Aqua.test_all(
       VortexStepMethod;
       stale_deps=(ignore=[:Xfoil, :Timers],),
-      compat=(ignore=[:PyCall],)
+      deps_compat=(ignore=[:PyCall],)
     )
   end
