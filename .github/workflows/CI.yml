@@ -63,7 +63,6 @@ jobs:
           BUILD_IS_PRODUCTION_BUILD: ${{ matrix.build_is_production_build }}
         with:
           coverage: false
-      - uses: julia-actions/julia-processcoverage@v1
   test-with-code-coverage:
     name: Julia ${{ matrix.julia_version }} - ${{ matrix.os }} - ${{ matrix.julia_arch }} - with code coverage
     timeout-minutes: 20
@@ -87,6 +86,9 @@ jobs:
       with:
         arch: ${{ matrix.julia_arch }}
         version: ${{ matrix.julia_version }}
+    - name: Build PyCall
+      run: julia --project -e 'ENV["PYTHON"]=""; using Pkg; Pkg.instantiate(); Pkg.add("PyCall"); Pkg.build("PyCall")'
+      shell: bash    
     - uses: julia-actions/cache@v2
     - uses: julia-actions/julia-runtest@v1
       env:
