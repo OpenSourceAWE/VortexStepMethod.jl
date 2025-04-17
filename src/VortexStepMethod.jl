@@ -10,6 +10,7 @@ using DefaultApplication
 using Measures
 using LaTeXStrings
 using NonlinearSolve
+import NonlinearSolve: solve!, solve
 using Interpolations
 using Interpolations: Extrapolation
 using Parameters
@@ -31,7 +32,7 @@ export Solver, solve, solve_base!, solve!, VSMSolution, linearize
 export calculate_results
 export add_section!, set_va!
 export calculate_span, calculate_projected_area
-export menu, MVec3
+export MVec3
 export Model, VSM, LLT
 export AeroModel, LEI_AIRFOIL_BREUKELS, POLAR_VECTORS, POLAR_MATRICES, INVISCID
 export PanelDistribution, LINEAR, COSINE, COSINE_VAN_GARREL, SPLIT_PROVIDED, UNCHANGED

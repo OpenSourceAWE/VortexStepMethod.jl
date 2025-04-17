@@ -1,3 +1,8 @@
+## VortexStepMethod v1.2.4 2025-04-17
+### Changed
+- implement export of `solve` and `solve!` correctly
+- do not export `menu()` because KiteUtils exports it
+
 ## VortexStepMethod v1.2.3 2025-04-13
 ### Changed
 - expose the angle of attack `alpha_array` in the `VSMSolution` #167
