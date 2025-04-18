@@ -56,7 +56,7 @@ println("Rectangular wing, solve:")
 @time solve(vsm_solver, body_aero, nothing)
 
 # Create wing geometry
-wing = RamAirWing("data/ram_air_kite_body.obj", "data/ram_air_kite_foil.dat")
+wing = RamAirWing("data/ram_air_kite_body.obj", "data/ram_air_kite_foil.dat"; prn=false)
 body_aero = BodyAerodynamics([wing])
 
 # Create solvers
@@ -80,10 +80,13 @@ vel_app = [
 ] * v_a
 set_va!(body_aero, vel_app)
 
-# Solving and plotting distributions
-results = solve(vsm_solver, body_aero, nothing)
+# Solving
 solve_base!(vsm_solver, body_aero, nothing)
-println("RAM-air kite:")
+println("RAM-air kite, solve_base!:")
 @time solve_base!(vsm_solver, body_aero, nothing)
+solve!(vsm_solver, body_aero, nothing)
+println("RAM-air kite, solve!:")
+@time solve!(vsm_solver, body_aero, nothing)
+
 
 nothing
