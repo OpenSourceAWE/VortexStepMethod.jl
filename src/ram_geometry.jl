@@ -184,7 +184,7 @@ Calculate center of mass of a mesh and translate vertices so that COM is at orig
 - Non-triangular faces are automatically triangulated into triangles
 - Assumes uniform surface density
 """
-function center_to_com!(vertices, faces)
+function center_to_com!(vertices, faces; prn=true)
     area_total = 0.0
     com = zeros(3)
     
@@ -209,7 +209,7 @@ function center_to_com!(vertices, faces)
     
     com = com / area_total
     !(abs(com[2]) < 0.01) && throw(ArgumentError("Center of mass $com of .obj file has to lie on the xz-plane."))
-    @info "Centering vertices of .obj file to the center of mass: $com"
+    prn && @info "Centering vertices of .obj file to the center of mass: $com"
     com[2] = 0.0
     for v in vertices
         v .+= com
@@ -430,7 +430,7 @@ function RamAirWing(
 
     ! prn || @info "Reading $obj_path"
     vertices, faces = read_faces(obj_path)
-    T_cad_body = center_to_com!(vertices, faces)
+    T_cad_body = center_to_com!(vertices, faces; prn)
     inertia_tensor = calculate_inertia_tensor(vertices, faces, mass, zeros(3))
 
     if align_to_principal
