@@ -3,12 +3,13 @@ using VortexStepMethod
 using LinearAlgebra
 
 PLOT = true
+PRN = true
 USE_TEX = false
 DEFORM = false
 LINEARIZE = false
 
 # Create wing geometry
-wing = RamAirWing("data/ram_air_kite_body.obj", "data/ram_air_kite_foil.dat")
+wing = RamAirWing("data/ram_air_kite_body.obj", "data/ram_air_kite_foil.dat"; prn=PRN)
 body_aero = BodyAerodynamics([wing];)
 println("First init")
 @time VortexStepMethod.init!(body_aero)
