@@ -1,3 +1,7 @@
+## VortexStepMethod v1.2.5 2025-04-18
+- suppress `@info` messages when creating a RamAirWing
+- improve examples `ram_air_kite.jl` and `bench.jl`
+
 ## VortexStepMethod v1.2.4 2025-04-17
 ### Changed
 - implement export of `solve` and `solve!` correctly
