@@ -1,4 +1,5 @@
 ## VortexStepMethod v1.2.5 2025-04-18
+### Changed
 - suppress `@info` messages when creating a RamAirWing
 - improve examples `ram_air_kite.jl` and `bench.jl`
 
