@@ -107,7 +107,7 @@ sol::VSMSolution = VSMSolution(): The result of calling [solve!](@ref)
 
     # Nonlin solver fields
     prob::Union{NonlinearProblem, Nothing} = nothing
-    nonlin_cache::Union{NonlinearSolve.AbstractNonlinearSolveCache, Nothing} = nothing
+    nonlin_cache::Union{NonlinearSolveFirstOrder.GeneralizedFirstOrderAlgorithmCache, Nothing} = nothing
     atol::Float64 = 1e-5
     
     # Damping settings
