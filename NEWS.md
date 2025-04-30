@@ -1,3 +1,7 @@
+## VortexStepMethod v1.2.6 2025-04-30
+### Changed
+- update NonlinearSolve.jl
+
 ## VortexStepMethod v1.2.5 2025-04-18
 ### Changed
 - suppress `@info` messages when creating a RamAirWing
