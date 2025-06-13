@@ -1,7 +1,7 @@
 [![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://OpenSourceAWE.github.io/VortexStepMethod.jl/stable)
 [![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://OpenSourceAWE.github.io/VortexStepMethod.jl/dev)
 [![Build Status](https://github.com/OpenSourceAWE/VortexStepMethod.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/OpenSourceAWE/VortexStepMethod.jl/actions/workflows/CI.yml?query=branch%3Amain) 
-[![Coverage](https://codecov.io/gh/OpenSourceAWE/VortexStepMethod.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/OpenSourceAWE/VortexStepMethod.jl)
+[![codecov](https://codecov.io/gh/OpenSourceAWE/VortexStepMethod.jl/graph/badge.svg?token=NykTlxGOrZ)](https://codecov.io/gh/OpenSourceAWE/VortexStepMethod.jl)
 [![Aqua QA](https://raw.githubusercontent.com/JuliaTesting/Aqua.jl/master/badge.svg)](https://github.com/JuliaTesting/Aqua.jl)
 
 
