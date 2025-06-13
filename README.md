@@ -1,7 +1,7 @@
-[![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://Albatross-Kite-Transport.github.io/VortexStepMethod.jl/stable)
-[![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://Albatross-Kite-Transport.github.io/VortexStepMethod.jl/dev)
-[![Build Status](https://github.com/Albatross-Kite-Transport/VortexStepMethod.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/Albatross-Kite-Transport/VortexStepMethod.jl/actions/workflows/CI.yml?query=branch%3Amain) 
-[![Coverage](https://codecov.io/gh/Albatross-Kite-Transport/VortexStepMethod.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/Albatross-Kite-Transport/VortexStepMethod.jl)
+[![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://OpenSourceAWE.github.io/VortexStepMethod.jl/stable)
+[![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://OpenSourceAWE.github.io/VortexStepMethod.jl/dev)
+[![Build Status](https://github.com/OpenSourceAWE/VortexStepMethod.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/OpenSourceAWE/VortexStepMethod.jl/actions/workflows/CI.yml?query=branch%3Amain) 
+[![Coverage](https://codecov.io/gh/OpenSourceAWE/VortexStepMethod.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/OpenSourceAWE/VortexStepMethod.jl)
 [![Aqua QA](https://raw.githubusercontent.com/JuliaTesting/Aqua.jl/master/badge.svg)](https://github.com/JuliaTesting/Aqua.jl)
 
 
@@ -12,7 +12,7 @@ VSM is further refined by coupling it with 2D viscous airfoil polars, making it 
 
 The software presented here includes a couple of examples: a rectangular wing, a leading-edge inflatable kite and a ram-air kite.
 
-This package was translated from the Python code version 1.0.0 available at https://github.com/ocayon/Vortex-Step-Method with some extensions as documented in [News.md](https://github.com/Albatross-Kite-Transport/VortexStepMethod.jl/blob/main/NEWS.md).
+This package was translated from the Python code version 1.0.0 available at https://github.com/ocayon/Vortex-Step-Method with some extensions as documented in [News.md](https://github.com/OpenSourceAWE/VortexStepMethod.jl/blob/main/NEWS.md).
 
 ## Installation
 Install [Julia 1.10](https://ufechner7.github.io/2024/08/09/installing-julia-with-juliaup.html) or later, 
@@ -52,7 +52,7 @@ If you have git installed, check out this repo because it makes it easier to und
 ```bash
 mkdir repos
 cd repos
-git clone https://github.com/Albatross-Kite-Transport/VortexStepMethod.jl
+git clone https://github.com/OpenSourceAWE/VortexStepMethod.jl
 cd VortexStepMethod.jl
 ```
 You can launch Julia with:
@@ -135,11 +135,11 @@ Surfplan files can be converted to an input for `VortexStepMethod.jl` using the 
 
 In addition, the spanwise distribution of these and additional values are available.
 
-See also the [documentation](https://albatross-kite-transport.github.io/VortexStepMethod.jl/dev/).
+See also the [documentation](https://OpenSourceAWE.github.io/VortexStepMethod.jl/dev/).
 
 ## Citation
 If you use this project in your research, please consider citing it. 
-Citation details can be found in the [CITATION.cff](https://github.com/Albatross-Kite-Transport/VortexStepMethod.jl/blob/main/CITATION.cff) file included in this repository.
+Citation details can be found in the [CITATION.cff](https://github.com/OpenSourceAWE/VortexStepMethod.jl/blob/main/CITATION.cff) file included in this repository.
 
 ## License
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
