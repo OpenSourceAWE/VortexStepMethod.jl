@@ -10,7 +10,7 @@ including low aspect ratio wings, as well as configurations with sweep, dihedral
 
 The software presented here includes a couple of examples: a rectangular wing, a leading-edge inflatable kite and a ram-air kite.
 
-This package was translated from the Python code version 1.0.0 available at [https://github.com/ocayon/Vortex-Step-Method](https://github.com/ocayon/Vortex-Step-Method) with some extensions as documented in [News.md](https://github.com/Albatross-Kite-Transport/VortexStepMethod.jl/blob/main/NEWS.md).
+This package was translated from the Python code version 1.0.0 available at [https://github.com/ocayon/Vortex-Step-Method](https://github.com/ocayon/Vortex-Step-Method) with some extensions as documented in [News.md](https://github.com/OpenSourceAWE/VortexStepMethod.jl/blob/main/NEWS.md).
 
 ## Installation
 Install [Julia 1.10](https://ufechner7.github.io/2024/08/09/installing-julia-with-juliaup.html) or later, 
@@ -50,7 +50,7 @@ If you have git installed, check out this repo because it makes it easier to und
 ```bash
 mkdir repos
 cd repos
-git clone https://github.com/Albatross-Kite-Transport/VortexStepMethod.jl
+git clone https://github.com/OpenSourceAWE/VortexStepMethod.jl
 cd VortexStepMethod.jl
 ```
 You can launch Julia with:
@@ -137,10 +137,10 @@ See also the [documentation](https://albatross-kite-transport.github.io/VortexSt
 
 ## Citation
 If you use this project in your research, please consider citing it. 
-Citation details can be found in the [CITATION.cff](https://github.com/Albatross-Kite-Transport/VortexStepMethod.jl/blob/main/CITATION.cff) file included in this repository.
+Citation details can be found in the [CITATION.cff](https://github.com/OpenSourceAWE/VortexStepMethod.jl/blob/main/CITATION.cff) file included in this repository.
 
 ## License
-This project is licensed under the MIT License - see the [LICENSE](https://github.com/Albatross-Kite-Transport/VortexStepMethod.jl/blob/main/LICENSE) file for details.
+This project is licensed under the MIT License - see the [LICENSE](https://github.com/OpenSourceAWE/VortexStepMethod.jl/blob/main/LICENSE) file for details.
 
 ## WAIVER
 Technische Universiteit Delft hereby disclaims all copyright interest in the package “VortexStepMethod.jl” written by the Author(s).

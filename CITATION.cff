@@ -18,7 +18,7 @@ version: 1.0.0
 # doi: "11.1111/11111"
 # date-released: YYYY-MM-DD
 license: MIT
-url: "https://github.com/Albatross-Kite-Transport/VortexStepMethod.jl"
+url: "https://github.com/OpenSourceAWE/VortexStepMethod.jl"
 preferred-citation:
   type: article
   authors:

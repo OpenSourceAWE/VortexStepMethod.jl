@@ -20,7 +20,7 @@ Currently, the `solve!()` function returns the results as [VSMSolution](@ref) st
 Calling `init!(body_aero; init_aero=false)` is very fast. After calling `deform!(wing)`, you have to run `init!(body_aero; init_aero=false)` to apply the deformed wing to the body aerodynamics. This is in turn necessary for the linearization from deformation to aerodynamic coefficients for RAM-air kites.
 
 ## Contributing
-Please, read [CONTRIBUTING.md](https://github.com/Albatross-Kite-Transport/VortexStepMethod.jl/blob/main/CONTRIBUTING.md)
+Please, read [CONTRIBUTING.md](https://github.com/OpenSourceAWE/VortexStepMethod.jl/blob/main/CONTRIBUTING.md)
 
 ## Building the documentation locally
 You can build the documentation locally after checking out the source code with git, launching Julia and executing:
