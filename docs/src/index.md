@@ -133,7 +133,7 @@ Surfplan files can be converted to an input for `VortexStepMethod.jl` using the 
 
 In addition, the spanwise distribution of these and additional values are available.
 
-See also the [documentation](https://albatross-kite-transport.github.io/VortexStepMethod.jl/dev/).
+See also the [documentation](https://opensourceawe.github.io/VortexStepMethod.jl/dev/).
 
 ## Citation
 If you use this project in your research, please consider citing it. 

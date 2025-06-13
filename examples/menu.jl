@@ -7,7 +7,7 @@ using ControlPlots
 using VortexStepMethod
 using REPL.TerminalMenus
 
-url = "https://albatross-kite-transport.github.io/VortexStepMethod.jl/dev"
+url = "https://opensourceawe.github.io/VortexStepMethod.jl/dev"
 
 options = ["rectangular_wing = include(\"rectangular_wing.jl\")",
            "ram_air_kite = include(\"ram_air_kite.jl\")",
