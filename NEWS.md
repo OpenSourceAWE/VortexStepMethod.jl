@@ -1,5 +1,7 @@
-## Unreleased
-- Bump Interpolations to 0.16
+## VortexStepMethod v2.0.0 2025-07-11
+### Changed
+- bump Interpolations to 0.16
+- breaking: rename `init!` to `reinit!`
 
 ## VortexStepMethod v1.2.6 2025-04-30
 ### Changed
