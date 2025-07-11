@@ -1,5 +1,5 @@
 using VortexStepMethod
-using VortexStepMethod: calculate_cl, calculate_cd_cm, calculate_projected_area, calculate_AIC_matrices!, init!
+using VortexStepMethod: calculate_cl, calculate_cd_cm, calculate_projected_area, calculate_AIC_matrices!, reinit!
 using LinearAlgebra
 using Test
 using Logging
@@ -101,7 +101,7 @@ end
                         throw(ArgumentError())
                     end
                     VortexStepMethod.group_deform!(ram_wing, reset_theta, reset_delta; smooth=false)
-                    init!(body_aero; init_aero=false, va=reset_va, omega=reset_omega)
+                    reinit!(body_aero; init_aero=false, va=reset_va, omega=reset_omega)
                     
                     # Get nonlinear solution
                     nonlin_res = VortexStepMethod.solve!(solver, body_aero, nothing; log=false)
@@ -176,7 +176,7 @@ end
             @testset "$combo_name" begin
                 # Start with a fresh model for each combination test
                 VortexStepMethod.group_deform!(ram_wing, theta, delta; smooth=false)
-                init!(body_aero; init_aero=false, va, omega)
+                reinit!(body_aero; init_aero=false, va, omega)
                 
                 # Create the appropriate input vector for this combination
                 input_vec = Vector{Float64}(undef, length(active_indices))
@@ -228,7 +228,7 @@ end
                 
                 # Apply to nonlinear model
                 VortexStepMethod.group_deform!(ram_wing, perturbed_theta, perturbed_delta; smooth=false)
-                init!(body_aero; init_aero=false, va=perturbed_va, omega=perturbed_omega)
+                reinit!(body_aero; init_aero=false, va=perturbed_va, omega=perturbed_omega)
                 
                 # Get nonlinear solution with perturbation
                 nonlin_res = VortexStepMethod.solve!(solver, body_aero; log=false)

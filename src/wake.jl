@@ -18,14 +18,14 @@ function frozen_wake!(body_aero::BodyAerodynamics, va_distribution)
         va_i = va_distribution[i, :]
         vel_mag = norm(va_i)
         direction = va_i / vel_mag
-        init!(
+        reinit!(
             panel.filaments[4],
             panel.TE_point_1, 
             direction, 
             vel_mag, 
             1
         )
-        init!(
+        reinit!(
             panel.filaments[5], 
             panel.TE_point_2, 
             direction, 

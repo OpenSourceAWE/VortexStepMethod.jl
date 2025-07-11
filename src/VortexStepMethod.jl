@@ -26,7 +26,7 @@ using Xfoil
 
 # Export public interface
 export VSMSettings, WingSettings, SolverSettings, vs
-export Wing, Section, RamAirWing, init!
+export Wing, Section, RamAirWing, reinit!
 export BodyAerodynamics
 export Solver, solve, solve_base!, solve!, VSMSolution, linearize
 export calculate_results

@@ -36,11 +36,11 @@ function Section(LE_point, TE_point, aero_model)
 end
 
 """
-    init!(section::Section, LE_point::PosVector, TE_point::PosVector, aero_model=nothing, aero_data=nothing)
+    reinit!(section::Section, LE_point::PosVector, TE_point::PosVector, aero_model=nothing, aero_data=nothing)
 
 Function to update a [Section](@ref) in place.
 """
-function init!(section::Section, LE_point, TE_point, aero_model=nothing, aero_data=nothing)
+function reinit!(section::Section, LE_point, TE_point, aero_model=nothing, aero_data=nothing)
     section.LE_point .= LE_point
     section.TE_point .= TE_point
     (!isnothing(aero_model)) && (section.aero_model = aero_model)
@@ -54,7 +54,7 @@ function init!(section::Section, LE_point, TE_point, aero_model=nothing, aero_da
     nothing
 end
 
-function init!(refined_section::Section, section::Section)
+function reinit!(refined_section::Section, section::Section)
     refined_section.LE_point .= section.LE_point
     refined_section.TE_point .= section.TE_point
     refined_section.aero_model = section.aero_model
@@ -241,7 +241,7 @@ function Wing(n_panels::Int;
     Wing(n_panels, n_groups, spanwise_distribution, panel_props, spanwise_direction, Section[], Section[], remove_nan)
 end
 
-function init!(wing::AbstractWing)
+function reinit!(wing::AbstractWing)
     refine_aerodynamic_mesh!(wing)
     
     # Calculate panel properties
@@ -368,7 +368,7 @@ function refine_aerodynamic_mesh!(wing::AbstractWing)
     # Handle special cases
     if wing.spanwise_distribution == UNCHANGED || length(wing.sections) == n_sections
         for i in eachindex(wing.sections)
-            init!(wing.refined_sections[i], wing.sections[i])
+            reinit!(wing.refined_sections[i], wing.sections[i])
         end
         return nothing
     end
@@ -377,8 +377,8 @@ function refine_aerodynamic_mesh!(wing::AbstractWing)
     
     # Handle two-section case
     if n_sections == 2
-        init!(wing.refined_sections[1], LE[1,:], TE[1,:], aero_model[1], aero_data[1])
-        init!(wing.refined_sections[2], LE[end,:], TE[end,:], aero_model[end], aero_data[end])
+        reinit!(wing.refined_sections[1], LE[1,:], TE[1,:], aero_model[1], aero_data[1])
+        reinit!(wing.refined_sections[2], LE[end,:], TE[end,:], aero_model[end], aero_data[end])
         return nothing
     end
     
@@ -593,7 +593,7 @@ function refine_mesh_for_linear_cosine_distribution!(
 
         # Create new section
         if endpoints || (i != 1 && i != n_sections)
-            @views init!(wing.refined_sections[idx], new_LE[i,:], new_TE[i,:], aero_model[1], new_data)
+            @views reinit!(wing.refined_sections[idx], new_LE[i,:], new_TE[i,:], aero_model[1], new_data)
             idx += 1
         end
     end
@@ -653,7 +653,7 @@ function calculate_cosine_van_Garrel!(wing::AbstractWing, idx)
     
     # Generate new sections
     for (i, (control_point, chord)) in enumerate(zip(control_points, chords))
-        @views init!(wing.refined_sections, 
+        @views reinit!(wing.refined_sections, 
             control_point - 0.25 * chord, 
             control_point + 0.75 * chord,
             sections[i].aero_model, 
@@ -683,7 +683,7 @@ function refine_mesh_by_splitting_provided_sections!(wing::AbstractWing)
     # Check if refinement is needed
     if n_panels_provided == n_panels_desired
         for (refined_section, section) in zip(wing.refined_sections, wing.sections)
-            init!(refined_section, section)
+            reinit!(refined_section, section)
         end
         return nothing
     end
@@ -711,7 +711,7 @@ function refine_mesh_by_splitting_provided_sections!(wing::AbstractWing)
     idx = 1
     for left_section_index in 1:n_section_pairs
         # Add left section of pair
-        init!(wing.refined_sections[idx], wing.sections[left_section_index])
+        reinit!(wing.refined_sections[idx], wing.sections[left_section_index])
         idx += 1
         
         # Calculate new sections for this pair
@@ -746,7 +746,7 @@ function refine_mesh_by_splitting_provided_sections!(wing::AbstractWing)
     end
     
     # Add final section
-    init!(wing.refined_sections[idx], wing.sections[end])
+    reinit!(wing.refined_sections[idx], wing.sections[end])
     idx += 1
     
     # Validate result

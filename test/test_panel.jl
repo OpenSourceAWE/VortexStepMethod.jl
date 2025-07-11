@@ -1,4 +1,4 @@
-using VortexStepMethod: Panel, Section, calculate_relative_alpha_and_relative_velocity, calculate_cl, calculate_cd_cm, init!
+using VortexStepMethod: Panel, Section, calculate_relative_alpha_and_relative_velocity, calculate_cl, calculate_cd_cm, reinit!
 using Interpolations: linear_interpolation, Line
 using LinearAlgebra
 using Test
@@ -36,7 +36,7 @@ function create_panel(section1::Section, section2::Section)
     y_airf = y_airf ./ norm(y_airf)
 
     panel = Panel()
-    init!(
+    reinit!(
         panel,
         section1,
         section2,
