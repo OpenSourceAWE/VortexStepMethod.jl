@@ -1,11 +1,11 @@
-using VortexStepMethod: BoundFilament, velocity_3D_bound_vortex!, init!
+using VortexStepMethod: BoundFilament, velocity_3D_bound_vortex!, reinit!
 using LinearAlgebra
 using Test
 
 # Test helper functions
 function create_test_filament()
     fil = BoundFilament()
-    init!(fil, [0.0, 0.0, 0.0], [1.0, 0.0, 0.0])
+    reinit!(fil, [0.0, 0.0, 0.0], [1.0, 0.0, 0.0])
     return fil
 end
 
@@ -72,7 +72,7 @@ end
 
     @testset "Long Filament" begin
         filament = BoundFilament()
-        init!(filament, [0.0, 0.0, 0.0], [1e6, 0.0, 0.0])
+        reinit!(filament, [0.0, 0.0, 0.0], [1e6, 0.0, 0.0])
         control_point = [5e5, 1.0, 0.0]
         
         velocity_3D_bound_vortex!(
@@ -122,7 +122,7 @@ end
 
     @testset "Symmetry" begin
         filament = BoundFilament()
-        init!(filament, [-1.0, 0.0, 0.0], [1.0, 0.0, 0.0])
+        reinit!(filament, [-1.0, 0.0, 0.0], [1.0, 0.0, 0.0])
 
         velocity_3D_bound_vortex!(v1, filament, [0.0, 1.0, 0.0], gamma, core_radius_fraction, work_vectors)
         velocity_3D_bound_vortex!(v2, filament, [0.0, -1.0, 0.0], gamma, core_radius_fraction, work_vectors)

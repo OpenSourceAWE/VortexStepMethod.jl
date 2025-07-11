@@ -9,7 +9,7 @@ function create_test_filament2()
     filament_direction = 1
     vel_mag = 1.0
     filament = SemiInfiniteFilament()
-    init!(filament, x1, direction, vel_mag, filament_direction)
+    reinit!(filament, x1, direction, vel_mag, filament_direction)
     return filament
 end
 

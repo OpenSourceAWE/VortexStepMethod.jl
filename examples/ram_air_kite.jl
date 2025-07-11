@@ -12,14 +12,14 @@ LINEARIZE = false
 wing = RamAirWing("data/ram_air_kite_body.obj", "data/ram_air_kite_foil.dat"; prn=PRN)
 body_aero = BodyAerodynamics([wing];)
 println("First init")
-@time VortexStepMethod.init!(body_aero)
+@time VortexStepMethod.reinit!(body_aero)
 
 if DEFORM
     # Linear interpolation of alpha from 10° at one tip to 0° at the other
     println("Deform")
     @time VortexStepMethod.smooth_deform!(wing, deg2rad.([10,20,10,0]), deg2rad.([-10,0,-10,0]))
     println("Deform init")
-    @time VortexStepMethod.init!(body_aero; init_aero=false)
+    @time VortexStepMethod.reinit!(body_aero; init_aero=false)
 end
 
 # Create solvers

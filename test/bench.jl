@@ -15,7 +15,7 @@ using VortexStepMethod: calculate_AIC_matrices!, gamma_loop!, calculate_results,
                        velocity_3D_trailing_vortex!,
                        velocity_3D_trailing_vortex_semiinfinite!,
                        Panel,
-                       init!
+                       reinit!
 using Test
 using LinearAlgebra
 
@@ -55,10 +55,10 @@ using LinearAlgebra
     
     body_aero = BodyAerodynamics([wing])
     unchanged_body_aero = BodyAerodynamics([unchanged_wing])
-    init!(unchanged_body_aero)
+    reinit!(unchanged_body_aero)
     
     @testset "Re-initialization" begin
-        result = @benchmark init!($unchanged_body_aero; init_aero=false) samples=1 evals=1
+        result = @benchmark reinit!($unchanged_body_aero; init_aero=false) samples=1 evals=1
         @info "Re-initializing Allocations: $(result.allocs) \t Memory: $(result.memory)"
         @test result.allocs ≤ 50
     end

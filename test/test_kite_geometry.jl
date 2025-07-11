@@ -199,7 +199,7 @@ using Serialization
         delta_dist = fill(deg2rad(5.0), wing.n_panels)   # 5 degrees trailing edge deflection
         
         VortexStepMethod.deform!(wing, theta_dist, delta_dist)
-        VortexStepMethod.init!(body_aero)
+        VortexStepMethod.reinit!(body_aero)
         
         # Check if TE point changed after deformation
         deformed_te_point = copy(body_aero.panels[i].TE_point_1)
@@ -214,7 +214,7 @@ using Serialization
         zero_delta_dist = zeros(wing.n_panels)
         
         VortexStepMethod.deform!(wing, zero_theta_dist, zero_delta_dist)
-        VortexStepMethod.init!(body_aero)
+        VortexStepMethod.reinit!(body_aero)
         
         # Check if TE point returned to original position
         reset_te_point = copy(body_aero.panels[i].TE_point_1)

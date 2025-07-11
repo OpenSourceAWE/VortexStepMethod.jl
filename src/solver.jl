@@ -707,20 +707,20 @@ function linearize(solver::Solver, body_aero::BodyAerodynamics, y::Vector{T};
         if !isnothing(theta_angles) && isnothing(delta_angles)
             if !all(theta_angles .== last_theta)
                 VortexStepMethod.group_deform!(wing, theta_angles, nothing; smooth=false)
-                VortexStepMethod.init!(body_aero; init_aero=false)
+                VortexStepMethod.reinit!(body_aero; init_aero=false)
                 last_theta .= theta_angles
             end
         elseif !isnothing(theta_angles) && !isnothing(delta_angles)
             if !all(delta_angles .== last_delta) || !all(theta_angles .== last_theta)
                 VortexStepMethod.group_deform!(wing, theta_angles, delta_angles; smooth=false)
-                VortexStepMethod.init!(body_aero; init_aero=false)
+                VortexStepMethod.reinit!(body_aero; init_aero=false)
                 last_theta .= theta_angles
                 last_delta .= delta_angles
             end
         elseif isnothing(theta_angles) && !isnothing(delta_angles)
             if !all(delta_angles .== last_delta)
                 VortexStepMethod.group_deform!(wing, nothing, delta_angles; smooth=false)
-                VortexStepMethod.init!(body_aero; init_aero=false)
+                VortexStepMethod.reinit!(body_aero; init_aero=false)
                 last_delta .= delta_angles
             end
         end

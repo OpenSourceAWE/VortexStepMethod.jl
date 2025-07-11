@@ -102,9 +102,9 @@ function init_pos!(
     panel.corner_points[:, 4] = panel.LE_point_2
     vec .= bound_point_2 .- bound_point_1
     panel.width = norm(vec)
-    init!(panel.filaments[1], bound_point_2, bound_point_1, vec)
-    init!(panel.filaments[2], bound_point_1, panel.TE_point_1, vec)
-    init!(panel.filaments[3], panel.TE_point_2, bound_point_2, vec)
+    reinit!(panel.filaments[1], bound_point_2, bound_point_1, vec)
+    reinit!(panel.filaments[2], bound_point_1, panel.TE_point_1, vec)
+    reinit!(panel.filaments[3], panel.TE_point_2, bound_point_2, vec)
 
     panel.bound_point_1 .= bound_point_1
     panel.bound_point_2 .= bound_point_2
@@ -184,7 +184,7 @@ function init_aero!(
     end
 end
 
-function init!(
+function reinit!(
     panel::Panel,
     section_1::Section,
     section_2::Section,

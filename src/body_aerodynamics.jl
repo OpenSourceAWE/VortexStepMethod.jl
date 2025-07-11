@@ -94,7 +94,7 @@ function BodyAerodynamics(
     end
 
     body_aero = BodyAerodynamics{length(panels)}(; panels, wings)
-    init!(body_aero; va, omega)
+    reinit!(body_aero; va, omega)
     return body_aero
 end
 
@@ -114,7 +114,7 @@ function Base.setproperty!(obj::BodyAerodynamics, sym::Symbol, val)
 end
 
 """
-    init!(body_aero::BodyAerodynamics; init_aero, va, omega)
+    reinit!(body_aero::BodyAerodynamics; init_aero, va, omega)
 
 Initialize a BodyAerodynamics struct in-place by setting up panels and coefficients.
 
@@ -129,7 +129,7 @@ Initialize a BodyAerodynamics struct in-place by setting up panels and coefficie
 # Returns
 nothing
 """
-function init!(body_aero::BodyAerodynamics; 
+function reinit!(body_aero::BodyAerodynamics; 
     init_aero=true,
     va=[15.0, 0.0, 0.0],
     omega=zeros(MVec3)
@@ -137,7 +137,7 @@ function init!(body_aero::BodyAerodynamics;
     idx = 1
     vec = zeros(MVec3)
     for wing in body_aero.wings
-        init!(wing)
+        reinit!(wing)
         panel_props = wing.panel_props
         
         # Create panels
@@ -147,7 +147,7 @@ function init!(body_aero::BodyAerodynamics;
             else
                 delta = 0.0
             end
-            @views init!(
+            @views reinit!(
                 body_aero.panels[idx], 
                 wing.refined_sections[i],
                 wing.refined_sections[i+1],

@@ -28,7 +28,7 @@ Represents a bound vortex filament defined by two points.
     initialized::Bool = false
 end
 
-function init!(filament::BoundFilament, x1, x2, vec=zeros(MVec3))
+function reinit!(filament::BoundFilament, x1, x2, vec=zeros(MVec3))
     filament.x1 .= x1
     filament.x2 .= x2
     vec .= x2 .- x1
@@ -173,7 +173,7 @@ Represents a semi-infinite vortex filament.
     initialized::Bool = false
 end
 
-function init!(filament::SemiInfiniteFilament, x1::PosVector, direction::PosVector, vel_mag::Real, filament_direction::Real)
+function reinit!(filament::SemiInfiniteFilament, x1::PosVector, direction::PosVector, vel_mag::Real, filament_direction::Real)
     filament.x1 .= x1
     filament.direction .= direction
     filament.vel_mag = vel_mag
