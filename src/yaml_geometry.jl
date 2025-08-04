@@ -43,68 +43,114 @@ mutable struct YamlWing <: AbstractWing
     cache::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}}
 end
 
+# """
+#     load_polar_data(csv_file_path)
+
+# Load polar data from CSV file at the given path.
+# Expected CSV format: columns named alpha, cl, cd, cm (case insensitive)
+
+# Returns (aero_data, aero_model) tuple.
+# """
+# function load_polar_data(csv_file_path::String)
+#     if isempty(csv_file_path) || !isfile(csv_file_path)
+#         @warn "Polar file not found or empty path: $csv_file_path. Using INVISCID model instead."
+#         return nothing, INVISCID
+#     end
+    
+#     try
+#         # Read the file and get headers
+#         file_content = readdlm(csv_file_path, ',')
+        
+#         # Extract headers (first row) and data (remaining rows)
+#         headers = String.(file_content[1, :])
+#         data = file_content[2:end, :]
+#         # Get column names and find required columns (case insensitive)
+#         col_names_lower = lowercase.(headers)
+        
+#         # Find required columns by matching lowercase names
+#         alpha_col = findfirst(x -> x == "alpha", col_names_lower)
+#         cl_col = findfirst(x -> x == "cl", col_names_lower)
+#         cd_col = findfirst(x -> x == "cd", col_names_lower)
+#         cm_col = findfirst(x -> x == "cm", col_names_lower)
+        
+#         # Check if all required columns are found
+#         if isnothing(alpha_col) || isnothing(cl_col) || isnothing(cd_col) || isnothing(cm_col)
+#             missing_cols = String[]
+#             isnothing(alpha_col) && push!(missing_cols, "alpha")
+#             isnothing(cl_col) && push!(missing_cols, "cl")
+#             isnothing(cd_col) && push!(missing_cols, "cd")
+#             isnothing(cm_col) && push!(missing_cols, "cm")
+#             @warn "Missing columns $missing_cols in $csv_file_path. Using INVISCID model instead."
+#             return nothing, INVISCID
+#         end
+        
+#         # Extract data using column indices and convert to Float64
+#         alpha_data = Float64.(data[:, alpha_col])
+#         cl_data = Float64.(data[:, cl_col])
+#         cd_data = Float64.(data[:, cd_col])
+#         cm_data = Float64.(data[:, cm_col])
+        
+#         # Create aero_data tuple
+#         aero_data = (alpha_data, cl_data, cd_data, cm_data)
+#         return aero_data, POLAR_VECTORS
+        
+#     catch e
+#         @warn "Error reading polar file $csv_file_path: $e. Using INVISCID model instead."
+#         return nothing, INVISCID
+#     end
+# end
 """
     load_polar_data(csv_file_path)
 
-Load polar data from CSV file at the given path.
-Expected CSV format: columns named alpha, cl, cd, cm (case insensitive)
+Load polar data from a CSV file using only `readlines`.
+Expected format: header row and columns alpha, cl, cd, cm (case-insensitive, order arbitrary).
 
-Returns (aero_data, aero_model) tuple.
+Returns (aero_data, POLAR_VECTORS) or (nothing, INVISCID) if missing/invalid.
 """
 function load_polar_data(csv_file_path::String)
     if isempty(csv_file_path) || !isfile(csv_file_path)
         @warn "Polar file not found or empty path: $csv_file_path. Using INVISCID model instead."
         return nothing, INVISCID
     end
-    
     try
-        # Dynamically load CSV and DataFrames if not already loaded
-        if !isdefined(Main, :CSV)
-            @eval Main using CSV
-        end
-        if !isdefined(Main, :DataFrames)
-            @eval Main using DataFrames
-        end
-        
-        # Read CSV file
-        df = Main.DataFrame(Main.CSV.File(csv_file_path))
-        
-        # Get column names and find required columns (case insensitive)
-        col_names = names(df)
-        col_names_lower = lowercase.(col_names)
-        
-        # Find required columns by matching lowercase names
-        alpha_col = findfirst(x -> x == "alpha", col_names_lower)
-        cl_col = findfirst(x -> x == "cl", col_names_lower)
-        cd_col = findfirst(x -> x == "cd", col_names_lower)
-        cm_col = findfirst(x -> x == "cm", col_names_lower)
-        
-        # Check if all required columns are found
-        if isnothing(alpha_col) || isnothing(cl_col) || isnothing(cd_col) || isnothing(cm_col)
-            missing_cols = String[]
-            isnothing(alpha_col) && push!(missing_cols, "alpha")
-            isnothing(cl_col) && push!(missing_cols, "cl")
-            isnothing(cd_col) && push!(missing_cols, "cd")
-            isnothing(cm_col) && push!(missing_cols, "cm")
-            @warn "Missing columns $missing_cols in $csv_file_path. Using INVISCID model instead."
+        lines = readlines(csv_file_path)
+        isempty(lines) && throw(ArgumentError("File is empty"))
+        header = lowercase.(split(strip(lines[1]), ','))
+
+        # Create a mapping from column name to index (1-based for Julia arrays)
+        col_map = Dict(name => i for (i, name) in enumerate(header))
+        required = ["alpha", "cl", "cd", "cm"]
+        missing = filter(x -> !haskey(col_map, x), required)
+        if !isempty(missing)
+            @warn "Missing columns $missing in $csv_file_path. Using INVISCID model instead."
             return nothing, INVISCID
         end
-        
-        # Extract data using actual column names
-        alpha_data = df[!, col_names[alpha_col]]
-        cl_data = df[!, col_names[cl_col]]
-        cd_data = df[!, col_names[cd_col]]
-        cm_data = df[!, col_names[cm_col]]
-        
-        # Create aero_data tuple
-        aero_data = (alpha_data, cl_data, cd_data, cm_data)
-        return aero_data, POLAR_VECTORS
-        
+
+        # Preallocate arrays
+        n = length(lines) - 1
+        alpha = Vector{Float64}(undef, n)
+        cl    = Vector{Float64}(undef, n)
+        cd    = Vector{Float64}(undef, n)
+        cm    = Vector{Float64}(undef, n)
+
+        # Converting to radians
+        alpha = deg2rad.(alpha)
+
+        # Read each data line
+        for (i, line) in enumerate(lines[2:end])
+            fields = split(strip(line), ',')
+            alpha[i] = parse(Float64, fields[col_map["alpha"]])
+            cl[i]    = parse(Float64, fields[col_map["cl"]])
+            cd[i]    = parse(Float64, fields[col_map["cd"]])
+            cm[i]    = parse(Float64, fields[col_map["cm"]])
+        end
+        return (alpha, cl, cd, cm), POLAR_VECTORS
     catch e
         @warn "Error reading polar file $csv_file_path: $e. Using INVISCID model instead."
         return nothing, INVISCID
     end
 end
+
 
 """
     YamlWing(yaml_path; kwargs...)

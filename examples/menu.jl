@@ -10,8 +10,9 @@ using REPL.TerminalMenus
 url = "https://opensourceawe.github.io/VortexStepMethod.jl/dev"
 
 options = [
-            "pyramid_model = include(\"pyramid_model.jl\")",
-            "rectangular_wing = include(\"rectangular_wing.jl\")",
+           "V3_kite = include(\"V3_kite.jl\")",
+           "pyramid_model = include(\"pyramid_model.jl\")",
+           "rectangular_wing = include(\"rectangular_wing.jl\")",
            "ram_air_kite = include(\"ram_air_kite.jl\")",
            "stall_model = include(\"stall_model.jl\")",
            "bench = include(\"bench.jl\")",
