@@ -23,7 +23,7 @@ Main structure for calculating aerodynamic properties of bodies. Use the constru
 """
 @with_kw mutable struct BodyAerodynamics{P}
     panels::Vector{Panel}
-    wings::Union{Vector{Wing}, Vector{RamAirWing}}
+    wings::Union{Vector{Wing}, Vector{RamAirWing}, Vector{YamlWing}}
     _va::MVec3 = zeros(MVec3)
     omega::MVec3 = zeros(MVec3)
     gamma_distribution::MVector{P, Float64} = zeros(MVector{P, Float64})

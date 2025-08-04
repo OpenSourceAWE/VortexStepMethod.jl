@@ -26,7 +26,7 @@ using Xfoil
 
 # Export public interface
 export VSMSettings, WingSettings, SolverSettings, vs
-export Wing, Section, RamAirWing, reinit!
+export Wing, Section, RamAirWing, YamlWing, reinit!
 export BodyAerodynamics
 export Solver, solve, solve_base!, solve!, VSMSolution, linearize
 export calculate_results
@@ -270,6 +270,7 @@ include("settings.jl")
 include("wing_geometry.jl")
 include("polars.jl")
 include("ram_geometry.jl")
+include("yaml_geometry.jl")
 include("filament.jl")
 include("panel.jl")
 include("body_aerodynamics.jl")

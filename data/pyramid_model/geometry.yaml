@@ -41,10 +41,12 @@ wing_airfoils:
   #       csv_file_path: Path to polar CSV file (columns: alpha [rad], cl, cd, cm)
   #   - masure_regression:
   #       t, eta, kappa, delta, lamba, phi: Regression parameters
+  #   - inviscid:
+  #       no further data is required 
   # ---------------------------------------------------------------
   alpha_range: [-10, 31, 0.5] # [deg], in this range the polars are calculated
   reynolds: !!float 1e6 # Reynolds number
   headers: [airfoil_id, type, info_dict]
   data:
-    - [1, breukels_regression, {t: 0.3225132246121334, kappa: 0.0405837}]
-    - [2, breukels_regression, {t: 0.1837401335882308, kappa: 0.043495}]
+    - [1, polars, {csv_file_path: "polars/1.csv"}]
+    - [2, polars, {csv_file_path: "polars/2.csv"}]
