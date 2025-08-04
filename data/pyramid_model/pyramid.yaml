@@ -1,0 +1,50 @@
+wing_sections:
+  # ---------------------------------------------------------------
+  # headers:
+  #   - airfoil_id: integer, unique identifier for the airfoil (matches wing_airfoils)
+  #   - LE_x: x-coordinate of leading edge
+  #   - LE_y: y-coordinate of leading edge
+  #   - LE_z: z-coordinate of leading edge
+  #   - TE_x: x-coordinate of trailing edge
+  #   - TE_y: y-coordinate of trailing edge
+  #   - TE_z: z-coordinate of trailing edge
+  # ---------------------------------------------------------------
+  headers: [airfoil_id, LE_x, LE_y, LE_z, TE_x, TE_y, TE_z]
+  data:
+    - [1, 0, 10, 0, 1, 10, 0]
+    - [2, 0, -10, 0, 1, -10, 0]
+
+wing_airfoils:
+  # ---------------------------------------------------------------
+  # headers:
+  #   - airfoil_id: integer, unique identifier for the airfoil
+  #   - type: one of [neuralfoil, breukels_regression, masure_regression, polars]
+  #   - info_dict: dictionary with parameters depending on 'type'
+  #
+  # info_dict fields by type:
+  #   - breukels_regression:
+  #       t: Tube diameter non-dimensionalized by chord (required)
+  #       kappa: Maximum camber height/magnitude, non-dimensionalized by chord (required)
+  #   - neuralfoil:
+  #       dat_file_path: Path to airfoil .dat file (x, y columns)
+  #       model_size: NeuralFoil model size (e.g., "xxxlarge")
+  #       xtr_lower: Lower transition location (0=forced, 1=free)
+  #       xtr_upper: Upper transition location
+  #       n_crit: Critical amplification factor (see guidelines below)
+  #         n_crit guidelines:
+  #           Sailplane:           12–14
+  #           Motorglider:         11–13
+  #           Clean wind tunnel:   10–12
+  #           Average wind tunnel: 9   (standard "e^9 method")
+  #           Dirty wind tunnel:   4–8
+  #   - polars:
+  #       csv_file_path: Path to polar CSV file (columns: alpha [rad], cl, cd, cm)
+  #   - masure_regression:
+  #       t, eta, kappa, delta, lamba, phi: Regression parameters
+  # ---------------------------------------------------------------
+  alpha_range: [-10, 31, 0.5] # [deg], in this range the polars are calculated
+  reynolds: !!float 1e6 # Reynolds number
+  headers: [airfoil_id, type, info_dict]
+  data:
+    - [1, breukels_regression, {t: 0.3225132246121334, kappa: 0.0405837}]
+    - [2, breukels_regression, {t: 0.1837401335882308, kappa: 0.043495}]
