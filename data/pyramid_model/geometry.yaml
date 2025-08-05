@@ -1,52 +1,68 @@
+# Kite system geometry for simulation based on provided Julia code
+
 wing_sections:
   # ---------------------------------------------------------------
-  # headers:
-  #   - airfoil_id: integer, unique identifier for the airfoil (matches wing_airfoils)
-  #   - LE_x: x-coordinate of leading edge
-  #   - LE_y: y-coordinate of leading edge
-  #   - LE_z: z-coordinate of leading edge
-  #   - TE_x: x-coordinate of trailing edge
-  #   - TE_y: y-coordinate of trailing edge
-  #   - TE_z: z-coordinate of trailing edge
+  # headers: [airfoil_id, LE_x, LE_y, LE_z, TE_x, TE_y, TE_z]
+  # airfoil_id: 1 (since only one polar/interpolator is used)
+  # The kite is represented by 4 chordwise points at y = width/2, -width/2 and at y = 0.
+  # Chord positions from get_kite_points(s): P2 (center right), P3 (center left)
+  # Bridle/other points are omitted for simplicity.
+  # Units: meters
   # ---------------------------------------------------------------
   headers: [airfoil_id, LE_x, LE_y, LE_z, TE_x, TE_y, TE_z]
   data:
-    - [1, 0, 10, 0, 1, 10, 0]
-    - [2, 0, -10, 0, 1, -10, 0]
+    - [1, 0.0,  8.16/2, 3.15+4.9, 2.0,  8.16/2, 3.15+4.9]      # Right tip chord (P2)
+    - [1, 0.0, -8.16/2, 3.15+4.9, 2.0, -8.16/2, 3.15+4.9]      # Left tip chord  (P3)
+    - [1, 0.0, 0.0,     4.9,       2.0, 0.0,     4.9]          # Bridle attachment (P4/P5 merged, approx.)
 
 wing_airfoils:
   # ---------------------------------------------------------------
-  # headers:
-  #   - airfoil_id: integer, unique identifier for the airfoil
-  #   - type: one of [neuralfoil, breukels_regression, masure_regression, polars]
-  #   - info_dict: dictionary with parameters depending on 'type'
-  #
-  # info_dict fields by type:
-  #   - breukels_regression:
-  #       t: Tube diameter non-dimensionalized by chord (required)
-  #       kappa: Maximum camber height/magnitude, non-dimensionalized by chord (required)
-  #   - neuralfoil:
-  #       dat_file_path: Path to airfoil .dat file (x, y columns)
-  #       model_size: NeuralFoil model size (e.g., "xxxlarge")
-  #       xtr_lower: Lower transition location (0=forced, 1=free)
-  #       xtr_upper: Upper transition location
-  #       n_crit: Critical amplification factor (see guidelines below)
-  #         n_crit guidelines:
-  #           Sailplane:           12–14
-  #           Motorglider:         11–13
-  #           Clean wind tunnel:   10–12
-  #           Average wind tunnel: 9   (standard "e^9 method")
-  #           Dirty wind tunnel:   4–8
-  #   - polars:
-  #       csv_file_path: Path to polar CSV file (columns: alpha [rad], cl, cd, cm)
-  #   - masure_regression:
-  #       t, eta, kappa, delta, lamba, phi: Regression parameters
-  #   - inviscid:
-  #       no further data is required 
+  # Only one polar, which is interpolated in code; you may later link to a CSV file.
   # ---------------------------------------------------------------
-  alpha_range: [-10, 31, 0.5] # [deg], in this range the polars are calculated
-  reynolds: !!float 1e6 # Reynolds number
+  alpha_range: [-180, 180, 1] # deg
+  reynolds: 1e6
   headers: [airfoil_id, type, info_dict]
   data:
-    - [1, polars, {csv_file_path: "polars/1.csv"}]
-    - [2, polars, {csv_file_path: "polars/2.csv"}]
+    - [1, polars, {csv_file_path: "cl_cd_polar.csv"}]
+
+bridle_nodes:
+  # ---------------------------------------------------------------
+  # Use the points from get_kite_points(s), assuming:
+  # - P1: Bridle point
+  # - P2: right tip
+  # - P3: left tip
+  # - P4/P5: at width/2, -width/2, z = bridle height
+  # ---------------------------------------------------------------
+  headers: [id, x, y, z, type]
+  data:
+    - [1, 0.0,     0.0,        0.0,       knot]  # Bridle origin
+    - [2, 0.0,     8.16/2,     3.15+4.9,  knot]  # Right tip
+    - [3, 0.0,    -8.16/2,     3.15+4.9,  knot]  # Left tip
+    - [4, 0.0,     8.16/2,     4.9,       knot]  # Bridle top right
+    - [5, 0.0,    -8.16/2,     4.9,       knot]  # Bridle top left
+
+bridle_lines:
+  # ---------------------------------------------------------------
+  headers: [name, rest_length, diameter, material, density]
+  data:
+    - [bridle_main, 33.4, 0.0025, dyneema, 970]
+
+bridle_connections:
+  # ---------------------------------------------------------------
+  # Very simplified; you can expand as needed. Connects bridle origin to tips and bridle tops.
+  # headers: [name, ci, cj, ck]
+  data:
+    - [bridle_main, 1, 2, 0]
+    - [bridle_main, 1, 3, 0]
+    - [bridle_main, 1, 4, 0]
+    - [bridle_main, 1, 5, 0]
+    - [bridle_top, 4, 2, 0]
+    - [bridle_top, 5, 3, 0]
+
+tether:
+  # Tether from bridle origin (node 1) extending for l_tether meters
+  length: 50.0
+  diameter: 0.004
+  material: dyneema
+  density: 724.0
+  segments: 14

@@ -5,10 +5,22 @@ using Test
 using Logging
 
 if !@isdefined ram_wing
+    # Use absolute paths to ensure files are found
+    data_dir = joinpath(dirname(@__DIR__), "data", "ram_air_kite")
     body_path = joinpath(tempdir(), "ram_air_kite_body.obj")
     foil_path = joinpath(tempdir(), "ram_air_kite_foil.dat")
-    cp("data/ram_air_kite_body.obj", body_path; force=true)
-    cp("data/ram_air_kite_foil.dat", foil_path; force=true)
+    
+    body_src = joinpath(data_dir, "ram_air_kite_body.obj")
+    foil_src = joinpath(data_dir, "ram_air_kite_foil.dat")
+    
+    # Check if source files exist before copying
+    if isfile(body_src) && isfile(foil_src)
+        cp(body_src, body_path; force=true)
+        cp(foil_src, foil_path; force=true)
+    else
+        error("Required data files not found: $body_src or $foil_src")
+    end
+    
     ram_wing = RamAirWing(body_path, foil_path; alpha_range=deg2rad.(-1:1), delta_range=deg2rad.(-1:1))
 end
 

@@ -48,7 +48,7 @@ function vs(filename)
     # But handle special fields manually due to enum conversion needs
     vsm_settings = VSMSettings()
     
-    # Convert condition settings using StructMapping
+    # Convert condition settings using StructMapping (if present)
     if haskey(data, "condition")
         vsm_settings.condition = convertdict(ConditionSettings, data["condition"])
     end
