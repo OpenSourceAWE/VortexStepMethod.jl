@@ -47,23 +47,23 @@ Struct for storing the solution of the [solve!](@ref) function. Must contain all
     moment::MVec3 = zeros(MVec3)       
     force_coeffs::MVec3 = zeros(MVec3)  
     moment_coeffs::MVec3 = zeros(MVec3)  
-    moment_dist::MVector{P, Float64} = zeros(MVector{P, Float64})
-    moment_coeff_dist::MVector{P, Float64} = zeros(MVector{P, Float64})
-    group_moment_dist::MVector{G, Float64} = zeros(MVector{G, Float64})
-    group_moment_coeff_dist::MVector{G, Float64} = zeros(MVector{G, Float64})
+    moment_dist::MVector{P, Float64} = zeros(P)
+    moment_coeff_dist::MVector{P, Float64} = zeros(P)
+    group_moment_dist::MVector{G, Float64} = zeros(G)
+    group_moment_coeff_dist::MVector{G, Float64} = zeros(G)
     solver_status::SolverStatus = FAILURE
 end
 
 # Output of the function gamma_loop!
 @with_kw mutable struct LoopResult{P}
     converged::Bool              = false
-    gamma_new::MVector{P, Float64}   = zeros(MVector{P, Float64})
-    alpha_array::MVector{P, Float64} = zeros(MVector{P, Float64}) # TODO: Is this different from BodyAerodynamics.alpha_array ?
-    v_a_array::MVector{P, Float64}   = zeros(MVector{P, Float64})
+    gamma_new::MVector{P, Float64}   = zeros(P)
+    alpha_array::MVector{P, Float64} = zeros(P) # TODO: Is this different from BodyAerodynamics.alpha_array ?
+    v_a_array::MVector{P, Float64}   = zeros(P)
 end
 
 @with_kw struct BaseResult{P}
-    va_norm_array::MVector{P, Float64} = zeros(MVector{P, Float64})
+    va_norm_array::MVector{P, Float64} = zeros(P)
     va_unit_array::Matrix{Float64} = zeros(P, 3)
 end
 

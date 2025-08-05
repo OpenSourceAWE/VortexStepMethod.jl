@@ -31,7 +31,7 @@ labels= [
 settings = vs("TUDELFT_V3_KITE/vsm_settings.yaml")
 
 # Create wing, body_aero, and solver objects using settings
-wing = YamlWing(settings.wings[1].yaml_path; 
+wing = YamlWing(settings.wings[1].geometry_file; 
     n_panels=settings.wings[1].n_panels, 
     n_groups=settings.wings[1].n_groups,
     spanwise_distribution=settings.wings[1].spanwise_panel_distribution

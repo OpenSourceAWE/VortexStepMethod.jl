@@ -7,7 +7,7 @@ end
 
 @with_kw mutable struct WingSettings
     name::String = "main_wing"
-    yaml_path::String = ""          # path to wing geometry YAML file
+    geometry_file::String = ""          # path to wing geometry YAML file
     n_panels::Int64 = 40
     n_groups::Int64 = 40 
     spanwise_panel_distribution::PanelDistribution = LINEAR
@@ -59,8 +59,8 @@ function vs(filename)
     for (i, wing) in pairs(data["wings"])
         push!(res.wings, WingSettings())
         res.wings[i].name = wing["name"]
-        if haskey(wing, "yaml_path")
-            res.wings[i].yaml_path = wing["yaml_path"]
+        if haskey(wing, "geometry_file")
+            res.wings[i].geometry_file = wing["geometry_file"]
         end
         res.wings[i].n_panels = wing["n_panels"]
         n_panels += res.wings[i].n_panels
