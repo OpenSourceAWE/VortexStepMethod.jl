@@ -349,9 +349,9 @@ function VortexStepMethod.plot_distribution(y_coordinates_list, results_list, la
     for (y_coordinates_i, result_i, label_i) in zip(y_coordinates_list, results_list, label_list)
         value = "$(round(result_i["cl"], digits=2))"
         if label_i == "LLT"
-            label = label_i * L" $~C_L$: " * value
+            label = label_i * L" $~C_\mathrm{L}$: " * value
         else
-            label = label_i * L" $C_L$: " * value
+            label = label_i * L" $C_\mathrm{L}$: " * value
         end
         axs[1, 1].plot(
             y_coordinates_i,
@@ -359,18 +359,18 @@ function VortexStepMethod.plot_distribution(y_coordinates_list, results_list, la
             label=label
         )
     end
-    axs[1, 1].set_title(L"$C_L$ Distribution", size=16)
+    axs[1, 1].set_title(L"$C_\mathrm{L}$ Distribution", size=16)
     axs[1, 1].set_xlabel(L"Spanwise Position $y/b$")
-    axs[1, 1].set_ylabel(L"Lift Coefficient $C_L$")
+    axs[1, 1].set_ylabel(L"Lift Coefficient $C_\mathrm{L}$")
     axs[1, 1].legend()
 
     # CD plot
     for (y_coordinates_i, result_i, label_i) in zip(y_coordinates_list, results_list, label_list)
         value = "$(round(result_i["cl"], digits=2))"
         if label_i == "LLT"
-            label = label_i * L" $~C_D$: " * value
+            label = label_i * L" $~C_\mathrm{D}$: " * value
         else
-            label = label_i * L" $C_D$: " * value
+            label = label_i * L" $C_\mathrm{D}$: " * value
         end
         axs[1, 2].plot(
             y_coordinates_i,
@@ -378,9 +378,9 @@ function VortexStepMethod.plot_distribution(y_coordinates_list, results_list, la
             label=label
         )
     end
-    axs[1, 2].set_title(L"$C_D$ Distribution", size=16)
+    axs[1, 2].set_title(L"$C_\mathrm{D}$ Distribution", size=16)
     axs[1, 2].set_xlabel(L"Spanwise Position $y/b$")
-    axs[1, 2].set_ylabel(L"Drag Coefficient $C_D$")
+    axs[1, 2].set_ylabel(L"Drag Coefficient $C_\mathrm{D}$")
     axs[1, 2].legend()
 
     # Gamma Distribution
@@ -705,10 +705,10 @@ function VortexStepMethod.plot_polars(
         if maximum(polar_data[2]) > 10
             axs[1, 1].set_ylim([-0.5, 2])
         end
-        title = raw"$C_L" * raw"$" * " vs $angle_type [°]"
+        title = raw"$C_\mathrm{L}" * raw"$" * " vs $angle_type [°]"
         axs[1, 1].set_title(title)
         axs[1, 1].set_xlabel("$angle_type [°]")
-        axs[1, 1].set_ylabel(L"$C_L$")
+        axs[1, 1].set_ylabel(L"$C_\mathrm{L}$")
         axs[1, 1].legend()
     end
 
@@ -745,10 +745,10 @@ function VortexStepMethod.plot_polars(
         if maximum(polar_data[2]) > 10
             axs[1, 2].set_ylim([-0.5, 2])
         end
-        title = raw"$C_D" * raw"$" * " vs $angle_type [°]"
+        title = raw"$C_\mathrm{D}" * raw"$" * " vs $angle_type [°]"
         axs[1, 2].set_title(title)
         axs[1, 2].set_xlabel("$angle_type [°]")
-        axs[1, 2].set_ylabel(L"$C_D$")
+        axs[1, 2].set_ylabel(L"$C_\mathrm{D}$")
         axs[1, 2].legend()
     end
 
@@ -786,10 +786,10 @@ function VortexStepMethod.plot_polars(
         if maximum(polar_data[2]) > 10
             axs[2, 1].set_ylim([-0.5, 2])
         end
-        title = raw"$C_S" * raw"$" * " vs $angle_type [°]"
+        title = raw"$C_\mathrm{S}" * raw"$" * " vs $angle_type [°]"
         axs[2, 1].set_title(title)
         axs[2, 1].set_xlabel("$angle_type [°]")
-        axs[2, 1].set_ylabel(L"$C_S$")
+        axs[2, 1].set_ylabel(L"$C_\mathrm{S}$")
         axs[2, 1].legend()
     end
 
@@ -827,10 +827,10 @@ function VortexStepMethod.plot_polars(
             axs[2, 2].set_ylim([-0.5, 2])
             axs[2, 2].set_xlim([-0.5, 2])
         end
-        title = raw"$C_L" * raw"$" * " vs " * raw"$C_D" * raw"$"
+        title = raw"$C_\mathrm{L}" * raw"$" * " vs " * raw"$C_\mathrm{D}" * raw"$"
         axs[2, 2].set_title(title)
-        axs[2, 2].set_xlabel(L"$C_D$")
-        axs[2, 2].set_ylabel(L"$C_L$")
+        axs[2, 2].set_xlabel(L"$C_\mathrm{D}$")
+        axs[2, 2].set_ylabel(L"$C_\mathrm{L}$")
         axs[2, 2].legend()
     end
 
