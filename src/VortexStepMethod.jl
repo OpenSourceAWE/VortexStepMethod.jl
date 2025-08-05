@@ -12,7 +12,7 @@ using LaTeXStrings
 using NonlinearSolve
 import NonlinearSolve: solve!, solve
 using Interpolations
-using Interpolations: Extrapolation
+import Interpolations: Extrapolation
 using Parameters
 using Serialization
 using Timers
@@ -22,6 +22,7 @@ using Pkg
 using DifferentiationInterface
 import SciMLBase: successful_retcode
 import YAML
+using StructMapping
 using Xfoil
 
 # Export public interface
@@ -40,13 +41,12 @@ export InitialGammaDistribution, ELLIPTIC, ZEROS
 export SolverStatus, FEASIBLE, INFEASIBLE, FAILURE
 export SolverType, LOOP, NONLIN
 
-export plot_geometry, plot_distribution, plot_circulation_distribution, plot_geometry, plot_polars, save_plot, show_plot, plot_polar_data
+export plot_geometry, plot_distribution, plot_circulation_distribution, plot_polars, save_plot, show_plot, plot_polar_data
 
 # the following functions are defined in ext/VortexStepMethodExt.jl
 function plot_geometry end
 function plot_distribution end
 function plot_circulation_distribution end
-function plot_geometry end
 function plot_polars end
 function save_plot end
 function show_plot end

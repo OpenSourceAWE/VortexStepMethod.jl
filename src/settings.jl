@@ -41,56 +41,63 @@ end
 end
 
 function vs(filename)
-    res = VSMSettings()
+    # Uwe's suggested 3-line approach using StructMapping.jl (adapted)
     data = YAML.load_file(joinpath("data", filename))
+    
+    # Use StructMapping for basic structure conversion
+    # But handle special fields manually due to enum conversion needs
+    vsm_settings = VSMSettings()
+    
+    # Convert condition settings using StructMapping
+    if haskey(data, "condition")
+        vsm_settings.condition = convertdict(ConditionSettings, data["condition"])
+    end
+    
+    # Convert wing settings manually due to enum conversions
     n_panels = 0
     n_groups = 0
     
-    # Load condition settings if present
-    if haskey(data, "condition")
-        condition = data["condition"]
-        res.condition.wind_speed = condition["wind_speed"]
-        res.condition.alpha = condition["alpha"]
-        res.condition.beta = condition["beta"]
-        res.condition.yaw_rate = condition["yaw_rate"]
+    if haskey(data, "wings")
+        for wing_data in data["wings"]
+            wing = WingSettings()
+            wing.name = wing_data["name"]
+            if haskey(wing_data, "geometry_file")
+                wing.geometry_file = wing_data["geometry_file"]
+            end
+            wing.n_panels = wing_data["n_panels"]
+            wing.n_groups = wing_data["n_groups"]
+            wing.spanwise_panel_distribution = eval(Symbol(wing_data["spanwise_panel_distribution"]))
+            wing.spanwise_direction = MVec3(wing_data["spanwise_direction"])
+            wing.remove_nan = wing_data["remove_nan"]
+            
+            push!(vsm_settings.wings, wing)
+            n_panels += wing.n_panels
+            n_groups += wing.n_groups
+        end
     end
     
-    # add and update wing settings
-    for (i, wing) in pairs(data["wings"])
-        push!(res.wings, WingSettings())
-        res.wings[i].name = wing["name"]
-        if haskey(wing, "geometry_file")
-            res.wings[i].geometry_file = wing["geometry_file"]
-        end
-        res.wings[i].n_panels = wing["n_panels"]
-        n_panels += res.wings[i].n_panels
-        res.wings[i].n_groups = wing["n_groups"]
-        n_groups += res.wings[i].n_groups
-        res.wings[i].spanwise_panel_distribution = eval(Symbol(wing["spanwise_panel_distribution"]))
-        res.wings[i].spanwise_direction = MVec3(wing["spanwise_direction"])
-        res.wings[i].remove_nan = wing["remove_nan"]
+    # Convert solver settings using StructMapping base, then override special fields
+    if haskey(data, "solver_settings")
+        solver_data = data["solver_settings"]
+        
+        # Create a copy of solver_data with string fields for enums removed
+        solver_data_clean = copy(solver_data)
+        delete!(solver_data_clean, "aerodynamic_model_type")
+        delete!(solver_data_clean, "type_initial_gamma_distribution")
+        
+        # Use StructMapping for the basic fields
+        vsm_settings.solver_settings = convertdict(SolverSettings, solver_data_clean)
+        
+        # Handle enum conversions manually
+        vsm_settings.solver_settings.aerodynamic_model_type = eval(Symbol(solver_data["aerodynamic_model_type"]))
+        vsm_settings.solver_settings.type_initial_gamma_distribution = eval(Symbol(solver_data["type_initial_gamma_distribution"]))
+        
+        # Override with calculated totals
+        vsm_settings.solver_settings.n_panels = n_panels
+        vsm_settings.solver_settings.n_groups = n_groups
     end
-    # update solver settings
-    solver = data["solver_settings"]
-    res.solver_settings.n_panels = n_panels
-    res.solver_settings.n_groups = n_groups
-    res.solver_settings.aerodynamic_model_type = eval(Symbol(solver["aerodynamic_model_type"]))
-    if haskey(solver, "solver_type")
-        res.solver_settings.solver_type = solver["solver_type"]
-    end
-    res.solver_settings.density = solver["density"]
-    res.solver_settings.max_iterations = solver["max_iterations"]
-    res.solver_settings.rtol = solver["rtol"]
-    res.solver_settings.tol_reference_error = solver["tol_reference_error"]
-    res.solver_settings.relaxation_factor = solver["relaxation_factor"]
-    res.solver_settings.artificial_damping = solver["artificial_damping"]
-    res.solver_settings.k2 = solver["k2"]
-    res.solver_settings.k4 = solver["k4"]
-    res.solver_settings.type_initial_gamma_distribution = eval(Symbol(solver["type_initial_gamma_distribution"]))
-    res.solver_settings.core_radius_fraction = solver["core_radius_fraction"]
-    res.solver_settings.mu = solver["mu"]
-    res.solver_settings.calc_only_f_and_gamma = solver["calc_only_f_and_gamma"]
-    res
+    
+    return vsm_settings
 end
 
 function Base.show(io::IO, vs::VSMSettings)

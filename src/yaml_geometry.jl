@@ -12,6 +12,45 @@ Expected format: header row and columns alpha, cl, cd, cm (case-insensitive, ord
 
 Returns (aero_data, POLAR_VECTORS) or (nothing, INVISCID) if missing/invalid.
 """
+
+# Structs for YAML parsing using StructMapping.jl
+@kwdef struct WingAirfoilInfo
+    csv_file_path::String = ""
+end
+
+@kwdef struct WingAirfoilData
+    airfoil_id::Int64
+    type::String
+    info_dict::WingAirfoilInfo
+end
+
+@kwdef struct WingAirfoils
+    alpha_range::Vector{Float64}
+    reynolds::Float64
+    headers::Vector{String}
+    data::Vector{WingAirfoilData}
+end
+
+@kwdef struct WingSectionData
+    airfoil_id::Int64
+    LE_x::Float64
+    LE_y::Float64
+    LE_z::Float64
+    TE_x::Float64
+    TE_y::Float64
+    TE_z::Float64
+end
+
+@kwdef struct WingSections
+    headers::Vector{String}
+    data::Vector{WingSectionData}
+end
+
+@kwdef struct WingGeometry
+    wing_sections::WingSections
+    wing_airfoils::WingAirfoils
+end
+
 function load_polar_data(csv_file_path::String)
     if isempty(csv_file_path) || !isfile(csv_file_path)
         @warn "Polar file not found or empty path: $csv_file_path. Using INVISCID model instead."
@@ -126,17 +165,44 @@ function YamlWing(
     
     prn && @info "Reading YAML wing configuration from $geometry_file"
     
-    # Read and parse YAML file
-    yaml_data = YAML.load_file(geometry_file)
+    # Load YAML file following Uwe's suggestion
+    data = YAML.load_file(geometry_file)
     
-    # Parse airfoils and create CSV file mapping
+    # Convert YAML data to our struct format
+    # Convert wing sections
+    wing_sections_data = data["wing_sections"]
+    sections = WingSectionData[]
+    for row in wing_sections_data["data"]
+        section_dict = Dict(zip(wing_sections_data["headers"], row))
+        push!(sections, WingSectionData(
+            airfoil_id = section_dict["airfoil_id"],
+            LE_x = section_dict["LE_x"],
+            LE_y = section_dict["LE_y"], 
+            LE_z = section_dict["LE_z"],
+            TE_x = section_dict["TE_x"],
+            TE_y = section_dict["TE_y"],
+            TE_z = section_dict["TE_z"]
+        ))
+    end
+    
+    # Convert wing airfoils
+    wing_airfoils_data = data["wing_airfoils"]
+    airfoils = WingAirfoilData[]
+    for row in wing_airfoils_data["data"]
+        airfoil_dict = Dict(zip(wing_airfoils_data["headers"], row))
+        push!(airfoils, WingAirfoilData(
+            airfoil_id = airfoil_dict["airfoil_id"],
+            type = airfoil_dict["type"],
+            info_dict = WingAirfoilInfo(csv_file_path = get(airfoil_dict["info_dict"], "csv_file_path", ""))
+        ))
+    end
+    
+    # Create CSV file mapping from airfoils
     airfoil_csv_map = Dict{Int64, String}()
-    
-    for row in yaml_data["wing_airfoils"]["data"]
-        airfoil_dict = Dict(zip(yaml_data["wing_airfoils"]["headers"], row))
-        airfoil_id, airfoil_type, info_dict = airfoil_dict["airfoil_id"], airfoil_dict["type"], airfoil_dict["info_dict"]
-        
-        haskey(info_dict, "csv_file_path") && (airfoil_csv_map[airfoil_id] = info_dict["csv_file_path"])
+    for airfoil in airfoils
+        if !isempty(airfoil.info_dict.csv_file_path)
+            airfoil_csv_map[airfoil.airfoil_id] = airfoil.info_dict.csv_file_path
+        end
     end
     
     # Create Wing using the standard constructor
@@ -148,23 +214,20 @@ function YamlWing(
     )
     
     # Parse sections and populate wing
-    for row in yaml_data["wing_sections"]["data"]
-        section_dict = Dict(zip(yaml_data["wing_sections"]["headers"], row))
-        airfoil_id = section_dict["airfoil_id"]
-        
-        # Get coordinates
-        le_coord = [section_dict["LE_x"], section_dict["LE_y"], section_dict["LE_z"]]
-        te_coord = [section_dict["TE_x"], section_dict["TE_y"], section_dict["TE_z"]]
+    for section in sections
+        # Get coordinates directly from struct fields
+        le_coord = [section.LE_x, section.LE_y, section.LE_z]
+        te_coord = [section.TE_x, section.TE_y, section.TE_z]
         
         # Load polar data and create section
-        csv_file_path = get(airfoil_csv_map, airfoil_id, "")
+        csv_file_path = get(airfoil_csv_map, section.airfoil_id, "")
         if !isempty(csv_file_path) && !isabspath(csv_file_path)
             # Make relative paths relative to YAML file directory
             csv_file_path = joinpath(dirname(geometry_file), csv_file_path)
         end
         aero_data, aero_model = load_polar_data(csv_file_path)
         
-        prn && println("Section airfoil_id $airfoil_id: Using $aero_model model")
+        prn && println("Section airfoil_id $(section.airfoil_id): Using $aero_model model")
         
         add_section!(wing, le_coord, te_coord, aero_model, aero_data)
     end
