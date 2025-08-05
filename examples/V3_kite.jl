@@ -13,12 +13,6 @@ angle_of_attack_deg = settings.condition.alpha
 sideslip_deg = settings.condition.beta
 yaw_rate = settings.condition.yaw_rate
 
-# Use wing geometry path from settings if provided, otherwise use default
-yaml_geometry_path = if !isempty(settings.wings[1].yaml_path)
-    joinpath(project_dir, settings.wings[1].yaml_path)
-else
-    joinpath(project_dir, "data", "TUDELFT_V3_KITE", "wing_geometry_CAD_CFD_polars_pchip_fitted.yaml")
-end
 literature_paths = [
     joinpath(project_dir, "data", "TUDELFT_V3_KITE", "literature_results","CFD_RANS_Rey_5e5_Poland2025_alpha_sweep_beta_0_NoStruts.csv"),
     joinpath(project_dir, "data", "TUDELFT_V3_KITE", "literature_results","CFD_RANS_Rey_10e5_Poland2025_alpha_sweep_beta_0.csv"),
@@ -37,7 +31,7 @@ labels= [
 settings = vs("TUDELFT_V3_KITE/vsm_settings.yaml")
 
 # Create wing, body_aero, and solver objects using settings
-wing = YamlWing(yaml_geometry_path; 
+wing = YamlWing(settings.wings[1].yaml_path; 
     n_panels=settings.wings[1].n_panels, 
     n_groups=settings.wings[1].n_groups,
     spanwise_distribution=settings.wings[1].spanwise_panel_distribution
@@ -51,6 +45,19 @@ solver = Solver(body_aero;
     relaxation_factor=settings.solver_settings.relaxation_factor,
     core_radius_fraction=settings.solver_settings.core_radius_fraction,
 )
+# Set flight conditions
+α = deg2rad(settings.condition.alpha)
+β = deg2rad(settings.condition.beta)
+va = settings.condition.wind_speed * [
+    cos(α)*cos(β),  # X_b (forward)
+    sin(β),         # Y_b (right)
+    sin(α)*cos(β)   # Z_b (down)
+]
+set_va!(body_aero, va)
+# Run the solver
+results = VortexStepMethod.solve(solver, body_aero; log=true)
+
+
 
 # Using plotting modules, to create more comprehensive plots
 PLOT = true
@@ -76,16 +83,6 @@ PLOT && plot_polars(
 
 
 # Plotting geometry
-#--- Set apparent wind vector in body axes ---
-α = deg2rad(angle_of_attack_deg)
-β = deg2rad(sideslip_deg)
-va = wind_speed * [
-    cos(α)*cos(β),  # X_b (forward)
-    sin(β),         # Y_b (right)
-    sin(α)*cos(β)   # Z_b (down)
-]
-set_va!(body_aero, va)
-
 results = VortexStepMethod.solve(solver, body_aero; log=true)
 PLOT && plot_geometry(
     body_aero,
