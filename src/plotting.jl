@@ -645,15 +645,25 @@ function VortexStepMethod.plot_polars(
         # Update label with Reynolds number
         label_list[i] = "$(label_list[i]) Re = $(round(Int64, rey*1e-5))e5"
     end
-
     # Load literature data if provided
     if !isempty(literature_path_list)
         for path in literature_path_list
-            # Read all data first
             data = readdlm(path, ',')
-            # Skip the header row by taking data from row 2 onwards
-            data = data[2:end, :]
-            push!(polar_data_list, [data[:, 3], data[:, 1], data[:, 2], zeros(length(data[:, 1]))])
+            header = lowercase.(string.(data[1, :]))
+            # Find column indices for alpha, CL, CD, CS (case-insensitive, allow common variants)
+            alpha_idx = findfirst(x -> occursin("alpha", x), header)
+            cl_idx    = findfirst(x -> occursin("cl", x), header)
+            cd_idx    = findfirst(x -> occursin("cd", x), header)
+            cs_idx    = findfirst(x -> occursin("cs", x), header)
+            # Fallback: if CS not found, fill with zeros
+            cs_col = cs_idx === nothing ? zeros(size(data, 1)-1) : data[2:end, cs_idx]
+            # Push as [alpha, CL, CD, CS]
+            push!(polar_data_list, [
+                data[2:end, alpha_idx],
+                data[2:end, cl_idx],
+                data[2:end, cd_idx],
+                cs_col
+            ])
         end
     end
 

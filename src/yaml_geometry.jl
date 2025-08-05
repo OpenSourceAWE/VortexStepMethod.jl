@@ -211,7 +211,7 @@ function YamlWing(
     spanwise_distribution=LINEAR,
     spanwise_direction=[0.0, 1.0, 0.0],
     remove_nan=true,
-    prn=true
+    prn=false
 )
     !(n_panels % n_groups == 0) && throw(ArgumentError("Number of panels should be divisible by number of groups"))
     !isapprox(spanwise_direction, [0.0, 1.0, 0.0]) && throw(ArgumentError("Spanwise direction has to be [0.0, 1.0, 0.0], not $spanwise_direction"))
