@@ -2,14 +2,23 @@ using LinearAlgebra
 using VortexStepMethod
 using ControlPlots
 
-# --- User-specified parameters ---
-wind_speed = 3.05        # [m/s]
-angle_of_attack_deg = 5.0   # [deg]
-sideslip_deg = 0.0
-yaw_rate = 0.0             # [rad/s] (not used in static analysis)
-
 project_dir = dirname(dirname(pathof(VortexStepMethod)))  # Go up one level from src to project root
-yaml_geometry_path = joinpath(project_dir, "data", "TUDELFT_V3_KITE", "geometry_CAD_CFD_polars_pchip_fitted.yaml")
+
+# Load VSM settings from YAML configuration file
+settings = vs("TUDELFT_V3_KITE/vsm_settings.yaml")
+
+# Extract flight conditions from settings
+wind_speed = settings.condition.wind_speed
+angle_of_attack_deg = settings.condition.alpha
+sideslip_deg = settings.condition.beta
+yaw_rate = settings.condition.yaw_rate
+
+# Use wing geometry path from settings if provided, otherwise use default
+yaml_geometry_path = if !isempty(settings.wings[1].yaml_path)
+    joinpath(project_dir, settings.wings[1].yaml_path)
+else
+    joinpath(project_dir, "data", "TUDELFT_V3_KITE", "wing_geometry_CAD_CFD_polars_pchip_fitted.yaml")
+end
 literature_paths = [
     joinpath(project_dir, "data", "TUDELFT_V3_KITE", "literature_results","CFD_RANS_Rey_5e5_Poland2025_alpha_sweep_beta_0_NoStruts.csv"),
     joinpath(project_dir, "data", "TUDELFT_V3_KITE", "literature_results","CFD_RANS_Rey_10e5_Poland2025_alpha_sweep_beta_0.csv"),
@@ -19,23 +28,28 @@ literature_paths = [
 labels= [
     "Julia VSM 2D CFD PCHIP",
     "CFD RANS Re=5e5", 
-    "CFD RANS Re=10e5", 
+    "CFD RANS Re=10e5 (With Struts)", 
     "Python VSM 2D CFD PCHIP Re=5e5",
-    "Wind Tunnel Re=5e5"
+    "Wind Tunnel Re=5e5 (With Struts)"
     ]
 
-# Create wing, body_aero, and solver objects
-wing = YamlWing(yaml_geometry_path; n_panels=36, spanwise_distribution=LINEAR)
+# Load VSM settings from YAML configuration file
+settings = vs("TUDELFT_V3_KITE/vsm_settings.yaml")
+
+# Create wing, body_aero, and solver objects using settings
+wing = YamlWing(yaml_geometry_path; 
+    n_panels=settings.wings[1].n_panels, 
+    n_groups=settings.wings[1].n_groups,
+    spanwise_distribution=settings.wings[1].spanwise_panel_distribution
+)
 body_aero = BodyAerodynamics([wing])
 solver = Solver(body_aero;
-    aerodynamic_model_type=VSM,
-    is_with_artificial_damping=false,
-    solver_type=LOOP,
-    density=1.225,
-    max_iterations=5000,
-    rtol = 1e-6,
-    relaxation_factor=0.01,
-    core_radius_fraction=1e-20,
+    aerodynamic_model_type=settings.solver_settings.aerodynamic_model_type,
+    density=settings.solver_settings.density,
+    max_iterations=settings.solver_settings.max_iterations,
+    rtol=settings.solver_settings.rtol,
+    relaxation_factor=settings.solver_settings.relaxation_factor,
+    core_radius_fraction=settings.solver_settings.core_radius_fraction,
 )
 
 # Using plotting modules, to create more comprehensive plots
@@ -48,12 +62,12 @@ PLOT && plot_polars(
     [body_aero],
     labels,
     literature_path_list=literature_paths,
-    angle_range=range(1, 20, length=20),
+    angle_range=range(-5, 25, length=30),
     angle_type="angle_of_attack",
     angle_of_attack=angle_of_attack_deg,
     side_slip=sideslip_deg,
     v_a=wind_speed,
-    title="$(wing.n_panels)_distribution_$(wing.spanwise_distribution)",
+    title="$(wing.n_panels)_panels_$(wing.spanwise_distribution)_from_yaml_settings",
     data_type=".pdf",
     is_save=false,
     is_show=true,

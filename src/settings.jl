@@ -1,5 +1,13 @@
+@with_kw mutable struct ConditionSettings
+    wind_speed::Float64 = 10.0      # wind speed [m/s]
+    alpha::Float64 = 5.0            # angle of attack [°]
+    beta::Float64 = 0.0             # sideslip angle [°]
+    yaw_rate::Float64 = 0.0         # yaw rate [°/s]
+end
+
 @with_kw mutable struct WingSettings
     name::String = "main_wing"
+    yaml_path::String = ""          # path to wing geometry YAML file
     n_panels::Int64 = 40
     n_groups::Int64 = 40 
     spanwise_panel_distribution::PanelDistribution = LINEAR
@@ -11,6 +19,7 @@ end
     n_panels::Int64 = 40
     n_groups::Int64 = 40 
     aerodynamic_model_type::Model = VSM
+    solver_type::String = "LOOP"    # type of solver
     density::Float64 = 1.225                # air density  [kg/m³] 
     max_iterations::Int64 = 1500
     rtol::Float64 = 1e-5                    # relative error   [-]
@@ -26,6 +35,7 @@ end
 end
 
 @Base.kwdef mutable struct VSMSettings
+    condition::ConditionSettings = ConditionSettings()
     wings::Vector{WingSettings} = []
     solver_settings::SolverSettings = SolverSettings()
 end
@@ -35,10 +45,23 @@ function vs(filename)
     data = YAML.load_file(joinpath("data", filename))
     n_panels = 0
     n_groups = 0
+    
+    # Load condition settings if present
+    if haskey(data, "condition")
+        condition = data["condition"]
+        res.condition.wind_speed = condition["wind_speed"]
+        res.condition.alpha = condition["alpha"]
+        res.condition.beta = condition["beta"]
+        res.condition.yaw_rate = condition["yaw_rate"]
+    end
+    
     # add and update wing settings
     for (i, wing) in pairs(data["wings"])
         push!(res.wings, WingSettings())
         res.wings[i].name = wing["name"]
+        if haskey(wing, "yaml_path")
+            res.wings[i].yaml_path = wing["yaml_path"]
+        end
         res.wings[i].n_panels = wing["n_panels"]
         n_panels += res.wings[i].n_panels
         res.wings[i].n_groups = wing["n_groups"]
@@ -52,6 +75,9 @@ function vs(filename)
     res.solver_settings.n_panels = n_panels
     res.solver_settings.n_groups = n_groups
     res.solver_settings.aerodynamic_model_type = eval(Symbol(solver["aerodynamic_model_type"]))
+    if haskey(solver, "solver_type")
+        res.solver_settings.solver_type = solver["solver_type"]
+    end
     res.solver_settings.density = solver["density"]
     res.solver_settings.max_iterations = solver["max_iterations"]
     res.solver_settings.rtol = solver["rtol"]
@@ -69,6 +95,7 @@ end
 
 function Base.show(io::IO, vs::VSMSettings)
     println(io, "VSMSettings:")
+    print(io, replace(repr(vs.condition), "\n" => "\n    "))
     for (i, wing) in pairs(vs.wings)
         if i==1
             print(io, "    ")
