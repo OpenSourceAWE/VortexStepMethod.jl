@@ -1,3 +1,28 @@
+"""
+    @with_kw mutable struct AirfoilSettings
+
+Configuration settings for airfoils loaded from YAML files.
+
+This struct stores the mapping between airfoil IDs and their aerodynamic data sources,
+typically CSV files containing polar data. It preserves the original YAML configuration
+for reference and enables reconstruction of the wing geometry from YAML specifications.
+
+# Fields
+- `airfoil_id::Int64`: Unique identifier for the airfoil section
+- `type::String`: Type of aerodynamic data (e.g., "polars", "inviscid")  
+- `info_dict::Dict{String, Any}`: Additional configuration data, typically containing
+  file paths to CSV polar data files and other airfoil-specific parameters
+
+# Example
+```julia
+# Typical usage when parsing YAML wing configuration
+settings = AirfoilSettings(
+    airfoil_id = 1,
+    type = "polars", 
+    info_dict = Dict("csv_file_path" => "polars/airfoil_1.csv")
+)
+```
+"""
 @with_kw mutable struct AirfoilSettings
     airfoil_id::Int64
     type::String
@@ -21,8 +46,6 @@ A wing model created from YAML configuration files with CSV polar data.
 - `spanwise_distribution::PanelDistribution`: Panel distribution type
 - `sections::Vector{Section}`: Wing cross-sections with aerodynamic data
 - `airfoil_settings::Vector{AirfoilSettings}`: Airfoil configuration data
-- `alpha_range::Vector{Float64}`: Angle of attack range for polars
-- `reynolds::Float64`: Reynolds number for aerodynamic analysis
 
 See constructor `YamlWing(yaml_path; kwargs...)` for usage details.
 """
@@ -36,74 +59,19 @@ mutable struct YamlWing <: AbstractWing
     refined_sections::Vector{Section}
     remove_nan::Bool
     
-    # Additional fields for YamlWing
+    # Essential YAML-specific fields
     airfoil_settings::Vector{AirfoilSettings}
-    alpha_range::Vector{Float64}
-    reynolds::Float64
-    cache::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}}
 end
 
-# """
-#     load_polar_data(csv_file_path)
-
-# Load polar data from CSV file at the given path.
-# Expected CSV format: columns named alpha, cl, cd, cm (case insensitive)
-
-# Returns (aero_data, aero_model) tuple.
-# """
-# function load_polar_data(csv_file_path::String)
-#     if isempty(csv_file_path) || !isfile(csv_file_path)
-#         @warn "Polar file not found or empty path: $csv_file_path. Using INVISCID model instead."
-#         return nothing, INVISCID
-#     end
-    
-#     try
-#         # Read the file and get headers
-#         file_content = readdlm(csv_file_path, ',')
-        
-#         # Extract headers (first row) and data (remaining rows)
-#         headers = String.(file_content[1, :])
-#         data = file_content[2:end, :]
-#         # Get column names and find required columns (case insensitive)
-#         col_names_lower = lowercase.(headers)
-        
-#         # Find required columns by matching lowercase names
-#         alpha_col = findfirst(x -> x == "alpha", col_names_lower)
-#         cl_col = findfirst(x -> x == "cl", col_names_lower)
-#         cd_col = findfirst(x -> x == "cd", col_names_lower)
-#         cm_col = findfirst(x -> x == "cm", col_names_lower)
-        
-#         # Check if all required columns are found
-#         if isnothing(alpha_col) || isnothing(cl_col) || isnothing(cd_col) || isnothing(cm_col)
-#             missing_cols = String[]
-#             isnothing(alpha_col) && push!(missing_cols, "alpha")
-#             isnothing(cl_col) && push!(missing_cols, "cl")
-#             isnothing(cd_col) && push!(missing_cols, "cd")
-#             isnothing(cm_col) && push!(missing_cols, "cm")
-#             @warn "Missing columns $missing_cols in $csv_file_path. Using INVISCID model instead."
-#             return nothing, INVISCID
-#         end
-        
-#         # Extract data using column indices and convert to Float64
-#         alpha_data = Float64.(data[:, alpha_col])
-#         cl_data = Float64.(data[:, cl_col])
-#         cd_data = Float64.(data[:, cd_col])
-#         cm_data = Float64.(data[:, cm_col])
-        
-#         # Create aero_data tuple
-#         aero_data = (alpha_data, cl_data, cd_data, cm_data)
-#         return aero_data, POLAR_VECTORS
-        
-#     catch e
-#         @warn "Error reading polar file $csv_file_path: $e. Using INVISCID model instead."
-#         return nothing, INVISCID
-#     end
-# end
 """
     load_polar_data(csv_file_path)
 
 Load polar data from a CSV file using only `readlines`.
 Expected format: header row and columns alpha, cl, cd, cm (case-insensitive, order arbitrary).
+- alpha: Angle of attack in degrees
+- cl: Lift coefficient
+- cd: Drag coefficient
+- cm: Moment coefficient
 
 Returns (aero_data, POLAR_VECTORS) or (nothing, INVISCID) if missing/invalid.
 """
@@ -133,8 +101,7 @@ function load_polar_data(csv_file_path::String)
         cd    = Vector{Float64}(undef, n)
         cm    = Vector{Float64}(undef, n)
 
-        # Converting to radians
-        alpha = deg2rad.(alpha)
+
 
         # Read each data line
         for (i, line) in enumerate(lines[2:end])
@@ -144,6 +111,10 @@ function load_polar_data(csv_file_path::String)
             cd[i]    = parse(Float64, fields[col_map["cd"]])
             cm[i]    = parse(Float64, fields[col_map["cm"]])
         end
+
+        # Converting to radians
+        alpha = deg2rad.(alpha)
+
         return (alpha, cl, cd, cm), POLAR_VECTORS
     catch e
         @warn "Error reading polar file $csv_file_path: $e. Using INVISCID model instead."
@@ -207,7 +178,7 @@ wing = YamlWing(
 function YamlWing(
     yaml_path;
     n_panels=20,
-    n_groups=4,
+    n_groups=1,
     spanwise_distribution=LINEAR,
     spanwise_direction=[0.0, 1.0, 0.0],
     remove_nan=true,
@@ -260,14 +231,10 @@ function YamlWing(
         push!(refined_sections, Section(le_coord, te_coord, aero_model, aero_data))
     end
     
-    # Extract configuration
-    alpha_range = get(yaml_data["wing_airfoils"], "alpha_range", [-10.0, 31.0, 0.5])
-    reynolds = get(yaml_data["wing_airfoils"], "reynolds", 1e6)
-    
     # Create YamlWing
     YamlWing(
         n_panels, n_groups, spanwise_distribution, PanelProperties{n_panels}(), 
         MVec3(spanwise_direction), sections, refined_sections, remove_nan,
-        airfoil_settings, alpha_range, reynolds, [LazyBufferCache()]
+        airfoil_settings
     )
 end
