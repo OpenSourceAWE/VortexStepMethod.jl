@@ -11,9 +11,9 @@ wing_sections:
   # ---------------------------------------------------------------
   headers: [airfoil_id, LE_x, LE_y, LE_z, TE_x, TE_y, TE_z]
   data:
-    - [1, 0.0,  8.16/2, 3.15+4.9, 2.0,  8.16/2, 3.15+4.9]      # Right tip chord (P2)
-    - [1, 0.0, -8.16/2, 3.15+4.9, 2.0, -8.16/2, 3.15+4.9]      # Left tip chord  (P3)
-    - [1, 0.0, 0.0,     4.9,       2.0, 0.0,     4.9]          # Bridle attachment (P4/P5 merged, approx.)
+    - [1, 0.0,  4.08, 4.9, 2.0,  4.08, 4.9]      # Right tip chord (P2)
+    - [1, 0.0, -4.08, 4.9, 2.0, -4.08, 4.9]      # Left tip chord  (P3)
+    - [1, 0.0, 0.0,   8.05,  2.0, 0.0,   8.05]       # Bridle attachment (P4/P5 merged, approx.)
 
 wing_airfoils:
   # ---------------------------------------------------------------
@@ -23,7 +23,7 @@ wing_airfoils:
   reynolds: 1e6
   headers: [airfoil_id, type, info_dict]
   data:
-    - [1, polars, {csv_file_path: "cl_cd_polar.csv"}]
+    - [1, polars, {csv_file_path: "polars/V3_kite_midspan_airfoil_polar.csv"}]
 
 bridle_nodes:
   # ---------------------------------------------------------------
@@ -35,11 +35,11 @@ bridle_nodes:
   # ---------------------------------------------------------------
   headers: [id, x, y, z, type]
   data:
-    - [1, 0.0,     0.0,        0.0,       knot]  # Bridle origin
-    - [2, 0.0,     8.16/2,     3.15+4.9,  knot]  # Right tip
-    - [3, 0.0,    -8.16/2,     3.15+4.9,  knot]  # Left tip
-    - [4, 0.0,     8.16/2,     4.9,       knot]  # Bridle top right
-    - [5, 0.0,    -8.16/2,     4.9,       knot]  # Bridle top left
+    - [1, 0.0,     0.0,    0.0,   knot]  # Bridle origin
+    - [2, 0.0,     4.08,   8.05,  knot]  # Right tip
+    - [3, 0.0,    -4.08,   8.05,  knot]  # Left tip
+    - [4, 0.0,     4.08,   4.9,   knot]  # Bridle top right
+    - [5, 0.0,    -4.08,   4.9,   knot]  # Bridle top left
 
 bridle_lines:
   # ---------------------------------------------------------------
