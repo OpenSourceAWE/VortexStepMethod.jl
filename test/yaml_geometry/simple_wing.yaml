@@ -9,4 +9,4 @@ wing_airfoils:
   reynolds: 1000000
   headers: [airfoil_id, type, info_dict]
   data:
-    - [1, polars, {csv_file_path: "../standard_airfoil.csv"}]
+    - [1, polars, {csv_file_path: "standard_airfoil.csv"}]

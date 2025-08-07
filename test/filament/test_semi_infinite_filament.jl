@@ -41,26 +41,6 @@ end
     gamma = 1.0
     core_radius_fraction = 0.01
     work_vectors = ntuple(_ -> Vector{Float64}(undef, 3), 10)
-
-    # @testset "Allocation Tests" begin
-    #     filament = create_test_filament2()
-    #     control_point = [0.5, 0.5, 2.0]
-    #     induced_velocity = zeros(3)
-    #     
-    #     b = @benchmarkable velocity_3D_trailing_vortex_semiinfinite!(
-    #         $induced_velocity,
-    #         $filament,
-    #         $filament.direction,
-    #         $control_point,
-    #         $gamma,
-    #         $filament.vel_mag,
-    #         $work_vectors
-    #     )
-    #     result = run(b)
-    #     @test result.allocs == 0
-    #     @test result.memory == 0
-    # end
-
     @testset "Calculate Induced Velocity" begin
         filament = create_test_filament2()
         control_point = [0.5, 0.5, 2.0]

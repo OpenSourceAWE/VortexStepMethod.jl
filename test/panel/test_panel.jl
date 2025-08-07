@@ -1,8 +1,7 @@
-using VortexStepMethod: Panel, Section, calculate_relative_alpha_and_relative_velocity, calculate_cl, calculate_cd_cm, reinit!
+using VortexStepMethod: Panel, Section, calculate_relative_alpha_and_relative_velocity, calculate_cl, calculate_cd_cm, reinit!, INVISCID, POLAR_VECTORS, MVec3
 using Interpolations: linear_interpolation, Line
 using LinearAlgebra
 using Test
-# using BenchmarkTools
 
 function create_panel(section1::Section, section2::Section)
     # Calculate panel geometry

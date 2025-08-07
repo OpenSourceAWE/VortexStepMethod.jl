@@ -2,103 +2,71 @@
 
 This directory contains organized test data for the VortexStepMethod.jl test suite.
 
+## Running Tests
+
+You can run tests in different ways:
+```bash
+# Run all tests
+julia --project=. test/runtests.jl
+```
+```bash
+# Run specific test files
+julia --project=. test/yaml_geometry/test_yaml_geometry.jl
+julia --project=. test/body_aerodynamics/test_body_aerodynamics.jl
+julia --project=. test/solver/test_solver.jl
+# etc.
+```
+## Adding New Test Data
+
+When adding test data for a new source module:
+
+1. Create test files in the appropriate module directory under `test/`
+2. Add any required data files (YAML, CSV) in the same directory
+3. Use `test_data_path()` helper function to access files with proper paths
+4. Follow the existing naming conventions
+
+
 ## Structure
 
 The test data is organized by source module being tested, following the structure of the `src/` directory:
 
 ```
-test/data/
+test/
 ├── body_aerodynamics/          # Tests for src/body_aerodynamics.jl
-│   ├── wings/
-│   │   └── test_wing.yaml
-│   ├── polars/
-│   │   └── simple_polar.csv
-│   └── complete_settings.yaml
+│   ├── test_body_aerodynamics.jl
+│   ├── test_results.jl
+│   └── test_wing.yaml         # Wing geometry for body aero tests
 ├── yaml_geometry/              # Tests for src/yaml_geometry.jl
-│   ├── wings/
-│   │   ├── simple_wing.yaml
-│   │   └── complex_wing.yaml
-│   └── polars/
-│       ├── standard_airfoil.csv
-│       └── alternate_airfoil.csv
+│   ├── test_yaml_geometry.jl
+│   ├── simple_wing.yaml       # Basic 2-section wing
+│   ├── complex_wing.yaml      # Multi-section wing
+│   ├── standard_airfoil.csv   # Standard polar data
+│   └── alternate_airfoil.csv  # Alternative airfoil data
 ├── solver/                     # Tests for src/solver.jl
-│   ├── wings/
-│   │   └── solver_test_wing.yaml
-│   ├── polars/
-│   │   └── solver_test_polar.csv
-│   └── solver_settings.yaml
-├── settings/                   # Common settings files
-│   ├── basic_vsm.yaml
-│   └── basic_llt.yaml
-└── wing_geometry/              # Tests for src/wing_geometry.jl (future)
+│   ├── test_solver.jl
+│   ├── solver_settings.yaml   # Settings for solver tests
+│   ├── solver_test_polar.csv  # Polar data for solver tests
+│   └── solver_test_wing.yaml  # Wing for solver tests
+├── settings/                   # Tests for src/settings.jl
+│   └── test_settings.jl
+├── filament/                   # Tests for src/filament.jl
+│   ├── test_bound_filament.jl
+│   └── test_semi_infinite_filament.jl
+├── panel/                      # Tests for src/panel.jl
+│   └── test_panel.jl
+├── plotting/                   # Tests for src/plotting.jl
+│   └── test_plotting.jl
+├── polars/                     # Tests for src/polars.jl
+│   └── test_polars.jl
+├── ram_geometry/               # Tests for src/ram_geometry.jl
+│   └── test_kite_geometry.jl
+├── wake/                       # Tests for src/wake.jl
+│   └── test_wake.jl
+├── wing_geometry/              # Tests for src/wing_geometry.jl
+│   └── test_wing_geometry.jl
+├── VortexStepMethod/           # Tests for main module
+│   └── test_VortexStepMethod.jl
+├── test_data_utils.jl          # Shared utilities for test data access
+├── runtests.jl                 # Main test runner
+└── README.md                   # This file
 ```
-
-## Usage
-
-Use the helper functions in `test_data_utils.jl` to access test data:
-
-### Basic Path Access
-```julia
-include("test_data_utils.jl")
-
-# Get paths to test data files
-wing_file = test_data_path("yaml_geometry", "wings", "simple_wing.yaml")
-polar_file = test_data_path("yaml_geometry", "polars", "standard_airfoil.csv")
-settings_file = test_data_path("settings", "basic_vsm.yaml")
-```
-
-### Module-Specific Convenience Functions
-```julia
-# Get standard wing file for a module
-wing_file = get_standard_wing_file("body_aerodynamics")
-
-# Get complete settings file for a module
-settings_file = get_complete_settings_file("solver")
-
-# Create temporary settings with custom parameters
-temp_settings = create_temp_wing_settings("yaml_geometry", "simple_wing.yaml"; 
-                                         alpha=15.0, wind_speed=25.0)
-```
-
-## Design Principles
-
-1. **Module Isolation**: Each source module has its own test data directory
-2. **Consistent Structure**: All modules follow the same subdirectory pattern (wings/, polars/, etc.)
-3. **Reusable Components**: Common files (like basic settings) are shared in the `settings/` directory
-4. **Clear Naming**: File names clearly indicate their purpose and content
-5. **Self-Contained**: Each module's data is independent and can be used in isolation
-
-## Adding New Test Data
-
-When adding test data for a new source module:
-
-1. Create a new directory under `test/data/` matching the source file name
-2. Add subdirectories as needed (`wings/`, `polars/`, etc.)
-3. Update `test_data_utils.jl` to include helper functions for the new module
-4. Follow the existing naming conventions
-
-## File Descriptions
-
-### Wing Geometry Files (.yaml)
-- `simple_wing.yaml`: Basic 2-section wing for common tests
-- `complex_wing.yaml`: Multi-section wing with multiple airfoil types
-- `test_wing.yaml`: Simple wing for body aerodynamics tests
-- `solver_test_wing.yaml`: Wing optimized for solver testing
-
-### Polar Data Files (.csv)
-- `standard_airfoil.csv`: Standard 6-point polar data
-- `alternate_airfoil.csv`: Alternative airfoil with different coefficients
-- `simple_polar.csv`: Minimal 3-point polar for basic tests
-- `solver_test_polar.csv`: Polar data for solver tests
-
-### Settings Files (.yaml)
-- `basic_vsm.yaml`: Basic VSM solver settings
-- `basic_llt.yaml`: Basic LLT solver settings
-- `complete_settings.yaml`: Full wing + solver configuration
-- `solver_settings.yaml`: Solver-specific configuration
-
-This organization makes it easy to:
-- Find test data relevant to specific source modules
-- Avoid conflicts between different test requirements
-- Maintain and update test data independently
-- Add new test cases without affecting existing ones

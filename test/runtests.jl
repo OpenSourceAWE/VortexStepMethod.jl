@@ -33,10 +33,10 @@ println("Running tests...")
     include("ram_geometry/test_kite_geometry.jl")
     include("settings/test_settings.jl")
     include("solver/test_solver.jl")
-    include("solver/test_solver_results.jl")
-    include("wing_geometry/test_wing_settings.jl")
-    include("VortexStepMethod/test_vortex_step_method.jl")
+    include("VortexStepMethod/test_VortexStepMethod.jl")
     include("wake/test_wake.jl")
     include("wing_geometry/test_wing_geometry.jl")
     include("yaml_geometry/test_yaml_geometry.jl")
+    include("Aqua.jl")
+
 end
