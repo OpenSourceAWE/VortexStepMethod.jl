@@ -137,6 +137,17 @@ function Solver(body_aero; kwargs...)
     return Solver{P,G}(; kwargs...)
 end
 
+function Solver(body_aero, settings::VSMSettings)
+    Solver(body_aero;
+        aerodynamic_model_type=settings.solver_settings.aerodynamic_model_type,
+        density=settings.solver_settings.density,
+        max_iterations=settings.solver_settings.max_iterations,
+        rtol=settings.solver_settings.rtol,
+        relaxation_factor=settings.solver_settings.relaxation_factor,
+        core_radius_fraction=settings.solver_settings.core_radius_fraction,
+    )
+end
+
 """
     solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=solver.sol.gamma_distribution; 
           log=false, reference_point=zeros(MVec3), moment_frac=0.1)

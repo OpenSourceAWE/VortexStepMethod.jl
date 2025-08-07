@@ -1,0 +1,134 @@
+# Test data utilities for managing shared test configurations
+# Organized by source module being tested
+
+using YAML
+using Random: randstring
+
+"""
+    test_data_path(module_name, relative_path...)
+
+Get the absolute path to test data files relative to the test/module_name directory.
+
+# Arguments
+- `module_name`: Name of the source module being tested (e.g., "yaml_geometry", "body_aerodynamics", "solver")
+- `relative_path...`: Path components relative to the module directory
+
+# Examples
+```julia
+wing_file = test_data_path("yaml_geometry", "wings", "simple_wing.yaml")
+polar_file = test_data_path("yaml_geometry", "polars", "standard_airfoil.csv")
+body_aero_wing = test_data_path("body_aerodynamics", "wings", "test_wing.yaml")
+```
+"""
+test_data_path(module_name, relative_path...) = joinpath(@__DIR__, module_name, relative_path...)
+
+"""
+    create_temp_wing_settings(module_name, wing_file; kwargs...)
+
+Create a temporary VSMSettings file that references the given wing geometry file.
+Useful for tests that need to modify settings while using standard wing geometries.
+
+# Arguments
+- `module_name`: Name of the source module being tested
+- `wing_file`: Wing geometry file name (relative to test/data/module_name/wings/)
+- `kwargs...`: Additional settings to override defaults
+
+# Returns
+- Path to temporary settings file (caller should clean up)
+
+# Example
+```julia
+settings_file = create_temp_wing_settings("body_aerodynamics", "test_wing.yaml"; alpha=15.0, wind_speed=25.0)
+# Use settings_file...
+rm(settings_file)
+```
+"""
+function create_temp_wing_settings(module_name, wing_file; 
+                                 name="test_wing",
+                                 n_panels=4,
+                                 n_groups=2,
+                                 spanwise_panel_distribution="COSINE",
+                                 spanwise_direction=[0.0, 1.0, 0.0],
+                                 remove_nan=true,
+                                 aerodynamic_model_type="VSM",
+                                 density=1.225,
+                                 type_initial_gamma_distribution="ZEROS",
+                                 alpha=10.0,
+                                 beta=5.0,
+                                 wind_speed=15.0)
+    
+    # Use wing_file path directly if it's already an absolute path, otherwise construct it
+    wing_file_path = if isabspath(wing_file)
+        wing_file
+    else
+        test_data_path(module_name, wing_file)
+    end
+    
+    settings_content = """
+wings:
+  - name: "$name"
+    geometry_file: "$wing_file_path"
+    n_panels: $n_panels
+    n_groups: $n_groups
+    spanwise_panel_distribution: $spanwise_panel_distribution
+    spanwise_direction: $spanwise_direction
+    remove_nan: $remove_nan
+
+solver_settings:
+  aerodynamic_model_type: $aerodynamic_model_type
+  density: $density
+  type_initial_gamma_distribution: $type_initial_gamma_distribution
+
+condition:
+  alpha: $alpha
+  beta: $beta
+  wind_speed: $wind_speed
+"""
+    
+    temp_file = joinpath(tempdir(), "temp_wing_settings_$(randstring(8)).yaml")
+    write(temp_file, settings_content)
+    return temp_file
+end
+
+"""
+    get_standard_wing_file(module_name)
+
+Get the path to the standard simple wing file for a given module.
+
+# Example
+```julia
+wing_file = get_standard_wing_file("body_aerodynamics")  # Returns path to test_wing.yaml
+```
+"""
+function get_standard_wing_file(module_name)
+    if module_name == "yaml_geometry"
+        return test_data_path("yaml_geometry", "wings", "simple_wing.yaml")
+    elseif module_name == "body_aerodynamics"
+        return test_data_path("body_aerodynamics", "wings", "test_wing.yaml")
+    elseif module_name == "solver"
+        return test_data_path("solver", "wings", "solver_test_wing.yaml")
+    else
+        error("Unknown module: $module_name")
+    end
+end
+
+"""
+    get_complete_settings_file(module_name)
+
+Get the path to a complete settings file for a given module.
+
+# Example
+```julia
+settings_file = get_complete_settings_file("body_aerodynamics")
+```
+"""
+function get_complete_settings_file(module_name)
+    if module_name == "body_aerodynamics"
+        return test_data_path("body_aerodynamics", "complete_settings.yaml")
+    elseif module_name == "solver"
+        return test_data_path("solver", "solver_settings.yaml")
+    else
+        # Fall back to creating a temporary file
+        return create_temp_wing_settings(module_name, basename(get_standard_wing_file(module_name)))
+    end
+end

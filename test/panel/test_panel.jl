@@ -2,7 +2,7 @@ using VortexStepMethod: Panel, Section, calculate_relative_alpha_and_relative_ve
 using Interpolations: linear_interpolation, Line
 using LinearAlgebra
 using Test
-using BenchmarkTools
+# using BenchmarkTools
 
 function create_panel(section1::Section, section2::Section)
     # Calculate panel geometry

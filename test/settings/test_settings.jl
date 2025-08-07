@@ -8,9 +8,9 @@ using Test
 
 @testset "Test settings.jl" begin
     # Change to project root directory for the test
-    project_root = dirname(@__DIR__)
+    project_root = dirname(dirname(@__DIR__))
     cd(project_root) do
-        vss = vs("ram_air_kite/vsm_settings_dual.yaml")
+        vss = VSMSettings("data/ram_air_kite/vsm_settings_dual.yaml")
         @test vss isa VSMSettings
         @test vss.solver_settings isa SolverSettings
         @test vss.wings isa Vector{WingSettings}

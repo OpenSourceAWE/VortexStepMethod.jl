@@ -40,7 +40,7 @@ end
     solver_settings::SolverSettings = SolverSettings()
 end
 
-function vs(filename)
+function VSMSettings(filename)
     # Uwe's suggested 3-line approach using StructMapping.jl (adapted)
     data = YAML.load_file(joinpath("data", filename))
     
@@ -100,14 +100,14 @@ function vs(filename)
     return vsm_settings
 end
 
-function Base.show(io::IO, vs::VSMSettings)
+function Base.show(io::IO, vsm_settings::VSMSettings)
     println(io, "VSMSettings:")
-    print(io, replace(repr(vs.condition), "\n" => "\n    "))
-    for (i, wing) in pairs(vs.wings)
+    print(io, replace(repr(vsm_settings.condition), "\n" => "\n    "))
+    for (i, wing) in pairs(vsm_settings.wings)
         if i==1
             print(io, "    ")
         end
         print(io, replace(repr(wing), "\n" => "\n    "))
     end
-    print(io, replace(repr(vs.solver_settings), "\n" => "\n    "))
+    print(io, replace(repr(vsm_settings.solver_settings), "\n" => "\n    "))
 end

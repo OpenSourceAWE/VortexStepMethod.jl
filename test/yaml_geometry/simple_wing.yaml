@@ -1,0 +1,12 @@
+wing_sections:
+  headers: [airfoil_id, LE_x, LE_y, LE_z, TE_x, TE_y, TE_z]
+  data:
+    - [1, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0]
+    - [1, 0.0, -1.0, 0.0, 1.0, -1.0, 0.0]
+
+wing_airfoils:
+  alpha_range: [-10, 10, 1]
+  reynolds: 1000000
+  headers: [airfoil_id, type, info_dict]
+  data:
+    - [1, polars, {csv_file_path: "../standard_airfoil.csv"}]

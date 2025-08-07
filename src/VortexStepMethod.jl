@@ -26,8 +26,8 @@ using StructMapping
 using Xfoil
 
 # Export public interface
-export VSMSettings, WingSettings, SolverSettings, vs
-export Wing, Section, RamAirWing, YamlWing, reinit!
+export VSMSettings, WingSettings, SolverSettings
+export Wing, Section, RamAirWing, reinit!
 export BodyAerodynamics
 export Solver, solve, solve_base!, solve!, VSMSolution, linearize
 export calculate_results

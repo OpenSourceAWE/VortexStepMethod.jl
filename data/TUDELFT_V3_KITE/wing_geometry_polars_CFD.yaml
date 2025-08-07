@@ -83,25 +83,28 @@ wing_airfoils:
   reynolds: !!float 1e6 # Reynolds number
   headers: [airfoil_id, type, info_dict]
   data:
-    - [1, polars, {csv_file_path: "2D_polars_CFD_re5e5_pchip_fitted/1.csv"}]
-    - [2, polars, {csv_file_path: "2D_polars_CFD_re5e5_pchip_fitted/2.csv"}]
-    - [3, polars, {csv_file_path: "2D_polars_CFD_re5e5_pchip_fitted/3.csv"}]
-    - [4, polars, {csv_file_path: "2D_polars_CFD_re5e5_pchip_fitted/4.csv"}]
-    - [5, polars, {csv_file_path: "2D_polars_CFD_re5e5_pchip_fitted/5.csv"}]
-    - [6, polars, {csv_file_path: "2D_polars_CFD_re5e5_pchip_fitted/6.csv"}]
-    - [7, polars, {csv_file_path: "2D_polars_CFD_re5e5_pchip_fitted/7.csv"}]
-    - [8, polars, {csv_file_path: "2D_polars_CFD_re5e5_pchip_fitted/8.csv"}]
-    - [9, polars, {csv_file_path: "2D_polars_CFD_re5e5_pchip_fitted/9.csv"}]
-    - [10, polars, {csv_file_path: "2D_polars_CFD_re5e5_pchip_fitted/10.csv"}]
-    - [11, polars, {csv_file_path: "2D_polars_CFD_re5e5_pchip_fitted/11.csv"}]
-    - [12, polars, {csv_file_path: "2D_polars_CFD_re5e5_pchip_fitted/12.csv"}]
-    - [13, polars, {csv_file_path: "2D_polars_CFD_re5e5_pchip_fitted/13.csv"}]
-    - [14, polars, {csv_file_path: "2D_polars_CFD_re5e5_pchip_fitted/14.csv"}]
-    - [15, polars, {csv_file_path: "2D_polars_CFD_re5e5_pchip_fitted/15.csv"}]
-    - [16, polars, {csv_file_path: "2D_polars_CFD_re5e5_pchip_fitted/16.csv"}]
-    - [17, polars, {csv_file_path: "2D_polars_CFD_re5e5_pchip_fitted/17.csv"}]
-    - [18, polars, {csv_file_path: "2D_polars_CFD_re5e5_pchip_fitted/18.csv"}]
-    - [19, polars, {csv_file_path: "2D_polars_CFD_re5e5_pchip_fitted/19.csv"}]
+  # The polars were generated using 2D RANS CFD simulations at Re=5e5
+  # And fitted using PCHIP interpolation 
+  # See --> https://repository.tudelft.nl/record/uuid:865d59fc-ccff-462e-9bac-e81725f1c0c9
+    - [1, polars, {csv_file_path: "polars_CFD/1.csv"}]
+    - [2, polars, {csv_file_path: "polars_CFD/2.csv"}]
+    - [3, polars, {csv_file_path: "polars_CFD/3.csv"}]
+    - [4, polars, {csv_file_path: "polars_CFD/4.csv"}]
+    - [5, polars, {csv_file_path: "polars_CFD/5.csv"}]
+    - [6, polars, {csv_file_path: "polars_CFD/6.csv"}]
+    - [7, polars, {csv_file_path: "polars_CFD/7.csv"}]
+    - [8, polars, {csv_file_path: "polars_CFD/8.csv"}]
+    - [9, polars, {csv_file_path: "polars_CFD/9.csv"}]
+    - [10, polars, {csv_file_path: "polars_CFD/10.csv"}]
+    - [11, polars, {csv_file_path: "polars_CFD/11.csv"}]
+    - [12, polars, {csv_file_path: "polars_CFD/12.csv"}]
+    - [13, polars, {csv_file_path: "polars_CFD/13.csv"}]
+    - [14, polars, {csv_file_path: "polars_CFD/14.csv"}]
+    - [15, polars, {csv_file_path: "polars_CFD/15.csv"}]
+    - [16, polars, {csv_file_path: "polars_CFD/16.csv"}]
+    - [17, polars, {csv_file_path: "polars_CFD/17.csv"}]
+    - [18, polars, {csv_file_path: "polars_CFD/18.csv"}]
+    - [19, polars, {csv_file_path: "polars_CFD/19.csv"}]
 
 
 

@@ -6,7 +6,7 @@ using Logging
 
 if !@isdefined ram_wing
     # Use absolute paths to ensure files are found
-    data_dir = joinpath(dirname(@__DIR__), "data", "ram_air_kite")
+    data_dir = joinpath(dirname(dirname(@__DIR__)), "data", "ram_air_kite")
     body_path = joinpath(tempdir(), "ram_air_kite_body.obj")
     foil_path = joinpath(tempdir(), "ram_air_kite_foil.dat")
     

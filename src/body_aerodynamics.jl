@@ -667,3 +667,44 @@ function set_va!(body_aero::BodyAerodynamics, va_distribution::Vector{VelVector}
     return nothing
 end
 
+"""
+    set_va!(body_aero::BodyAerodynamics, settings::VSMSettings)
+
+Set velocity array from VSM settings configuration.
+
+This convenience method extracts flight conditions from VSMSettings and 
+constructs the velocity vector in the body reference frame based on:
+- Wind speed from settings.condition.wind_speed
+- Angle of attack from settings.condition.alpha (converted from degrees)
+- Sideslip angle from settings.condition.beta (converted from degrees)
+
+The velocity vector is constructed as:
+- X_b (forward): wind_speed * cos(α) * cos(β)  
+- Y_b (right): wind_speed * sin(β)
+- Z_b (down): wind_speed * sin(α) * cos(β)
+
+# Arguments
+- `body_aero::BodyAerodynamics`: The aerodynamic body to modify
+- `settings::VSMSettings`: Settings object containing flight conditions
+
+# Example
+```julia
+settings = VSMSettings("path/to/settings.yaml")
+body_aero = BodyAerodynamics([wing])
+set_va!(body_aero, settings)
+```
+"""
+function set_va!(body_aero::BodyAerodynamics, settings::VSMSettings)
+    α = deg2rad(settings.condition.alpha)
+    β = deg2rad(settings.condition.beta)
+    wind_speed = settings.condition.wind_speed
+    
+    va = wind_speed * [
+        cos(α)*cos(β),  # X_b (forward)
+        sin(β),         # Y_b (right)
+        sin(α)*cos(β)   # Z_b (down)
+    ]
+    
+    set_va!(body_aero, va)
+end
+

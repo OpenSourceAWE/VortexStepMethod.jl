@@ -4,40 +4,22 @@ using ControlPlots
 
 project_dir = dirname(dirname(pathof(VortexStepMethod)))  # Go up one level from src to project root
 
-# Load VSM settings from YAML configuration file
-settings = vs("pyramid_model/vsm_settings.yaml")
+# Load VSM vsm_settings from YAML configuration file
+vsm_settings = VSMSettings("pyramid_model/vsm_settings.yaml")
 
-# Extract flight conditions from settings
-wind_speed = settings.condition.wind_speed
-angle_of_attack_deg = settings.condition.alpha
-sideslip_deg = settings.condition.beta
-yaw_rate = settings.condition.yaw_rate
-
-# Create wing, body_aero, and solver objects using settings
-wing = YamlWing(settings.wings[1].geometry_file; 
-    n_panels=settings.wings[1].n_panels, 
-    n_groups=settings.wings[1].n_groups,
-    spanwise_distribution=settings.wings[1].spanwise_panel_distribution
-)
+# Create wing, body_aero, and solver objects using vsm_settings
+wing = Wing(vsm_settings)
 body_aero = BodyAerodynamics([wing])
-solver = Solver(body_aero;
-    aerodynamic_model_type=settings.solver_settings.aerodynamic_model_type,
-    density=settings.solver_settings.density,
-    max_iterations=settings.solver_settings.max_iterations,
-    rtol=settings.solver_settings.rtol,
-    relaxation_factor=settings.solver_settings.relaxation_factor,
-    core_radius_fraction=settings.solver_settings.core_radius_fraction,
-)
+solver = Solver(body_aero, vsm_settings)
 
-# Set flight conditions
-α = deg2rad(settings.condition.alpha)
-β = deg2rad(settings.condition.beta)
-va = settings.condition.wind_speed * [
-    cos(α)*cos(β),  # X_b (forward)
-    sin(β),         # Y_b (right)
-    sin(α)*cos(β)   # Z_b (down)
-]
-set_va!(body_aero, va)
+# Set flight conditions from settings
+set_va!(body_aero, vsm_settings)
+
+# Extract values for plotting (optional - for reference)
+wind_speed = vsm_settings.condition.wind_speed
+angle_of_attack_deg = vsm_settings.condition.alpha
+sideslip_deg = vsm_settings.condition.beta
+yaw_rate = vsm_settings.condition.yaw_rate
 
 # Run the solver
 results = VortexStepMethod.solve(solver, body_aero; log=true)

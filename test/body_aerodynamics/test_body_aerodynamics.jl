@@ -4,7 +4,8 @@ using LinearAlgebra
 using Test
 using Logging
 
-include("utils.jl")
+include("../utils.jl")
+include("../test_data_utils.jl")
 
 @testset "Induction Matrix Creation" begin
     # Setup
@@ -413,3 +414,40 @@ end
     @test length(results_NEW["cd_distribution"]) == length(body_aero.panels)
 end
 
+@testset "set_va! with VSMSettings" begin
+    # Use module-specific test data files
+    wing_file = test_data_path("body_aerodynamics", "test_wing.yaml")
+    settings_file = create_temp_wing_settings("body_aerodynamics", "test_wing.yaml"; alpha=10.0, beta=5.0, wind_speed=15.0)
+    
+    try
+        # Test set_va! with VSMSettings
+        settings = VSMSettings(settings_file)
+        wing = Wing(settings)
+        body_aero = BodyAerodynamics([wing])
+        
+        # Set velocity using convenience method
+        set_va!(body_aero, settings)
+        
+        # Calculate expected velocity vector
+        α = deg2rad(10.0)
+        β = deg2rad(5.0)
+        wind_speed = 15.0
+        expected_va = wind_speed * [
+            cos(α)*cos(β),  # X_b (forward)
+            sin(β),         # Y_b (right)
+            sin(α)*cos(β)   # Z_b (down)
+        ]
+        
+        # Verify that all panels have the correct velocity
+        for panel in body_aero.panels
+            @test panel.va ≈ expected_va atol=1e-10
+        end
+        
+        # Verify body_aero._va is set correctly
+        @test body_aero._va ≈ expected_va atol=1e-10
+        
+    finally
+        # Cleanup
+        rm(settings_file; force=true)
+    end
+end

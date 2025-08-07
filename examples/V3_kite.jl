@@ -2,17 +2,7 @@ using LinearAlgebra
 using VortexStepMethod
 using ControlPlots
 
-project_dir = dirname(dirname(pathof(VortexStepMethod)))  # Go up one level from src to project root
-
-# Load VSM settings from YAML configuration file
-settings = vs("TUDELFT_V3_KITE/vsm_settings.yaml")
-
-# Extract flight conditions from settings
-wind_speed = settings.condition.wind_speed
-angle_of_attack_deg = settings.condition.alpha
-sideslip_deg = settings.condition.beta
-yaw_rate = settings.condition.yaw_rate
-
+project_dir = dirname(dirname(pathof(VortexStepMethod)))  # Go up one level from src to project root#
 literature_paths = [
     joinpath(project_dir, "data", "TUDELFT_V3_KITE", "literature_results","CFD_RANS_Rey_5e5_Poland2025_alpha_sweep_beta_0_NoStruts.csv"),
     joinpath(project_dir, "data", "TUDELFT_V3_KITE", "literature_results","CFD_RANS_Rey_10e5_Poland2025_alpha_sweep_beta_0.csv"),
@@ -28,36 +18,21 @@ labels= [
     ]
 
 # Load VSM settings from YAML configuration file
-settings = vs("TUDELFT_V3_KITE/vsm_settings.yaml")
+settings = VSMSettings("TUDELFT_V3_KITE/vsm_settings.yaml")
 
 # Create wing, body_aero, and solver objects using settings
-wing = YamlWing(settings.wings[1].geometry_file; 
-    n_panels=settings.wings[1].n_panels, 
-    n_groups=settings.wings[1].n_groups,
-    spanwise_distribution=settings.wings[1].spanwise_panel_distribution
-)
+wing = Wing(settings)
 body_aero = BodyAerodynamics([wing])
-solver = Solver(body_aero;
-    aerodynamic_model_type=settings.solver_settings.aerodynamic_model_type,
-    density=settings.solver_settings.density,
-    max_iterations=settings.solver_settings.max_iterations,
-    rtol=settings.solver_settings.rtol,
-    relaxation_factor=settings.solver_settings.relaxation_factor,
-    core_radius_fraction=settings.solver_settings.core_radius_fraction,
-)
-# Set flight conditions
-α = deg2rad(settings.condition.alpha)
-β = deg2rad(settings.condition.beta)
-va = settings.condition.wind_speed * [
-    cos(α)*cos(β),  # X_b (forward)
-    sin(β),         # Y_b (right)
-    sin(α)*cos(β)   # Z_b (down)
-]
-set_va!(body_aero, va)
-# Run the solver
-results = VortexStepMethod.solve(solver, body_aero; log=true)
+solver = Solver(body_aero, settings)
 
+# Set flight conditions from settings
+set_va!(body_aero, settings)
 
+# Extract values for plotting (optional - for reference)
+wind_speed = settings.condition.wind_speed
+angle_of_attack_deg = settings.condition.alpha
+sideslip_deg = settings.condition.beta
+yaw_rate = settings.condition.yaw_rate
 
 # Using plotting modules, to create more comprehensive plots
 PLOT = true

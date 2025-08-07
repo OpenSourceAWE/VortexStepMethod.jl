@@ -1,8 +1,10 @@
 using VortexStepMethod
-using VortexStepMethod: load_polar_data, YamlWing
+using VortexStepMethod: load_polar_data
 using LinearAlgebra
 using Test
 using YAML
+
+include("../test_data_utils.jl")
 
 @testset "YAML Geometry Tests" begin
     # Setup temporary files for testing
@@ -22,12 +24,12 @@ using YAML
         @testset "Valid CSV File" begin
             # Create a valid CSV file with polar data
             csv_content = """alpha,cl,cd,cm
--10.0,0.1,0.02,-0.01
--5.0,0.5,0.015,-0.005
-0.0,1.0,0.01,0.0
-5.0,1.5,0.015,0.005
-10.0,1.8,0.025,0.01
-15.0,1.6,0.05,0.015"""
+                  -10.0,0.1,0.02,-0.01
+                  -5.0,0.5,0.015,-0.005
+                  0.0,1.0,0.01,0.0
+                  5.0,1.5,0.015,0.005
+                  10.0,1.8,0.025,0.01
+                  15.0,1.6,0.05,0.015"""
             write(test_csv_path, csv_content)
             
             aero_data, aero_model = load_polar_data(test_csv_path)
@@ -49,9 +51,9 @@ using YAML
         @testset "Different Column Order" begin
             # Test with different column ordering
             csv_content = """cm,alpha,cd,cl
--0.01,-10.0,0.02,0.1
--0.005,-5.0,0.015,0.5
-0.0,0.0,0.01,1.0"""
+                    -0.01,-10.0,0.02,0.1
+                    -0.005,-5.0,0.015,0.5
+                    0.0,0.0,0.01,1.0"""
             write(test_csv_path, csv_content)
             
             aero_data, aero_model = load_polar_data(test_csv_path)
@@ -66,8 +68,8 @@ using YAML
         @testset "Case Insensitive Headers" begin
             # Test with mixed case headers
             csv_content = """ALPHA,CL,CD,CM
-0.0,1.0,0.01,0.0
-5.0,1.5,0.015,0.005"""
+              0.0,1.0,0.01,0.0
+              5.0,1.5,0.015,0.005"""
             write(test_csv_path, csv_content)
             
             aero_data, aero_model = load_polar_data(test_csv_path)
@@ -94,8 +96,8 @@ using YAML
         @testset "Invalid CSV Format" begin
             # Missing required columns
             csv_content = """alpha,cl
-0.0,1.0
-5.0,1.5"""
+            0.0,1.0
+            5.0,1.5"""
             write(test_csv_path, csv_content)
             
             aero_data, aero_model = load_polar_data(test_csv_path)
@@ -116,8 +118,8 @@ using YAML
         @testset "Malformed Data" begin
             # Invalid numeric data
             csv_content = """alpha,cl,cd,cm
-invalid,1.0,0.01,0.0
-5.0,1.5,0.015,0.005"""
+            invalid,1.0,0.01,0.0
+            5.0,1.5,0.015,0.005"""
             write(test_csv_path, csv_content)
             
             aero_data, aero_model = load_polar_data(test_csv_path)
@@ -127,7 +129,7 @@ invalid,1.0,0.01,0.0
         end
     end
     
-    @testset "YamlWing Constructor Tests" begin
+    @testset "Wing Constructor Tests" begin
         # Create polar data directory and files
         mkpath(test_polar_dir)
         
@@ -135,40 +137,44 @@ invalid,1.0,0.01,0.0
         polar1_path = joinpath(test_polar_dir, "1.csv")
         polar2_path = joinpath(test_polar_dir, "2.csv")
         
-        polar1_content = """alpha,cl,cd,cm
--10.0,0.1,0.02,-0.01
-0.0,1.0,0.01,0.0
-10.0,1.8,0.025,0.01"""
+        polar1_content = """
+        alpha,cl,cd,cm
+        -10.0,0.1,0.02,-0.01
+        0.0,1.0,0.01,0.0
+        10.0,1.8,0.025,0.01
+        """
         
-        polar2_content = """alpha,cl,cd,cm
--10.0,0.15,0.025,-0.015
-0.0,1.1,0.012,0.001
-10.0,1.9,0.03,0.012"""
-        
+        polar2_content = """
+        alpha,cl,cd,cm
+        -10.0,0.15,0.025,-0.015
+        0.0,1.1,0.012,0.001
+        10.0,1.9,0.03,0.012
+        """
+
         write(polar1_path, polar1_content)
         write(polar2_path, polar2_content)
         
         @testset "Valid YAML Wing Construction" begin
             # Create a valid YAML wing configuration
             yaml_content = """
-wing_sections:
-  headers: [airfoil_id, LE_x, LE_y, LE_z, TE_x, TE_y, TE_z]
-  data:
-    - [1, 0.0, 4.08, 8.05, 2.0, 4.08, 8.05]
-    - [2, 0.0, -4.08, 8.05, 2.0, -4.08, 8.05]
-    - [1, 0.0, 0.0, 4.9, 2.0, 0.0, 4.9]
+            wing_sections:
+              headers: [airfoil_id, LE_x, LE_y, LE_z, TE_x, TE_y, TE_z]
+              data:
+                - [1, 0.0, 4.08, 8.05, 2.0, 4.08, 8.05]
+                - [2, 0.0, -4.08, 8.05, 2.0, -4.08, 8.05]
+                - [1, 0.0, 0.0, 4.9, 2.0, 0.0, 4.9]
 
-wing_airfoils:
-  alpha_range: [-10, 10, 1]
-  reynolds: 1000000
-  headers: [airfoil_id, type, info_dict]
-  data:
-    - [1, polars, {csv_file_path: "polars/1.csv"}]
-    - [2, polars, {csv_file_path: "polars/2.csv"}]
-"""
+            wing_airfoils:
+              alpha_range: [-10, 10, 1]
+              reynolds: 1000000
+              headers: [airfoil_id, type, info_dict]
+              data:
+                - [1, polars, {csv_file_path: "polars/1.csv"}]
+                - [2, polars, {csv_file_path: "polars/2.csv"}]
+            """
             write(test_yaml_path, yaml_content)
             
-            wing = YamlWing(test_yaml_path; n_panels=4, n_groups=2)
+            wing = Wing(test_yaml_path; n_panels=4, n_groups=2)
             
             @test wing isa Wing
             @test wing.n_panels == 4
@@ -177,13 +183,15 @@ wing_airfoils:
             @test wing.spanwise_direction ≈ [0.0, 1.0, 0.0]
             @test length(wing.sections) == 3
             
-            # Test section coordinates
+            # Test section coordinates (sections are sorted by spanwise position)
+            # Original order: [1, 0.0, 4.08, 8.05], [2, 0.0, -4.08, 8.05], [1, 0.0, 0.0, 4.9]
+            # Sorted by y-coordinate: y=4.08, y=0.0, y=-4.08
             @test wing.sections[1].LE_point ≈ [0.0, 4.08, 8.05]
             @test wing.sections[1].TE_point ≈ [2.0, 4.08, 8.05]
-            @test wing.sections[2].LE_point ≈ [0.0, -4.08, 8.05]
-            @test wing.sections[2].TE_point ≈ [2.0, -4.08, 8.05]
-            @test wing.sections[3].LE_point ≈ [0.0, 0.0, 4.9]
-            @test wing.sections[3].TE_point ≈ [2.0, 0.0, 4.9]
+            @test wing.sections[2].LE_point ≈ [0.0, 0.0, 4.9]
+            @test wing.sections[2].TE_point ≈ [2.0, 0.0, 4.9]
+            @test wing.sections[3].LE_point ≈ [0.0, -4.08, 8.05]
+            @test wing.sections[3].TE_point ≈ [2.0, -4.08, 8.05]
             
             # Test that sections have polar data
             @test wing.sections[1].aero_model == POLAR_VECTORS
@@ -198,23 +206,23 @@ wing_airfoils:
         
         @testset "Wing Constructor Parameters" begin
             yaml_content = """
-wing_sections:
-  headers: [airfoil_id, LE_x, LE_y, LE_z, TE_x, TE_y, TE_z]
-  data:
-    - [1, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0]
-    - [1, 0.0, -1.0, 0.0, 1.0, -1.0, 0.0]
+            wing_sections:
+              headers: [airfoil_id, LE_x, LE_y, LE_z, TE_x, TE_y, TE_z]
+              data:
+                - [1, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0]
+                - [1, 0.0, -1.0, 0.0, 1.0, -1.0, 0.0]
 
-wing_airfoils:
-  alpha_range: [-10, 10, 1]
-  reynolds: 1000000
-  headers: [airfoil_id, type, info_dict]
-  data:
-    - [1, polars, {csv_file_path: "polars/1.csv"}]
-"""
+            wing_airfoils:
+              alpha_range: [-10, 10, 1]
+              reynolds: 1000000
+              headers: [airfoil_id, type, info_dict]
+              data:
+                - [1, polars, {csv_file_path: "polars/1.csv"}]
+            """
             write(test_yaml_path, yaml_content)
             
             # Test custom parameters
-            wing = YamlWing(
+            wing = Wing(
                 test_yaml_path;
                 n_panels=8,
                 n_groups=4,
@@ -235,6 +243,7 @@ wing_sections:
   headers: [airfoil_id, LE_x, LE_y, LE_z, TE_x, TE_y, TE_z]
   data:
     - [1, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0]
+    - [1, 0.0, -1.0, 0.0, 1.0, -1.0, 0.0]
 
 wing_airfoils:
   alpha_range: [-10, 10, 1]
@@ -245,7 +254,7 @@ wing_airfoils:
 """
             write(test_yaml_path, yaml_content)
             
-            wing = YamlWing(test_yaml_path; n_panels=2)
+            wing = Wing(test_yaml_path; n_panels=2)
             
             # Should fall back to INVISCID model
             @test wing.sections[1].aero_model == INVISCID
@@ -259,6 +268,7 @@ wing_sections:
   headers: [airfoil_id, LE_x, LE_y, LE_z, TE_x, TE_y, TE_z]
   data:
     - [1, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0]
+    - [1, 0.0, -1.0, 0.0, 1.0, -1.0, 0.0]
 
 wing_airfoils:
   alpha_range: [-10, 10, 1]
@@ -269,7 +279,7 @@ wing_airfoils:
 """
             write(test_yaml_path, yaml_content)
             
-            wing = YamlWing(test_yaml_path; n_panels=2)
+            wing = Wing(test_yaml_path; n_panels=2)
             
             # Should fall back to INVISCID model
             @test wing.sections[1].aero_model == INVISCID
@@ -281,6 +291,7 @@ wing_sections:
   headers: [airfoil_id, LE_x, LE_y, LE_z, TE_x, TE_y, TE_z]
   data:
     - [1, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0]
+    - [1, 0.0, -1.0, 0.0, 1.0, -1.0, 0.0]
 
 wing_airfoils:
   alpha_range: [-10, 10, 1]
@@ -292,10 +303,10 @@ wing_airfoils:
             write(test_yaml_path, yaml_content)
             
             # Test invalid n_panels/n_groups combination
-            @test_throws ArgumentError YamlWing(test_yaml_path; n_panels=5, n_groups=2)
+            @test_throws ArgumentError Wing(test_yaml_path; n_panels=5, n_groups=2)
             
             # Test invalid spanwise direction
-            @test_throws ArgumentError YamlWing(test_yaml_path; spanwise_direction=[1.0, 0.0, 0.0])
+            @test_throws ArgumentError Wing(test_yaml_path; spanwise_direction=[1.0, 0.0, 0.0])
         end
         
         @testset "Relative Path Resolution" begin
@@ -312,25 +323,28 @@ wing_airfoils:
             # Create YAML in subdirectory with relative path
             subdir_yaml_path = joinpath(subdir, "wing.yaml")
             yaml_content = """
-wing_sections:
-  headers: [airfoil_id, LE_x, LE_y, LE_z, TE_x, TE_y, TE_z]
-  data:
-    - [1, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0]
+            wing_sections:
+              headers: [airfoil_id, LE_x, LE_y, LE_z, TE_x, TE_y, TE_z]
+              data:
+                - [1, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0]
+                - [1, 0.0, -1.0, 0.0, 1.0, -1.0, 0.0]
 
-wing_airfoils:
-  alpha_range: [-10, 10, 1]
-  reynolds: 1000000
-  headers: [airfoil_id, type, info_dict]
-  data:
-    - [1, polars, {csv_file_path: "polars/airfoil.csv"}]
-"""
+            wing_airfoils:
+              alpha_range: [-10, 10, 1]
+              reynolds: 1000000
+              headers: [airfoil_id, type, info_dict]
+              data:
+                - [1, polars, {csv_file_path: "polars/airfoil.csv"}]
+            """
             write(subdir_yaml_path, yaml_content)
             
-            wing = YamlWing(subdir_yaml_path; n_panels=2)
+            wing = Wing(subdir_yaml_path; n_panels=2)
             
             # Should successfully load polar data with relative path
             @test wing.sections[1].aero_model == POLAR_VECTORS
             @test wing.sections[1].aero_data isa Tuple
+            @test wing.sections[2].aero_model == POLAR_VECTORS
+            @test wing.sections[2].aero_data isa Tuple
             
             # Cleanup
             rm(subdir; recursive=true)
@@ -339,28 +353,28 @@ wing_airfoils:
         @testset "Complex Wing Geometry" begin
             # Test with more complex wing geometry
             yaml_content = """
-wing_sections:
-  headers: [airfoil_id, LE_x, LE_y, LE_z, TE_x, TE_y, TE_z]
-  data:
-    - [1, 0.0, 5.0, 0.0, 2.0, 5.0, 0.5]
-    - [2, 0.2, 3.0, 0.2, 1.8, 3.0, 0.3]
-    - [2, 0.4, 1.0, 0.4, 1.6, 1.0, 0.1]
-    - [1, 0.5, 0.0, 0.5, 1.5, 0.0, 0.0]
-    - [2, 0.4, -1.0, 0.4, 1.6, -1.0, 0.1]
-    - [2, 0.2, -3.0, 0.2, 1.8, -3.0, 0.3]
-    - [1, 0.0, -5.0, 0.0, 2.0, -5.0, 0.5]
+            wing_sections:
+              headers: [airfoil_id, LE_x, LE_y, LE_z, TE_x, TE_y, TE_z]
+              data:
+                - [1, 0.0, 5.0, 0.0, 2.0, 5.0, 0.5]
+                - [2, 0.2, 3.0, 0.2, 1.8, 3.0, 0.3]
+                - [2, 0.4, 1.0, 0.4, 1.6, 1.0, 0.1]
+                - [1, 0.5, 0.0, 0.5, 1.5, 0.0, 0.0]
+                - [2, 0.4, -1.0, 0.4, 1.6, -1.0, 0.1]
+                - [2, 0.2, -3.0, 0.2, 1.8, -3.0, 0.3]
+                - [1, 0.0, -5.0, 0.0, 2.0, -5.0, 0.5]
 
-wing_airfoils:
-  alpha_range: [-10, 10, 1]
-  reynolds: 1000000
-  headers: [airfoil_id, type, info_dict]
-  data:
-    - [1, polars, {csv_file_path: "polars/1.csv"}]
-    - [2, polars, {csv_file_path: "polars/2.csv"}]
-"""
+            wing_airfoils:
+              alpha_range: [-10, 10, 1]
+              reynolds: 1000000
+              headers: [airfoil_id, type, info_dict]
+              data:
+                - [1, polars, {csv_file_path: "polars/1.csv"}]
+                - [2, polars, {csv_file_path: "polars/2.csv"}]
+            """
             write(test_yaml_path, yaml_content)
             
-            wing = YamlWing(test_yaml_path; n_panels=12, n_groups=3)
+            wing = Wing(test_yaml_path; n_panels=12, n_groups=3)
             
             @test wing.n_panels == 12
             @test wing.n_groups == 3
@@ -374,6 +388,80 @@ wing_airfoils:
             @test wing.sections[1].LE_point[2] == 5.0   # First section at y=5
             @test wing.sections[4].LE_point[2] == 0.0   # Middle section at y=0
             @test wing.sections[7].LE_point[2] == -5.0  # Last section at y=-5
+        end
+        
+        @testset "VSMSettings Constructor" begin
+            # Test Wing constructor that takes VSMSettings
+            yaml_content = """
+            wing_sections:
+              headers: [airfoil_id, LE_x, LE_y, LE_z, TE_x, TE_y, TE_z]
+              data:
+                - [1, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0]
+                - [1, 0.0, -1.0, 0.0, 1.0, -1.0, 0.0]
+
+            wing_airfoils:
+              alpha_range: [-10, 10, 1]
+              reynolds: 1000000
+              headers: [airfoil_id, type, info_dict]
+              data:
+                - [1, polars, {csv_file_path: "polars/1.csv"}]
+            """
+            write(test_yaml_path, yaml_content)
+            
+            # Create VSMSettings with wing configuration
+            settings = VSMSettings()
+            settings.wings = [WingSettings(
+                geometry_file=test_yaml_path,
+                n_panels=6,
+                n_groups=3,
+                spanwise_panel_distribution=COSINE
+            )]
+            
+            # Test Wing constructor with VSMSettings
+            wing = Wing(settings)
+            
+            @test wing isa Wing
+            @test wing.n_panels == 6
+            @test wing.n_groups == 3
+            @test wing.spanwise_distribution == COSINE
+            @test length(wing.sections) == 2
+            @test wing.sections[1].aero_model == POLAR_VECTORS
+            @test wing.sections[2].aero_model == POLAR_VECTORS
+        end
+        
+        @testset "Shared Test Data Usage" begin
+            # Demonstrate using module-specific test data files
+            simple_wing_file = test_data_path("yaml_geometry", "wings", "simple_wing.yaml")
+            @test isfile(simple_wing_file)
+            
+            # Test basic Wing construction with shared data
+            wing = Wing(simple_wing_file; n_panels=4, n_groups=2)
+            @test wing isa Wing
+            @test wing.n_panels == 4
+            @test wing.n_groups == 2
+            @test length(wing.sections) == 2
+            
+            # Test complex wing construction
+            complex_wing_file = test_data_path("yaml_geometry", "wings", "complex_wing.yaml")
+            @test isfile(complex_wing_file)
+            
+            complex_wing = Wing(complex_wing_file; n_panels=12, n_groups=3)
+            @test complex_wing isa Wing
+            @test complex_wing.n_panels == 12
+            @test complex_wing.n_groups == 3
+            @test length(complex_wing.sections) == 7
+            
+            # Verify polar data is loaded from shared files
+            @test complex_wing.sections[1].aero_model == POLAR_VECTORS
+            @test complex_wing.sections[1].aero_data isa Tuple
+            
+            # Test with module-specific convenience function
+            standard_wing_file = get_standard_wing_file("yaml_geometry")
+            @test isfile(standard_wing_file)
+            
+            standard_wing = Wing(standard_wing_file; n_panels=2, n_groups=1)
+            @test standard_wing isa Wing
+            @test length(standard_wing.sections) == 2
         end
     end
     

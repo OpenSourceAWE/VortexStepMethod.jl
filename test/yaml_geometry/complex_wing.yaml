@@ -1,0 +1,18 @@
+wing_sections:
+  headers: [airfoil_id, LE_x, LE_y, LE_z, TE_x, TE_y, TE_z]
+  data:
+    - [1, 0.0, 5.0, 0.0, 2.0, 5.0, 0.5]
+    - [2, 0.2, 3.0, 0.2, 1.8, 3.0, 0.3]
+    - [2, 0.4, 1.0, 0.4, 1.6, 1.0, 0.1]
+    - [1, 0.5, 0.0, 0.5, 1.5, 0.0, 0.0]
+    - [2, 0.4, -1.0, 0.4, 1.6, -1.0, 0.1]
+    - [2, 0.2, -3.0, 0.2, 1.8, -3.0, 0.3]
+    - [1, 0.0, -5.0, 0.0, 2.0, -5.0, 0.5]
+
+wing_airfoils:
+  alpha_range: [-10, 10, 1]
+  reynolds: 1000000
+  headers: [airfoil_id, type, info_dict]
+  data:
+    - [1, polars, {csv_file_path: "../standard_airfoil.csv"}]
+    - [2, polars, {csv_file_path: "../alternate_airfoil.csv"}]

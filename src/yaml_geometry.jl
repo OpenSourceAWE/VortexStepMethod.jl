@@ -100,7 +100,7 @@ end
 
 
 """
-    YamlWing(geometry_file; kwargs...)
+    Wing(geometry_file; kwargs...)
 
 Create a wing model from YAML configuration file with CSV polar data.
 
@@ -144,15 +144,15 @@ wing_airfoils:
 # Example
 ```julia
 # Create a YAML-based wing from configuration file
-wing = YamlWing(
+wing = Wing(
     "path/to/wing_config.yaml";
     n_panels=40,
     n_groups=4
 )
 ```
 """
-function YamlWing(
-    geometry_file;
+function Wing(
+    geometry_file::String;
     n_panels=20,
     n_groups=1,
     spanwise_distribution=LINEAR,
@@ -236,4 +236,34 @@ function YamlWing(
     reinit!(wing)
     
     return wing
+end
+
+"""
+    Wing(settings::VSMSettings)
+
+Create a wing model from VSM settings configuration.
+
+This constructor is a convenience wrapper that extracts wing configuration 
+from VSMSettings and creates a Wing using the YAML geometry file path and 
+parameters specified in the settings.
+
+# Arguments
+- `settings`: VSMSettings object containing wing configuration
+
+# Returns
+A fully initialized `Wing` instance ready for aerodynamic simulation.
+
+# Example
+```julia
+# Load settings and create wing in one step
+settings = VSMSettings("path/to/vsm_settings.yaml")
+wing = Wing(settings)
+```
+"""
+function Wing(settings::VSMSettings)
+    Wing(settings.wings[1].geometry_file; 
+        n_panels=settings.wings[1].n_panels, 
+        n_groups=settings.wings[1].n_groups,
+        spanwise_distribution=settings.wings[1].spanwise_panel_distribution
+    )
 end

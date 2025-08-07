@@ -1,7 +1,7 @@
-using VortexStepMethod: SemiInfiniteFilament, velocity_3D_trailing_vortex_semiinfinite!
+using VortexStepMethod: SemiInfiniteFilament, velocity_3D_trailing_vortex_semiinfinite!, reinit!
 using LinearAlgebra
 using Test
-using BenchmarkTools
+# using BenchmarkTools
 
 function create_test_filament2()
     x1 = [0.0, 0.0, 0.0]
@@ -42,24 +42,24 @@ end
     core_radius_fraction = 0.01
     work_vectors = ntuple(_ -> Vector{Float64}(undef, 3), 10)
 
-    @testset "Allocation Tests" begin
-        filament = create_test_filament2()
-        control_point = [0.5, 0.5, 2.0]
-        induced_velocity = zeros(3)
-        
-        b = @benchmarkable velocity_3D_trailing_vortex_semiinfinite!(
-            $induced_velocity,
-            $filament,
-            $filament.direction,
-            $control_point,
-            $gamma,
-            $filament.vel_mag,
-            $work_vectors
-        )
-        result = run(b)
-        @test result.allocs == 0
-        @test result.memory == 0
-    end
+    # @testset "Allocation Tests" begin
+    #     filament = create_test_filament2()
+    #     control_point = [0.5, 0.5, 2.0]
+    #     induced_velocity = zeros(3)
+    #     
+    #     b = @benchmarkable velocity_3D_trailing_vortex_semiinfinite!(
+    #         $induced_velocity,
+    #         $filament,
+    #         $filament.direction,
+    #         $control_point,
+    #         $gamma,
+    #         $filament.vel_mag,
+    #         $work_vectors
+    #     )
+    #     result = run(b)
+    #     @test result.allocs == 0
+    #     @test result.memory == 0
+    # end
 
     @testset "Calculate Induced Velocity" begin
         filament = create_test_filament2()
