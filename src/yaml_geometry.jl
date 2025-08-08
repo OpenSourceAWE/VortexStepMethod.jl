@@ -148,27 +148,38 @@ function load_polar_data(csv_file_path::String)
 end
 
 """
-    # Module: yaml_geometry.jl
+    Wing(geometry_file::String; n_panels=20, n_groups=1, spanwise_distribution=LINEAR,
+         spanwise_direction=[0.0, 1.0, 0.0], remove_nan=true, prn=false)
 
-    This module provides functionality for parsing and handling geometry data from YAML files.
-    It is intended for use within the VortexStepMethod.jl package to facilitate the import,
-    validation, and manipulation of geometric configurations specified in YAML format.
+Constructs a `Wing` object from a YAML geometry file.
 
-    Functions and types in this module allow users to:
-    - Load geometry definitions from YAML files.
-    - Convert YAML data into Julia-native structures.
-    - Validate the integrity and consistency of imported geometry data.
+# Arguments
+- `geometry_file::String`: Path to a YAML file describing the wing geometry and airfoils.
 
-    Typical use cases include reading wing or blade geometry for aerodynamic simulations.
+# Keyword Arguments
+- `n_panels::Int`: Number of spanwise panels (default: 20).
+- `n_groups::Int`: Number of grouped sections across the span (default: 1). Must divide `n_panels`.
+- `spanwise_distribution`: Spanwise panel distribution type (default: `LINEAR`).
+- `spanwise_direction::Vector{Float64}`: Direction of the spanwise axis (default: `[0.0, 1.0, 0.0]`). Must be the global Y axis.
+- `remove_nan::Bool`: Remove NaN values from the geometry (default: `true`).
+- `prn::Bool`: Print informational messages during construction (default: `false`).
 
-    # Example
-    ```julia
-    geometry = load_yaml_geometry("geometry.yaml")
-    ```
+# Returns
+- `Wing`: A fully constructed and initialized `Wing` object.
 
-    # See Also
-    - [`YAML`](@ref)
-    - [`VortexStepMethod`](@ref)
+# Description
+This function reads a YAML configuration file to define the geometry and airfoil data for a multi-section wing.
+Each section and corresponding airfoil is parsed from the YAML file, polar data is loaded, and each section is added
+to the wing. The geometry logic currently assumes the spanwise direction is `[0.0, 1.0, 0.0]` (aligned with the global Y axis).
+
+# Errors
+- Throws an `ArgumentError` if `n_panels` is not divisible by `n_groups`.
+- Throws an `ArgumentError` if `spanwise_direction` is not `[0.0, 1.0, 0.0]`.
+
+# Example
+```julia
+wing = Wing("wing_geometry.yaml"; n_panels=30, n_groups=2, prn=true)
+```
 """
 function Wing(
     geometry_file::String;
