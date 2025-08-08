@@ -65,50 +65,49 @@ settings_file = create_temp_wing_settings("body_aerodynamics", "test_wing.yaml";
 rm(settings_file)
 ```
 """
-function create_temp_wing_settings(module_name, wing_file; 
-                                 name="test_wing",
-                                 n_panels=4,
-                                 n_groups=2,
-                                 spanwise_panel_distribution="COSINE",
-                                 spanwise_direction=[0.0, 1.0, 0.0],
-                                 remove_nan=true,
-                                 aerodynamic_model_type="VSM",
-                                 density=1.225,
-                                 type_initial_gamma_distribution="ZEROS",
-                                 alpha=10.0,
-                                 beta=5.0,
-                                 wind_speed=15.0)
-    
-    # Use wing_file path directly if it's already an absolute path, otherwise construct it
-    wing_file_path = if isabspath(wing_file)
-        wing_file
-    else
-        test_data_path(module_name, wing_file)
-    end
-    
-    settings_content = """
-wings:
-  - name: "$name"
-    geometry_file: "$wing_file_path"
-    n_panels: $n_panels
-    n_groups: $n_groups
-    spanwise_panel_distribution: $spanwise_panel_distribution
-    spanwise_direction: $spanwise_direction
-    remove_nan: $remove_nan
+function create_temp_wing_settings(module_name, wing_file;
+    name="test_wing",
+    n_panels=4,
+    n_groups=2,
+    spanwise_panel_distribution="COSINE",
+    spanwise_direction=[0.0, 1.0, 0.0],
+    remove_nan=true,
+    aerodynamic_model_type="VSM",
+    density=1.225,
+    type_initial_gamma_distribution="ZEROS",
+    alpha=10.0,
+    beta=5.0,
+    wind_speed=15.0,
+)
+    wing_file_path = isabspath(wing_file) ? wing_file : test_data_path(module_name, wing_file)
+    wing_file_path = replace(normpath(wing_file_path), '\\' => '/')
 
-solver_settings:
-  aerodynamic_model_type: $aerodynamic_model_type
-  density: $density
-  type_initial_gamma_distribution: $type_initial_gamma_distribution
+    doc = Dict(
+        "wings" => [Dict(
+            "name" => name,
+            "geometry_file" => wing_file_path,
+            "n_panels" => n_panels,
+            "n_groups" => n_groups,
+            "spanwise_panel_distribution" => spanwise_panel_distribution,
+            "spanwise_direction" => spanwise_direction,
+            "remove_nan" => remove_nan,
+        )],
+        "solver_settings" => Dict(
+            "aerodynamic_model_type" => aerodynamic_model_type,
+            "density" => density,
+            "type_initial_gamma_distribution" => type_initial_gamma_distribution,
+        ),
+        "condition" => Dict(
+            "alpha" => alpha,
+            "beta" => beta,
+            "wind_speed" => wind_speed,
+        ),
+    )
 
-condition:
-  alpha: $alpha
-  beta: $beta
-  wind_speed: $wind_speed
-"""
-    
     temp_file = joinpath(tempdir(), "temp_wing_settings_$(randstring(8)).yaml")
-    write(temp_file, settings_content)
+    open(temp_file, "w") do io
+        YAML.write(io, doc)
+    end
     return temp_file
 end
 
@@ -154,3 +153,4 @@ function get_complete_settings_file(module_name)
         return create_temp_wing_settings(module_name, basename(get_standard_wing_file(module_name)))
     end
 end
+
