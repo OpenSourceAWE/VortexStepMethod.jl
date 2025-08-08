@@ -9,7 +9,11 @@ DEFORM = false
 LINEARIZE = false
 
 # Create wing geometry
-wing = RamAirWing("data/ram_air_kite/ram_air_kite_body.obj", "data/ram_air_kite/ram_air_kite_foil.dat"; prn=PRN)
+wing = RamAirWing(
+    joinpath("data", "ram_air_kite", "ram_air_kite_body.obj"), 
+    joinpath("data", "ram_air_kite", "ram_air_kite_foil.dat"); 
+    prn=PRN
+)
 body_aero = BodyAerodynamics([wing];)
 println("First init")
 @time VortexStepMethod.reinit!(body_aero)

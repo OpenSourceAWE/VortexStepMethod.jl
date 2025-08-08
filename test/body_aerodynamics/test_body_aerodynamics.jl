@@ -5,7 +5,6 @@ using Test
 using Logging
 
 include("../utils.jl")
-include("../test_data_utils.jl")
 
 @testset "Induction Matrix Creation" begin
     # Setup

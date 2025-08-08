@@ -40,6 +40,7 @@ export PanelDistribution, LINEAR, COSINE, COSINE_VAN_GARREL, SPLIT_PROVIDED, UNC
 export InitialGammaDistribution, ELLIPTIC, ZEROS
 export SolverStatus, FEASIBLE, INFEASIBLE, FAILURE
 export SolverType, LOOP, NONLIN
+export load_polar_data
 
 export plot_geometry, plot_distribution, plot_circulation_distribution, plot_polars, save_plot, show_plot, plot_polar_data
 
@@ -202,7 +203,9 @@ const AeroData = Union{
     }
 
 function menu()
-   Main.include("examples/menu.jl")
+   # Load the examples menu using a portable path
+   ex = joinpath(dirname(pathof(@__MODULE__)), "..", "examples", "menu.jl")
+   Base.include(Main, normpath(ex))
 end
 
 """
@@ -213,11 +216,11 @@ Copy all example scripts to the folder "examples"
 """
 function copy_examples()
     PATH = "examples"
-    if ! isdir(PATH) 
+    if ! isdir(PATH)
         mkdir(PATH)
     end
     src_path = joinpath(dirname(pathof(@__MODULE__)), "..", PATH)
-    copy_files("examples", readdir(src_path))
+    copy_files(PATH, readdir(src_path))
 end
 
 function install_examples(add_packages=true)

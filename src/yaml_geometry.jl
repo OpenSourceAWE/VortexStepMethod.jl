@@ -1,37 +1,9 @@
-
-
-"""
-    load_polar_data(csv_file_path)
-
-Load polar data from a CSV file using only `readlines`.
-Expected format: header row and columns alpha, cl, cd, cm (case-insensitive, order arbitrary).
-- alpha: Angle of attack in degrees
-- cl: Lift coefficient
-- cd: Drag coefficient
-- cm: Moment coefficient
-
-Returns (aero_data, POLAR_VECTORS) or (nothing, INVISCID) if missing/invalid.
-"""
-
-# Structs for YAML parsing using StructMapping.jl
-@kwdef struct WingAirfoilInfo
-    csv_file_path::String = ""
+# Data structures for YAML wing geometry
+@with_kw struct WingAirfoilInfo
+    csv_file_path::String
 end
 
-@kwdef struct WingAirfoilData
-    airfoil_id::Int64
-    type::String
-    info_dict::WingAirfoilInfo
-end
-
-@kwdef struct WingAirfoils
-    alpha_range::Vector{Float64}
-    reynolds::Float64
-    headers::Vector{String}
-    data::Vector{WingAirfoilData}
-end
-
-@kwdef struct WingSectionData
+@with_kw struct WingSectionData
     airfoil_id::Int64
     LE_x::Float64
     LE_y::Float64
@@ -41,105 +13,33 @@ end
     TE_z::Float64
 end
 
-@kwdef struct WingSections
-    headers::Vector{String}
-    data::Vector{WingSectionData}
+@with_kw struct WingAirfoilData
+    airfoil_id::Int64
+    type::String
+    info_dict::WingAirfoilInfo
 end
-
-@kwdef struct WingGeometry
-    wing_sections::WingSections
-    wing_airfoils::WingAirfoils
-end
-
-function load_polar_data(csv_file_path::String)
-    if isempty(csv_file_path) || !isfile(csv_file_path)
-        @warn "Polar file not found or empty path: $csv_file_path. Using INVISCID model instead."
-        return nothing, INVISCID
-    end
-    try
-        lines = readlines(csv_file_path)
-        isempty(lines) && throw(ArgumentError("File is empty"))
-        header = lowercase.(split(strip(lines[1]), ','))
-
-        # Create a mapping from column name to index (1-based for Julia arrays)
-        col_map = Dict(name => i for (i, name) in enumerate(header))
-        required = ["alpha", "cl", "cd", "cm"]
-        missing = filter(x -> !haskey(col_map, x), required)
-        if !isempty(missing)
-            @warn "Missing columns $missing in $csv_file_path. Using INVISCID model instead."
-            return nothing, INVISCID
-        end
-
-        # Preallocate arrays
-        n = length(lines) - 1
-        alpha = Vector{Float64}(undef, n)
-        cl    = Vector{Float64}(undef, n)
-        cd    = Vector{Float64}(undef, n)
-        cm    = Vector{Float64}(undef, n)
-
-
-
-        # Read each data line
-        for (i, line) in enumerate(lines[2:end])
-            fields = split(strip(line), ',')
-            alpha[i] = parse(Float64, fields[col_map["alpha"]])
-            cl[i]    = parse(Float64, fields[col_map["cl"]])
-            cd[i]    = parse(Float64, fields[col_map["cd"]])
-            cm[i]    = parse(Float64, fields[col_map["cm"]])
-        end
-
-        # Converting to radians
-        alpha = deg2rad.(alpha)
-
-        return (alpha, cl, cd, cm), POLAR_VECTORS
-    catch e
-        @warn "Error reading polar file $csv_file_path: $e. Using INVISCID model instead."
-        return nothing, INVISCID
-    end
-end
-
 
 """
-    Wing(geometry_file; kwargs...)
+    load_polar_data(csv_file_path::String) -> Tuple{Union{Nothing, Tuple{Vector{Float64}, Vector{Float64}, Vector{Float64}, Vector{Float64}}}, Symbol}
 
-Create a wing model from YAML configuration file with CSV polar data.
+Load aerodynamic polar data from a CSV file using only `readlines`.
 
-This constructor builds a complete aerodynamic model by:
-1. Loading wing geometry and airfoil configurations from YAML file
-2. Loading aerodynamic polars from CSV files specified in the YAML
-3. Creating wing sections with appropriate aerodynamic models
-4. Setting up panel distribution and geometric properties
+The CSV file must contain a header row with columns for `alpha`, `cl`, `cd`, and `cm` (case-insensitive, order arbitrary). Each subsequent row should contain numeric values for these columns.
 
 # Arguments
-- `geometry_file`: Path to YAML file containing wing geometry and airfoil specifications
-
-# Keyword Arguments
-- `n_panels=20`: Number of aerodynamic panels across wingspan
-- `n_groups=4`: Number of control groups
-- `spanwise_distribution=LINEAR`: Panel distribution type
-- `spanwise_direction=[0.0, 1.0, 0.0]`: Spanwise direction vector
-- `remove_nan=true`: Interpolate NaN values in aerodynamic data
-- `prn=true`: Print info messages during construction
+- `csv_file_path::String`: Path to the CSV file containing polar data.
 
 # Returns
-A fully initialized `Wing` instance ready for aerodynamic simulation.
+- A tuple `(aero_data, model_type)` where:
+    - `aero_data`: A tuple of vectors `(alpha, cl, cd, cm)` if the file is valid, or `nothing` if invalid or missing.
+        - `alpha`: Angle of attack in degrees (converted to radians internally).
+        - `cl`: Lift coefficient.
+        - `cd`: Drag coefficient.
+        - `cm`: Moment coefficient.
+    - `model_type`: `POLAR_VECTORS` if data is loaded, or `INVISCID` if not.
 
-# Example YAML format
-```yaml
-wing_sections:
-  headers: [airfoil_id, LE_x, LE_y, LE_z, TE_x, TE_y, TE_z]
-  data:
-    - [1, 0.0, 10.0, 0.0, 1.0, 10.0, 0.0]
-    - [2, 0.0, -10.0, 0.0, 1.0, -10.0, 0.0]
-
-wing_airfoils:
-  alpha_range: [-10, 31, 0.5]
-  reynolds: 1e6
-  headers: [airfoil_id, type, info_dict]
-  data:
-    - [1, polars, {csv_file_path: "polars/1.csv"}]
-    - [2, polars, {csv_file_path: "polars/2.csv"}]
-```
+# Behavior
+- If the file is missing, empty, or invalid, a warning is issued and `(nothing, INVISCID)` is returned.
 
 # Example
 ```julia
@@ -150,6 +50,125 @@ wing = Wing(
     n_groups=4
 )
 ```
+"""
+function load_polar_data(csv_file_path::String)
+    # Return early for empty path
+    if isempty(csv_file_path)
+        @warn "Empty CSV file path provided"
+        return (nothing, INVISCID)
+    end
+
+    # Check if file exists
+    if !isfile(csv_file_path)
+        @warn "CSV file not found: $csv_file_path"
+        return (nothing, INVISCID)
+    end
+
+    try
+        # Read all lines from the file
+        lines = readlines(csv_file_path)
+        
+        # Check if file is empty
+        if isempty(lines)
+            @warn "CSV file is empty: $csv_file_path"
+            return (nothing, INVISCID)
+        end
+
+        # Parse header - make case insensitive
+        header_line = strip(lines[1])
+        if isempty(header_line)
+            @warn "CSV file has empty header: $csv_file_path"
+            return (nothing, INVISCID)
+        end
+
+        # Split header and normalize to lowercase
+        header_parts = map(strip ∘ lowercase, split(header_line, ','))
+        
+        # Find column indices for required columns
+        required_cols = ["alpha", "cl", "cd", "cm"]
+        col_indices = Dict{String, Int}()
+        
+        for (i, col_name) in enumerate(header_parts)
+            if col_name in required_cols
+                col_indices[col_name] = i
+            end
+        end
+        
+        # Check if all required columns are present
+        missing_cols = setdiff(required_cols, keys(col_indices))
+        if !isempty(missing_cols)
+            @warn "CSV file missing required columns: $(join(missing_cols, ", ")) in $csv_file_path"
+            return (nothing, INVISCID)
+        end
+
+        # Parse data rows
+        data_vectors = Dict{String, Vector{Float64}}()
+        for col in required_cols
+            data_vectors[col] = Float64[]
+        end
+
+        for line_num in 2:length(lines)
+            line = strip(lines[line_num])
+            isempty(line) && continue  # Skip empty lines
+            
+            parts = split(line, ',')
+            if length(parts) != length(header_parts)
+                @warn "Line $line_num has incorrect number of columns in $csv_file_path"
+                return (nothing, INVISCID)  # Strict: any malformed data rejects the file
+            end
+
+            try
+                for col in required_cols
+                    value_str = strip(parts[col_indices[col]])
+                    value = parse(Float64, value_str)
+                    push!(data_vectors[col], value)
+                end
+            catch e
+                @warn "Failed to parse line $line_num in $csv_file_path: $e"
+                return (nothing, INVISCID)  # Strict: any parsing error rejects the file
+            end
+        end
+
+        # Check if we got any valid data
+        if isempty(data_vectors["alpha"])
+            @warn "No valid data rows found in $csv_file_path"
+            return (nothing, INVISCID)
+        end
+
+        # Convert alpha from degrees to radians and create tuple
+        alpha_rad = deg2rad.(data_vectors["alpha"])
+        aero_data = (alpha_rad, data_vectors["cl"], data_vectors["cd"], data_vectors["cm"])
+        
+        return (aero_data, POLAR_VECTORS)
+
+    catch e
+        @warn "Error reading CSV file $csv_file_path: $e"
+        return (nothing, INVISCID)
+    end
+end
+
+"""
+    # Module: yaml_geometry.jl
+
+    This module provides functionality for parsing and handling geometry data from YAML files.
+    It is intended for use within the VortexStepMethod.jl package to facilitate the import,
+    validation, and manipulation of geometric configurations specified in YAML format.
+
+    Functions and types in this module allow users to:
+    - Load geometry definitions from YAML files.
+    - Convert YAML data into Julia-native structures.
+    - Validate the integrity and consistency of imported geometry data.
+
+    Typical use cases include reading wing or blade geometry for aerodynamic simulations.
+
+    # Example
+    ```julia
+    geometry = load_yaml_geometry("geometry.yaml")
+    ```
+
+    # See Also
+    - [`YAML`](@ref)
+    - [`VortexStepMethod`](@ref)
 """
 function Wing(
     geometry_file::String;
@@ -167,7 +186,7 @@ function Wing(
     
     # Load YAML file following Uwe's suggestion
     data = YAML.load_file(geometry_file)
-    
+
     # Convert YAML data to our struct format
     # Convert wing sections
     wing_sections_data = data["wing_sections"]
@@ -222,7 +241,9 @@ function Wing(
         # Load polar data and create section
         csv_file_path = get(airfoil_csv_map, section.airfoil_id, "")
         if !isempty(csv_file_path) && !isabspath(csv_file_path)
-            # Make relative paths relative to YAML file directory
+            # NOTE: The spanwise direction is currently restricted to [0.0, 1.0, 0.0] (the global Y axis).
+            # This is required because downstream geometry and panel generation code assumes the spanwise axis is aligned with Y.
+            # If you need to support arbitrary spanwise directions, refactor the geometry logic accordingly.
             csv_file_path = joinpath(dirname(geometry_file), csv_file_path)
         end
         aero_data, aero_model = load_polar_data(csv_file_path)

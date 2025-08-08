@@ -2,8 +2,6 @@ using VortexStepMethod
 using LinearAlgebra
 using Test
 
-include("../test_data_utils.jl")
-
 @testset "Solver Constructor Tests" begin
     @testset "Solver Constructor with VSMSettings" begin
         # Use module-specific test data files

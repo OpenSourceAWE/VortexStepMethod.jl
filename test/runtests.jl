@@ -1,23 +1,18 @@
 using Test, VortexStepMethod
 
-# TODO fix allocation tests
-# and: https://github.com/JuliaArrays/FixedSizeArrays.jl/blob/d17373edf4144a672cd80a062bf24d017f01e42f/.github/workflows/UnitTests.yml
+# Make paths robust (avoid cd(".."))
+cd(@__DIR__)  # ensure we're in test/ no matter how tests are launched
+include("TestSupport.jl")
+using .TestSupport
 
-# Check if the compilation options allow maximum performance.
+println("Running tests...")
+
+# keep your env check as-is...
 const build_is_production_build_env_name = "BUILD_IS_PRODUCTION_BUILD"
 const build_is_production_build = let v = get(ENV, build_is_production_build_env_name, "true")
-    if v ∉ ("false", "true")
-        error("unknown value for environment variable $build_is_production_build_env_name: $v")
-    end
-    if v == "true"
-        true
-    else
-        false
-    end
+    v == "true" || v == "false" || error("unknown value for $build_is_production_build_env_name: $v")
+    v == "true"
 end::Bool
-
-cd("..")
-println("Running tests...")
 
 @testset verbose = true "Testing VortexStepMethod..." begin
     if build_is_production_build
@@ -38,5 +33,6 @@ println("Running tests...")
     include("wing_geometry/test_wing_geometry.jl")
     include("yaml_geometry/test_yaml_geometry.jl")
     include("Aqua.jl")
-
 end
+
+nothing

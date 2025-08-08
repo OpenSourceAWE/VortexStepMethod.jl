@@ -6,8 +6,6 @@ end
 using VortexStepMethod
 using Test
 
-include("../test_data_utils.jl")
-
 @testset "Test settings.jl" begin
     # Use the absolute path to test data to avoid path concatenation issues
     project_root = dirname(dirname(@__DIR__))

@@ -3,6 +3,28 @@
 
 using YAML
 using Random: randstring
+using Logging
+
+"""
+    suppress_warnings(f)
+
+Temporarily suppress all warnings while executing function `f`.
+Useful for tests that expect and want to ignore certain warnings.
+
+# Example
+```julia
+result = suppress_warnings(() -> some_function_that_warns())
+```
+"""
+function suppress_warnings(f)
+    old_logger = global_logger()
+    try
+        global_logger(NullLogger())
+        return f()
+    finally
+        global_logger(old_logger)
+    end
+end
 
 """
     test_data_path(module_name, relative_path...)

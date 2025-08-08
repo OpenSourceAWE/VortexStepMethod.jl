@@ -4,9 +4,19 @@ using LinearAlgebra
 using Test
 using Logging
 
-if !@isdefined ram_wing
-    # Use absolute paths to ensure files are found
+# Helper to find the data directory for test files
+function _find_ram_data_dir()
     data_dir = joinpath(dirname(dirname(@__DIR__)), "data", "ram_air_kite")
+    if isdir(data_dir)
+        return data_dir
+    else
+        # Fallback for case where test is run from different working directory
+        return joinpath(@__DIR__, "..", "..", "data", "ram_air_kite")
+    end
+end
+
+if !@isdefined ram_wing_results
+    data_dir = _find_ram_data_dir()
     body_path = joinpath(tempdir(), "ram_air_kite_body.obj")
     foil_path = joinpath(tempdir(), "ram_air_kite_foil.dat")
     
