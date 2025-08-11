@@ -56,7 +56,11 @@ println("Rectangular wing, solve:")
 @time solve(vsm_solver, body_aero, nothing)
 
 # Create wing geometry
-wing = RamAirWing("data/ram_air_kite_body.obj", "data/ram_air_kite_foil.dat"; prn=false)
+wing = RamAirWing(
+    joinpath("data", "ram_air_kite", "ram_air_kite_body.obj"), 
+    joinpath("data", "ram_air_kite", "ram_air_kite_foil.dat"); 
+    prn=false
+)
 body_aero = BodyAerodynamics([wing])
 
 # Create solvers

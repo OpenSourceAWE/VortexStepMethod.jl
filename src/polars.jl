@@ -363,4 +363,3 @@ function read_aero_matrix(filepath::String)
     
     return matrix, alpha_values, delta_values
 end
-

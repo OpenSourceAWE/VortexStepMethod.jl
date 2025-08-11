@@ -1,3 +1,35 @@
+## VortexStepMethod v2.0.1 2025-08-08
+### Changed
+#### 1. Core New Functionality: YAML Geometry Support
+- **New file:** `yaml_geometry.jl` (290+ lines) — Complete YAML-based wing geometry loading.
+- **New structs:** `WingSectionData`, `WingAirfoilData`, `WingAirfoilInfo` (with `@with_kw` macros).
+- **New function:** `load_polar_data()` — Robust CSV polar data loading with error handling.
+- **New constructors:**
+    - `Wing(geometry_file::String)` — Create wings from YAML files.
+    - `Wing(settings::VSMSettings)` — Create wings from settings.
+
+#### 2. Enhanced Settings System
+- Renamed `vs()` to `VSMSettings()` constructor.
+- Added convenience `Solver(body_aero, settings)` constructor.
+- Improved settings structure and validation.
+
+#### 3. Comprehensive Test Infrastructure
+- **Split tests:** Reorganized from monolithic files to modular structure (`test/module_name/test_*.jl`).
+- **New test module:** `yaml_geometry` with `test_load_polar_data.jl` and `test_wing_constructor.jl`.
+- **Test utilities:** `test_data_utils.jl` with shared helper functions.
+- **Test data:** Extensive YAML and CSV test files in `data`.
+
+#### 4. Data and Examples
+- **New data sets:** Complete `TUDELFT_V3_KITE` with CFD polars and literature results.
+- **Enhanced examples:** Updated examples to use YAML geometry (e.g., `pyramid_model.jl`, `V3_kite.jl`).
+- **Real-world configs:** Production-ready YAML geometry files for various kite configurations.
+
+#### 5. Core Module Improvements
+- **Path handling:** Robust file path resolution for relative/absolute paths.
+- **Error handling:** Comprehensive validation and graceful fallback to INVISCID mode.
+- **Memory management:** Improved file I/O and cleanup in tests.
+- **Documentation:** Added comprehensive docstrings and examples.
+
 ## VortexStepMethod v2.0.0 2025-07-11
 ### Changed
 - bump Interpolations to 0.16

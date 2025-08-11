@@ -18,7 +18,7 @@ Main structure for calculating aerodynamic properties of bodies. Use the constru
 - `work_vectors`::NTuple{10, MVec3} = ntuple(_ -> zeros(MVec3), 10)
 - `AIC::Array{Float64, 3}` = zeros(3, P, P)
 - `projected_area::Float64` = 1.0: The area projected onto the xy-plane of the kite body reference frame [m²]
-- `y::MVector{P, Float64}` = zeros(MVector{P, Float64})
+- `y::MVector{P, Float64}` = MVector{P,Float64}(zeros(P))
 - `cache::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}}` = [LazyBufferCache() for _ in 1:5]
 """
 @with_kw mutable struct BodyAerodynamics{P}
@@ -26,16 +26,16 @@ Main structure for calculating aerodynamic properties of bodies. Use the constru
     wings::Union{Vector{Wing}, Vector{RamAirWing}}
     _va::MVec3 = zeros(MVec3)
     omega::MVec3 = zeros(MVec3)
-    gamma_distribution::MVector{P, Float64} = zeros(MVector{P, Float64})
-    alpha_uncorrected::MVector{P, Float64} = zeros(MVector{P, Float64})
-    alpha_corrected::MVector{P, Float64} = zeros(MVector{P, Float64})
-    stall_angle_list::MVector{P, Float64} = zeros(MVector{P, Float64})
-    alpha_array::MVector{P, Float64} = zeros(MVector{P, Float64})
-    v_a_array::MVector{P, Float64} = zeros(MVector{P, Float64})
+    gamma_distribution::MVector{P, Float64} = zeros(P)
+    alpha_uncorrected::MVector{P, Float64} = zeros(P)
+    alpha_corrected::MVector{P, Float64} = zeros(P)
+    stall_angle_list::MVector{P, Float64} = zeros(P)
+    alpha_array::MVector{P, Float64} = zeros(P)
+    v_a_array::MVector{P, Float64} = zeros(P)
     work_vectors::NTuple{10,MVec3} = ntuple(_ -> zeros(MVec3), 10)
     AIC::Array{Float64, 3} = zeros(3, P, P)
     projected_area::Float64 = one(Float64)
-    y::MVector{P, Float64} = zeros(MVector{P, Float64})
+    y::MVector{P, Float64} = zeros(P)
     cache::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}} = [LazyBufferCache() for _ in 1:5]
 end
 
@@ -665,5 +665,46 @@ function set_va!(body_aero::BodyAerodynamics, va_distribution::Vector{VelVector}
     frozen_wake!(body_aero, va_distribution)
     body_aero._va = va
     return nothing
+end
+
+"""
+    set_va!(body_aero::BodyAerodynamics, settings::VSMSettings)
+
+Set velocity array from VSM settings configuration.
+
+This convenience method extracts flight conditions from VSMSettings and 
+constructs the velocity vector in the body reference frame based on:
+- Wind speed from settings.condition.wind_speed
+- Angle of attack from settings.condition.alpha (converted from degrees)
+- Sideslip angle from settings.condition.beta (converted from degrees)
+
+The velocity vector is constructed as:
+- X_b (forward): wind_speed * cos(α) * cos(β)  
+- Y_b (right): wind_speed * sin(β)
+- Z_b (down): wind_speed * sin(α) * cos(β)
+
+# Arguments
+- `body_aero::BodyAerodynamics`: The aerodynamic body to modify
+- `settings::VSMSettings`: Settings object containing flight conditions
+
+# Example
+```julia
+settings = VSMSettings("path/to/settings.yaml")
+body_aero = BodyAerodynamics([wing])
+set_va!(body_aero, settings)
+```
+"""
+function set_va!(body_aero::BodyAerodynamics, settings::VSMSettings)
+    α = deg2rad(settings.condition.alpha)
+    β = deg2rad(settings.condition.beta)
+    wind_speed = settings.condition.wind_speed
+    
+    va = wind_speed * [
+        cos(α)*cos(β),  # X_b (forward)
+        sin(β),         # Y_b (right)
+        sin(α)*cos(β)   # Z_b (down)
+    ]
+    
+    set_va!(body_aero, va)
 end
 

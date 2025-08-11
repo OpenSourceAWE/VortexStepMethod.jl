@@ -1,0 +1,68 @@
+# Kite system geometry for simulation based on provided Julia code
+
+wing_sections:
+  # ---------------------------------------------------------------
+  # headers: [airfoil_id, LE_x, LE_y, LE_z, TE_x, TE_y, TE_z]
+  # airfoil_id: 1 (since only one polar/interpolator is used)
+  # The kite is represented by 4 chordwise points at y = width/2, -width/2 and at y = 0.
+  # Chord positions from get_kite_points(s): P2 (center right), P3 (center left)
+  # Bridle/other points are omitted for simplicity.
+  # Units: meters
+  # ---------------------------------------------------------------
+  headers: [airfoil_id, LE_x, LE_y, LE_z, TE_x, TE_y, TE_z]
+  data:
+    - [1, 0.0,  4.08, 4.9, 2.0,  4.08, 4.9]      # Right tip chord (P2)
+    - [1, 0.0, -4.08, 4.9, 2.0, -4.08, 4.9]      # Left tip chord  (P3)
+    - [1, 0.0, 0.0,   8.05,  2.0, 0.0,   8.05]       # Bridle attachment (P4/P5 merged, approx.)
+
+wing_airfoils:
+  # ---------------------------------------------------------------
+  # Only one polar, which is interpolated in code; you may later link to a CSV file.
+  # ---------------------------------------------------------------
+  alpha_range: [-180, 180, 1] # deg
+  reynolds: 1e6
+  headers: [airfoil_id, type, info_dict]
+  data:
+    - [1, polars, {csv_file_path: "polars/V3_kite_midspan_airfoil_polar.csv"}]
+
+bridle_nodes:
+  # ---------------------------------------------------------------
+  # Use the points from get_kite_points(s), assuming:
+  # - P1: Bridle point
+  # - P2: right tip
+  # - P3: left tip
+  # - P4/P5: at width/2, -width/2, z = bridle height
+  # ---------------------------------------------------------------
+  headers: [id, x, y, z, type]
+  data:
+    - [1, 0.0,     0.0,    0.0,   knot]  # Bridle origin
+    - [2, 0.0,     4.08,   8.05,  knot]  # Right tip
+    - [3, 0.0,    -4.08,   8.05,  knot]  # Left tip
+    - [4, 0.0,     4.08,   4.9,   knot]  # Bridle top right
+    - [5, 0.0,    -4.08,   4.9,   knot]  # Bridle top left
+
+bridle_lines:
+  # ---------------------------------------------------------------
+  headers: [name, rest_length, diameter, material, density]
+  data:
+    - [bridle_main, 33.4, 0.0025, dyneema, 970]
+
+bridle_connections:
+  # ---------------------------------------------------------------
+  # Very simplified; you can expand as needed. Connects bridle origin to tips and bridle tops.
+  # headers: [name, ci, cj, ck]
+  data:
+    - [bridle_main, 1, 2, 0]
+    - [bridle_main, 1, 3, 0]
+    - [bridle_main, 1, 4, 0]
+    - [bridle_main, 1, 5, 0]
+    - [bridle_top, 4, 2, 0]
+    - [bridle_top, 5, 3, 0]
+
+tether:
+  # Tether from bridle origin (node 1) extending for l_tether meters
+  length: 50.0
+  diameter: 0.004
+  material: dyneema
+  density: 724.0
+  segments: 14

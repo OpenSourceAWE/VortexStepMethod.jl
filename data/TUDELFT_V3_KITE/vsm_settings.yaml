@@ -1,0 +1,80 @@
+# =============================================================================
+# VSM Settings Configuration File
+# =============================================================================
+#
+# This YAML file configures the Vortex Step Method (VSM) aerodynamic solver
+# for wing analysis. All simulation parameters are centralized here.
+#
+# FILE STRUCTURE:
+# ├── condition:          Flight conditions (wind speed, angles, rates)
+# ├── wings:              Wing geometry and discretization settings
+# └── solver_settings:    Numerical solver parameters and convergence criteria
+#
+# AERODYNAMIC MODELS:
+#   VSM: Vortex Step Method - Full 3D potential flow with wake modeling
+#   LLT: Lifting Line Theory - Classical 1D approach for high aspect ratios
+#
+# PANEL DISTRIBUTIONS:
+#   LINEAR:             Uniform panel spacing along wingspan
+#   COSINE:             Cosine clustering (more panels at tips)
+#   COSINE_VAN_GARREL:  Van Garrel's modified cosine distribution
+#   SPLIT_PROVIDED:     Use predefined section splits from geometry
+#   UNCHANGED:          Preserve original geometry discretization
+#
+# INITIAL CIRCULATION DISTRIBUTIONS:
+#   ELLIPTIC:           Elliptical distribution (optimal for efficiency)
+#   ZEROS:              Start with zero circulation (cold start)
+#
+# SOLVER TYPES:
+#   LOOP:               Iterative fixed-point solver
+#   NEWTON:             Newton-Raphson nonlinear solver
+#
+# USAGE NOTES:
+# - n_panels should be divisible by n_groups for proper load balancing
+# - Higher n_panels improves accuracy but increases computation time
+# - Lower relaxation_factor if convergence issues occur
+
+# Define the flight state for the aerodynamic analysis
+condition:
+    wind_speed: 10.0     # [m/s] Free stream velocity magnitude
+    alpha: 5.0           # [°] Angle of attack (pitch angle relative to flow)
+    beta: 0.0            # [°] Sideslip angle (yaw angle relative to flow)
+    yaw_rate: 0.0        # [°/s] Yaw rate (for dynamic analysis, 0 for static)
+
+# Define wing geometry files and discretization parameters
+wings:
+    - name: V3_Kite                    # Wing identifier for output labeling
+      geometry_file: data/TUDELFT_V3_KITE/wing_geometry_polars_CFD.yaml
+      n_panels: 36                     # Total number of panels along wingspan
+      n_groups: 1                      # Number of panel groups (must divide n_panels)
+      spanwise_panel_distribution: LINEAR    # Panel spacing algorithm
+      spanwise_direction: [0.0, 1.0, 0.0]   # Unit vector defining wingspan direction
+      remove_nan: true                 # Remove NaN values from polar data
+
+# Numerical method settings and convergence criteria
+solver_settings:
+    # --- Core Aerodynamic Model ---
+    aerodynamic_model_type: VSM      # VSM=3D vortex method, LLT=lifting line theory
+    solver_type: LOOP                # LOOP=fixed-point iteration, NEWTON=Newton-Raphson
+    
+    # --- Physical Properties ---
+    density: 1.225                   # [kg/m³] Air density (ISA sea level)
+    mu: 1.81e-5                      # [N·s/m²] Dynamic viscosity (ISA sea level)
+    
+    # --- Convergence Control ---
+    max_iterations: 5000             # Maximum solver iterations before timeout
+    rtol: 1e-6                       # Relative tolerance for convergence
+    tol_reference_error: 0.001       # Reference error tolerance
+    relaxation_factor: 0.01          # [0.001-0.1] Under-relaxation for stability
+    
+    # --- Numerical Stability ---
+    artificial_damping: false        # Enable artificial damping for unstable cases
+    k2: 0.1                          # 2nd-order damping coefficient
+    k4: 0.0                          # 4th-order damping coefficient
+    core_radius_fraction: 1e-20      # Vortex core radius (fraction of chord)
+    
+    # --- Initial Conditions ---
+    type_initial_gamma_distribution: ELLIPTIC  # Starting circulation distribution
+    
+    # --- Output Control ---
+    calc_only_f_and_gamma: false     # true=compute only forces & circulation

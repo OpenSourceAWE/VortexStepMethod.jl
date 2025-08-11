@@ -12,7 +12,7 @@ using LaTeXStrings
 using NonlinearSolve
 import NonlinearSolve: solve!, solve
 using Interpolations
-using Interpolations: Extrapolation
+import Interpolations: Extrapolation
 using Parameters
 using Serialization
 using Timers
@@ -22,10 +22,11 @@ using Pkg
 using DifferentiationInterface
 import SciMLBase: successful_retcode
 import YAML
+using StructMapping
 using Xfoil
 
 # Export public interface
-export VSMSettings, WingSettings, SolverSettings, vs
+export VSMSettings, WingSettings, SolverSettings
 export Wing, Section, RamAirWing, reinit!
 export BodyAerodynamics
 export Solver, solve, solve_base!, solve!, VSMSolution, linearize
@@ -39,14 +40,14 @@ export PanelDistribution, LINEAR, COSINE, COSINE_VAN_GARREL, SPLIT_PROVIDED, UNC
 export InitialGammaDistribution, ELLIPTIC, ZEROS
 export SolverStatus, FEASIBLE, INFEASIBLE, FAILURE
 export SolverType, LOOP, NONLIN
+export load_polar_data
 
-export plot_geometry, plot_distribution, plot_circulation_distribution, plot_geometry, plot_polars, save_plot, show_plot, plot_polar_data
+export plot_geometry, plot_distribution, plot_circulation_distribution, plot_polars, save_plot, show_plot, plot_polar_data
 
 # the following functions are defined in ext/VortexStepMethodExt.jl
 function plot_geometry end
 function plot_distribution end
 function plot_circulation_distribution end
-function plot_geometry end
 function plot_polars end
 function save_plot end
 function show_plot end
@@ -202,7 +203,9 @@ const AeroData = Union{
     }
 
 function menu()
-   Main.include("examples/menu.jl")
+   # Load the examples menu using a portable path
+   ex = joinpath(dirname(pathof(@__MODULE__)), "..", "examples", "menu.jl")
+   Base.include(Main, normpath(ex))
 end
 
 """
@@ -213,11 +216,11 @@ Copy all example scripts to the folder "examples"
 """
 function copy_examples()
     PATH = "examples"
-    if ! isdir(PATH) 
+    if ! isdir(PATH)
         mkdir(PATH)
     end
     src_path = joinpath(dirname(pathof(@__MODULE__)), "..", PATH)
-    copy_files("examples", readdir(src_path))
+    copy_files(PATH, readdir(src_path))
 end
 
 function install_examples(add_packages=true)
@@ -270,6 +273,7 @@ include("settings.jl")
 include("wing_geometry.jl")
 include("polars.jl")
 include("ram_geometry.jl")
+include("yaml_geometry.jl")
 include("filament.jl")
 include("panel.jl")
 include("body_aerodynamics.jl")
