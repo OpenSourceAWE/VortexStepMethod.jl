@@ -1,4 +1,4 @@
-## VortexStepMethod v2.0.1 2025-08-08
+## VortexStepMethod v2.1.0 2025-08-11
 ### Changed
 #### 1. Core New Functionality: YAML Geometry Support
 - **New file:** `yaml_geometry.jl` (290+ lines) — Complete YAML-based wing geometry loading.
