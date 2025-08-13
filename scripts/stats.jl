@@ -29,7 +29,8 @@ function check_exported_docs(mod::Module; only_functions=false)
     exported_symbols = names(mod, all=false)
     doc_status = Dict{Symbol,Bool}()
     for sym in exported_symbols
-        if only_functions && !isa(getfield(mod, sym), Function)
+        val = getfield(mod, sym)
+        if only_functions && !isa(val, Function)
             continue
         end
         doc_status[sym] = Base.Docs.hasdoc(mod, sym)
