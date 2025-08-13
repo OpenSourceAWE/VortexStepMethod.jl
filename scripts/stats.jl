@@ -1,5 +1,5 @@
 # Copyright (c) 2025 Uwe Fechner
-# SPDX-License-Identifier: BSD-3-Clause
+# SPDX-License-Identifier: MIT
 
 # List all methods of VortexStepMethod and report if they are documented;
 # By default, also exported constants are reported
