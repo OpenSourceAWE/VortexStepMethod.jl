@@ -37,7 +37,7 @@ function check_exported_docs(mod::Module; only_functions=false)
     return doc_status
 end
 
-# Usage example:
+# Main execution block:
 results = check_exported_docs(VortexStepMethod)
 undocumented = filter(kv -> !kv[2], results)
 println("\nUndocumented exported symbols: \n", keys(undocumented))
