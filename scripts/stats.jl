@@ -14,7 +14,7 @@ function find_exported_functions(exported_functions)
         f = getfield(VortexStepMethod, fun)
         mes = methods(f)
         for me in mes
-            println(split(repr(me),'@')[1])
+            println(me.sig)
             total += 1
         end
     end
