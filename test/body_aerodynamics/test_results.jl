@@ -70,11 +70,25 @@ end
         delta_idxs=11:14,
         moment_frac=0.1
     )
+
+    coeff_jac, coeff_lin_res = VortexStepMethod.linearize(
+        solver, 
+        body_aero, 
+        base_inputs; 
+        theta_idxs=1:4, 
+        va_idxs=5:7, 
+        omega_idxs=8:10,
+        delta_idxs=11:14,
+        moment_frac=0.1,
+        aero_coeffs=true
+    )
     
     # Verify that linearization results match nonlinear results at operating point
     baseline_res = VortexStepMethod.solve!(solver, body_aero; log=false)
     baseline_res = [solver.sol.force; solver.sol.moment; solver.sol.group_moment_dist]
+    coeff_baseline_res = [solver.sol.force_coeffs; solver.sol.moment_coeffs; solver.sol.group_moment_coeff_dist]
     @test baseline_res ≈ lin_res
+    @test coeff_baseline_res ≈ coeff_lin_res
     
     # Define test cases
     test_cases = [
@@ -88,6 +102,7 @@ end
     for (input_name, indices, magnitudes) in test_cases
         @testset "Input: $input_name" begin
             max_error_ratio = 0.0
+            coeff_max_error_ratio = 0.0
             
             # Select one index at a time for focused testing
             for idx in indices
@@ -128,18 +143,25 @@ end
                     # Get nonlinear solution
                     nonlin_res = VortexStepMethod.solve!(solver, body_aero, nothing; log=false)
                     nonlin_res = [solver.sol.force; solver.sol.moment; solver.sol.group_moment_dist]
+                    coeff_nonlin_res = [solver.sol.force_coeffs; solver.sol.moment_coeffs; solver.sol.group_moment_coeff_dist]
                     @test nonlin_res ≉ baseline_res
+                    @test coeff_nonlin_res ≉ baseline_res
                     
                     # Compute linearized prediction
                     lin_prediction = lin_res + jac * perturbation
+                    coeff_lin_prediction = coeff_lin_res + coeff_jac * perturbation
                     
                     # Calculate error ratio for this case
                     prediction_error = norm(lin_prediction - nonlin_res)
                     baseline_difference = norm(baseline_res - nonlin_res)
                     error_ratio = prediction_error / baseline_difference
+                    coeff_prediction_error = norm(coeff_lin_prediction - coeff_nonlin_res)
+                    coeff_baseline_difference = norm(coeff_baseline_res - coeff_nonlin_res)
+                    coeff_error_ratio = coeff_prediction_error / coeff_baseline_difference
 
                     # Update max error ratio
                     max_error_ratio = max(max_error_ratio, error_ratio)
+                    coeff_max_error_ratio = max(coeff_max_error_ratio, coeff_error_ratio)
                     
                     # For small perturbations, test that error ratio is small
                     if idx == first(indices) && mag == first(magnitudes)
@@ -149,6 +171,7 @@ end
             end
             
             @info "Max error ratio for $input_name: $max_error_ratio"
+            @info "Max coeff error ratio for $input_name: $coeff_max_error_ratio"
         end
     end
     
