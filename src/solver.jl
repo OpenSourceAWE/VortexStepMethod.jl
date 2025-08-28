@@ -694,6 +694,7 @@ function linearize(solver::Solver, body_aero::BodyAerodynamics, y::Vector{T};
         delta_idxs=nothing,
         va_idxs=nothing,
         omega_idxs=nothing,
+        aero_coeffs=false,
         kwargs...) where T
 
     !(length(body_aero.wings) == 1) && throw(ArgumentError("Linearization only works for a body_aero with one wing"))
@@ -745,9 +746,15 @@ function linearize(solver::Solver, body_aero::BodyAerodynamics, y::Vector{T};
         end
 
         solve!(solver, body_aero; kwargs...)
-        results[1:3] .= solver.sol.force
-        results[4:6] .= solver.sol.moment
-        results[7:end] .= solver.sol.group_moment_dist
+        if !aero_coeffs
+            results[1:3] .= solver.sol.force
+            results[4:6] .= solver.sol.moment
+            results[7:end] .= solver.sol.group_moment_dist
+        else
+            results[1:3] .= solver.sol.force_coeffs
+            results[4:6] .= solver.sol.moment_coeffs
+            results[7:end] .= solver.sol.group_moment_coeff_dist
+        end
         return nothing
     end
 

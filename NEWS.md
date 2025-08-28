@@ -1,3 +1,8 @@
+## VortexStepMethod v2.2.0 2025-08-28
+### Added
+- The kwarg `aero_coeffs` to the function `linearize`: if true the linearization will output
+    normalized coefficients instead of moments and forces.
+
 ## VortexStepMethod v2.1.0 2025-08-11
 ### Changed
 #### 1. Core New Functionality: YAML Geometry Support
