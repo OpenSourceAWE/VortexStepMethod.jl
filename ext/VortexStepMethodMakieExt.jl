@@ -30,21 +30,21 @@ function Makie.plot(panel::VortexStepMethod.Panel; size = (1200, 800), kwargs...
     ax = Axis3(fig[1, 1]; aspect = :data,
                xlabel = "X", ylabel = "Y", zlabel = "Z",
                azimuth = 9/8*π, zoommode = :cursor, viewmode = :fit,
-               xautolimitmargin=(1.0, 1.0),
-               yautolimitmargin=(10.0, 10.0),
            )
 
     plot!(ax, panel; kwargs...)
     return fig
 end
 
-function Makie.plot(body_aero::VortexStepMethod.BodyAerodynamics; size = (1200, 800), kwargs...)
+function Makie.plot(body_aero::VortexStepMethod.BodyAerodynamics; size = (1200, 800),
+                    limitmargin = 0.1, kwargs...)
     fig = Figure(; size)
     ax = Axis3(fig[1, 1]; aspect = :data,
                xlabel = "X", ylabel = "Y", zlabel = "Z",
                azimuth = 9/8*π, zoommode = :cursor, viewmode = :fit,
-               # xautolimitmargin=(1.0, 1.0),
-               # yautolimitmargin=(10.0, 10.0),
+               xautolimitmargin=(limitmargin, limitmargin),
+               yautolimitmargin=(limitmargin, limitmargin),
+               zautolimitmargin=(limitmargin, limitmargin),
            )
 
     plot!(ax, body_aero; kwargs...)
