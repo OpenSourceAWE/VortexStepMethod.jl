@@ -15,10 +15,10 @@ function Makie.plot!(ax, panel::VortexStepMethod.Panel; color=(:red, 0.2), R_b_w
         points = [Point3f(R_b_w * p + T_b_w) for p in points]
     end
     faces = [Makie.GLTriangleFace(1, 2, 3), Makie.GLTriangleFace(1, 3, 4)]
-    p = mesh!(ax, points, faces; color, kwargs...)
+    p = mesh!(ax, points, faces; color, transparency=true, kwargs...)
     push!(plots, p)
     border_points = [points..., points[1]]
-    p = lines!(ax, border_points; color=:black)
+    p = lines!(ax, border_points; color=:black, transparency=true, kwargs...)
     push!(plots, p)
     return plots
 end
