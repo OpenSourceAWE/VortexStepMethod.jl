@@ -34,6 +34,6 @@ makedocs(;
 )
 
 deploydocs(;
-    repo="https://github.com/OpenSourceAWE/VortexStepMethod.jl",
+    repo="github.com/OpenSourceAWE/VortexStepMethod.jl",
     devbranch="main",
 )

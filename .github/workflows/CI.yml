@@ -6,6 +6,7 @@ on:
     tags: '*'
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
 concurrency:
   # Skip intermediate builds: always.
   # Cancel intermediate builds: only if it is a pull request build.
@@ -72,15 +73,13 @@ jobs:
         julia_version:
           - "1.10"
           - "1.11"
+          - "pre"
         julia_arch:
           - x64
         os:
           - ubuntu-latest
     runs-on: ${{ matrix.os }}
     steps:
-    - name: Build PyCall
-      run: julia --project -e 'ENV["PYTHON"]=""; using Pkg; Pkg.instantiate(); Pkg.add("PyCall"); Pkg.build("PyCall")'
-      shell: bash
     - name: Install matplotlib
       run: if [ "$RUNNER_OS" = "Linux" ]; then sudo apt-get install -y python3-matplotlib; fi
       shell: bash
@@ -89,10 +88,11 @@ jobs:
       with:
         arch: ${{ matrix.julia_arch }}
         version: ${{ matrix.julia_version }}
+    - uses: julia-actions/cache@v2
+    - uses: julia-actions/julia-buildpkg@v1
     - name: Build PyCall
       run: julia --project -e 'ENV["PYTHON"]=""; using Pkg; Pkg.instantiate(); Pkg.add("PyCall"); Pkg.build("PyCall")'
       shell: bash    
-    - uses: julia-actions/cache@v2
     - uses: julia-actions/julia-runtest@v1
       env:
         BUILD_IS_PRODUCTION_BUILD: false
@@ -114,7 +114,9 @@ jobs:
         shell: bash
       - uses: julia-actions/cache@v2
       - uses: julia-actions/julia-buildpkg@v1
+      
       - uses: julia-actions/julia-docdeploy@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}
+
