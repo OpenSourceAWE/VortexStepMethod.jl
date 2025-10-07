@@ -1,3 +1,16 @@
+## VortexStepMethod v2.2.1 2025-10-07
+### Fixed
+- Reference in vsm_settings.yaml now points to aero_geometry.yaml.
+
+### Added
+- None.
+
+### Removed
+- Bridle configuration data (nodes, lines, connections).
+
+### Changed
+- Renamed wing_geometry_polars_CFD.yaml → aero_geometry.yaml.
+
 ## VortexStepMethod v2.2.0 2025-08-28
 ### Added
 - The kwarg `aero_coeffs` to the function `linearize`: if true the linearization will output
