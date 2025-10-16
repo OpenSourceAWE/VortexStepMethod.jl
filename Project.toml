@@ -31,9 +31,11 @@ YAML = "ddb6d928-2868-570f-bddf-ab3f9cf99eb6"
 
 [weakdeps]
 ControlPlots = "23c2ee80-7a9e-4350-b264-8e670f12517c"
+Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
 
 [extensions]
 VortexStepMethodControlPlotsExt = "ControlPlots"
+VortexStepMethodMakieExt = "Makie"
 
 [compat]
 Aqua = "0.8"
@@ -51,6 +53,7 @@ Interpolations = "0.15, 0.16"
 LaTeXStrings = "1"
 LinearAlgebra = "1"
 Logging = "1"
+Makie = "0.24.6"
 Measures = "0.3"
 NonlinearSolve = "4.8.0"
 Parameters = "0.12"
