@@ -1,3 +1,7 @@
+## VortexStepMethod v2.3.0 2025-10-16
+### Added
+- A Makie plotting extension.
+
 ## VortexStepMethod v2.2.1 2025-10-07
 ### Fixed
 - Reference in vsm_settings.yaml now points to aero_geometry.yaml.
