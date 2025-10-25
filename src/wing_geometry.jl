@@ -235,7 +235,7 @@ function Wing(n_panels::Int;
         spanwise_distribution::PanelDistribution=LINEAR,
         spanwise_direction::PosVector=MVec3([0.0, 1.0, 0.0]),
         remove_nan=true)
-    !(n_panels % n_groups == 0) && throw(ArgumentError("Number of panels should be divisible by number of groups"))
+    !(n_groups == 0 || n_panels % n_groups == 0) && throw(ArgumentError("Number of panels should be divisible by number of groups"))
     panel_props = PanelProperties{n_panels}()
     Wing(n_panels, n_groups, spanwise_distribution, panel_props, spanwise_direction, Section[], Section[], remove_nan)
 end

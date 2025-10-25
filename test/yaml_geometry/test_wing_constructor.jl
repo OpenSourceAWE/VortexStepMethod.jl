@@ -151,7 +151,12 @@ wing_airfoils:
         
         # Test invalid n_panels/n_groups combination
         @test_throws ArgumentError Wing(test_yaml_path; n_panels=5, n_groups=2)
-        
+
+        # Test n_groups=0 (no grouping functionality)
+        wing_no_groups = Wing(test_yaml_path; n_panels=4, n_groups=0)
+        @test wing_no_groups.n_groups == 0
+        @test wing_no_groups.n_panels == 4
+
         # Test invalid spanwise direction
         @test_throws ArgumentError Wing(test_yaml_path; spanwise_direction=[1.0, 0.0, 0.0])
     end

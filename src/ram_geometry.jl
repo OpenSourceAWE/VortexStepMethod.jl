@@ -415,7 +415,7 @@ function RamAirWing(
     interp_steps=n_sections # TODO: check if interpolations are still needed
 )
 
-    !(n_panels % n_groups == 0) && throw(ArgumentError("Number of panels should be divisible by number of groups"))
+    !(n_groups == 0 || n_panels % n_groups == 0) && throw(ArgumentError("Number of panels should be divisible by number of groups"))
     !isapprox(spanwise_direction, [0.0, 1.0, 0.0]) && throw(ArgumentError("Spanwise direction has to be [0.0, 1.0, 0.0], not $spanwise_direction"))
 
     # Load or create polars

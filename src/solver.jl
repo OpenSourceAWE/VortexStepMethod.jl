@@ -292,21 +292,29 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
         moment_coeff_dist[i] = moment_dist[i] / (q_inf * projected_area)
     end
 
-    group_moment_dist = solver.sol.group_moment_dist
-    group_moment_coeff_dist = solver.sol.group_moment_coeff_dist
-    group_moment_dist .= 0.0
-    group_moment_coeff_dist .= 0.0
-    panel_idx = 1
-    group_idx = 1
-    for wing in body_aero.wings
-        panels_per_group = wing.n_panels ÷ wing.n_groups
-        for _ in 1:wing.n_groups
-            for _ in 1:panels_per_group
-                group_moment_dist[group_idx] += moment_dist[panel_idx]
-                group_moment_coeff_dist[group_idx] += moment_coeff_dist[panel_idx]
-                panel_idx += 1
+    # Only compute group moments if there are groups
+    if length(solver.sol.group_moment_dist) > 0
+        group_moment_dist = solver.sol.group_moment_dist
+        group_moment_coeff_dist = solver.sol.group_moment_coeff_dist
+        group_moment_dist .= 0.0
+        group_moment_coeff_dist .= 0.0
+        panel_idx = 1
+        group_idx = 1
+        for wing in body_aero.wings
+            if wing.n_groups > 0
+                panels_per_group = wing.n_panels ÷ wing.n_groups
+                for _ in 1:wing.n_groups
+                    for _ in 1:panels_per_group
+                        group_moment_dist[group_idx] += moment_dist[panel_idx]
+                        group_moment_coeff_dist[group_idx] += moment_coeff_dist[panel_idx]
+                        panel_idx += 1
+                    end
+                    group_idx += 1
+                end
+            else
+                # Skip panels for wings with n_groups=0
+                panel_idx += wing.n_panels
             end
-            group_idx += 1
         end
     end
 
@@ -689,8 +697,8 @@ jac, results = linearize(
 )
 ```
 """
-function linearize(solver::Solver, body_aero::BodyAerodynamics, y::Vector{T}; 
-        theta_idxs=1:4, 
+function linearize(solver::Solver, body_aero::BodyAerodynamics, y::Vector{T};
+        theta_idxs=1:4,
         delta_idxs=nothing,
         va_idxs=nothing,
         omega_idxs=nothing,
@@ -699,6 +707,19 @@ function linearize(solver::Solver, body_aero::BodyAerodynamics, y::Vector{T};
 
     !(length(body_aero.wings) == 1) && throw(ArgumentError("Linearization only works for a body_aero with one wing"))
     wing = body_aero.wings[1]
+
+    # Validate that theta_idxs and delta_idxs match the number of groups
+    if !isnothing(theta_idxs) && wing.n_groups > 0
+        length(theta_idxs) != wing.n_groups && throw(ArgumentError(
+            "Length of theta_idxs ($(length(theta_idxs))) must match number of groups ($(wing.n_groups))"))
+    end
+    if !isnothing(delta_idxs) && wing.n_groups > 0
+        length(delta_idxs) != wing.n_groups && throw(ArgumentError(
+            "Length of delta_idxs ($(length(delta_idxs))) must match number of groups ($(wing.n_groups))"))
+    end
+    if wing.n_groups == 0 && (!isnothing(theta_idxs) || !isnothing(delta_idxs))
+        throw(ArgumentError("Cannot use theta_idxs or delta_idxs when wing has n_groups=0 (no group functionality)"))
+    end
 
     init_va = body_aero.cache[1][body_aero.va]
     init_va .= body_aero.va
