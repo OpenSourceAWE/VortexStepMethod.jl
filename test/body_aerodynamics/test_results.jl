@@ -31,7 +31,7 @@ if !@isdefined ram_wing_results
         error("Required data files not found: $body_src or $foil_src")
     end
     
-    ram_wing = RamAirWing(body_path, foil_path; alpha_range=deg2rad.(-1:1), delta_range=deg2rad.(-1:1))
+    ram_wing = ObjWing(body_path, foil_path; alpha_range=deg2rad.(-1:1), delta_range=deg2rad.(-1:1))
 end
 
 @testset "Nonlinear vs Linear - Comprehensive Input Testing" begin

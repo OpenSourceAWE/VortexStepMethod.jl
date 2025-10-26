@@ -5,7 +5,7 @@ Main structure for calculating aerodynamic properties of bodies. Use the constru
 
 # Fields
 - panels::Vector{Panel}: Vector of [Panel](@ref) structs
-- wings::Union{Vector{Wing}, Vector{RamAirWing}}: A vector of wings; a body can have multiple wings
+- wings::Vector{Wing}: A vector of wings; a body can have multiple wings
 - `va::MVec3` = zeros(MVec3):   A vector of the apparent wind speed, see: [MVec3](@ref)
 - `omega`::MVec3 = zeros(MVec3): A vector of the turn rates around the kite body axes
 - `gamma_distribution`=zeros(Float64, P): A vector of the circulation 
@@ -23,7 +23,7 @@ Main structure for calculating aerodynamic properties of bodies. Use the constru
 """
 @with_kw mutable struct BodyAerodynamics{P}
     panels::Vector{Panel}
-    wings::Union{Vector{Wing}, Vector{RamAirWing}}
+    wings::Vector{Wing}
     _va::MVec3 = zeros(MVec3)
     omega::MVec3 = zeros(MVec3)
     gamma_distribution::MVector{P, Float64} = zeros(P)
@@ -142,7 +142,7 @@ function reinit!(body_aero::BodyAerodynamics;
         
         # Create panels
         for i in 1:wing.n_panels
-            if wing isa RamAirWing
+            if !isnothing(wing.delta_dist)
                 delta = wing.delta_dist[i]
             else
                 delta = 0.0

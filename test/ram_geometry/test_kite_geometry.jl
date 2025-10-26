@@ -165,9 +165,9 @@ using Serialization
         @test R_b_p2 ≈ I(3)
     end
     
-    @testset "RamAirWing Construction" begin
-        wing = RamAirWing(test_obj_path, test_dat_path; remove_nan=true)
-        
+    @testset "ObjWing Construction" begin
+        wing = ObjWing(test_obj_path, test_dat_path; remove_nan=true)
+
         @test wing.n_panels == 56  # Default value
         @test wing.spanwise_distribution == UNCHANGED
         @test wing.spanwise_direction ≈ [0.0, 1.0, 0.0]
@@ -179,15 +179,15 @@ using Serialization
         @test !isnan(wing.sections[1].aero_data[4][end])
         @test !isnan(wing.sections[1].aero_data[5][end])
 
-        wing = RamAirWing(test_obj_path, test_dat_path; remove_nan=false)
+        wing = ObjWing(test_obj_path, test_dat_path; remove_nan=false)
         @test isnan(wing.sections[1].aero_data[3][end])
         @test isnan(wing.sections[1].aero_data[4][end])
         @test isnan(wing.sections[1].aero_data[5][end])
     end
 
     @testset "Wing Deformation" begin
-        # Create a RamAirWing for testing
-        wing = RamAirWing(test_obj_path, test_dat_path; remove_nan=true)
+        # Create an ObjWing for testing
+        wing = ObjWing(test_obj_path, test_dat_path; remove_nan=true)
         body_aero = BodyAerodynamics([wing])
         
         # Store original TE point for comparison

@@ -192,7 +192,7 @@ end
 
 Represents a wing composed of multiple sections with aerodynamic properties.
 
-# Fields
+# Core Fields (all wings)
 - `n_panels::Int16`: Number of panels in aerodynamic mesh
 - `n_groups::Int16`: Number of panel groups
 - `spanwise_distribution`::PanelDistribution: [PanelDistribution](@ref)
@@ -200,6 +200,23 @@ Represents a wing composed of multiple sections with aerodynamic properties.
 - `sections::Vector{Section}`: Vector of wing sections, see: [Section](@ref)
 - `refined_sections::Vector{Section}`: Vector of refined wing sections, see: [Section](@ref)
 - `remove_nan::Bool`: Wether to remove the NaNs from interpolations or not
+
+# Deformation Fields (optional, for deformable wings)
+- `non_deformed_sections::Vector{Section}`: Original undeformed sections
+- `theta_dist::Vector{Float64}`: Panel twist angle distribution
+- `delta_dist::Vector{Float64}`: Trailing edge deflection distribution
+
+# Physical Properties (optional, for OBJ-based wings)
+- `mass::Float64`: Total wing mass in kg (0.0 if not applicable)
+- `gamma_tip::Float64`: Angular extent from center to wing tip (0.0 if not applicable)
+- `inertia_tensor::Matrix{Float64}`: 3x3 inertia tensor (empty if not applicable)
+- `T_cad_body::MVec3`: Translation from CAD to body frame (zeros if not applicable)
+- `R_cad_body::MMat3`: Rotation from CAD to body frame (identity if not applicable)
+- `radius::Float64`: Wing curvature radius (0.0 if not applicable)
+- `le_interp::Union{Nothing, NTuple{3, Extrapolation}}`: Leading edge interpolation
+- `te_interp::Union{Nothing, NTuple{3, Extrapolation}}`: Trailing edge interpolation
+- `area_interp::Union{Nothing, Extrapolation}`: Area interpolation
+- `cache::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}}`: Preallocated buffers
 
 """
 mutable struct Wing <: AbstractWing
@@ -211,6 +228,23 @@ mutable struct Wing <: AbstractWing
     sections::Vector{Section}
     refined_sections::Vector{Section}
     remove_nan::Bool
+
+    # Deformation fields
+    non_deformed_sections::Vector{Section}
+    theta_dist::Vector{Float64}
+    delta_dist::Vector{Float64}
+
+    # Physical properties (OBJ-based wings)
+    mass::Float64
+    gamma_tip::Float64
+    inertia_tensor::Matrix{Float64}
+    T_cad_body::MVec3
+    R_cad_body::MMat3
+    radius::Float64
+    le_interp::Union{Nothing, NTuple{3, Extrapolation}}
+    te_interp::Union{Nothing, NTuple{3, Extrapolation}}
+    area_interp::Union{Nothing, Extrapolation}
+    cache::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}}
 end
 
 """
@@ -220,8 +254,8 @@ end
          spanwise_direction::PosVector=MVec3([0.0, 1.0, 0.0]),
          remove_nan::Bool=true)
 
-Constructor for a [Wing](@ref) struct with default values that initializes the sections 
-and refined sections as empty arrays.
+Constructor for a [Wing](@ref) struct with default values that initializes the sections
+and refined sections as empty arrays. Creates a basic wing suitable for YAML-based construction.
 
 # Parameters
 - `n_panels::Int`: Number of panels in aerodynamic mesh
@@ -237,18 +271,171 @@ function Wing(n_panels::Int;
         remove_nan=true)
     !(n_groups == 0 || n_panels % n_groups == 0) && throw(ArgumentError("Number of panels should be divisible by number of groups"))
     panel_props = PanelProperties{n_panels}()
-    Wing(n_panels, n_groups, spanwise_distribution, panel_props, spanwise_direction, Section[], Section[], remove_nan)
+
+    # Initialize with default/empty values for optional fields
+    Wing(
+        n_panels, n_groups, spanwise_distribution, panel_props, spanwise_direction,
+        Section[], Section[], remove_nan,
+        # Deformation fields
+        Section[], zeros(n_panels), zeros(n_panels),
+        # Physical properties (defaults for non-OBJ wings)
+        0.0, 0.0, zeros(0, 0), zeros(MVec3), Matrix{Float64}(I, 3, 3),
+        0.0, nothing, nothing, nothing,
+        PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}[]
+    )
 end
 
 function reinit!(wing::AbstractWing)
     refine_aerodynamic_mesh!(wing)
-    
+
     # Calculate panel properties
     update_panel_properties!(
         wing.panel_props,
         wing.refined_sections,
         wing.n_panels
     )
+    return nothing
+end
+
+"""
+    group_deform!(wing::Wing, theta_angles=nothing, delta_angles=nothing; smooth=false)
+
+Distribute control angles across wing panels and optionally apply smoothing.
+
+For wings that support deformation (OBJ-based wings with non_deformed_sections), this
+distributes theta_angles and delta_angles to panel groups and applies deformation.
+For wings without deformation support (YAML-based), this is a no-op that only succeeds
+if both angle inputs are nothing.
+
+# Arguments
+- `wing::Wing`: The wing to deform
+- `theta_angles::AbstractVector`: Twist angles in radians for each control group (or nothing)
+- `delta_angles::AbstractVector`: Trailing edge deflection angles in radians (or nothing)
+- `smooth::Bool`: Whether to apply moving average smoothing
+
+# Algorithm
+1. Distributes each control input to its corresponding group of panels
+2. Optionally applies moving average smoothing with window based on group size
+3. Calls deform! to update wing geometry
+
+# Errors
+- Throws `ArgumentError` if wing doesn't support deformation but angles are provided
+- Throws `ArgumentError` if panel count is not divisible by number of control inputs
+
+# Returns
+- `nothing` (modifies wing in-place)
+"""
+function group_deform!(wing::Wing, theta_angles=nothing, delta_angles=nothing; smooth=false)
+    # Check if deformation is supported
+    can_deform = !isempty(wing.non_deformed_sections)
+
+    # If no deformation requested, just return
+    isnothing(theta_angles) && isnothing(delta_angles) && return nothing
+
+    # If deformation requested but not supported, throw error
+    if !can_deform
+        throw(ArgumentError("This Wing does not support deformation. Only OBJ-based wings created with ObjWing() can be deformed."))
+    end
+
+    # Validate inputs
+    !isnothing(theta_angles) && !(wing.n_panels % length(theta_angles) == 0) &&
+        throw(ArgumentError("Number of theta_angles has to be a divisor of number of panels"))
+    !isnothing(delta_angles) && !(wing.n_panels % length(delta_angles) == 0) &&
+        throw(ArgumentError("Number of delta_angles has to be a divisor of number of panels"))
+
+    n_panels = wing.n_panels
+    theta_dist = wing.theta_dist
+    delta_dist = wing.delta_dist
+    n_angles = isnothing(theta_angles) ? length(delta_angles) : length(theta_angles)
+
+    # Distribute angles to panels
+    dist_idx = 0
+    for angle_idx in 1:n_angles
+        for _ in 1:(wing.n_panels ÷ n_angles)
+            dist_idx += 1
+            !isnothing(theta_angles) && (theta_dist[dist_idx] = theta_angles[angle_idx])
+            !isnothing(delta_angles) && (delta_dist[dist_idx] = delta_angles[angle_idx])
+        end
+    end
+    @assert (dist_idx == wing.n_panels)
+
+    # Apply smoothing if requested
+    if smooth
+        window_size = wing.n_panels ÷ n_angles
+        if n_panels > window_size
+            smoothed = wing.cache[1][theta_dist]
+
+            if !isnothing(theta_angles)
+                smoothed .= theta_dist
+                for i in (window_size÷2 + 1):(n_panels - window_size÷2)
+                    @views smoothed[i] = mean(theta_dist[(i - window_size÷2):(i + window_size÷2)])
+                end
+                theta_dist .= smoothed
+            end
+
+            if !isnothing(delta_angles)
+                smoothed .= delta_dist
+                for i in (window_size÷2 + 1):(n_panels - window_size÷2)
+                    @views smoothed[i] = mean(delta_dist[(i - window_size÷2):(i + window_size÷2)])
+                end
+                delta_dist .= smoothed
+            end
+        end
+    end
+
+    deform!(wing)
+    return nothing
+end
+
+"""
+    deform!(wing::Wing, theta_dist::AbstractVector, delta_dist::AbstractVector)
+
+Deform wing by applying theta and delta distributions directly.
+
+# Arguments
+- `wing::Wing`: Wing to deform (must support deformation)
+- `theta_dist::AbstractVector`: Twist angle in radians for each panel
+- `delta_dist::AbstractVector`: Trailing edge deflection for each panel
+
+# Effects
+Updates wing.sections with deformed geometry based on wing.non_deformed_sections
+"""
+function deform!(wing::Wing, theta_dist::AbstractVector, delta_dist::AbstractVector)
+    !isempty(wing.non_deformed_sections) || throw(ArgumentError("Wing does not support deformation"))
+    !(length(theta_dist) == wing.n_panels) && throw(ArgumentError("theta_dist and panels are of different lengths"))
+    !(length(delta_dist) == wing.n_panels) && throw(ArgumentError("delta_dist and panels are of different lengths"))
+    wing.theta_dist .= theta_dist
+    wing.delta_dist .= delta_dist
+
+    deform!(wing)
+end
+
+"""
+    deform!(wing::Wing)
+
+Apply stored theta_dist and delta_dist to deform the wing geometry.
+
+# Arguments
+- `wing::Wing`: Wing to deform (must have non_deformed_sections)
+
+# Effects
+Updates wing.sections based on wing.non_deformed_sections and stored distributions
+"""
+function deform!(wing::Wing)
+    !isempty(wing.non_deformed_sections) || return nothing
+
+    local_y = zeros(MVec3)
+    chord = zeros(MVec3)
+    normal = zeros(MVec3)
+
+    for i in 1:wing.n_panels
+        section1 = wing.non_deformed_sections[i]
+        section2 = wing.non_deformed_sections[i+1]
+        local_y .= normalize(section1.LE_point - section2.LE_point)
+        chord .= section1.TE_point .- section1.LE_point
+        normal .= chord × local_y
+        @. wing.sections[i].TE_point = section1.LE_point + cos(wing.theta_dist[i]) * chord - sin(wing.theta_dist[i]) * normal
+    end
     return nothing
 end
 

@@ -654,15 +654,15 @@ function smooth_circulation!(
 end
 
 """
-    linearize(solver::Solver, body_aero::BodyAerodynamics, wing::RamAirWing, y::Vector{T}; 
+    linearize(solver::Solver, body_aero::BodyAerodynamics, wing::Wing, y::Vector{T};
         theta_idxs=1:4, delta_idxs=nothing, va_idxs=nothing, omega_idxs=nothing, kwargs...) where T
 
-Compute the Jacobian matrix for a ram air wing around an operating point using finite differences.
+Compute the Jacobian matrix for a deformable wing around an operating point using finite differences.
 
 # Arguments
 - `solver`: VSM solver instance (must be initialized)
 - `body_aero`: Aerodynamic body representation
-- `wing`: RamAirWing model to linearize
+- `wing`: Wing model to linearize (must support deformation, i.e., created with ObjWing())
 - `y`: Input vector at operating point, containing a combination of control angles and velocities
 
 # Keyword Arguments
@@ -679,7 +679,7 @@ Compute the Jacobian matrix for a ram air wing around an operating point using f
 # Example
 ```julia
 # Initialize wing and solver
-wing = RamAirWing("path/to/body.obj", "path/to/foil.dat")
+wing = ObjWing("path/to/body.obj", "path/to/foil.dat")
 body_aero = BodyAerodynamics([wing])
 solver = Solver(body_aero)
 

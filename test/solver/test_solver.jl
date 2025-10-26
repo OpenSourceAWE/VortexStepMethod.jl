@@ -53,7 +53,7 @@ using Test
             sol = solve!(solver, body_aero)
 
             @test sol isa VSMSolution
-            @test sol.solver_status == SUCCESS
+            @test sol.solver_status == FEASIBLE
 
             # Verify that group moments are empty
             @test length(sol.group_moment_dist) == 0
@@ -172,6 +172,49 @@ using Test
                 delta_idxs=1:4,  # Wrong: 4 angles but only 2 groups
                 va_idxs=5:7
             )
+
+        finally
+            rm(settings_file; force=true)
+        end
+    end
+
+    @testset "Wing type cannot deform" begin
+        # Test that regular Wing type (YAML-based) cannot use group_deform!
+        settings_file = create_temp_wing_settings("solver", "solver_test_wing.yaml";
+            alpha=5.0, beta=0.0, wind_speed=10.0, n_groups=2, n_panels=4)
+
+        try
+            settings = VSMSettings(settings_file)
+            wing = Wing(settings)
+            @test wing isa Wing
+            @test wing.n_groups == 2
+
+            body_aero = BodyAerodynamics([wing])
+            solver = Solver(body_aero, settings)
+
+            va = [10.0, 0.0, 0.0]
+            set_va!(body_aero, va)
+
+            # Test that trying to use theta angles with Wing throws an error
+            y = [0.0, 0.0, 10.0, 0.0, 0.0]  # 2 theta + 3 va
+            @test_throws ArgumentError VortexStepMethod.linearize(
+                solver,
+                body_aero,
+                y;
+                theta_idxs=1:2,
+                va_idxs=3:5
+            )
+
+            # But linearize should work fine with only velocity (no deformation)
+            y_velocity_only = [10.0, 0.0, 0.0]
+            jac, results = VortexStepMethod.linearize(
+                solver,
+                body_aero,
+                y_velocity_only;
+                theta_idxs=nothing,
+                va_idxs=1:3
+            )
+            @test size(jac, 1) == 8  # 6 + 2 group moments
 
         finally
             rm(settings_file; force=true)

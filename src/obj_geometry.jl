@@ -14,7 +14,7 @@ Read vertices and faces from an OBJ file.
 function read_faces(filename)
     vertices = []
     faces = []
-    
+
     open(filename) do file
         for line in eachline(file)
             if startswith(line, "v ") && !startswith(line, "vt") && !startswith(line, "vn")
@@ -115,13 +115,13 @@ function create_interpolations(vertices, circle_center_z, radius, gamma_tip, R=I
     gamma_range = range(-gamma_tip+1e-6, gamma_tip-1e-6, interp_steps)
     stepsize = gamma_range.step.hi
     vz_centered = [v[3] - circle_center_z for v in vertices]
-    
+
     te_gammas = zeros(length(gamma_range))
     le_gammas = zeros(length(gamma_range))
     trailing_edges = zeros(3, length(gamma_range))
     leading_edges = zeros(3, length(gamma_range))
     areas  = zeros(length(gamma_range))
-    
+
     for (j, gamma) in enumerate(gamma_range)
         trailing_edges[1, j] = -Inf
         leading_edges[1, j] = Inf
@@ -164,7 +164,7 @@ function create_interpolations(vertices, circle_center_z, radius, gamma_tip, R=I
     te_interp = ntuple(i -> linear_interpolation(le_gammas, trailing_edges[i, :],
                                            extrapolation_bc=Line()), 3)
     area_interp = linear_interpolation(gamma_range, areas, extrapolation_bc=Line())
-    
+
     return (le_interp, te_interp, area_interp)
 end
 
@@ -187,26 +187,26 @@ Calculate center of mass of a mesh and translate vertices so that COM is at orig
 function center_to_com!(vertices, faces; prn=true)
     area_total = 0.0
     com = zeros(3)
-    
+
     for face in faces
         if length(face) == 3
             # Triangle case
             v1 = vertices[face[1]]
             v2 = vertices[face[2]]
             v3 = vertices[face[3]]
-            
+
             # Calculate triangle area and centroid
             normal = cross(v2 - v1, v3 - v1)
             area = norm(normal) / 2
             centroid = (v1 + v2 + v3) / 3
-            
+
             area_total += area
             com -= area * centroid
         else
             throw(ArgumentError("Triangulate faces in a CAD program first"))
         end
     end
-    
+
     com = com / area_total
     !(abs(com[2]) < 0.01) && throw(ArgumentError("Center of mass $com of .obj file has to lie on the xz-plane."))
     prn && @info "Centering vertices of .obj file to the center of mass: $com"
@@ -220,7 +220,7 @@ end
 """
     calculate_inertia_tensor(vertices, faces, mass, com)
 
-Calculate the inertia tensor for a triangulated surface mesh, assuming a thin shell with uniform 
+Calculate the inertia tensor for a triangulated surface mesh, assuming a thin shell with uniform
 surface density.
 
 # Arguments
@@ -244,23 +244,23 @@ function calculate_inertia_tensor(vertices, faces, mass, com)
     # Initialize inertia tensor
     I = zeros(3, 3)
     total_area = 0.0
-    
+
     for face in faces
         v1 = vertices[face[1]] .- com
         v2 = vertices[face[2]] .- com
         v3 = vertices[face[3]] .- com
-        
+
         # Calculate triangle area
         normal = cross(v2 - v1, v3 - v1)
         area = norm(normal) / 2
         total_area += area
-        
+
         # Calculate contribution to inertia tensor
         for i in 1:3
             for j in 1:3
                 # Vertices relative to center of mass
                 points = [v1, v2, v3]
-                
+
                 # Calculate contribution to inertia tensor
                 for p in points
                     if i == j
@@ -274,7 +274,7 @@ function calculate_inertia_tensor(vertices, faces, mass, com)
             end
         end
     end
-    
+
     # Scale by mass/total_area to get actual inertia tensor
     return (mass / total_area) * I / 3
 end
@@ -291,14 +291,14 @@ function calc_inertia_y_rotation(I_b_tensor)
         # Transform inertia tensor
         I_rotated = R_y * I_b_tensor * R_y'
         # We want the off-diagonal xz elements to be zero
-        F[1] = I_rotated[1,3] 
+        F[1] = I_rotated[1,3]
     end
-    
+
     theta0 = [0.0]
     prob = NonlinearProblem(eq!, theta0, nothing)
     sol = NonlinearSolve.solve(prob, NewtonRaphson())
     theta_opt = sol.u[1]
-    
+
     R_b_p = [
         cos(theta_opt)  0  sin(theta_opt);
         0               1  0;
@@ -312,66 +312,17 @@ end
 
 
 """
-    RamAirWing <: AbstractWing
+    ObjWing(obj_path, dat_path; kwargs...)
 
-A ram-air wing model that represents a curved parafoil with deformable aerodynamic surfaces.
-
-## Core Features
-- Curved wing geometry derived from 3D mesh (.obj file)
-- Aerodynamic properties based on 2D airfoil data (.dat file)
-- Support for control inputs (twist angles and trailing edge deflections)
-- Inertial and geometric properties calculation
-
-## Notable Fields
-- `n_panels::Int16`: Number of panels in aerodynamic mesh
-- `n_groups::Int16`: Number of control groups for distributed deformation
-- `mass::Float64`: Total wing mass in kg
-- `gamma_tip::Float64`: Angular extent from center to wing tip
-- `inertia_tensor::Matrix{Float64}`: Full 3x3 inertia tensor in the kite body frame
-- `T_cad_body::MVec3`: Translation vector from CAD frame to body frame
-- `R_cad_body::MMat3`: Rotation matrix from CAD frame to body frame
-- `radius::Float64`: Wing curvature radius
-- `theta_dist::Vector{Float64}`: Panel twist angle distribution
-- `delta_dist::Vector{Float64}`: Trailing edge deflection distribution
-
-See constructor `RamAirWing(obj_path, dat_path; kwargs...)` for usage details.
-"""
-mutable struct RamAirWing <: AbstractWing
-    n_panels::Int16
-    n_groups::Int16
-    spanwise_distribution::PanelDistribution
-    panel_props::PanelProperties
-    spanwise_direction::MVec3
-    sections::Vector{Section}
-    refined_sections::Vector{Section}
-    remove_nan::Bool
-    
-    # Additional fields for RamAirWing
-    non_deformed_sections::Vector{Section}
-    mass::Float64
-    gamma_tip::Float64
-    inertia_tensor::Matrix{Float64}
-    T_cad_body::MVec3
-    R_cad_body::MMat3
-    radius::Float64
-    le_interp::NTuple{3, Extrapolation}
-    te_interp::NTuple{3, Extrapolation}
-    area_interp::Extrapolation
-    theta_dist::Vector{Float64}
-    delta_dist::Vector{Float64}
-    cache::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}}
-end
-
-"""
-    RamAirWing(obj_path, dat_path; kwargs...)
-
-Create a ram-air wing model from 3D geometry and airfoil data files.
+Create a deformable wing model from 3D geometry (.obj) and airfoil data (.dat) files.
 
 This constructor builds a complete aerodynamic model by:
-1. Loading or generating wing geometry from the .obj file
-2. Creating aerodynamic polars from the airfoil .dat file
+1. Loading wing geometry from the .obj file
+2. Creating aerodynamic polars from the airfoil .dat file (or loading existing)
 3. Computing inertial properties and coordinate transformations
 4. Setting up control surfaces and panel distribution
+
+The resulting Wing supports deformation through group_deform! and deform! functions.
 
 # Arguments
 - `obj_path`: Path to .obj file containing 3D wing geometry
@@ -389,32 +340,34 @@ This constructor builds a complete aerodynamic model by:
 - `remove_nan=true`: Interpolate NaN values in aerodynamic data
 - `alpha_range=deg2rad.(-5:1:20)`: Angle of attack range for polars (rad)
 - `delta_range=deg2rad.(-5:1:20)`: Trailing edge deflection range for polars (rad)
-- prn=true: if info messages shall be printed
+- `prn=true`: Print informational messages
 
 # Returns
-A fully initialized `RamAirWing` instance ready for aerodynamic simulation.
+A fully initialized `Wing` instance ready for aerodynamic simulation with deformation support.
 
 # Example
 ```julia
-# Create a ram-air wing from geometry files
-wing = RamAirWing(
+# Create a deformable wing from geometry files
+wing = ObjWing(
     "path/to/wing.obj",
     "path/to/airfoil.dat";
     mass=1.5,
     n_panels=40,
     n_groups=4
 )
+
+# Apply deformation
+group_deform!(wing, deg2rad.([5, 10, 5, 0]), deg2rad.([-5, 0, -5, 0]))
 ```
 """
-function RamAirWing(
-    obj_path, dat_path; 
-    crease_frac=0.9, wind_vel=10., mass=1.0, 
-    n_panels=56, n_sections=n_panels+1, n_groups=4, spanwise_distribution=UNCHANGED, 
+function ObjWing(
+    obj_path, dat_path;
+    crease_frac=0.9, wind_vel=10., mass=1.0,
+    n_panels=56, n_sections=n_panels+1, n_groups=4, spanwise_distribution=UNCHANGED,
     spanwise_direction=[0.0, 1.0, 0.0], remove_nan=true, align_to_principal=false,
     alpha_range=deg2rad.(-5:1:20), delta_range=deg2rad.(-5:1:20), prn=true,
-    interp_steps=n_sections # TODO: check if interpolations are still needed
+    interp_steps=n_sections
 )
-
     !(n_groups == 0 || n_panels % n_groups == 0) && throw(ArgumentError("Number of panels should be divisible by number of groups"))
     !isapprox(spanwise_direction, [0.0, 1.0, 0.0]) && throw(ArgumentError("Spanwise direction has to be [0.0, 1.0, 0.0], not $spanwise_direction"))
 
@@ -436,7 +389,7 @@ function RamAirWing(
     if align_to_principal
         inertia_tensor, R_cad_body = calc_inertia_y_rotation(inertia_tensor)
     else
-        R_cad_body = I(3)
+        R_cad_body = Matrix{Float64}(I, 3, 3)
     end
     circle_center_z, radius, gamma_tip = find_circle_center_and_radius(vertices)
     le_interp, te_interp, area_interp = create_interpolations(vertices, circle_center_z, radius, gamma_tip, R_cad_body; interp_steps)
@@ -446,7 +399,7 @@ function RamAirWing(
         if !ispath(cl_polar_path) || !ispath(cd_polar_path) || !ispath(cm_polar_path)
             width = 2gamma_tip * radius
             area = area_interp(gamma_tip)
-            create_polars(; dat_path, cl_polar_path, cd_polar_path, cm_polar_path, wind_vel, 
+            create_polars(; dat_path, cl_polar_path, cd_polar_path, cm_polar_path, wind_vel,
                 area, width, crease_frac, alpha_range, delta_range, remove_nan)
         end
 
@@ -459,7 +412,7 @@ function RamAirWing(
             any(isnan.(cd_matrix)) && interpolate_matrix_nans!(cd_matrix; prn)
             any(isnan.(cm_matrix)) && interpolate_matrix_nans!(cm_matrix; prn)
         end
-        
+
         # Create sections
         sections = Section[]
         refined_sections = Section[]
@@ -474,12 +427,13 @@ function RamAirWing(
         end
 
         panel_props = PanelProperties{n_panels}()
-        cache = [LazyBufferCache()]
+        cache = [PreallocationTools.LazyBufferCache()]
 
-        RamAirWing(n_panels, n_groups, spanwise_distribution, panel_props, spanwise_direction, sections, 
-            refined_sections, remove_nan, non_deformed_sections,
+        Wing(n_panels, n_groups, spanwise_distribution, panel_props, MVec3(spanwise_direction),
+            sections, refined_sections, remove_nan,
+            non_deformed_sections, zeros(n_panels), zeros(n_panels),
             mass, gamma_tip, inertia_tensor, T_cad_body, R_cad_body, radius,
-            le_interp, te_interp, area_interp, zeros(n_panels), zeros(n_panels), cache)
+            le_interp, te_interp, area_interp, cache)
 
     catch e
         if e isa BoundsError
@@ -487,111 +441,4 @@ function RamAirWing(
         end
         rethrow(e)
     end
-end
-
-"""
-    group_deform!(wing::RamAirWing, theta_angles::AbstractVector, delta_angles::AbstractVector)
-
-Distribute control angles across wing panels and apply smoothing using a moving average filter.
-
-# Arguments
-- `wing::RamAirWing`: The wing to deform
-- `theta_angles::AbstractVector`: Twist angles in radians for each control section
-- `delta_angles::AbstractVector`: Trailing edge deflection angles in radians for each control section
-- `smooth::Bool`: Wether to apply smoothing or not
-
-# Algorithm
-1. Distributes each control input to its corresponding group of panels
-2. Applies moving average smoothing with window size based on control group size
-
-# Errors
-- Throws `ArgumentError` if panel count is not divisible by the number of control inputs
-
-# Returns
-- `nothing` (modifies wing in-place)
-"""
-function group_deform!(wing::RamAirWing, theta_angles=nothing, delta_angles=nothing; smooth=false)
-    !isnothing(theta_angles) && !(wing.n_panels % length(theta_angles) == 0) && 
-        throw(ArgumentError("Number of angles has to be a multiple of number of panels"))
-    !isnothing(delta_angles) && !(wing.n_panels % length(delta_angles) == 0) && 
-        throw(ArgumentError("Number of angles has to be a multiple of number of panels"))
-    isnothing(theta_angles) && isnothing(delta_angles) && return nothing
-
-    n_panels = wing.n_panels
-    theta_dist = wing.theta_dist
-    delta_dist = wing.delta_dist
-    n_angles = isnothing(theta_angles) ? length(delta_angles) : length(theta_angles)
-
-    dist_idx = 0
-    for angle_idx in 1:n_angles
-        for _ in 1:(wing.n_panels ÷ n_angles)
-            dist_idx += 1
-            !isnothing(theta_angles) && (theta_dist[dist_idx] = theta_angles[angle_idx])
-            !isnothing(delta_angles) && (delta_dist[dist_idx] = delta_angles[angle_idx])
-        end
-    end
-    @assert (dist_idx == wing.n_panels)
-
-    if smooth
-        window_size = wing.n_panels ÷ n_angles
-        if n_panels > window_size
-            smoothed = wing.cache[1][theta_dist]
-
-            if !isnothing(theta_angles)
-                smoothed .= theta_dist
-                for i in (window_size÷2 + 1):(n_panels - window_size÷2)
-                    @views smoothed[i] = mean(theta_dist[(i - window_size÷2):(i + window_size÷2)])
-                end
-                theta_dist .= smoothed
-            end
-            
-            if !isnothing(delta_angles)
-                smoothed .= delta_dist
-                for i in (window_size÷2 + 1):(n_panels - window_size÷2)
-                    @views smoothed[i] = mean(delta_dist[(i - window_size÷2):(i + window_size÷2)])
-                end
-                delta_dist .= smoothed
-            end
-        end
-    end
-    deform!(wing)
-    return nothing
-end
-
-"""
-    deform!(wing::RamAirWing, theta_dist::AbstractVector, delta_dist::AbstractVector; width)
-
-Deform wing by applying theta and delta distributions.
-
-# Arguments
-- `wing`: RamAirWing to deform
-- `theta_dist`: the angle distribution between of the kite and the body x-axis in radians of each panel
-- `delta_dist`: the deformation of the trailing edges of each panel
-
-# Effects
-Updates wing.sections with deformed geometry
-"""
-function deform!(wing::RamAirWing, theta_dist::AbstractVector, delta_dist::AbstractVector)
-    !(length(theta_dist) == wing.n_panels) && throw(ArgumentError("theta_dist and panels are of different lengths"))
-    !(length(delta_dist) == wing.n_panels) && throw(ArgumentError("delta_dist and panels are of different lengths"))
-    wing.theta_dist .= theta_dist
-    wing.delta_dist .= delta_dist
-
-    deform!(wing)
-end
-
-function deform!(wing::RamAirWing)
-    local_y = zeros(MVec3)
-    chord = zeros(MVec3)
-    normal = zeros(MVec3)
-
-    for i in 1:wing.n_panels
-        section1 = wing.non_deformed_sections[i]
-        section2 = wing.non_deformed_sections[i+1]
-        local_y .= normalize(section1.LE_point - section2.LE_point)
-        chord .= section1.TE_point .- section1.LE_point
-        normal .= chord × local_y
-        @. wing.sections[i].TE_point = section1.LE_point + cos(wing.theta_dist[i]) * chord - sin(wing.theta_dist[i]) * normal
-    end
-    return nothing
 end
