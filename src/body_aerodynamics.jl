@@ -129,13 +129,13 @@ Initialize a BodyAerodynamics struct in-place by setting up panels and coefficie
 # Returns
 nothing
 """
-function reinit!(body_aero::BodyAerodynamics; 
+function reinit!(body_aero::BodyAerodynamics;
     init_aero=true,
     va=[15.0, 0.0, 0.0],
     omega=zeros(MVec3)
 )
     idx = 1
-    vec = zeros(MVec3)
+    vec = @MVector zeros(3)
     for wing in body_aero.wings
         reinit!(wing)
         panel_props = wing.panel_props
@@ -168,8 +168,8 @@ function reinit!(body_aero::BodyAerodynamics;
     end
     
     # Initialize rest of the struct
-    body_aero.projected_area = sum(wing -> calculate_projected_area(wing), body_aero.wings)
-    body_aero.stall_angle_list .= calculate_stall_angle_list(body_aero.panels)
+    body_aero.projected_area = sum(calculate_projected_area, body_aero.wings)
+    calculate_stall_angle_list!(body_aero.stall_angle_list, body_aero.panels)
     body_aero.alpha_array .= 0.0
     body_aero.v_a_array .= 0.0 
     body_aero.AIC .= 0.0
@@ -191,21 +191,28 @@ Returns: nothing
 """
 @inline function calculate_AIC_matrices!(body_aero::BodyAerodynamics, model::Model,
                               core_radius_fraction,
-                              va_norm_array, 
+                              va_norm_array,
                               va_unit_array)
     # Determine evaluation point based on model
     evaluation_point = model == VSM ? :control_point : :aero_center
     evaluation_point_on_bound = model == LLT
-    
-    # Initialize AIC matrices
-    velocity_induced, tempvel, va_unit, U_2D = zeros(MVec3), zeros(MVec3), zeros(MVec3), zeros(MVec3)
+
+    # Allocate work vectors for this function (separate from those used by child functions)
+    velocity_induced = @MVector zeros(3)
+    tempvel = @MVector zeros(3)
+    va_unit = @MVector zeros(3)
+    U_2D = @MVector zeros(3)
     
     # Calculate influence coefficients
     for icp in eachindex(body_aero.panels)
-        ep = getproperty(body_aero.panels[icp], evaluation_point)
+        panel_icp = body_aero.panels[icp]
+        ep = evaluation_point == :control_point ? panel_icp.control_point : panel_icp.aero_center
         for jring in eachindex(body_aero.panels)
-            va_unit .= @views va_unit_array[jring, :]
-            filaments = body_aero.panels[jring].filaments
+            panel_jring = body_aero.panels[jring]
+            @inbounds for k in 1:3
+                va_unit[k] = va_unit_array[jring, k]
+            end
+            filaments = panel_jring.filaments
             va_norm = va_norm_array[jring]
             calculate_velocity_induced_single_ring_semiinfinite!(
                 velocity_induced,
@@ -222,8 +229,8 @@ Returns: nothing
                       
             # Subtract 2D induced velocity for VSM
             if icp == jring && model == VSM
-                calculate_velocity_induced_bound_2D!(U_2D, body_aero.panels[jring], ep, body_aero.work_vectors)
-                velocity_induced .-= U_2D              
+                calculate_velocity_induced_bound_2D!(U_2D, panel_jring, ep, body_aero.work_vectors)
+                velocity_induced .-= U_2D
             end
             body_aero.AIC[:, icp, jring] .= velocity_induced
         end
@@ -276,19 +283,34 @@ function calculate_stall_angle_list(panels::Vector{Panel};
                                   step_aoa=1.0,
                                   stall_angle_if_none_detected=50.0,
                                   cl_initial=-10.0)
-    
-    aoa_range = deg2rad.(range(begin_aoa, end_aoa, step=step_aoa))
-    stall_angles = Float64[]
-    
-    for panel in panels
+    stall_angles = Vector{Float64}(undef, length(panels))
+    calculate_stall_angle_list!(stall_angles, panels;
+                                begin_aoa, end_aoa, step_aoa,
+                                stall_angle_if_none_detected, cl_initial)
+    return stall_angles
+end
+
+function calculate_stall_angle_list!(stall_angles::AbstractVector{Float64},
+                                     panels::Vector{Panel};
+                                     begin_aoa=9.0,
+                                     end_aoa=22.0,
+                                     step_aoa=1.0,
+                                     stall_angle_if_none_detected=50.0,
+                                     cl_initial=-10.0)
+
+    # Pre-compute range values to avoid allocation
+    n_steps = Int(floor((end_aoa - begin_aoa) / step_aoa)) + 1
+
+    for (idx, panel) in enumerate(panels)
         # Default stall angle if none found
         panel_stall = stall_angle_if_none_detected
-        
+
         # Start with minimum cl
         cl_old = cl_initial
-        
+
         # Find stall angle
-        for aoa in aoa_range
+        for i in 0:(n_steps-1)
+            aoa = deg2rad(begin_aoa + i * step_aoa)
             cl = calculate_cl(panel, aoa)
             if cl < cl_old
                 panel_stall = aoa
@@ -296,11 +318,11 @@ function calculate_stall_angle_list(panels::Vector{Panel};
             end
             cl_old = cl
         end
-        
-        push!(stall_angles, panel_stall)
+
+        stall_angles[idx] = panel_stall
     end
-    
-    return stall_angles
+
+    return nothing
 end
 
 """
