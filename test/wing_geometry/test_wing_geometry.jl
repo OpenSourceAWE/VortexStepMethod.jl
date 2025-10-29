@@ -332,4 +332,157 @@ end
             @test section.aero_model == INVISCID
         end
     end
+
+    @testset "REFINE grouping panel mapping" begin
+        # Test that refined panel mapping actually maps each panel to its closest unrefined panel
+
+        @testset "LINEAR distribution" begin
+            n_panels = 20
+            span = 10.0
+
+            wing = Wing(n_panels; spanwise_distribution=LINEAR, n_groups=2, grouping_method=REFINE)
+            # 3 sections = 2 unrefined panels
+            add_section!(wing, [0.0, span/2, 0.0], [1.0, span/2, 0.0], INVISCID)
+            add_section!(wing, [0.0, 0.0, 0.0], [1.0, 0.0, 0.0], INVISCID)
+            add_section!(wing, [0.0, -span/2, 0.0], [1.0, -span/2, 0.0], INVISCID)
+
+            refine_aerodynamic_mesh!(wing)
+
+            @test length(wing.refined_panel_mapping) == n_panels
+
+            # Manually verify each refined panel is mapped to its closest unrefined panel
+            n_unrefined_panels = length(wing.sections) - 1
+            for refined_panel_idx in 1:n_panels
+                # Calculate refined panel center
+                le_mid = (wing.refined_sections[refined_panel_idx].LE_point +
+                         wing.refined_sections[refined_panel_idx+1].LE_point) / 2
+                te_mid = (wing.refined_sections[refined_panel_idx].TE_point +
+                         wing.refined_sections[refined_panel_idx+1].TE_point) / 2
+                refined_center = (le_mid + te_mid) / 2
+
+                # Find closest unrefined panel manually
+                min_dist = Inf
+                closest_idx = 1
+                for unrefined_panel_idx in 1:n_unrefined_panels
+                    le_mid_unref = (wing.sections[unrefined_panel_idx].LE_point +
+                                   wing.sections[unrefined_panel_idx+1].LE_point) / 2
+                    te_mid_unref = (wing.sections[unrefined_panel_idx].TE_point +
+                                   wing.sections[unrefined_panel_idx+1].TE_point) / 2
+                    unrefined_center = (le_mid_unref + te_mid_unref) / 2
+
+                    dist = norm(refined_center - unrefined_center)
+                    if dist < min_dist
+                        min_dist = dist
+                        closest_idx = unrefined_panel_idx
+                    end
+                end
+
+                # Verify mapping is correct
+                @test wing.refined_panel_mapping[refined_panel_idx] == closest_idx
+            end
+        end
+
+        @testset "COSINE distribution" begin
+            n_panels = 30
+            span = 20.0
+
+            wing = Wing(n_panels; spanwise_distribution=COSINE, n_groups=3, grouping_method=REFINE)
+            # 4 sections = 3 unrefined panels
+            add_section!(wing, [0.0, span/2, 0.0], [1.0, span/2, 0.0], INVISCID)
+            add_section!(wing, [0.0, span/6, 0.0], [1.0, span/6, 0.0], INVISCID)
+            add_section!(wing, [0.0, -span/6, 0.0], [1.0, -span/6, 0.0], INVISCID)
+            add_section!(wing, [0.0, -span/2, 0.0], [1.0, -span/2, 0.0], INVISCID)
+
+            refine_aerodynamic_mesh!(wing)
+
+            @test length(wing.refined_panel_mapping) == n_panels
+
+            # Verify each panel is mapped to its closest unrefined panel
+            n_unrefined_panels = length(wing.sections) - 1
+            for refined_panel_idx in 1:n_panels
+                # Calculate refined panel center
+                le_mid = (wing.refined_sections[refined_panel_idx].LE_point +
+                         wing.refined_sections[refined_panel_idx+1].LE_point) / 2
+                te_mid = (wing.refined_sections[refined_panel_idx].TE_point +
+                         wing.refined_sections[refined_panel_idx+1].TE_point) / 2
+                refined_center = (le_mid + te_mid) / 2
+
+                # Find closest unrefined panel manually
+                min_dist = Inf
+                closest_idx = 1
+                for unrefined_panel_idx in 1:n_unrefined_panels
+                    le_mid_unref = (wing.sections[unrefined_panel_idx].LE_point +
+                                   wing.sections[unrefined_panel_idx+1].LE_point) / 2
+                    te_mid_unref = (wing.sections[unrefined_panel_idx].TE_point +
+                                   wing.sections[unrefined_panel_idx+1].TE_point) / 2
+                    unrefined_center = (le_mid_unref + te_mid_unref) / 2
+
+                    dist = norm(refined_center - unrefined_center)
+                    if dist < min_dist
+                        min_dist = dist
+                        closest_idx = unrefined_panel_idx
+                    end
+                end
+
+                # Verify mapping is correct
+                @test wing.refined_panel_mapping[refined_panel_idx] == closest_idx
+            end
+        end
+
+        @testset "SPLIT_PROVIDED distribution" begin
+            n_panels = 12
+
+            wing = Wing(n_panels; spanwise_distribution=SPLIT_PROVIDED, n_groups=3, grouping_method=REFINE)
+            # 4 sections = 3 unrefined panels
+            add_section!(wing, [0.0, 6.0, 0.0], [1.0, 6.0, 0.0], INVISCID)
+            add_section!(wing, [0.0, 2.0, 0.0], [1.0, 2.0, 0.0], INVISCID)
+            add_section!(wing, [0.0, -2.0, 0.0], [1.0, -2.0, 0.0], INVISCID)
+            add_section!(wing, [0.0, -6.0, 0.0], [1.0, -6.0, 0.0], INVISCID)
+
+            refine_aerodynamic_mesh!(wing)
+
+            @test length(wing.refined_panel_mapping) == n_panels
+
+            # Verify each panel is mapped to its closest unrefined panel
+            n_unrefined_panels = length(wing.sections) - 1
+            for refined_panel_idx in 1:n_panels
+                # Calculate refined panel center
+                le_mid = (wing.refined_sections[refined_panel_idx].LE_point +
+                         wing.refined_sections[refined_panel_idx+1].LE_point) / 2
+                te_mid = (wing.refined_sections[refined_panel_idx].TE_point +
+                         wing.refined_sections[refined_panel_idx+1].TE_point) / 2
+                refined_center = (le_mid + te_mid) / 2
+
+                # Find closest unrefined panel manually
+                min_dist = Inf
+                closest_idx = 1
+                for unrefined_panel_idx in 1:n_unrefined_panels
+                    le_mid_unref = (wing.sections[unrefined_panel_idx].LE_point +
+                                   wing.sections[unrefined_panel_idx+1].LE_point) / 2
+                    te_mid_unref = (wing.sections[unrefined_panel_idx].TE_point +
+                                   wing.sections[unrefined_panel_idx+1].TE_point) / 2
+                    unrefined_center = (le_mid_unref + te_mid_unref) / 2
+
+                    dist = norm(refined_center - unrefined_center)
+                    if dist < min_dist
+                        min_dist = dist
+                        closest_idx = unrefined_panel_idx
+                    end
+                end
+
+                # Verify mapping is correct
+                @test wing.refined_panel_mapping[refined_panel_idx] == closest_idx
+            end
+        end
+
+        @testset "Validation: n_groups must equal unrefined panels" begin
+            wing = Wing(20; spanwise_distribution=LINEAR, n_groups=5, grouping_method=REFINE)
+            add_section!(wing, [0.0, 5.0, 0.0], [1.0, 5.0, 0.0], INVISCID)
+            add_section!(wing, [0.0, 0.0, 0.0], [1.0, 0.0, 0.0], INVISCID)
+            add_section!(wing, [0.0, -5.0, 0.0], [1.0, -5.0, 0.0], INVISCID)
+
+            # Should throw error: 5 groups but only 2 unrefined panels
+            @test_throws ArgumentError refine_aerodynamic_mesh!(wing)
+        end
+    end
 end

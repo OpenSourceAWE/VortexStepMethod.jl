@@ -107,21 +107,23 @@ path_cfd_lebesque = joinpath(
     "V3_CL_CD_RANS_Lebesque_2024_Rey_300e4.csv"
 )
 
+# Only include literature data if file exists
+literature_paths = isfile(path_cfd_lebesque) ? [path_cfd_lebesque] : String[]
+labels = isfile(path_cfd_lebesque) ?
+    ["VSM CAD 19ribs", "VSM CAD 19ribs , with stall correction", "CFD_Lebesque Rey 30e5"] :
+    ["VSM CAD 19ribs", "VSM CAD 19ribs , with stall correction"]
+
 PLOT && plot_polars(
     [vsm_solver, VSM_with_stall_correction],
     [body_aero, body_aero],
-    [
-        "VSM CAD 19ribs",
-        "VSM CAD 19ribs , with stall correction",
-        "CFD_Lebesque Rey 30e5"
-    ];
-    literature_path_list=[path_cfd_lebesque],
+    labels;
+    literature_path_list=literature_paths,
     angle_range=range(0, 25, length=25),
     angle_type="angle_of_attack",
     angle_of_attack=0,
     side_slip=0,
     v_a=10,
-    title="tutorial_testing_stall_model_n_panels_$(n_panels)_distribution_$(spanwise_distribution)",
+    title="tutorial_testing_stall_model_n_panels_$(n_panels)_distribution_$(spanwise_distribution)_grouping_$(CAD_wing.grouping_method)",
     data_type=".pdf",
     save_path=joinpath(save_folder, "polars"),
     is_save=true,
