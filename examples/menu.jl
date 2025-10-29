@@ -1,8 +1,3 @@
-using Pkg
-if ! ("ControlPlots" ∈ keys(Pkg.project().dependencies))
-    using TestEnv; TestEnv.activate()
-end
-
 using ControlPlots
 using VortexStepMethod
 using REPL.TerminalMenus

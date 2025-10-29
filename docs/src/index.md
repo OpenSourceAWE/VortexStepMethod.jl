@@ -18,9 +18,9 @@ if you haven't already. On Linux, make sure that Python3 and Matplotlib are inst
 ```
 sudo apt install python3-matplotlib
 ```
-Furthermore, the packages `TestEnv` and `ControlPlots` must be installed globally:
+Furthermore, the package `ControlPlots` must be installed globally:
 ```
-julia -e 'using Pkg; Pkg.add("TestEnv"); Pkg.add("ControlPlots")'
+julia -e 'using Pkg; Pkg.add("ControlPlots")'
 ```
 
 Before installing this software it is suggested to create a new project, for example like this:

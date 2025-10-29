@@ -5,6 +5,7 @@
 | AIC | Aerodynamic Influence Coefficient (AIC). The AIC matrix represents the relationship between the induced velocities or pressures on aerodynamic surfaces and the circulation strength or modal deformations of the lifting surfaces.|
 | inviscid | A fluid flow in which viscosity is considered negligible or zero. This means that there is no internal friction between the fluid layers, and the effects of viscosity on the flow are assumed to be insignificant. |
 | Panel | Flat surface element in 3D that approximate the contour of the aerodynamic body being studied.|
+| Panel Group | A collection of panels whose aerodynamic forces and moments are summed together. Groups can be defined using EQUAL_SIZE (sequential grouping) or REFINE (based on original unrefined structure) methods.|
 | Section |A wing section, also known as an airfoil or aerofoil, is the cross-sectional shape of an aircraft wing.|
 | Span | Distance from one wing tip to the other wing tip. |
 | Polar | The polar typically plots the coefficient of lift (CL) against the coefficient of drag (CD), with the angle of attack as a parameter along the curve. |

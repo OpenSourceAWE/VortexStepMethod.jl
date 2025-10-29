@@ -366,7 +366,7 @@ function ObjWing(
     n_panels=56, n_sections=n_panels+1, n_groups=4, spanwise_distribution=UNCHANGED,
     spanwise_direction=[0.0, 1.0, 0.0], remove_nan=true, align_to_principal=false,
     alpha_range=deg2rad.(-5:1:20), delta_range=deg2rad.(-5:1:20), prn=true,
-    interp_steps=n_sections
+    interp_steps=n_sections, grouping_method::PanelGroupingMethod=EQUAL_SIZE
 )
     !(n_groups == 0 || n_panels % n_groups == 0) && throw(ArgumentError("Number of panels should be divisible by number of groups"))
     !isapprox(spanwise_direction, [0.0, 1.0, 0.0]) && throw(ArgumentError("Spanwise direction has to be [0.0, 1.0, 0.0], not $spanwise_direction"))
@@ -431,6 +431,7 @@ function ObjWing(
 
         Wing(n_panels, n_groups, spanwise_distribution, panel_props, MVec3(spanwise_direction),
             sections, refined_sections, remove_nan,
+            grouping_method, Int16[],
             non_deformed_sections, zeros(n_panels), zeros(n_panels),
             mass, gamma_tip, inertia_tensor, T_cad_body, R_cad_body, radius,
             le_interp, te_interp, area_interp, cache)

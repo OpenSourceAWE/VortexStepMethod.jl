@@ -1,8 +1,3 @@
-using Pkg
-if !("BenchmarkTools" ∈ keys(Pkg.project().dependencies))
-    using TestEnv
-    TestEnv.activate()
-end
 using BenchmarkTools
 using StaticArrays
 using VortexStepMethod

@@ -37,6 +37,7 @@ export MVec3
 export Model, VSM, LLT
 export AeroModel, LEI_AIRFOIL_BREUKELS, POLAR_VECTORS, POLAR_MATRICES, INVISCID
 export PanelDistribution, LINEAR, COSINE, COSINE_VAN_GARREL, SPLIT_PROVIDED, UNCHANGED
+export PanelGroupingMethod, EQUAL_SIZE, REFINE
 export InitialGammaDistribution, ELLIPTIC, ZEROS
 export SolverStatus, FEASIBLE, INFEASIBLE, FAILURE
 export SolverType, LOOP, NONLIN
@@ -137,6 +138,17 @@ Enumeration of the implemented panel distributions.
    SPLIT_PROVIDED     # Split provided sections
    UNCHANGED          # Keep original sections
 end
+
+"""
+   PanelGroupingMethod EQUAL_SIZE REFINE
+
+Enumeration of methods for grouping panels.
+
+# Elements
+- EQUAL_SIZE: Divide panels into equally-sized sequential groups
+- REFINE: Group refined panels back to their original unrefined section
+"""
+@enum PanelGroupingMethod EQUAL_SIZE REFINE
 
 """
    InitialGammaDistribution ELLIPTIC ZEROS

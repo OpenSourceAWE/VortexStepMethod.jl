@@ -7,6 +7,7 @@ Model
 WingType
 AeroModel
 PanelDistribution
+PanelGroupingMethod
 InitialGammaDistribution
 SolverStatus
 ```
