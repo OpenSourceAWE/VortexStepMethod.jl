@@ -44,10 +44,12 @@ function reinit!(section::Section, LE_point, TE_point, aero_model=nothing, aero_
     section.TE_point .= TE_point
     (!isnothing(aero_model)) && (section.aero_model = aero_model)
     if !isnothing(aero_data)
-        if !isnothing(section.aero_data)
-            section.aero_data .= aero_data
-        else 
+        # NTuple is immutable, so we must assign directly
+        # For mutable types (Vector, Matrix), we can broadcast for efficiency
+        if aero_data isa NTuple || isnothing(section.aero_data)
             section.aero_data = aero_data
+        else
+            section.aero_data .= aero_data
         end
     end
     nothing
