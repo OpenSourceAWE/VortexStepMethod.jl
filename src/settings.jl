@@ -40,9 +40,13 @@ end
     solver_settings::SolverSettings = SolverSettings()
 end
 
-function VSMSettings(filename)
+function VSMSettings(filename; data_prefix=true)
     # Uwe's suggested 3-line approach using StructMapping.jl (adapted)
-    data = YAML.load_file(joinpath("data", filename))
+    if data_prefix
+        data = YAML.load_file(joinpath("data", filename))
+    else
+        data = YAML.load_file(filename)
+    end
     
     # Use StructMapping for basic structure conversion
     # But handle special fields manually due to enum conversion needs
