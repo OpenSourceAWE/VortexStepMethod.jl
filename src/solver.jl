@@ -51,6 +51,9 @@ Struct for storing the solution of the [solve!](@ref) function. Must contain all
     moment_coeff_dist::MVector{P, Float64} = zeros(P)
     group_moment_dist::MVector{G, Float64} = zeros(G)
     group_moment_coeff_dist::MVector{G, Float64} = zeros(G)
+    cl_group_array::MVector{G, Float64} = zeros(G)
+    cd_group_array::MVector{G, Float64} = zeros(G)
+    cm_group_array::MVector{G, Float64} = zeros(G)
     solver_status::SolverStatus = FAILURE
 end
 
@@ -296,8 +299,14 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
     if length(solver.sol.group_moment_dist) > 0
         group_moment_dist = solver.sol.group_moment_dist
         group_moment_coeff_dist = solver.sol.group_moment_coeff_dist
+        cl_group_array = solver.sol.cl_group_array
+        cd_group_array = solver.sol.cd_group_array
+        cm_group_array = solver.sol.cm_group_array
         group_moment_dist .= 0.0
         group_moment_coeff_dist .= 0.0
+        cl_group_array .= 0.0
+        cd_group_array .= 0.0
+        cm_group_array .= 0.0
         panel_idx = 1
         group_idx = 1
         for wing in body_aero.wings
@@ -306,20 +315,45 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
                     # Original method: divide panels into equally-sized sequential groups
                     panels_per_group = wing.n_panels ÷ wing.n_groups
                     for _ in 1:wing.n_groups
+                        panel_count = 0
                         for _ in 1:panels_per_group
                             group_moment_dist[group_idx] += moment_dist[panel_idx]
                             group_moment_coeff_dist[group_idx] += moment_coeff_dist[panel_idx]
+                            cl_group_array[group_idx] += solver.sol.cl_array[panel_idx]
+                            cd_group_array[group_idx] += solver.sol.cd_array[panel_idx]
+                            cm_group_array[group_idx] += solver.sol.cm_array[panel_idx]
                             panel_idx += 1
+                            panel_count += 1
                         end
+                        # Average the coefficients over panels in the group
+                        cl_group_array[group_idx] /= panel_count
+                        cd_group_array[group_idx] /= panel_count
+                        cm_group_array[group_idx] /= panel_count
                         group_idx += 1
                     end
                 elseif wing.grouping_method == REFINE
                     # REFINE method: group refined panels by their original unrefined section
+                    # First pass: accumulate values
+                    group_panel_counts = zeros(Int, wing.n_groups)
                     for local_panel_idx in 1:wing.n_panels
                         original_section_idx = wing.refined_panel_mapping[local_panel_idx]
-                        group_moment_dist[group_idx + original_section_idx - 1] += moment_dist[panel_idx]
-                        group_moment_coeff_dist[group_idx + original_section_idx - 1] += moment_coeff_dist[panel_idx]
+                        target_group_idx = group_idx + original_section_idx - 1
+                        group_moment_dist[target_group_idx] += moment_dist[panel_idx]
+                        group_moment_coeff_dist[target_group_idx] += moment_coeff_dist[panel_idx]
+                        cl_group_array[target_group_idx] += solver.sol.cl_array[panel_idx]
+                        cd_group_array[target_group_idx] += solver.sol.cd_array[panel_idx]
+                        cm_group_array[target_group_idx] += solver.sol.cm_array[panel_idx]
+                        group_panel_counts[original_section_idx] += 1
                         panel_idx += 1
+                    end
+                    # Second pass: average coefficients
+                    for i in 1:wing.n_groups
+                        target_group_idx = group_idx + i - 1
+                        if group_panel_counts[i] > 0
+                            cl_group_array[target_group_idx] /= group_panel_counts[i]
+                            cd_group_array[target_group_idx] /= group_panel_counts[i]
+                            cm_group_array[target_group_idx] /= group_panel_counts[i]
+                        end
                     end
                     group_idx += wing.n_groups
                 end
