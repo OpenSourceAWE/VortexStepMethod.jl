@@ -301,8 +301,20 @@ function Wing(n_panels::Int;
     )
 end
 
-function reinit!(wing::AbstractWing)
-    refine_aerodynamic_mesh!(wing)
+"""
+    reinit!(wing::AbstractWing; refine_mesh=true)
+
+Reinitialize wing geometry and panel properties.
+
+# Keyword Arguments
+- `refine_mesh::Bool=true`: Whether to refine the mesh. Set to `false` after
+  `deform!()` to preserve deformed geometry while updating panel properties.
+"""
+function reinit!(wing::AbstractWing; refine_mesh=true)
+    # Refine mesh unless explicitly disabled (e.g., to preserve deformation)
+    if refine_mesh
+        refine_aerodynamic_mesh!(wing)
+    end
 
     # Calculate panel properties
     update_panel_properties!(

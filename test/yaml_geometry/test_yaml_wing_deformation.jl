@@ -25,7 +25,7 @@ end
         delta_dist = fill(deg2rad(5.0), wing.n_panels)   # 5 degrees trailing edge deflection
 
         VortexStepMethod.deform!(wing, theta_dist, delta_dist)
-        VortexStepMethod.reinit!(body_aero)
+        VortexStepMethod.reinit!(body_aero; refine_mesh=false)
 
         # Check if TE point changed after deformation
         deformed_te_point = copy(body_aero.panels[i].TE_point_1)
@@ -46,7 +46,7 @@ end
         zero_delta_dist = zeros(wing.n_panels)
 
         VortexStepMethod.deform!(wing, zero_theta_dist, zero_delta_dist)
-        VortexStepMethod.reinit!(body_aero)
+        VortexStepMethod.reinit!(body_aero; refine_mesh=false)
 
         # Check if TE point returned to original position
         reset_te_point = copy(body_aero.panels[i].TE_point_1)
@@ -77,7 +77,7 @@ end
         delta_dist = [deg2rad(-5.0 + 10.0 * i / wing.n_panels) for i in 1:wing.n_panels]  # Varying deflection
 
         VortexStepMethod.deform!(wing, theta_dist, delta_dist)
-        VortexStepMethod.reinit!(body_aero)
+        VortexStepMethod.reinit!(body_aero; refine_mesh=false)
 
         # Check that different panels have different deformations
         for (idx, i) in enumerate(test_indices)
@@ -96,7 +96,7 @@ end
 
         # Reset and verify
         VortexStepMethod.deform!(wing, zeros(wing.n_panels), zeros(wing.n_panels))
-        VortexStepMethod.reinit!(body_aero)
+        VortexStepMethod.reinit!(body_aero; refine_mesh=false)
 
         for (idx, i) in enumerate(test_indices)
             reset_te = body_aero.panels[i].TE_point_1
@@ -138,6 +138,7 @@ end
         theta_dist = fill(deg2rad(15.0), wing.n_panels)
         delta_dist = fill(deg2rad(3.0), wing.n_panels)
         VortexStepMethod.deform!(wing, theta_dist, delta_dist)
+        VortexStepMethod.reinit!(body_aero; refine_mesh=false)
 
         # Store state after deformation
         i = length(body_aero.panels) ÷ 2
@@ -147,7 +148,8 @@ end
             VortexStepMethod.reinit!(body_aero;
                 va=zeros(3),
                 omega=zeros(3),
-                init_aero=true
+                init_aero=true,
+                refine_mesh=false
             )
         end
 
@@ -162,7 +164,7 @@ end
 
         # Test zero deformation
         VortexStepMethod.deform!(wing, zeros(wing.n_panels), zeros(wing.n_panels))
-        VortexStepMethod.reinit!(body_aero)
+        VortexStepMethod.reinit!(body_aero; refine_mesh=false)
         @test all(p.delta ≈ 0.0 for p in body_aero.panels)
 
         # Test large deformation angles
@@ -171,14 +173,14 @@ end
 
         # Should not error even with large angles
         VortexStepMethod.deform!(wing, theta_dist, delta_dist)
-        VortexStepMethod.reinit!(body_aero)
+        VortexStepMethod.reinit!(body_aero; refine_mesh=false)
         @test all(p.delta ≈ deg2rad(30.0) for p in body_aero.panels)
 
         # Test negative angles
         theta_dist = fill(deg2rad(-20.0), wing.n_panels)
         delta_dist = fill(deg2rad(-10.0), wing.n_panels)
         VortexStepMethod.deform!(wing, theta_dist, delta_dist)
-        VortexStepMethod.reinit!(body_aero)
+        VortexStepMethod.reinit!(body_aero; refine_mesh=false)
         @test all(p.delta ≈ deg2rad(-10.0) for p in body_aero.panels)
     end
 end
