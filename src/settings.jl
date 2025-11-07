@@ -8,8 +8,10 @@ end
 @with_kw mutable struct WingSettings
     name::String = "main_wing"
     geometry_file::String = ""          # path to wing geometry YAML file
+    obj_file::String = ""               # path to .obj geometry file
+    dat_file::String = ""               # path to .dat airfoil file
     n_panels::Int64 = 40
-    n_groups::Int64 = 40 
+    n_groups::Int64 = 40
     spanwise_panel_distribution::PanelDistribution = LINEAR
     spanwise_direction::MVec3 = [0.0, 1.0, 0.0]
     remove_nan = true
@@ -68,12 +70,18 @@ function VSMSettings(filename; data_prefix=true)
             if haskey(wing_data, "geometry_file")
                 wing.geometry_file = wing_data["geometry_file"]
             end
+            if haskey(wing_data, "obj_file")
+                wing.obj_file = wing_data["obj_file"]
+            end
+            if haskey(wing_data, "dat_file")
+                wing.dat_file = wing_data["dat_file"]
+            end
             wing.n_panels = wing_data["n_panels"]
             wing.n_groups = wing_data["n_groups"]
             wing.spanwise_panel_distribution = eval(Symbol(wing_data["spanwise_panel_distribution"]))
             wing.spanwise_direction = MVec3(wing_data["spanwise_direction"])
             wing.remove_nan = wing_data["remove_nan"]
-            
+
             push!(vsm_settings.wings, wing)
             n_panels += wing.n_panels
             n_groups += wing.n_groups

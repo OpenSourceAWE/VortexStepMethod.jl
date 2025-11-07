@@ -275,9 +275,13 @@ end
 
 Create a wing model from VSM settings configuration.
 
-This constructor is a convenience wrapper that extracts wing configuration 
-from VSMSettings and creates a Wing using the YAML geometry file path and 
-parameters specified in the settings.
+This constructor is a convenience wrapper that extracts wing configuration
+from VSMSettings and creates a Wing using either:
+- YAML geometry file (geometry_file field), or
+- OBJ + DAT files (obj_file and dat_file fields)
+
+The constructor automatically determines which path to use based on which
+fields are populated in the settings.
 
 # Arguments
 - `settings`: VSMSettings object containing wing configuration
@@ -287,15 +291,64 @@ A fully initialized `Wing` instance ready for aerodynamic simulation.
 
 # Example
 ```julia
-# Load settings and create wing in one step
+# Using YAML geometry
 settings = VSMSettings("path/to/vsm_settings.yaml")
 wing = Wing(settings)
+
+# Settings can specify either:
+# - geometry_file: "path/to/wing.yaml"  # YAML-based
+# - obj_file + dat_file                  # OBJ-based
 ```
 """
 function Wing(settings::VSMSettings)
-    Wing(settings.wings[1].geometry_file; 
-        n_panels=settings.wings[1].n_panels, 
-        n_groups=settings.wings[1].n_groups,
-        spanwise_distribution=settings.wings[1].spanwise_panel_distribution
-    )
+    wing_settings = settings.wings[1]
+
+    # Check which geometry format to use
+    has_yaml = !isempty(wing_settings.geometry_file)
+    has_obj = !isempty(wing_settings.obj_file)
+    has_dat = !isempty(wing_settings.dat_file)
+
+    if has_yaml && (has_obj || has_dat)
+        throw(ArgumentError(
+            "Cannot specify both geometry_file and obj_file/dat_file"
+        ))
+    end
+
+    if has_obj && !has_dat
+        throw(ArgumentError(
+            "obj_file requires dat_file to be specified"
+        ))
+    end
+
+    if has_dat && !has_obj
+        throw(ArgumentError(
+            "dat_file requires obj_file to be specified"
+        ))
+    end
+
+    if has_yaml
+        # Use YAML geometry constructor
+        Wing(wing_settings.geometry_file;
+            n_panels=wing_settings.n_panels,
+            n_groups=wing_settings.n_groups,
+            spanwise_distribution=wing_settings.spanwise_panel_distribution,
+            remove_nan=wing_settings.remove_nan
+        )
+    elseif has_obj && has_dat
+        # Use ObjWing constructor
+        ObjWing(
+            wing_settings.obj_file,
+            wing_settings.dat_file;
+            n_panels=wing_settings.n_panels,
+            n_groups=wing_settings.n_groups,
+            spanwise_distribution=wing_settings.spanwise_panel_distribution,
+            spanwise_direction=wing_settings.spanwise_direction,
+            remove_nan=wing_settings.remove_nan
+        )
+    else
+        throw(ArgumentError(
+            "WingSettings must specify either geometry_file or " *
+            "both obj_file and dat_file"
+        ))
+    end
 end

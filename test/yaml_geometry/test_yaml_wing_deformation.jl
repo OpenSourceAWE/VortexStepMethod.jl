@@ -29,8 +29,8 @@ using Test
         @test !isapprox(original_te_point, deformed_te_point, atol=1e-2)
         @test deformed_te_point[3] < original_te_point[3]  # TE should move down with positive twist
 
-        # LE point should also change due to twist
-        @test !isapprox(original_le_point, deformed_le_point, atol=1e-2)
+        # LE point stays fixed (deform! rotates TE around LE)
+        @test isapprox(original_le_point, deformed_le_point, atol=1e-4)
 
         # Check delta is set correctly
         @test body_aero.panels[i].delta ≈ deg2rad(5.0)
@@ -78,9 +78,10 @@ using Test
             deformed_te = body_aero.panels[i].TE_point_1
             deformed_le = body_aero.panels[i].LE_point_1
 
-            # Points should have changed
+            # TE points should have changed due to deformation
             @test !isapprox(original_points[idx].TE, deformed_te, atol=1e-2)
-            @test !isapprox(original_points[idx].LE, deformed_le, atol=1e-2)
+            # LE points stay fixed (deform! rotates TE around LE)
+            @test isapprox(original_points[idx].LE, deformed_le, atol=1e-4)
         end
 
         # Check that the deformation is applied correctly
@@ -116,7 +117,8 @@ using Test
 
         # Wing should still be valid after multiple reinits
         @test wing.sections[1].aero_data !== nothing
-        @test length(wing.sections) == 2
+        # Note: For deformation support, wing.sections now points to refined_sections
+        @test length(wing.sections) == wing.n_panels + 1
     end
 
     @testset "Deformation with BodyAerodynamics Reinit" begin
