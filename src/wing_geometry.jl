@@ -450,7 +450,7 @@ function deform!(wing::Wing)
         local_y .= normalize(section1.LE_point - section2.LE_point)
         chord .= section1.TE_point .- section1.LE_point
         normal .= chord × local_y
-        @. wing.sections[i].TE_point = section1.LE_point + cos(wing.theta_dist[i]) * chord - sin(wing.theta_dist[i]) * normal
+        @. wing.refined_sections[i].TE_point = section1.LE_point + cos(wing.theta_dist[i]) * chord - sin(wing.theta_dist[i]) * normal
     end
     return nothing
 end
@@ -529,6 +529,28 @@ end
 
 
 """
+    update_non_deformed_sections!(wing::AbstractWing)
+
+Create non_deformed_sections to match refined_sections.
+This enables deformation support for all wings (YAML and OBJ).
+Should be called after refined_sections are populated for the FIRST time only.
+Once populated, non_deformed_sections serves as the undeformed reference geometry.
+"""
+function update_non_deformed_sections!(wing::AbstractWing)
+    n_sections = wing.n_panels + 1
+
+    # Only populate non_deformed_sections if it's empty (initial setup)
+    # Once populated, it serves as the undeformed reference and should not be overwritten
+    if isempty(wing.non_deformed_sections)
+        wing.non_deformed_sections = [Section() for _ in 1:n_sections]
+        for i in 1:n_sections
+            reinit!(wing.non_deformed_sections[i], wing.refined_sections[i])
+        end
+    end
+    return nothing
+end
+
+"""
     refine_aerodynamic_mesh!(wing::AbstractWing)
 
 Refine the aerodynamic mesh of the wing based on spanwise panel distribution.
@@ -542,6 +564,7 @@ function refine_aerodynamic_mesh!(wing::AbstractWing)
     if length(wing.refined_sections) == 0
         if wing.spanwise_distribution == UNCHANGED || length(wing.sections) == n_sections
             wing.refined_sections = wing.sections
+            update_non_deformed_sections!(wing)
             return nothing
         else
             wing.refined_sections = Section[Section() for _ in 1:wing.n_panels+1]
@@ -573,6 +596,7 @@ function refine_aerodynamic_mesh!(wing::AbstractWing)
             reinit!(wing.refined_sections[i], wing.sections[i])
         end
         compute_refined_panel_mapping!(wing)
+        update_non_deformed_sections!(wing)
         return nothing
     end
 
@@ -583,6 +607,7 @@ function refine_aerodynamic_mesh!(wing::AbstractWing)
         reinit!(wing.refined_sections[1], LE[1,:], TE[1,:], aero_model[1], aero_data[1])
         reinit!(wing.refined_sections[2], LE[end,:], TE[end,:], aero_model[end], aero_data[end])
         compute_refined_panel_mapping!(wing)
+        update_non_deformed_sections!(wing)
         return nothing
     end
 
@@ -618,6 +643,9 @@ function refine_aerodynamic_mesh!(wing::AbstractWing)
             ))
         end
     end
+
+    # Create/update non_deformed_sections to match refined_sections
+    update_non_deformed_sections!(wing)
 
     return nothing
 end

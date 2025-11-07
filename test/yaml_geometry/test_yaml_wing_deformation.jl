@@ -2,6 +2,12 @@ using VortexStepMethod
 using LinearAlgebra
 using Test
 
+# Load TestSupport if not already loaded (for standalone execution)
+if !@isdefined(TestSupport)
+    include(joinpath(@__DIR__, "..", "TestSupport.jl"))
+    using .TestSupport
+end
+
 @testset "YAML Wing Deformation Tests" begin
     @testset "Simple Wing Deformation" begin
         # Load existing simple_wing.yaml
@@ -117,8 +123,9 @@ using Test
 
         # Wing should still be valid after multiple reinits
         @test wing.sections[1].aero_data !== nothing
-        # Note: For deformation support, wing.sections now points to refined_sections
-        @test length(wing.sections) == wing.n_panels + 1
+        # Verify refined_sections and non_deformed_sections are properly populated
+        @test length(wing.refined_sections) == wing.n_panels + 1
+        @test length(wing.non_deformed_sections) == wing.n_panels + 1
     end
 
     @testset "Deformation with BodyAerodynamics Reinit" begin
