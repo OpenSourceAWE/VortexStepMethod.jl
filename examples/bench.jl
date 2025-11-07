@@ -2,12 +2,6 @@ using LinearAlgebra
 using ControlPlots
 using VortexStepMethod
 
-using Pkg
-
-if !("CSV" ∈ keys(Pkg.project().dependencies))
-    using TestEnv
-    TestEnv.activate()
-end
 
 # Step 1: Define wing parameters
 n_panels = 20          # Number of panels

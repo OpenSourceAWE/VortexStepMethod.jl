@@ -302,14 +302,26 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
         group_idx = 1
         for wing in body_aero.wings
             if wing.n_groups > 0
-                panels_per_group = wing.n_panels ÷ wing.n_groups
-                for _ in 1:wing.n_groups
-                    for _ in 1:panels_per_group
-                        group_moment_dist[group_idx] += moment_dist[panel_idx]
-                        group_moment_coeff_dist[group_idx] += moment_coeff_dist[panel_idx]
+                if wing.grouping_method == EQUAL_SIZE
+                    # Original method: divide panels into equally-sized sequential groups
+                    panels_per_group = wing.n_panels ÷ wing.n_groups
+                    for _ in 1:wing.n_groups
+                        for _ in 1:panels_per_group
+                            group_moment_dist[group_idx] += moment_dist[panel_idx]
+                            group_moment_coeff_dist[group_idx] += moment_coeff_dist[panel_idx]
+                            panel_idx += 1
+                        end
+                        group_idx += 1
+                    end
+                elseif wing.grouping_method == REFINE
+                    # REFINE method: group refined panels by their original unrefined section
+                    for local_panel_idx in 1:wing.n_panels
+                        original_section_idx = wing.refined_panel_mapping[local_panel_idx]
+                        group_moment_dist[group_idx + original_section_idx - 1] += moment_dist[panel_idx]
+                        group_moment_coeff_dist[group_idx + original_section_idx - 1] += moment_coeff_dist[panel_idx]
                         panel_idx += 1
                     end
-                    group_idx += 1
+                    group_idx += wing.n_groups
                 end
             else
                 # Skip panels for wings with n_groups=0

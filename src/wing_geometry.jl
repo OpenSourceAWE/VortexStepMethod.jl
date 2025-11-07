@@ -231,6 +231,10 @@ mutable struct Wing <: AbstractWing
     refined_sections::Vector{Section}
     remove_nan::Bool
 
+    # Grouping
+    grouping_method::PanelGroupingMethod
+    refined_panel_mapping::Vector{Int16}  # Maps each refined panel to its original unrefined section index
+
     # Deformation fields
     non_deformed_sections::Vector{Section}
     theta_dist::Vector{Float64}
@@ -254,7 +258,8 @@ end
          n_groups=n_panels,
          spanwise_distribution::PanelDistribution=LINEAR,
          spanwise_direction::PosVector=MVec3([0.0, 1.0, 0.0]),
-         remove_nan::Bool=true)
+         remove_nan::Bool=true,
+         grouping_method::PanelGroupingMethod=EQUAL_SIZE)
 
 Constructor for a [Wing](@ref) struct with default values that initializes the sections
 and refined sections as empty arrays. Creates a basic wing suitable for YAML-based construction.
@@ -265,19 +270,28 @@ and refined sections as empty arrays. Creates a basic wing suitable for YAML-bas
 - `spanwise_distribution`::PanelDistribution = LINEAR: [PanelDistribution](@ref)
 - `spanwise_direction::MVec3` = MVec3([0.0, 1.0, 0.0]): Wing span direction vector
 - `remove_nan::Bool`: Wether to remove the NaNs from interpolations or not
+- `grouping_method::PanelGroupingMethod` = EQUAL_SIZE: Method for grouping panels (EQUAL_SIZE or REFINE)
 """
 function Wing(n_panels::Int;
         n_groups = n_panels,
         spanwise_distribution::PanelDistribution=LINEAR,
         spanwise_direction::PosVector=MVec3([0.0, 1.0, 0.0]),
-        remove_nan=true)
-    !(n_groups == 0 || n_panels % n_groups == 0) && throw(ArgumentError("Number of panels should be divisible by number of groups"))
+        remove_nan=true,
+        grouping_method::PanelGroupingMethod=EQUAL_SIZE)
+    # Validate grouping parameters
+    if grouping_method == EQUAL_SIZE
+        !(n_groups == 0 || n_panels % n_groups == 0) && throw(ArgumentError("With EQUAL_SIZE grouping, number of panels should be divisible by number of groups"))
+    end
+    # Note: For REFINE grouping, validation happens after refinement when we know the number of unrefined sections
+
     panel_props = PanelProperties{n_panels}()
 
     # Initialize with default/empty values for optional fields
     Wing(
         n_panels, n_groups, spanwise_distribution, panel_props, spanwise_direction,
         Section[], Section[], remove_nan,
+        # Grouping
+        grouping_method, Int16[],
         # Deformation fields
         Section[], zeros(n_panels), zeros(n_panels),
         # Physical properties (defaults for non-OBJ wings)
@@ -558,23 +572,25 @@ function refine_aerodynamic_mesh!(wing::AbstractWing)
         for i in eachindex(wing.sections)
             reinit!(wing.refined_sections[i], wing.sections[i])
         end
+        compute_refined_panel_mapping!(wing)
         return nothing
     end
 
     @debug "Refining aerodynamic mesh from $(length(wing.sections)) sections to $n_sections sections."
-    
+
     # Handle two-section case
     if n_sections == 2
         reinit!(wing.refined_sections[1], LE[1,:], TE[1,:], aero_model[1], aero_data[1])
         reinit!(wing.refined_sections[2], LE[end,:], TE[end,:], aero_model[end], aero_data[end])
+        compute_refined_panel_mapping!(wing)
         return nothing
     end
-    
+
     # Handle different distribution types
     if wing.spanwise_distribution == SPLIT_PROVIDED
-        return refine_mesh_by_splitting_provided_sections!(wing)
+        refine_mesh_by_splitting_provided_sections!(wing)
     elseif wing.spanwise_distribution in (LINEAR, COSINE, COSINE_VAN_GARREL)
-        return refine_mesh_for_linear_cosine_distribution!(
+        refine_mesh_for_linear_cosine_distribution!(
             wing,
             1,
             wing.spanwise_distribution,
@@ -587,6 +603,80 @@ function refine_aerodynamic_mesh!(wing::AbstractWing)
     else
         throw(ArgumentError("Unsupported spanwise panel distribution: $(wing.spanwise_distribution)"))
     end
+
+    # Compute panel mapping by finding closest unrefined panel for each refined panel
+    compute_refined_panel_mapping!(wing)
+
+    # Validate REFINE grouping method
+    if wing.grouping_method == REFINE && wing.n_groups > 0
+        n_unrefined_panels = length(wing.sections) - 1
+        if wing.n_groups != n_unrefined_panels
+            throw(ArgumentError(
+                "With REFINE grouping method, n_groups ($(wing.n_groups)) must equal " *
+                "the number of unrefined panels ($n_unrefined_panels). " *
+                "The wing has $(length(wing.sections)) unrefined sections, forming $n_unrefined_panels panels."
+            ))
+        end
+    end
+
+    return nothing
+end
+
+
+"""
+    compute_refined_panel_mapping!(wing::AbstractWing)
+
+Compute the mapping from refined panels to unrefined panels by finding
+the closest unrefined panel for each refined panel (based on panel center distance).
+This is non-allocating and works after refinement is complete.
+"""
+function compute_refined_panel_mapping!(wing::AbstractWing)
+    n_unrefined_sections = length(wing.sections)
+    n_refined_panels = wing.n_panels
+
+    # Handle case where no refinement occurred
+    if n_unrefined_sections == n_refined_panels + 1
+        wing.refined_panel_mapping = Int16[i for i in 1:n_refined_panels]
+        return nothing
+    end
+
+    # Ensure mapping array is allocated
+    if length(wing.refined_panel_mapping) != n_refined_panels
+        wing.refined_panel_mapping = zeros(Int16, n_refined_panels)
+    end
+
+    # Compute centers of unrefined panels
+    n_unrefined_panels = n_unrefined_sections - 1
+    unrefined_centers = Vector{MVec3}(undef, n_unrefined_panels)
+    for i in 1:n_unrefined_panels
+        le_mid = (wing.sections[i].LE_point + wing.sections[i+1].LE_point) / 2
+        te_mid = (wing.sections[i].TE_point + wing.sections[i+1].TE_point) / 2
+        unrefined_centers[i] = MVec3((le_mid + te_mid) / 2)
+    end
+
+    # For each refined panel, find closest unrefined panel
+    for refined_panel_idx in 1:n_refined_panels
+        le_mid = (wing.refined_sections[refined_panel_idx].LE_point +
+                  wing.refined_sections[refined_panel_idx+1].LE_point) / 2
+        te_mid = (wing.refined_sections[refined_panel_idx].TE_point +
+                  wing.refined_sections[refined_panel_idx+1].TE_point) / 2
+        refined_center = MVec3((le_mid + te_mid) / 2)
+
+        # Find closest unrefined panel
+        min_dist = Inf
+        closest_idx = 1
+        for unrefined_panel_idx in 1:n_unrefined_panels
+            dist = norm(refined_center - unrefined_centers[unrefined_panel_idx])
+            if dist < min_dist
+                min_dist = dist
+                closest_idx = unrefined_panel_idx
+            end
+        end
+
+        wing.refined_panel_mapping[refined_panel_idx] = Int16(closest_idx)
+    end
+
+    return nothing
 end
 
 
@@ -738,7 +828,7 @@ function refine_mesh_for_linear_cosine_distribution!(
         target_length = target_lengths[i]
 
         # Find segment index
-        section_index = searchsortedlast(qc_cum_length, target_length) 
+        section_index = searchsortedlast(qc_cum_length, target_length)
         section_index = clamp(section_index, 1, length(qc_cum_length)-1)
 
         # 4. Calculate weights
@@ -749,7 +839,7 @@ function refine_mesh_for_linear_cosine_distribution!(
         right_weight = t
 
         # 5. Calculate quarter chord point
-        new_quarter_chord[i,:] = quarter_chord[section_index,:] + 
+        new_quarter_chord[i,:] = quarter_chord[section_index,:] +
                                 t .* (quarter_chord[section_index+1,:] - quarter_chord[section_index,:])
 
         # 6. Calculate chord vectors
@@ -901,10 +991,10 @@ function refine_mesh_by_splitting_provided_sections!(wing::AbstractWing)
         # Add left section of pair
         reinit!(wing.refined_sections[idx], wing.sections[left_section_index])
         idx += 1
-        
+
         # Calculate new sections for this pair
         num_new_sections = new_sections_per_pair + (left_section_index <= remaining ? 1 : 0)
-        
+
         if num_new_sections > 0
             # Prepare pair data
             LE_pair = hcat(LE[left_section_index], LE[left_section_index + 1])'
@@ -917,7 +1007,7 @@ function refine_mesh_by_splitting_provided_sections!(wing::AbstractWing)
                 aero_data[left_section_index],
                 aero_data[left_section_index + 1]
             ]
-            
+
             # Generate sections for this pair
             idx = refine_mesh_for_linear_cosine_distribution!(
                 wing,

@@ -188,7 +188,8 @@ function Wing(
     spanwise_distribution=LINEAR,
     spanwise_direction=[0.0, 1.0, 0.0],
     remove_nan=true,
-    prn=false
+    prn=false,
+    grouping_method::PanelGroupingMethod=EQUAL_SIZE
 )
     !(n_groups == 0 || n_panels % n_groups == 0) && throw(ArgumentError("Number of panels should be divisible by number of groups"))
     !isapprox(spanwise_direction, [0.0, 1.0, 0.0]) && throw(ArgumentError("Spanwise direction has to be [0.0, 1.0, 0.0], not $spanwise_direction"))
@@ -236,11 +237,12 @@ function Wing(
     end
     
     # Create Wing using the standard constructor
-    wing = Wing(n_panels; 
-        n_groups=n_groups, 
+    wing = Wing(n_panels;
+        n_groups=n_groups,
         spanwise_distribution=spanwise_distribution,
-        spanwise_direction=MVec3(spanwise_direction), 
-        remove_nan=remove_nan
+        spanwise_direction=MVec3(spanwise_direction),
+        remove_nan=remove_nan,
+        grouping_method=grouping_method
     )
     
     # Parse sections and populate wing

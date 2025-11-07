@@ -1,8 +1,3 @@
-using Pkg
-if ! ("Test" ∈ keys(Pkg.project().dependencies))
-    using TestEnv; TestEnv.activate()
-end
-
 using VortexStepMethod
 using Test
 
