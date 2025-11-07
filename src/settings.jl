@@ -14,6 +14,7 @@ end
     n_groups::Int64 = 40
     spanwise_panel_distribution::PanelDistribution = LINEAR
     spanwise_direction::MVec3 = [0.0, 1.0, 0.0]
+    grouping_method::PanelGroupingMethod = EQUAL_SIZE
     remove_nan = true
 end
 
@@ -80,6 +81,9 @@ function VSMSettings(filename; data_prefix=true)
             wing.n_groups = wing_data["n_groups"]
             wing.spanwise_panel_distribution = eval(Symbol(wing_data["spanwise_panel_distribution"]))
             wing.spanwise_direction = MVec3(wing_data["spanwise_direction"])
+            if haskey(wing_data, "grouping_method")
+                wing.grouping_method = eval(Symbol(wing_data["grouping_method"]))
+            end
             wing.remove_nan = wing_data["remove_nan"]
 
             push!(vsm_settings.wings, wing)

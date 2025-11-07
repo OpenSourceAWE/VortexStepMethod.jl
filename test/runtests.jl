@@ -28,6 +28,7 @@ end::Bool
     include("ram_geometry/test_kite_geometry.jl")
     include("settings/test_settings.jl")
     include("solver/test_solver.jl")
+    include("solver/test_group_coefficients.jl")
     include("VortexStepMethod/test_VortexStepMethod.jl")
     include("wake/test_wake.jl")
     include("wing_geometry/test_wing_geometry.jl")
