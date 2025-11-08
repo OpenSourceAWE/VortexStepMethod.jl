@@ -23,7 +23,7 @@ jobs:
       matrix:
         version:
           - '1.10'
-          - '1'
+          - '1.11'
         os:
           - ubuntu-latest
         build_is_production_build:
