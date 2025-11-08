@@ -302,7 +302,7 @@ function Wing(n_panels::Int;
 end
 
 """
-    reinit!(wing::AbstractWing; refine_mesh=true, recompute_mapping=true)
+    reinit!(wing::AbstractWing; refine_mesh=true, recompute_mapping=true, sort_sections=true)
 
 Reinitialize wing geometry and panel properties.
 
@@ -311,11 +311,13 @@ Reinitialize wing geometry and panel properties.
   `deform!()` to preserve deformed geometry while updating panel properties.
 - `recompute_mapping::Bool=true`: Whether to recompute the refined panel mapping.
   Set to `false` to skip mapping computation when it hasn't changed.
+- `sort_sections::Bool=true`: Whether to sort sections by spanwise position.
+  Set to `false` for REFINE wings where section order is determined by structural connectivity.
 """
-function reinit!(wing::AbstractWing; refine_mesh=true, recompute_mapping=true)
+function reinit!(wing::AbstractWing; refine_mesh=true, recompute_mapping=true, sort_sections=true)
     # Refine mesh unless explicitly disabled (e.g., to preserve deformation)
     if refine_mesh
-        refine_aerodynamic_mesh!(wing; recompute_mapping)
+        refine_aerodynamic_mesh!(wing; recompute_mapping, sort_sections)
     end
 
     # Calculate panel properties
@@ -589,19 +591,22 @@ function update_non_deformed_sections!(wing::AbstractWing)
 end
 
 """
-    refine_aerodynamic_mesh!(wing::AbstractWing; recompute_mapping=true)
+    refine_aerodynamic_mesh!(wing::AbstractWing; recompute_mapping=true, sort_sections=true)
 
 Refine the aerodynamic mesh of the wing based on spanwise panel distribution.
 
 # Keyword Arguments
 - `recompute_mapping::Bool=true`: Whether to recompute the refined panel mapping.
   Set to `false` to skip mapping computation when it hasn't changed.
+- `sort_sections::Bool=true`: Whether to sort sections by spanwise position (y-coordinate).
+  Set to `false` for REFINE wings where section order is determined by structural connectivity.
 
 Returns:
     Vector{Section}: List of refined sections
 """
-function refine_aerodynamic_mesh!(wing::AbstractWing; recompute_mapping=true)
-    sort!(wing.sections, by=s -> s.LE_point[2], rev=true)
+function refine_aerodynamic_mesh!(wing::AbstractWing; recompute_mapping=true, sort_sections=true)
+    # Only sort sections if requested (skip for REFINE wings with fixed structural order)
+    sort_sections && sort!(wing.sections, by=s -> s.LE_point[2], rev=true)
     n_sections = wing.n_panels + 1
     if length(wing.refined_sections) == 0
         if wing.spanwise_distribution == UNCHANGED || length(wing.sections) == n_sections

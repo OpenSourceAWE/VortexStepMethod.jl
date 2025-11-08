@@ -114,7 +114,7 @@ function Base.setproperty!(obj::BodyAerodynamics, sym::Symbol, val)
 end
 
 """
-    reinit!(body_aero::BodyAerodynamics; init_aero, va, omega, refine_mesh, recompute_mapping)
+    reinit!(body_aero::BodyAerodynamics; init_aero, va, omega, refine_mesh, recompute_mapping, sort_sections)
 
 Initialize a BodyAerodynamics struct in-place by setting up panels and coefficients.
 
@@ -129,6 +129,8 @@ Initialize a BodyAerodynamics struct in-place by setting up panels and coefficie
   `deform!()` to preserve deformed geometry.
 - `recompute_mapping=true`: Whether to recompute the refined panel mapping.
   Set to `false` to skip mapping computation when it hasn't changed.
+- `sort_sections=true`: Whether to sort sections by spanwise position.
+  Set to `false` for REFINE wings where section order is determined by structural connectivity.
 
 # Returns
 nothing
@@ -138,12 +140,13 @@ function reinit!(body_aero::BodyAerodynamics;
     va=[15.0, 0.0, 0.0],
     omega=zeros(MVec3),
     refine_mesh=true,
-    recompute_mapping=true
+    recompute_mapping=true,
+    sort_sections=true
 )
     idx = 1
     vec = @MVector zeros(3)
     for wing in body_aero.wings
-        reinit!(wing; refine_mesh, recompute_mapping)
+        reinit!(wing; refine_mesh, recompute_mapping, sort_sections)
         panel_props = wing.panel_props
         
         # Create panels
