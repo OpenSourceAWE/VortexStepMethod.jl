@@ -114,7 +114,7 @@ function Base.setproperty!(obj::BodyAerodynamics, sym::Symbol, val)
 end
 
 """
-    reinit!(body_aero::BodyAerodynamics; init_aero, va, omega, refine_mesh)
+    reinit!(body_aero::BodyAerodynamics; init_aero, va, omega, refine_mesh, recompute_mapping)
 
 Initialize a BodyAerodynamics struct in-place by setting up panels and coefficients.
 
@@ -127,6 +127,8 @@ Initialize a BodyAerodynamics struct in-place by setting up panels and coefficie
 - `omega=zeros(3)`: Turn rate in kite body frame x y and z
 - `refine_mesh=true`: Whether to refine wing meshes. Set to `false` after
   `deform!()` to preserve deformed geometry.
+- `recompute_mapping=true`: Whether to recompute the refined panel mapping.
+  Set to `false` to skip mapping computation when it hasn't changed.
 
 # Returns
 nothing
@@ -135,12 +137,13 @@ function reinit!(body_aero::BodyAerodynamics;
     init_aero=true,
     va=[15.0, 0.0, 0.0],
     omega=zeros(MVec3),
-    refine_mesh=true
+    refine_mesh=true,
+    recompute_mapping=true
 )
     idx = 1
     vec = @MVector zeros(3)
     for wing in body_aero.wings
-        reinit!(wing; refine_mesh=refine_mesh)
+        reinit!(wing; refine_mesh, recompute_mapping)
         panel_props = wing.panel_props
         
         # Create panels

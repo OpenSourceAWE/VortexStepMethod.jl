@@ -302,18 +302,20 @@ function Wing(n_panels::Int;
 end
 
 """
-    reinit!(wing::AbstractWing; refine_mesh=true)
+    reinit!(wing::AbstractWing; refine_mesh=true, recompute_mapping=true)
 
 Reinitialize wing geometry and panel properties.
 
 # Keyword Arguments
 - `refine_mesh::Bool=true`: Whether to refine the mesh. Set to `false` after
   `deform!()` to preserve deformed geometry while updating panel properties.
+- `recompute_mapping::Bool=true`: Whether to recompute the refined panel mapping.
+  Set to `false` to skip mapping computation when it hasn't changed.
 """
-function reinit!(wing::AbstractWing; refine_mesh=true)
+function reinit!(wing::AbstractWing; refine_mesh=true, recompute_mapping=true)
     # Refine mesh unless explicitly disabled (e.g., to preserve deformation)
     if refine_mesh
-        refine_aerodynamic_mesh!(wing)
+        refine_aerodynamic_mesh!(wing; recompute_mapping)
     end
 
     # Calculate panel properties
@@ -587,14 +589,18 @@ function update_non_deformed_sections!(wing::AbstractWing)
 end
 
 """
-    refine_aerodynamic_mesh!(wing::AbstractWing)
+    refine_aerodynamic_mesh!(wing::AbstractWing; recompute_mapping=true)
 
 Refine the aerodynamic mesh of the wing based on spanwise panel distribution.
+
+# Keyword Arguments
+- `recompute_mapping::Bool=true`: Whether to recompute the refined panel mapping.
+  Set to `false` to skip mapping computation when it hasn't changed.
 
 Returns:
     Vector{Section}: List of refined sections
 """
-function refine_aerodynamic_mesh!(wing::AbstractWing)
+function refine_aerodynamic_mesh!(wing::AbstractWing; recompute_mapping=true)
     sort!(wing.sections, by=s -> s.LE_point[2], rev=true)
     n_sections = wing.n_panels + 1
     if length(wing.refined_sections) == 0
@@ -631,7 +637,7 @@ function refine_aerodynamic_mesh!(wing::AbstractWing)
         for i in eachindex(wing.sections)
             reinit!(wing.refined_sections[i], wing.sections[i])
         end
-        compute_refined_panel_mapping!(wing)
+        recompute_mapping && compute_refined_panel_mapping!(wing)
         update_non_deformed_sections!(wing)
         return nothing
     end
@@ -642,7 +648,7 @@ function refine_aerodynamic_mesh!(wing::AbstractWing)
     if n_sections == 2
         reinit!(wing.refined_sections[1], LE[1,:], TE[1,:], aero_model[1], aero_data[1])
         reinit!(wing.refined_sections[2], LE[end,:], TE[end,:], aero_model[end], aero_data[end])
-        compute_refined_panel_mapping!(wing)
+        recompute_mapping && compute_refined_panel_mapping!(wing)
         update_non_deformed_sections!(wing)
         return nothing
     end
@@ -666,7 +672,7 @@ function refine_aerodynamic_mesh!(wing::AbstractWing)
     end
 
     # Compute panel mapping by finding closest unrefined panel for each refined panel
-    compute_refined_panel_mapping!(wing)
+    recompute_mapping && compute_refined_panel_mapping!(wing)
 
     # Validate REFINE grouping method
     if wing.grouping_method == REFINE && wing.n_groups > 0
