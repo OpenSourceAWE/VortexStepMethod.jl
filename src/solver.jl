@@ -316,43 +316,92 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
                     panels_per_group = wing.n_panels ÷ wing.n_groups
                     for _ in 1:wing.n_groups
                         panel_count = 0
+                        group_panel = body_aero.groups[group_idx]
+                        # Zero out accumulated fields
+                        group_panel.x_airf .= 0.0
+                        group_panel.y_airf .= 0.0
+                        group_panel.z_airf .= 0.0
+                        group_panel.va .= 0.0
+                        group_panel.chord = 0.0
+                        group_panel.width = 0.0
                         for _ in 1:panels_per_group
+                            panel = body_aero.panels[panel_idx]
                             group_moment_dist[group_idx] += moment_dist[panel_idx]
                             group_moment_coeff_dist[group_idx] += moment_coeff_dist[panel_idx]
                             cl_group_array[group_idx] += solver.sol.cl_array[panel_idx]
                             cd_group_array[group_idx] += solver.sol.cd_array[panel_idx]
                             cm_group_array[group_idx] += solver.sol.cm_array[panel_idx]
+                            # Accumulate geometry for averaging
+                            group_panel.x_airf .+= panel.x_airf
+                            group_panel.y_airf .+= panel.y_airf
+                            group_panel.z_airf .+= panel.z_airf
+                            group_panel.va .+= panel.va
+                            group_panel.chord += panel.chord
+                            group_panel.width += panel.width
                             panel_idx += 1
                             panel_count += 1
                         end
-                        # Average the coefficients over panels in the group
+                        # Average the coefficients and geometry over panels in the group
                         cl_group_array[group_idx] /= panel_count
                         cd_group_array[group_idx] /= panel_count
                         cm_group_array[group_idx] /= panel_count
+                        group_panel.x_airf ./= panel_count
+                        group_panel.y_airf ./= panel_count
+                        group_panel.z_airf ./= panel_count
+                        group_panel.va ./= panel_count
+                        group_panel.chord /= panel_count
+                        group_panel.width /= panel_count
                         group_idx += 1
                     end
                 elseif wing.grouping_method == REFINE
                     # REFINE method: group refined panels by their original unrefined section
+                    # Initialize group panels
+                    for i in 1:wing.n_groups
+                        target_group_idx = group_idx + i - 1
+                        group_panel = body_aero.groups[target_group_idx]
+                        group_panel.x_airf .= 0.0
+                        group_panel.y_airf .= 0.0
+                        group_panel.z_airf .= 0.0
+                        group_panel.va .= 0.0
+                        group_panel.chord = 0.0
+                        group_panel.width = 0.0
+                    end
                     # First pass: accumulate values
                     group_panel_counts = zeros(Int, wing.n_groups)
                     for local_panel_idx in 1:wing.n_panels
+                        panel = body_aero.panels[panel_idx]
                         original_section_idx = wing.refined_panel_mapping[local_panel_idx]
                         target_group_idx = group_idx + original_section_idx - 1
+                        group_panel = body_aero.groups[target_group_idx]
                         group_moment_dist[target_group_idx] += moment_dist[panel_idx]
                         group_moment_coeff_dist[target_group_idx] += moment_coeff_dist[panel_idx]
                         cl_group_array[target_group_idx] += solver.sol.cl_array[panel_idx]
                         cd_group_array[target_group_idx] += solver.sol.cd_array[panel_idx]
                         cm_group_array[target_group_idx] += solver.sol.cm_array[panel_idx]
+                        # Accumulate geometry
+                        group_panel.x_airf .+= panel.x_airf
+                        group_panel.y_airf .+= panel.y_airf
+                        group_panel.z_airf .+= panel.z_airf
+                        group_panel.va .+= panel.va
+                        group_panel.chord += panel.chord
+                        group_panel.width += panel.width
                         group_panel_counts[original_section_idx] += 1
                         panel_idx += 1
                     end
-                    # Second pass: average coefficients
+                    # Second pass: average coefficients and geometry
                     for i in 1:wing.n_groups
                         target_group_idx = group_idx + i - 1
                         if group_panel_counts[i] > 0
+                            group_panel = body_aero.groups[target_group_idx]
                             cl_group_array[target_group_idx] /= group_panel_counts[i]
                             cd_group_array[target_group_idx] /= group_panel_counts[i]
                             cm_group_array[target_group_idx] /= group_panel_counts[i]
+                            group_panel.x_airf ./= group_panel_counts[i]
+                            group_panel.y_airf ./= group_panel_counts[i]
+                            group_panel.z_airf ./= group_panel_counts[i]
+                            group_panel.va ./= group_panel_counts[i]
+                            group_panel.chord /= group_panel_counts[i]
+                            group_panel.width /= group_panel_counts[i]
                         end
                     end
                     group_idx += wing.n_groups

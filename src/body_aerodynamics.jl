@@ -24,6 +24,7 @@ Main structure for calculating aerodynamic properties of bodies. Use the constru
 @with_kw mutable struct BodyAerodynamics{P}
     panels::Vector{Panel}
     wings::Vector{Wing}
+    groups::Vector{Panel} = Panel[]
     _va::MVec3 = zeros(MVec3)
     omega::MVec3 = zeros(MVec3)
     gamma_distribution::MVector{P, Float64} = zeros(P)
@@ -73,6 +74,7 @@ function BodyAerodynamics(
 ) where T <: AbstractWing
     # Initialize panels
     panels = Panel[]
+    n_groups = 0
     for wing in wings
         for section in wing.sections
             section.LE_point .-= kite_body_origin
@@ -80,7 +82,7 @@ function BodyAerodynamics(
         end
         if wing.spanwise_distribution == UNCHANGED
             wing.refined_sections = wing.sections
-            !(wing.n_panels == length(wing.sections) - 1) && 
+            !(wing.n_panels == length(wing.sections) - 1) &&
                 throw(ArgumentError("(wing.n_panels = $(wing.n_panels)) != (length(wing.sections) - 1 = $(length(wing.sections) - 1))"))
         else
             wing.refined_sections = Section[Section() for _ in 1:wing.n_panels+1]
@@ -91,9 +93,15 @@ function BodyAerodynamics(
             panel = Panel()
             push!(panels, panel)
         end
+
+        # Count total groups
+        n_groups += wing.n_groups
     end
 
-    body_aero = BodyAerodynamics{length(panels)}(; panels, wings)
+    # Initialize groups (unrefined panel representatives)
+    groups = [Panel() for _ in 1:n_groups]
+
+    body_aero = BodyAerodynamics{length(panels)}(; panels, wings, groups)
     reinit!(body_aero; va, omega)
     return body_aero
 end
