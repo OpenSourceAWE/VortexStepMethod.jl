@@ -2,10 +2,6 @@ using VortexStepMethod
 using LinearAlgebra
 using Test
 
-# Load test support
-include("../TestSupport.jl")
-using .TestSupport
-
 @testset "Group Coefficient Arrays Tests" begin
     @testset "Group coefficients with EQUAL_SIZE method" begin
         # Create a simple wing with groups

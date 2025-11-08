@@ -462,7 +462,8 @@ function deform!(wing::Wing)
         local_y .= normalize(section1.LE_point - section2.LE_point)
         chord .= section1.TE_point .- section1.LE_point
         normal .= chord × local_y
-        @. wing.refined_sections[i].TE_point = section1.LE_point + cos(wing.theta_dist[i]) * chord - sin(wing.theta_dist[i]) * normal
+        @. wing.refined_sections[i].TE_point = section1.LE_point +
+            cos(wing.theta_dist[i]) * chord - sin(wing.theta_dist[i]) * normal
     end
     return nothing
 end

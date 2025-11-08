@@ -2,8 +2,7 @@ using Test, VortexStepMethod
 
 # Make paths robust (avoid cd(".."))
 cd(@__DIR__)  # ensure we're in test/ no matter how tests are launched
-include("TestSupport.jl")
-using .TestSupport
+include("test_data_utils.jl")
 
 println("Running tests...")
 

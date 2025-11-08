@@ -2,12 +2,6 @@ using VortexStepMethod
 using LinearAlgebra
 using Test
 
-# Load TestSupport if not already loaded (for standalone execution)
-if !@isdefined(TestSupport)
-    include(joinpath(@__DIR__, "..", "TestSupport.jl"))
-    using .TestSupport
-end
-
 @testset "YAML Wing Deformation Tests" begin
     @testset "Simple Wing Deformation" begin
         # Load existing simple_wing.yaml

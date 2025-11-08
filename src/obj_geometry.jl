@@ -112,7 +112,8 @@ Create interpolation functions for leading/trailing edges and area.
 - Where le_interp and te_interp are tuples themselves, containing the x, y and z interpolations
 """
 function create_interpolations(vertices, circle_center_z, radius, gamma_tip, R=I(3); interp_steps=40)
-    gamma_range = range(-gamma_tip+1e-6, gamma_tip-1e-6, interp_steps)
+    gamma_range = range(-gamma_tip+gamma_tip/interp_steps*2,
+                        gamma_tip-gamma_tip/interp_steps*2, interp_steps)
     stepsize = gamma_range.step.hi
     vz_centered = [v[3] - circle_center_z for v in vertices]
 
@@ -122,33 +123,91 @@ function create_interpolations(vertices, circle_center_z, radius, gamma_tip, R=I
     leading_edges = zeros(3, length(gamma_range))
     areas  = zeros(length(gamma_range))
 
+    n_slices = length(gamma_range)
     for (j, gamma) in enumerate(gamma_range)
         trailing_edges[1, j] = -Inf
         leading_edges[1, j] = Inf
-        for (i, v) in enumerate(vertices)
-            # Rotate y coordinate to check box containment
-            # rotated_y = v[2] * cos(-gamma) - vz_centered[i] * sin(-gamma)
-            gamma_v = atan(-v[2], vz_centered[i])
-            if gamma ≤ 0 && gamma - stepsize ≤ gamma_v ≤ gamma
-                if v[1] > trailing_edges[1, j]
-                    trailing_edges[:, j] .= v
-                    te_gammas[j] = gamma_v
+
+        # Determine if this is a tip slice and get search parameters
+        is_first_tip = (j == 1)
+        is_last_tip = (j == n_slices)
+
+        if is_first_tip || is_last_tip
+            # Tip slices: use directional search within adjacent slice region
+            gamma_search = is_first_tip ? gamma_range[1] : gamma_range[end]
+            max_te_score = -Inf
+            max_le_score = -Inf
+
+            for (i, v) in enumerate(vertices)
+                gamma_v = atan(-v[2], vz_centered[i])
+
+                # Check if vertex is in the adjacent slice region
+                in_range = if gamma_search ≤ 0
+                    gamma_search - stepsize ≤ gamma_v ≤ gamma_search
+                else
+                    gamma_search ≤ gamma_v ≤ gamma_search + stepsize
                 end
-                if v[1] < leading_edges[1, j]
-                    leading_edges[:, j] .= v
-                    le_gammas[j] = gamma_v
+
+                if in_range
+                    if is_first_tip
+                        # TE: furthest in [X, Y, -Z] direction
+                        te_score = v[1] + v[2] - v[3]
+                        if te_score > max_te_score
+                            trailing_edges[:, j] .= v
+                            te_gammas[j] = gamma_v
+                            max_te_score = te_score
+                        end
+                        # LE: furthest in [-X, Y, -Z] direction
+                        le_score = -v[1] + v[2] - v[3]
+                        if le_score > max_le_score
+                            leading_edges[:, j] .= v
+                            le_gammas[j] = gamma_v
+                            max_le_score = le_score
+                        end
+                    else  # is_last_tip
+                        # TE: furthest in [X, -Y, -Z] direction
+                        te_score = v[1] - v[2] - v[3]
+                        if te_score > max_te_score
+                            trailing_edges[:, j] .= v
+                            te_gammas[j] = gamma_v
+                            max_te_score = te_score
+                        end
+                        # LE: furthest in [-X, -Y, -Z] direction
+                        le_score = -v[1] - v[2] - v[3]
+                        if le_score > max_le_score
+                            leading_edges[:, j] .= v
+                            le_gammas[j] = gamma_v
+                            max_le_score = le_score
+                        end
+                    end
                 end
-            elseif gamma > 0 && gamma ≤ gamma_v ≤ gamma + stepsize
-                if v[1] > trailing_edges[1, j]
-                    trailing_edges[:, j] .= v
-                    te_gammas[j] = gamma_v
-                end
-                if v[1] < leading_edges[1, j]
-                    leading_edges[:, j] .= v
-                    le_gammas[j] = gamma_v
+            end
+        else
+            # Interior slices: use standard min/max x-coordinate search
+            for (i, v) in enumerate(vertices)
+                gamma_v = atan(-v[2], vz_centered[i])
+                if gamma ≤ 0 && gamma - stepsize ≤ gamma_v ≤ gamma
+                    if v[1] > trailing_edges[1, j]
+                        trailing_edges[:, j] .= v
+                        te_gammas[j] = gamma_v
+                    end
+                    if v[1] < leading_edges[1, j]
+                        leading_edges[:, j] .= v
+                        le_gammas[j] = gamma_v
+                    end
+                elseif gamma > 0 && gamma ≤ gamma_v ≤ gamma + stepsize
+                    if v[1] > trailing_edges[1, j]
+                        trailing_edges[:, j] .= v
+                        te_gammas[j] = gamma_v
+                    end
+                    if v[1] < leading_edges[1, j]
+                        leading_edges[:, j] .= v
+                        le_gammas[j] = gamma_v
+                    end
                 end
             end
         end
+
         area = norm(leading_edges[:, j] - trailing_edges[:, j]) * stepsize * radius
         last_area = j > 1 ? areas[j-1] : 0.0
         areas[j] = last_area + area
@@ -159,9 +218,9 @@ function create_interpolations(vertices, circle_center_z, radius, gamma_tip, R=I
         trailing_edges[:, j] .= R * trailing_edges[:, j]
     end
 
-    le_interp = ntuple(i -> linear_interpolation(te_gammas, leading_edges[i, :],
+    le_interp = ntuple(i -> linear_interpolation(le_gammas, leading_edges[i, :],
                                            extrapolation_bc=Line()), 3)
-    te_interp = ntuple(i -> linear_interpolation(le_gammas, trailing_edges[i, :],
+    te_interp = ntuple(i -> linear_interpolation(te_gammas, trailing_edges[i, :],
                                            extrapolation_bc=Line()), 3)
     area_interp = linear_interpolation(gamma_range, areas, extrapolation_bc=Line())
 
