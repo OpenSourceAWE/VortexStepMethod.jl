@@ -232,11 +232,6 @@ using Serialization
         original_te_points = [copy(wing.refined_sections[i].TE_point)
             for i in 1:n_sections]
 
-        @show wing.refined_sections[1].LE_point
-        @show wing.refined_sections[1].TE_point
-        @show wing.refined_sections[end].LE_point
-        @show wing.refined_sections[end].TE_point
-
         # Apply group_deform! with non-zero angles (2 groups, each controlling 2 panels)
         theta_angles = [deg2rad(15.0), deg2rad(20.0)]
         delta_angles = [deg2rad(5.0), deg2rad(10.0)]

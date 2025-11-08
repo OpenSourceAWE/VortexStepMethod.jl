@@ -456,14 +456,37 @@ function deform!(wing::Wing)
     chord = zeros(MVec3)
     normal = zeros(MVec3)
 
-    for i in 1:wing.n_panels
-        section1 = wing.non_deformed_sections[i]
-        section2 = wing.non_deformed_sections[i+1]
-        local_y .= normalize(section1.LE_point - section2.LE_point)
-        chord .= section1.TE_point .- section1.LE_point
+    # Process all sections (n_panels + 1)
+    # Each section gets angle(s) from adjacent panel(s)
+    for i in 1:(wing.n_panels + 1)
+        section = wing.non_deformed_sections[i]
+
+        # Determine the angle for this section
+        if i == 1
+            # First section: use angle from first panel
+            theta = wing.theta_dist[1]
+        elseif i == wing.n_panels + 1
+            # Last section: use angle from last panel
+            theta = wing.theta_dist[wing.n_panels]
+        else
+            # Middle sections: average of adjacent panels
+            theta = 0.5 * (wing.theta_dist[i-1] + wing.theta_dist[i])
+        end
+
+        # Compute local coordinate system
+        if i < wing.n_panels + 1
+            section2 = wing.non_deformed_sections[i+1]
+            local_y .= normalize(section.LE_point - section2.LE_point)
+        else
+            # For last section, use same local_y as previous
+            section_prev = wing.non_deformed_sections[i-1]
+            local_y .= normalize(section_prev.LE_point - section.LE_point)
+        end
+
+        chord .= section.TE_point .- section.LE_point
         normal .= chord × local_y
-        @. wing.refined_sections[i].TE_point = section1.LE_point +
-            cos(wing.theta_dist[i]) * chord - sin(wing.theta_dist[i]) * normal
+        @. wing.refined_sections[i].TE_point = section.LE_point +
+            cos(theta) * chord - sin(theta) * normal
     end
     return nothing
 end
