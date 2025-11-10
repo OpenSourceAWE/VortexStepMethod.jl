@@ -1,4 +1,4 @@
-using ControlPlots
+using GLMakie
 using VortexStepMethod
 using LinearAlgebra
 

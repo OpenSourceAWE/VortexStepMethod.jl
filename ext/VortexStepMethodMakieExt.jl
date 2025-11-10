@@ -1,5 +1,8 @@
 module VortexStepMethodMakieExt
-using Makie, VortexStepMethod
+using Makie, VortexStepMethod, LinearAlgebra, Statistics, DelimitedFiles
+import VortexStepMethod: calculate_filaments_for_plotting
+
+export plot_geometry, plot_distribution, plot_polars, save_plot, show_plot, plot_polar_data
 
 """
     plot!(ax, panel::VortexStepMethod.Panel; kwargs...)
@@ -60,6 +63,691 @@ function Makie.plot(body_aero::VortexStepMethod.BodyAerodynamics; size = (1200, 
            )
     plot!(ax, body_aero; kwargs...)
     return fig
+end
+
+"""
+    save_plot(fig, save_path, title; data_type=".pdf")
+
+Save a Makie figure to a file.
+
+# Arguments
+- `fig`: Makie Figure object
+- `save_path`: Path to save the plot
+- `title`: Title of the plot
+
+# Keyword arguments
+- `data_type`: File extension (default: ".pdf")
+"""
+function VortexStepMethod.save_plot(fig, save_path, title; data_type=".pdf")
+    isnothing(save_path) && throw(ArgumentError("save_path should be provided"))
+
+    !isdir(save_path) && mkpath(save_path)
+    full_path = joinpath(save_path, title * data_type)
+
+    @debug "Attempting to save figure to: $full_path"
+    @debug "Current working directory: $(pwd())"
+
+    try
+        save(full_path, fig)
+        @debug "Figure saved as $data_type"
+
+        if isfile(full_path)
+            @debug "File successfully saved to $full_path"
+            @debug "File size: $(filesize(full_path)) bytes"
+        else
+            @info "File does not exist after save attempt: $full_path"
+        end
+    catch e
+        @error "Error saving figure: $e"
+        @error "Error type: $(typeof(e))"
+        rethrow(e)
+    end
+end
+
+"""
+    show_plot(fig; dpi=130)
+
+Display a Makie figure.
+
+# Arguments
+- `fig`: Makie Figure object
+
+# Keyword arguments
+- `dpi`: Dots per inch for the figure (default: 130) - currently unused in Makie
+"""
+function VortexStepMethod.show_plot(fig; dpi=130)
+    display(fig)
+end
+
+"""
+    plot_line_segment_makie!(ax, segment, color, label; width=3)
+
+Plot a line segment in 3D with arrow using Makie.
+
+# Arguments
+- `ax`: Makie Axis3
+- `segment`: Array of two points defining the segment
+- `color`: Color of the segment
+- `label`: Label for the legend
+
+# Keyword Arguments
+- `width`: Line width (default: 3)
+"""
+function plot_line_segment_makie!(ax, segment, color, label; width=3)
+    # Plot line
+    lines!(ax, [Point3f(segment[1]), Point3f(segment[2])];
+           color=color, linewidth=width, label=label)
+
+    # Plot arrow
+    dir = segment[2] - segment[1]
+    arrows!(ax, [Point3f(segment[1])], [Point3f(dir)];
+            color=color, arrowsize=0.1)
+end
+
+"""
+    set_axes_equal_makie!(ax, panels; zoom=1.8)
+
+Set 3D Makie axis to equal scale based on panel data.
+
+# Arguments
+- `ax`: Makie Axis3
+- `panels`: Array of panels
+- `zoom`: zoom factor (default: 1.8)
+"""
+function set_axes_equal_makie!(ax, panels; zoom=1.8)
+    # Calculate bounds from all panels
+    all_x = Float64[]
+    all_y = Float64[]
+    all_z = Float64[]
+
+    for panel in panels
+        for i in 1:4
+            push!(all_x, panel.corner_points[1, i])
+            push!(all_y, panel.corner_points[2, i])
+            push!(all_z, panel.corner_points[3, i])
+        end
+    end
+
+    x_range = (maximum(all_x) - minimum(all_x)) / zoom
+    y_range = (maximum(all_y) - minimum(all_y)) / zoom
+    z_range = (maximum(all_z) - minimum(all_z)) / zoom
+
+    max_range = max(x_range, y_range, z_range)
+
+    x_mid = mean([maximum(all_x), minimum(all_x)])
+    y_mid = mean([maximum(all_y), minimum(all_y)])
+    z_mid = mean([maximum(all_z), minimum(all_z)])
+
+    limits!(ax,
+            x_mid - max_range/2, x_mid + max_range/2,
+            y_mid - max_range/2, y_mid + max_range/2,
+            z_mid - max_range/2, z_mid + max_range/2)
+end
+
+"""
+    create_geometry_plot_makie(body_aero::BodyAerodynamics, title,
+                               view_elevation, view_azimuth; zoom=1.8)
+
+Create a 3D Makie plot of wing geometry including panels and filaments.
+
+# Arguments
+- `body_aero`: struct of type BodyAerodynamics
+- `title`: plot title
+- `view_elevation`: initial view elevation angle [°]
+- `view_azimuth`: initial view azimuth angle [°]
+
+# Keyword arguments
+- `zoom`: zoom factor (default: 1.8)
+"""
+function create_geometry_plot_makie(body_aero::BodyAerodynamics, title,
+                                   view_elevation, view_azimuth; zoom=1.8)
+    panels = body_aero.panels
+    va = isa(body_aero.va, Tuple) ? body_aero.va[1] : body_aero.va
+
+    # Create figure
+    fig = Figure(size=(1400, 1400))
+    ax = Axis3(fig[1, 1];
+               title=title,
+               xlabel="x", ylabel="y", zlabel="z",
+               aspect=:data,
+               azimuth=deg2rad(view_azimuth),
+               elevation=deg2rad(view_elevation))
+
+    # Plot panels
+    legend_used = Dict{String,Bool}()
+    for (i, panel) in enumerate(panels)
+        # Panel edges
+        corners = [Point3f(panel.corner_points[:, j]) for j in 1:4]
+        push!(corners, corners[1])
+        lines!(ax, corners; color=:grey, linewidth=1,
+               label = i == 1 ? "Panel Edges" : nothing)
+
+        # Control points
+        scatter!(ax, [Point3f(panel.control_point)];
+                color=:green, markersize=10,
+                label = i == 1 ? "Control Points" : nothing)
+
+        # Aerodynamic centers
+        scatter!(ax, [Point3f(panel.aero_center)];
+                color=:blue, markersize=10,
+                label = i == 1 ? "Aerodynamic Centers" : nothing)
+
+        # Plot filaments
+        filaments = calculate_filaments_for_plotting(panel)
+        legends = ["Bound Vortex", "side1", "side2", "wake_1", "wake_2"]
+
+        for (filament, legend) in zip(filaments, legends)
+            x1, x2, color = filament
+            show_legend = !get(legend_used, legend, false)
+            plot_line_segment_makie!(ax, [x1, x2], color,
+                                     show_legend ? legend : nothing)
+            legend_used[legend] = true
+        end
+    end
+
+    # Plot velocity vector
+    max_chord = maximum(panel.chord for panel in panels)
+    va_mag = norm(va)
+    va_vector_begin = -2 * max_chord * va / va_mag
+    va_vector_end = va_vector_begin + 1.5 * va / va_mag
+    plot_line_segment_makie!(ax, [va_vector_begin, va_vector_end], :lightblue, "va")
+
+    # Set equal axes
+    set_axes_equal_makie!(ax, panels; zoom)
+
+    # Add legend
+    axislegend(ax; position=:lt)
+
+    return fig
+end
+
+"""
+    plot_geometry(body_aero::BodyAerodynamics, title;
+                  data_type=".pdf", save_path=nothing,
+                  is_save=false, is_show=false,
+                  view_elevation=15, view_azimuth=-120, use_tex=false)
+
+Plot wing geometry from different viewpoints using Makie.
+
+# Arguments:
+- `body_aero`: the BodyAerodynamics to plot
+- `title`: plot title
+
+# Keyword arguments:
+- `data_type`: File extension (default: ".pdf")
+- `save_path`: Path for saving (default: nothing)
+- `is_save`: Whether to save (default: false)
+- `is_show`: Whether to display (default: false)
+- `view_elevation`: View elevation angle [°] (default: 15)
+- `view_azimuth`: View azimuth angle [°] (default: -120)
+- `use_tex`: Ignored for Makie (default: false)
+"""
+function VortexStepMethod.plot_geometry(body_aero::BodyAerodynamics, title;
+    data_type=".pdf",
+    save_path=nothing,
+    is_save=false,
+    is_show=false,
+    view_elevation=15,
+    view_azimuth=-120,
+    use_tex=false)
+
+    if is_save
+        # Angled view
+        fig = create_geometry_plot_makie(body_aero, "$(title)_angled_view", 15, -120)
+        save_plot(fig, save_path, "$(title)_angled_view", data_type=data_type)
+
+        # Top view
+        fig = create_geometry_plot_makie(body_aero, "$(title)_top_view", 90, 0)
+        save_plot(fig, save_path, "$(title)_top_view", data_type=data_type)
+
+        # Front view
+        fig = create_geometry_plot_makie(body_aero, "$(title)_front_view", 0, 0)
+        save_plot(fig, save_path, "$(title)_front_view", data_type=data_type)
+
+        # Side view
+        fig = create_geometry_plot_makie(body_aero, "$(title)_side_view", 0, -90)
+        save_plot(fig, save_path, "$(title)_side_view", data_type=data_type)
+    end
+
+    fig = create_geometry_plot_makie(body_aero, title, view_elevation, view_azimuth)
+
+    if is_show
+        display(fig)
+    end
+
+    return fig
+end
+
+"""
+    plot_distribution(y_coordinates_list, results_list, label_list;
+                      title="spanwise_distribution", data_type=".pdf",
+                      save_path=nothing, is_save=false, is_show=true, use_tex=false)
+
+Plot spanwise distributions of aerodynamic properties using Makie.
+
+# Arguments
+- `y_coordinates_list`: List of spanwise coordinates
+- `results_list`: List of result dictionaries
+- `label_list`: List of labels for different results
+
+# Keyword arguments
+- `title`: Plot title (default: "spanwise_distribution")
+- `data_type`: File extension (default: ".pdf")
+- `save_path`: Path to save plots (default: nothing)
+- `is_save`: Whether to save (default: false)
+- `is_show`: Whether to display (default: true)
+- `use_tex`: Ignored for Makie (default: false)
+"""
+function VortexStepMethod.plot_distribution(y_coordinates_list, results_list, label_list;
+    title="spanwise_distribution",
+    data_type=".pdf",
+    save_path=nothing,
+    is_save=false,
+    is_show=true,
+    use_tex=false)
+
+    length(results_list) == length(label_list) || throw(ArgumentError(
+        "Number of results ($(length(results_list))) must match labels ($(length(label_list)))"
+    ))
+
+    # Create figure with 3x3 grid
+    fig = Figure(size=(1600, 1000))
+    Label(fig[0, :], title, fontsize=20)
+
+    # Row 1: CL, CD, Gamma
+    ax_cl = Axis(fig[1, 1], title="CL Distribution",
+                 xlabel="Spanwise Position y/b", ylabel="Lift Coefficient CL")
+    ax_cd = Axis(fig[1, 2], title="CD Distribution",
+                 xlabel="Spanwise Position y/b", ylabel="Drag Coefficient CD")
+    ax_gamma = Axis(fig[1, 3], title="Γ Distribution",
+                    xlabel="Spanwise Position y/b", ylabel="Circulation Γ")
+
+    # Row 2: Alpha geometric, alpha at ac, alpha uncorrected
+    ax_alpha_geo = Axis(fig[2, 1], title="α Geometric",
+                        xlabel="Spanwise Position y/b", ylabel="Angle of Attack α (deg)")
+    ax_alpha_ac = Axis(fig[2, 2], title="α result (corrected to aerodynamic center)",
+                       xlabel="Spanwise Position y/b", ylabel="Angle of Attack α (deg)")
+    ax_alpha_unc = Axis(fig[2, 3], title="α Uncorrected (if VSM, at control point)",
+                        xlabel="Spanwise Position y/b", ylabel="Angle of Attack α (deg)")
+
+    # Row 3: Force components
+    ax_fx = Axis(fig[3, 1], title="Force in x direction",
+                 xlabel="Spanwise Position y/b", ylabel="Fx")
+    ax_fy = Axis(fig[3, 2], title="Force in y direction",
+                 xlabel="Spanwise Position y/b", ylabel="Fy")
+    ax_fz = Axis(fig[3, 3], title="Force in z direction",
+                 xlabel="Spanwise Position y/b", ylabel="Fz")
+
+    # Plot CL
+    for (y_coords, results, label) in zip(y_coordinates_list, results_list, label_list)
+        value = round(results["cl"], digits=2)
+        lines!(ax_cl, Vector(y_coords), Vector(results["cl_distribution"]),
+               label="$label CL: $value")
+    end
+    axislegend(ax_cl, position=:lt)
+
+    # Plot CD
+    for (y_coords, results, label) in zip(y_coordinates_list, results_list, label_list)
+        value = round(results["cd"], digits=2)
+        lines!(ax_cd, Vector(y_coords), Vector(results["cd_distribution"]),
+               label="$label CD: $value")
+    end
+    axislegend(ax_cd, position=:lt)
+
+    # Plot Gamma
+    for (y_coords, results, label) in zip(y_coordinates_list, results_list, label_list)
+        lines!(ax_gamma, Vector(y_coords), Vector(results["gamma_distribution"]),
+               label=label)
+    end
+    axislegend(ax_gamma, position=:lt)
+
+    # Plot alpha geometric
+    for (y_coords, results, label) in zip(y_coordinates_list, results_list, label_list)
+        lines!(ax_alpha_geo, Vector(y_coords), Vector(results["alpha_geometric"]),
+               label=label)
+    end
+    axislegend(ax_alpha_geo, position=:lt)
+
+    # Plot alpha at ac
+    for (y_coords, results, label) in zip(y_coordinates_list, results_list, label_list)
+        lines!(ax_alpha_ac, Vector(y_coords), Vector(results["alpha_at_ac"]),
+               label=label)
+    end
+    axislegend(ax_alpha_ac, position=:lt)
+
+    # Plot alpha uncorrected
+    for (y_coords, results, label) in zip(y_coordinates_list, results_list, label_list)
+        lines!(ax_alpha_unc, Vector(y_coords), Vector(results["alpha_uncorrected"]),
+               label=label)
+    end
+    axislegend(ax_alpha_unc, position=:lt)
+
+    # Plot force components
+    force_axes = [ax_fx, ax_fy, ax_fz]
+    components = ["x", "y", "z"]
+    for (idx, (ax, comp)) in enumerate(zip(force_axes, components))
+        for (y_coords, results, label) in zip(y_coordinates_list, results_list, label_list)
+            forces = results["F_distribution"][idx, :]
+            if length(y_coords) != length(forces)
+                @warn "Dimension mismatch" length(y_coords) length(forces) comp
+                continue
+            end
+            total_force = round(results["F$comp"], digits=2)
+            lines!(ax, Vector(y_coords), Vector(forces),
+                   label="$label ΣF$comp: $total_force N")
+        end
+        axislegend(ax, position=:lt)
+    end
+
+    # Save and show
+    if is_save
+        save_plot(fig, save_path, title, data_type=data_type)
+    end
+
+    if is_show
+        display(fig)
+    end
+
+    return fig
+end
+
+"""
+    generate_polar_data(solver, body_aero::BodyAerodynamics, angle_range;
+                        angle_type="angle_of_attack", angle_of_attack=0.0,
+                        side_slip=0.0, v_a=10.0)
+
+Generate polar data for aerodynamic analysis over a range of angles.
+
+# Arguments
+- `solver`: Aerodynamic solver object
+- `body_aero`: Wing aerodynamics struct
+- `angle_range`: Range of angles to analyze
+
+# Keyword arguments
+- `angle_type`: Type of angle variation ("angle_of_attack" or "side_slip")
+- `angle_of_attack`: Initial angle of attack [rad]
+- `side_slip`: Initial side slip angle [rad]
+- `v_a`: norm of apparent wind speed [m/s]
+
+# Returns
+- Tuple of polar data array and Reynolds number
+"""
+function generate_polar_data_makie(
+    solver,
+    body_aero::BodyAerodynamics,
+    angle_range;
+    angle_type="angle_of_attack",
+    angle_of_attack=0.0,
+    side_slip=0.0,
+    v_a=10.0
+)
+    n_panels = length(body_aero.panels)
+    n_angles = length(angle_range)
+
+    # Initialize arrays
+    cl = zeros(n_angles)
+    cd = zeros(n_angles)
+    cs = zeros(n_angles)
+    gamma_distribution = zeros(n_angles, n_panels)
+    reynolds_number = zeros(n_angles)
+
+    for (i, angle_i) in enumerate(angle_range)
+        # Set angle based on type
+        if angle_type == "angle_of_attack"
+            α = deg2rad(angle_i)
+            β = side_slip
+        elseif angle_type == "side_slip"
+            α = angle_of_attack
+            β = deg2rad(angle_i)
+        else
+            throw(ArgumentError("angle_type must be 'angle_of_attack' or 'side_slip'"))
+        end
+
+        # Update inflow conditions
+        set_va!(
+            body_aero,
+            [
+                cos(α) * cos(β),
+                sin(β),
+                sin(α)
+            ] * v_a
+        )
+
+        # Solve and store results
+        results = solve(solver, body_aero, gamma_distribution[i, :])
+
+        cl[i] = results["cl"]
+        cd[i] = results["cd"]
+        cs[i] = results["cs"]
+        gamma_distribution[i, :] = results["gamma_distribution"]
+        reynolds_number[i] = results["Rey"]
+    end
+
+    polar_data = [angle_range, cl, cd, cs]
+    return polar_data, reynolds_number[1]
+end
+
+"""
+    plot_polars(solver_list, body_aero_list, label_list;
+                literature_path_list=String[],
+                angle_range=range(0, 20, 2), angle_type="angle_of_attack",
+                angle_of_attack=0.0, side_slip=0.0, v_a=10.0,
+                title="polar", data_type=".pdf", save_path=nothing,
+                is_save=true, is_show=true, use_tex=false)
+
+Plot polar data comparing different solvers using Makie.
+
+# Arguments
+- `solver_list`: List of aerodynamic solvers
+- `body_aero_list`: List of wing aerodynamics objects
+- `label_list`: List of labels for each configuration
+
+# Keyword arguments
+- `literature_path_list`: Optional paths to literature data files
+- `angle_range`: Range of angles [°]
+- `angle_type`: "angle_of_attack" or "side_slip" (default: angle_of_attack)
+- `angle_of_attack`: AoA [rad] (default: 0.0)
+- `side_slip`: Side slip angle [rad] (default: 0.0)
+- `v_a`: Wind speed [m/s] (default: 10.0)
+- `title`: Plot title
+- `data_type`: File extension (default: ".pdf")
+- `save_path`: Path to save (default: nothing)
+- `is_save`: Whether to save (default: true)
+- `is_show`: Whether to display (default: true)
+- `use_tex`: Ignored for Makie (default: false)
+"""
+function VortexStepMethod.plot_polars(
+    solver_list,
+    body_aero_list,
+    label_list;
+    literature_path_list=String[],
+    angle_range=range(0, 20, 2),
+    angle_type="angle_of_attack",
+    angle_of_attack=0.0,
+    side_slip=0.0,
+    v_a=10.0,
+    title="polar",
+    data_type=".pdf",
+    save_path=nothing,
+    is_save=true,
+    is_show=true,
+    use_tex=false
+)
+    # Validate inputs
+    total_cases = length(body_aero_list) + length(literature_path_list)
+    if total_cases != length(label_list) || length(solver_list) != length(body_aero_list)
+        throw(ArgumentError("Mismatch in solvers/cases/labels"))
+    end
+    main_title = replace(title, " " => "_")
+
+    # Generate polar data
+    polar_data_list = []
+    labels_with_re = copy(label_list)
+    for (i, (solver, body_aero)) in enumerate(zip(solver_list, body_aero_list))
+        polar_data, rey = generate_polar_data_makie(
+            solver, body_aero, angle_range;
+            angle_type, angle_of_attack, side_slip, v_a
+        )
+        push!(polar_data_list, polar_data)
+        labels_with_re[i] = "$(label_list[i]) Re = $(round(Int64, rey*1e-5))e5"
+    end
+
+    # Load literature data if provided
+    if !isempty(literature_path_list)
+        for path in literature_path_list
+            data = readdlm(path, ',')
+            header = lowercase.(string.(data[1, :]))
+            alpha_idx = findfirst(x -> occursin("alpha", x), header)
+            cl_idx = findfirst(x -> occursin("cl", x), header)
+            cd_idx = findfirst(x -> occursin("cd", x), header)
+            cs_idx = findfirst(x -> occursin("cs", x), header)
+            cs_col = cs_idx === nothing ? zeros(size(data, 1)-1) : data[2:end, cs_idx]
+            push!(polar_data_list, [
+                data[2:end, alpha_idx],
+                data[2:end, cl_idx],
+                data[2:end, cd_idx],
+                cs_col
+            ])
+        end
+    end
+
+    # Create figure with 2x2 grid
+    fig = Figure(size=(1400, 1400))
+
+    ax_cl = Axis(fig[1, 1], title="CL vs $angle_type [°]",
+                 xlabel="$angle_type [°]", ylabel="CL")
+    ax_cd = Axis(fig[1, 2], title="CD vs $angle_type [°]",
+                 xlabel="$angle_type [°]", ylabel="CD")
+    ax_cs = Axis(fig[2, 1], title="CS vs $angle_type [°]",
+                 xlabel="$angle_type [°]", ylabel="CS")
+    ax_polar = Axis(fig[2, 2], title="CL vs CD",
+                    xlabel="CD", ylabel="CL")
+
+    # Number of computational results
+    n_solvers = length(solver_list)
+
+    # Plot CL vs angle
+    for (i, (polar_data, label)) in enumerate(zip(polar_data_list, labels_with_re))
+        marker = i <= n_solvers ? :star5 : :circle
+        markersize = i <= n_solvers ? 12 : 8
+        scatterlines!(ax_cl, polar_data[1], polar_data[2];
+                     label=label, marker=marker, markersize=markersize)
+        if maximum(polar_data[2]) > 10
+            ylims!(ax_cl, -0.5, 2)
+        end
+    end
+    axislegend(ax_cl, position=:lt)
+
+    # Plot CD vs angle
+    for (i, (polar_data, label)) in enumerate(zip(polar_data_list, labels_with_re))
+        marker = i <= n_solvers ? :star5 : :circle
+        markersize = i <= n_solvers ? 12 : 8
+        scatterlines!(ax_cd, polar_data[1], polar_data[3];
+                     label=label, marker=marker, markersize=markersize)
+        if maximum(polar_data[2]) > 10
+            ylims!(ax_cd, -0.5, 2)
+        end
+    end
+    axislegend(ax_cd, position=:lt)
+
+    # Plot CS vs angle
+    for (i, (polar_data, label)) in enumerate(zip(polar_data_list, labels_with_re))
+        marker = i <= n_solvers ? :star5 : :circle
+        markersize = i <= n_solvers ? 12 : 8
+        scatterlines!(ax_cs, polar_data[1], polar_data[4];
+                     label=label, marker=marker, markersize=markersize)
+        if maximum(polar_data[2]) > 10
+            ylims!(ax_cs, -0.5, 2)
+        end
+    end
+    axislegend(ax_cs, position=:lt)
+
+    # Plot CL vs CD
+    for (i, (polar_data, label)) in enumerate(zip(polar_data_list, labels_with_re))
+        marker = i <= n_solvers ? :star5 : :circle
+        markersize = i <= n_solvers ? 12 : 8
+        scatterlines!(ax_polar, polar_data[3], polar_data[2];
+                     label=label, marker=marker, markersize=markersize)
+        if maximum(polar_data[2]) > 10 || maximum(polar_data[3]) > 10
+            ylims!(ax_polar, -0.5, 2)
+            xlims!(ax_polar, -0.5, 2)
+        end
+    end
+    axislegend(ax_polar, position=:lt)
+
+    # Save and show
+    if is_save && !isnothing(save_path)
+        save_plot(fig, save_path, main_title; data_type)
+    end
+
+    if is_show
+        display(fig)
+    end
+
+    return fig
+end
+
+"""
+    plot_polar_data(body_aero::BodyAerodynamics;
+                    alphas=collect(deg2rad.(-5:0.3:25)),
+                    delta_tes=collect(deg2rad.(-5:0.3:25)),
+                    is_show=true, use_tex=false)
+
+Plot polar data (Cl, Cd, Cm) as 3D surfaces using Makie.
+
+# Arguments
+- `body_aero`: Wing aerodynamics struct
+
+# Keyword arguments
+- `alphas`: Range of AoA values [rad] (default: -5° to 25° in 0.3° steps)
+- `delta_tes`: Range of trailing edge angles [rad] (default: -5° to 25° in 0.3° steps)
+- `is_show`: Whether to display (default: true)
+- `use_tex`: Ignored for Makie (default: false)
+"""
+function VortexStepMethod.plot_polar_data(body_aero::BodyAerodynamics;
+        alphas=collect(deg2rad.(-5:0.3:25)),
+        delta_tes=collect(deg2rad.(-5:0.3:25)),
+        is_show=true,
+        use_tex=false)
+
+    if body_aero.panels[1].aero_model == POLAR_MATRICES
+        # Create figure with 3 subplots
+        fig = Figure(size=(1500, 600))
+
+        # Get interpolation functions
+        interp_data = [
+            (body_aero.panels[1].cl_interp, "Cl"),
+            (body_aero.panels[1].cd_interp, "Cd"),
+            (body_aero.panels[1].cm_interp, "Cm")
+        ]
+
+        # Create each subplot
+        for (idx, (interp, label)) in enumerate(interp_data)
+            ax = Axis3(fig[1, idx];
+                      title="$label vs α and δ",
+                      xlabel="δ [rad]",
+                      ylabel="α [rad]",
+                      zlabel=label,
+                      azimuth=1.275*π)
+
+            # Create interpolation matrix
+            interp_matrix = [interp(alpha, delta_te)
+                           for alpha in alphas, delta_te in delta_tes]
+
+            # Create wireframe
+            wireframe!(ax, delta_tes, alphas, interp_matrix;
+                      color=:blue, linewidth=0.5, transparency=true)
+        end
+
+        if is_show
+            display(fig)
+        end
+        return fig
+    else
+        throw(ArgumentError(
+            "Plotting polar data for $(body_aero.panels[1].aero_model) not implemented."
+        ))
+    end
 end
 
 end
