@@ -4,55 +4,193 @@ import VortexStepMethod: calculate_filaments_for_plotting
 
 export plot_geometry, plot_distribution, plot_polars, save_plot, show_plot, plot_polar_data
 
+# Global storage for panel mesh observables (for dynamic plotting)
+const PANEL_MESH_OBSERVABLES = Ref{Union{Nothing, Dict}}(nothing)
+
 """
-    plot!(ax, panel::VortexStepMethod.Panel; kwargs...)
+    plot!(ax, panel::VortexStepMethod.Panel; use_observables=false, kwargs...)
 
 Plot a single `Panel` as a `mesh`.
 The corner points are ordered as: LE1, TE1, TE2, LE2.
 This creates two triangles: (LE1, TE1, TE2) and (LE1, TE2, LE2).
+
+If `use_observables=true`, creates observables for dynamic updates.
 """
-function Makie.plot!(ax, panel::VortexStepMethod.Panel; color=(:red, 0.2), R_b_w=nothing, T_b_w=nothing, kwargs...)
+function Makie.plot!(ax, panel::VortexStepMethod.Panel; color=(:red, 0.2), R_b_w=nothing, T_b_w=nothing,
+                     use_observables=false, kwargs...)
     plots = []
     points = [Point3f(panel.corner_points[:, i]) for i in 1:4]
     if !isnothing(R_b_w) && !isnothing(T_b_w)
         points = [Point3f(R_b_w * p + T_b_w) for p in points]
     end
-    faces = [Makie.GLTriangleFace(1, 2, 3), Makie.GLTriangleFace(1, 3, 4)]
-    p = mesh!(ax, points, faces; color, transparency=true, kwargs...)
-    push!(plots, p)
-    border_points = [points..., points[1]]
-    p = lines!(ax, border_points; color=:black, transparency=true, kwargs...)
-    push!(plots, p)
-    return plots
-end
 
-"""
-    plot!(ax, body::VortexStepMethod.BodyAerodynamics; kwargs...)
+    if use_observables
+        # Create observables for dynamic updates
+        vertices_obs = Observable(points)
+        faces_obs = Observable([Makie.GLTriangleFace(1, 2, 3), Makie.GLTriangleFace(1, 3, 4)])
+        border_obs = Observable([points..., points[1]])
 
-Plot a `BodyAerodynamics` object by plotting each of its panels.
-"""
-function Makie.plot!(ax, body::VortexStepMethod.BodyAerodynamics; color=(:red, 0.2), R_b_w=nothing, T_b_w=nothing, kwargs...)
-    plots = []
-    for panel in body.panels
-        p = Makie.plot!(ax, panel; color, R_b_w, T_b_w, kwargs...)
+        p = mesh!(ax, vertices_obs, faces_obs; color, transparency=true, kwargs...)
+        push!(plots, p)
+        p = lines!(ax, border_obs; color=:black, transparency=true, kwargs...)
+        push!(plots, p)
+
+        # Note: Observables are stored at the body level, not individual panel level
+        # Individual panels need their parent body for proper tracking
+    else
+        # Static plotting (original behavior)
+        faces = [Makie.GLTriangleFace(1, 2, 3), Makie.GLTriangleFace(1, 3, 4)]
+        p = mesh!(ax, points, faces; color, transparency=true, kwargs...)
+        push!(plots, p)
+        border_points = [points..., points[1]]
+        p = lines!(ax, border_points; color=:black, transparency=true, kwargs...)
         push!(plots, p)
     end
+
     return plots
 end
 
-function Makie.plot(panel::VortexStepMethod.Panel; size = (1200, 800), kwargs...)
+"""
+    plot!(ax, body::VortexStepMethod.BodyAerodynamics; use_observables=false, kwargs...)
+
+Plot a `BodyAerodynamics` object by plotting each of its panels.
+
+If `use_observables=true`, creates observables for dynamic updates keyed by (body_id, panel_index).
+Otherwise, creates static plots (original behavior).
+"""
+function Makie.plot!(ax, body::VortexStepMethod.BodyAerodynamics; color=(:red, 0.2), R_b_w=nothing, T_b_w=nothing,
+                     use_observables=false, kwargs...)
+    plots = []
+
+    if use_observables
+        # Initialize global storage if needed
+        if isnothing(PANEL_MESH_OBSERVABLES[])
+            PANEL_MESH_OBSERVABLES[] = Dict()
+        end
+
+        body_id = objectid(body)
+
+        # Create observables for each panel
+        for (panel_idx, panel) in enumerate(body.panels)
+            # Compute initial points
+            points = [Point3f(panel.corner_points[:, i]) for i in 1:4]
+            if !isnothing(R_b_w) && !isnothing(T_b_w)
+                points = [Point3f(R_b_w * p + T_b_w) for p in points]
+            end
+
+            # Create observables
+            vertices_obs = Observable(points)
+            faces_obs = Observable([Makie.GLTriangleFace(1, 2, 3), Makie.GLTriangleFace(1, 3, 4)])
+            border_obs = Observable([points..., points[1]])
+
+            # Plot using observables
+            p = mesh!(ax, vertices_obs, faces_obs; color, transparency=true, kwargs...)
+            push!(plots, p)
+            p = lines!(ax, border_obs; color=:black, transparency=true, kwargs...)
+            push!(plots, p)
+
+            # Store observables with stable key
+            PANEL_MESH_OBSERVABLES[][(body_id, panel_idx)] = (
+                vertices = vertices_obs,
+                border = border_obs,
+                faces = faces_obs
+            )
+        end
+    else
+        # Static plotting (original behavior)
+        for panel in body.panels
+            p = Makie.plot!(ax, panel; color, R_b_w, T_b_w, use_observables=false, kwargs...)
+            push!(plots, p)
+        end
+    end
+
+    return plots
+end
+
+
+"""
+    plot!(body::VortexStepMethod.BodyAerodynamics; R_b_w=nothing, T_b_w=nothing)
+
+Update existing body aerodynamics plot observables with current geometry.
+This updates all panels in the body using their current corner_points.
+
+Requires that `plot(body; use_observables=true)` or `plot!(ax, body; use_observables=true)`
+was called first to create the observables.
+"""
+function Makie.plot!(body::VortexStepMethod.BodyAerodynamics; R_b_w=nothing, T_b_w=nothing, kwargs...)
+    # Check if observables exist
+    if isnothing(PANEL_MESH_OBSERVABLES[])
+        error("No panel observables found. Call plot(body; use_observables=true) first.")
+    end
+
+    body_id = objectid(body)
+
+    # Update each panel using stable (body_id, panel_idx) key
+    for (panel_idx, panel) in enumerate(body.panels)
+        key = (body_id, panel_idx)
+        if !haskey(PANEL_MESH_OBSERVABLES[], key)
+            error("No observables found for body $body_id panel $panel_idx. " *
+                  "Call plot(body; use_observables=true) first.")
+        end
+
+        # Get observables for this panel
+        obs = PANEL_MESH_OBSERVABLES[][key]
+
+        # Recompute vertices from current panel.corner_points
+        points = [Point3f(panel.corner_points[:, i]) for i in 1:4]
+        if !isnothing(R_b_w) && !isnothing(T_b_w)
+            points = [Point3f(R_b_w * p + T_b_w) for p in points]
+        end
+
+        # Update observables
+        obs.vertices[] = points
+        obs.border[] = [points..., points[1]]
+    end
+
+    return nothing
+end
+
+function Makie.plot(panel::VortexStepMethod.Panel; size = (1200, 800),
+                    R_b_w=nothing, T_b_w=nothing, color=(:red, 0.2), kwargs...)
     fig = Figure(; size)
     ax = Axis3(fig[1, 1]; aspect = :data,
                xlabel = "X", ylabel = "Y", zlabel = "Z",
                azimuth = 9/8*π, zoommode = :cursor, viewmode = :fit,
            )
 
-    plot!(ax, panel; kwargs...)
+    # Create observables for panel geometry
+    points = [Point3f(panel.corner_points[:, i]) for i in 1:4]
+    if !isnothing(R_b_w) && !isnothing(T_b_w)
+        points = [Point3f(R_b_w * p + T_b_w) for p in points]
+    end
+
+    vertices_obs = Observable(points)
+    faces_obs = Observable([Makie.GLTriangleFace(1, 2, 3), Makie.GLTriangleFace(1, 3, 4)])
+
+    # Plot mesh using observables
+    mesh!(ax, vertices_obs, faces_obs; color, transparency=true, kwargs...)
+
+    # Plot border
+    border_obs = Observable([points..., points[1]])
+    lines!(ax, border_obs; color=:black, transparency=true, kwargs...)
+
+    # Store observables globally for updates
+    panel_id = objectid(panel)
+    if isnothing(PANEL_MESH_OBSERVABLES[])
+        PANEL_MESH_OBSERVABLES[] = Dict()
+    end
+    PANEL_MESH_OBSERVABLES[][panel_id] = (
+        vertices = vertices_obs,
+        border = border_obs,
+        faces = faces_obs
+    )
+
     return fig
 end
 
 function Makie.plot(body_aero::VortexStepMethod.BodyAerodynamics; size = (1200, 800),
-                    limitmargin = 0.1, kwargs...)
+                    limitmargin = 0.1, R_b_w=nothing, T_b_w=nothing, color=(:red, 0.2),
+                    kwargs...)
     fig = Figure(; size)
     ax = Axis3(fig[1, 1]; aspect = :data,
                xlabel = "X", ylabel = "Y", zlabel = "Z",
@@ -61,7 +199,39 @@ function Makie.plot(body_aero::VortexStepMethod.BodyAerodynamics; size = (1200, 
                yautolimitmargin=(limitmargin, limitmargin),
                zautolimitmargin=(limitmargin, limitmargin),
            )
-    plot!(ax, body_aero; kwargs...)
+
+    # Initialize global storage if needed
+    if isnothing(PANEL_MESH_OBSERVABLES[])
+        PANEL_MESH_OBSERVABLES[] = Dict()
+    end
+
+    body_id = objectid(body_aero)
+
+    # Create observables for each panel using stable (body_id, panel_idx) key
+    for (panel_idx, panel) in enumerate(body_aero.panels)
+        # Compute initial points
+        points = [Point3f(panel.corner_points[:, i]) for i in 1:4]
+        if !isnothing(R_b_w) && !isnothing(T_b_w)
+            points = [Point3f(R_b_w * p + T_b_w) for p in points]
+        end
+
+        # Create observables
+        vertices_obs = Observable(points)
+        faces_obs = Observable([Makie.GLTriangleFace(1, 2, 3), Makie.GLTriangleFace(1, 3, 4)])
+        border_obs = Observable([points..., points[1]])
+
+        # Plot using observables
+        mesh!(ax, vertices_obs, faces_obs; color, transparency=true, kwargs...)
+        lines!(ax, border_obs; color=:black, transparency=true, kwargs...)
+
+        # Store observables with stable key
+        PANEL_MESH_OBSERVABLES[][(body_id, panel_idx)] = (
+            vertices = vertices_obs,
+            border = border_obs,
+            faces = faces_obs
+        )
+    end
+
     return fig
 end
 
