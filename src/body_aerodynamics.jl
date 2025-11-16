@@ -449,7 +449,8 @@ function calculate_results(
     va_norm_array,
     va_unit_array,
     panels::Vector{Panel},
-    is_only_f_and_gamma_output::Bool,
+    is_only_f_and_gamma_output::Bool;
+    correct_aoa::Bool=false,
 )
 
     # Initialize arrays
@@ -473,7 +474,7 @@ function calculate_results(
     moment = reshape((cm_array .* 0.5 .* density .* v_a_array.^2 .* chord_array), :, 1)
 
     # Calculate alpha corrections based on model type
-    if aerodynamic_model_type == VSM
+    if correct_aoa
         update_effective_angle_of_attack!(
             alpha_corrected,
             body_aero,
@@ -485,7 +486,7 @@ function calculate_results(
             va_norm_array,
             va_unit_array
         )
-    elseif aerodynamic_model_type == LLT
+    else
         alpha_corrected .= alpha_array
     end
 
@@ -661,8 +662,7 @@ Set velocity array and update wake filaments.
 - `va::VelVector`: Velocity vector of the apparent wind speed           [m/s]
 - `omega::VelVector`: Turn rate vector around x y and z axis            [rad/s]
 """
-function set_va!(body_aero::BodyAerodynamics, va::VelVector, omega=zeros(MVec3))
-    
+function set_va!(body_aero::BodyAerodynamics, va::AbstractVector, omega=zeros(MVec3))
     # Calculate va_distribution based on input type
     va_distribution = if all(omega .== 0.0)
         repeat(reshape(va, 1, 3), length(body_aero.panels))
@@ -693,16 +693,17 @@ function set_va!(body_aero::BodyAerodynamics, va::VelVector, omega=zeros(MVec3))
     return nothing
 end
 
-function set_va!(body_aero::BodyAerodynamics, va_distribution::Vector{VelVector}, omega=zeros(MVec3))
-    length(va) != length(body_aero.panels) && throw(ArgumentError("Length of va distribution should be equal to number of panels."))
-    
+function set_va!(body_aero::BodyAerodynamics, va_distribution::AbstractMatrix, omega=zeros(MVec3))
+    size(va_distribution, 1) != length(body_aero.panels) &&
+        throw(ArgumentError("Number of rows in va distribution should be equal to number of panels."))
+
     for (i, panel) in enumerate(body_aero.panels)
-        panel.va = va_distribution[i]
+        panel.va .= va_distribution[i, :]
     end
-    
+
     # Update wake elements
     frozen_wake!(body_aero, va_distribution)
-    body_aero._va = va
+    body_aero._va .= [mean(va_distribution[:,i]) for i in 1:3]
     return nothing
 end
 

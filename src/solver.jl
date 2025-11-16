@@ -123,6 +123,7 @@ sol::VSMSolution = VSMSolution(): The result of calling [solve!](@ref)
     core_radius_fraction::Float64 = 1e-20
     mu::Float64 = 1.81e-5
     is_only_f_and_gamma_output::Bool = false
+    correct_aoa::Bool = false
 
     # Intermediate results
     lr::LoopResult{P} = LoopResult{P}()
@@ -149,6 +150,7 @@ function Solver(body_aero, settings::VSMSettings)
         rtol=settings.solver_settings.rtol,
         relaxation_factor=settings.solver_settings.relaxation_factor,
         core_radius_fraction=settings.solver_settings.core_radius_fraction,
+        correct_aoa=settings.solver_settings.correct_aoa,
     )
 end
 
@@ -485,7 +487,8 @@ function solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=n
         solver.br.va_norm_array,
         solver.br.va_unit_array,
         body_aero.panels,
-        solver.is_only_f_and_gamma_output
+        solver.is_only_f_and_gamma_output;
+        correct_aoa=solver.correct_aoa
     )
     return results
 end

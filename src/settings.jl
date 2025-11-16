@@ -35,6 +35,7 @@ end
     core_radius_fraction::Float64 = 1e-20
     mu::Float64 = 1.81e-5                   # dynamic viscosity [N·s/m²]
     calc_only_f_and_gamma::Bool=false       # whether to only output f and gamma
+    correct_aoa::Bool=false                 # perform aoa correction
 end
 
 @Base.kwdef mutable struct VSMSettings
@@ -107,7 +108,12 @@ function VSMSettings(filename; data_prefix=true)
         # Handle enum conversions manually
         vsm_settings.solver_settings.aerodynamic_model_type = eval(Symbol(solver_data["aerodynamic_model_type"]))
         vsm_settings.solver_settings.type_initial_gamma_distribution = eval(Symbol(solver_data["type_initial_gamma_distribution"]))
-        
+
+        # Set correct_aoa default based on model type if not explicitly provided
+        if !haskey(solver_data, "correct_aoa")
+            vsm_settings.solver_settings.correct_aoa = (vsm_settings.solver_settings.aerodynamic_model_type == VSM)
+        end
+
         # Override with calculated totals
         vsm_settings.solver_settings.n_panels = n_panels
         vsm_settings.solver_settings.n_groups = n_groups
