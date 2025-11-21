@@ -6,7 +6,7 @@ using Test
     @testset "Simple Wing Deformation" begin
         # Load existing simple_wing.yaml
         simple_wing_file = test_data_path("yaml_geometry", "simple_wing.yaml")
-        wing = Wing(simple_wing_file; n_panels=4, n_groups=2)
+        wing = Wing(simple_wing_file; n_panels=4, # n_groups=2)
         body_aero = BodyAerodynamics([wing])
 
         # Store original TE point for comparison
@@ -53,7 +53,7 @@ using Test
     @testset "Complex Wing Deformation" begin
         # Load existing complex_wing.yaml with multiple sections
         complex_wing_file = test_data_path("yaml_geometry", "complex_wing.yaml")
-        wing = Wing(complex_wing_file; n_panels=12, n_groups=3)
+        wing = Wing(complex_wing_file; n_panels=12, # n_groups=3)
         body_aero = BodyAerodynamics([wing])
 
         # Store original points for multiple panels
@@ -104,7 +104,7 @@ using Test
     @testset "Multiple Reinit Calls with NTuple aero_data" begin
         # This test specifically checks the NTuple handling fix
         simple_wing_file = test_data_path("yaml_geometry", "simple_wing.yaml")
-        wing = Wing(simple_wing_file; n_panels=4, n_groups=2)
+        wing = Wing(simple_wing_file; n_panels=4, # n_groups=2)
 
         # Verify that sections have NTuple aero_data (for wings with simple polars)
         # or other valid AeroData types
@@ -125,7 +125,7 @@ using Test
     @testset "Deformation with BodyAerodynamics Reinit" begin
         # Test that reinit! on BodyAerodynamics properly handles deformed wings
         simple_wing_file = test_data_path("yaml_geometry", "simple_wing.yaml")
-        wing = Wing(simple_wing_file; n_panels=4, n_groups=2)
+        wing = Wing(simple_wing_file; n_panels=4, # n_groups=2)
         body_aero = BodyAerodynamics([wing])
 
         # Apply deformation
@@ -153,7 +153,7 @@ using Test
 
     @testset "Edge Cases" begin
         simple_wing_file = test_data_path("yaml_geometry", "simple_wing.yaml")
-        wing = Wing(simple_wing_file; n_panels=2, n_groups=1)
+        wing = Wing(simple_wing_file; n_panels=2, # n_groups=1)
         body_aero = BodyAerodynamics([wing])
 
         # Test zero deformation

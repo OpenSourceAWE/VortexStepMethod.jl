@@ -184,16 +184,33 @@ wing = Wing("wing_geometry.yaml"; n_panels=30, n_groups=2, prn=true)
 function Wing(
     geometry_file::String;
     n_panels=20,
-    n_groups=1,
+    n_unrefined_sections=nothing,
+    n_groups=nothing,
     spanwise_distribution=LINEAR,
     spanwise_direction=[0.0, 1.0, 0.0],
     remove_nan=true,
     prn=false,
     grouping_method::PanelGroupingMethod=EQUAL_SIZE
 )
-    !(n_groups == 0 || n_panels % n_groups == 0) && throw(ArgumentError("Number of panels should be divisible by number of groups"))
+    # Handle deprecated parameters
+    if !isnothing(n_groups)
+        if !isnothing(n_unrefined_sections)
+            error("Cannot specify both n_groups and n_unrefined_sections. Use n_unrefined_sections only.")
+        end
+        @warn "Parameter n_groups is deprecated. For YAML wings, n_unrefined_sections is inferred from added sections." maxlog=1
+    end
+
+    if grouping_method != EQUAL_SIZE
+        @warn "Parameter grouping_method is deprecated and ignored. Grouping is now always by unrefined sections." maxlog=1
+    end
+
+    # For YAML wings, n_unrefined_sections is inferred from the number of sections added
+    if !isnothing(n_unrefined_sections)
+        @warn "For YAML wings, n_unrefined_sections is automatically inferred from the sections in the geometry file. The parameter is ignored." maxlog=1
+    end
+
     !isapprox(spanwise_direction, [0.0, 1.0, 0.0]) && throw(ArgumentError("Spanwise direction has to be [0.0, 1.0, 0.0], not $spanwise_direction"))
-    
+
     prn && @info "Reading YAML wing configuration from $geometry_file"
     
     # Load YAML file following Uwe's suggestion
@@ -237,12 +254,11 @@ function Wing(
     end
     
     # Create Wing using the standard constructor
+    # n_unrefined_sections will be set automatically after sections are added
     wing = Wing(n_panels;
-        n_groups=n_groups,
         spanwise_distribution=spanwise_distribution,
         spanwise_direction=MVec3(spanwise_direction),
-        remove_nan=remove_nan,
-        grouping_method=grouping_method
+        remove_nan=remove_nan
     )
     
     # Parse sections and populate wing

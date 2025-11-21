@@ -333,14 +333,14 @@ end
         end
     end
 
-    @testset "REFINE grouping panel mapping" begin
+    @testset "Refined panel mapping" begin
         # Test that refined panel mapping actually maps each panel to its closest unrefined panel
 
         @testset "LINEAR distribution" begin
             n_panels = 20
             span = 10.0
 
-            wing = Wing(n_panels; spanwise_distribution=LINEAR, n_groups=2, grouping_method=REFINE)
+            wing = Wing(n_panels; spanwise_distribution=LINEAR)
             # 3 sections = 2 unrefined panels
             add_section!(wing, [0.0, span/2, 0.0], [1.0, span/2, 0.0], INVISCID)
             add_section!(wing, [0.0, 0.0, 0.0], [1.0, 0.0, 0.0], INVISCID)
@@ -386,7 +386,7 @@ end
             n_panels = 30
             span = 20.0
 
-            wing = Wing(n_panels; spanwise_distribution=COSINE, n_groups=3, grouping_method=REFINE)
+            wing = Wing(n_panels; spanwise_distribution=COSINE)
             # 4 sections = 3 unrefined panels
             add_section!(wing, [0.0, span/2, 0.0], [1.0, span/2, 0.0], INVISCID)
             add_section!(wing, [0.0, span/6, 0.0], [1.0, span/6, 0.0], INVISCID)
@@ -432,7 +432,7 @@ end
         @testset "SPLIT_PROVIDED distribution" begin
             n_panels = 12
 
-            wing = Wing(n_panels; spanwise_distribution=SPLIT_PROVIDED, n_groups=3, grouping_method=REFINE)
+            wing = Wing(n_panels; spanwise_distribution=SPLIT_PROVIDED)
             # 4 sections = 3 unrefined panels
             add_section!(wing, [0.0, 6.0, 0.0], [1.0, 6.0, 0.0], INVISCID)
             add_section!(wing, [0.0, 2.0, 0.0], [1.0, 2.0, 0.0], INVISCID)
@@ -475,14 +475,5 @@ end
             end
         end
 
-        @testset "Validation: n_groups must equal unrefined panels" begin
-            wing = Wing(20; spanwise_distribution=LINEAR, n_groups=5, grouping_method=REFINE)
-            add_section!(wing, [0.0, 5.0, 0.0], [1.0, 5.0, 0.0], INVISCID)
-            add_section!(wing, [0.0, 0.0, 0.0], [1.0, 0.0, 0.0], INVISCID)
-            add_section!(wing, [0.0, -5.0, 0.0], [1.0, -5.0, 0.0], INVISCID)
-
-            # Should throw error: 5 groups but only 2 unrefined panels
-            @test_throws ArgumentError refine_aerodynamic_mesh!(wing)
-        end
     end
 end

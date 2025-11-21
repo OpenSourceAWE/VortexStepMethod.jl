@@ -2,7 +2,6 @@ wings:
   - name: "body_aero_test_wing"
     geometry_file: "test/body_aerodynamics/test_wing.yaml"
     n_panels: 4
-    n_groups: 2
     spanwise_panel_distribution: COSINE
     spanwise_direction: [0.0, 1.0, 0.0]
     remove_nan: true

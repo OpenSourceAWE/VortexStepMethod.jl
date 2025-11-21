@@ -224,7 +224,7 @@ using Serialization
     @testset "First and Last Section Deformation with group_deform!" begin
         # Create an ObjWing with a small number of panels and groups
         wing = ObjWing(test_obj_path, test_dat_path;
-            n_panels=4, n_groups=2, remove_nan=true)
+            n_panels=4, remove_nan=true)
 
         # Store original TE points from all refined_sections
         # Wing has n_panels+1 sections (5 sections for 4 panels)

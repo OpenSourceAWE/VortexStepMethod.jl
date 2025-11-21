@@ -34,9 +34,8 @@ for row in eachrow(df)
 end
 
 # Create wing geometry
-# Using REFINE grouping method: n_groups should equal number of unrefined panels (18 sections = 18 panels)
-n_groups = length(rib_list) - 1
-CAD_wing = Wing(n_panels; spanwise_distribution, n_groups, grouping_method=REFINE)
+# n_unrefined_sections will be automatically set to the number of ribs (18 sections)
+CAD_wing = Wing(n_panels; spanwise_distribution)
 for rib in rib_list
     add_section!(CAD_wing, rib[1], rib[2], rib[3], rib[4])
 end
@@ -123,7 +122,7 @@ PLOT && plot_polars(
     angle_of_attack=0,
     side_slip=0,
     v_a=10,
-    title="tutorial_testing_stall_model_n_panels_$(n_panels)_distribution_$(spanwise_distribution)_grouping_$(CAD_wing.grouping_method)",
+    title="tutorial_testing_stall_model_n_panels_$(n_panels)_distribution_$(spanwise_distribution)_unrefined_$(CAD_wing.n_unrefined_sections)",
     data_type=".pdf",
     save_path=joinpath(save_folder, "polars"),
     is_save=true,

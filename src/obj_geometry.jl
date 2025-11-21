@@ -422,12 +422,35 @@ group_deform!(wing, deg2rad.([5, 10, 5, 0]), deg2rad.([-5, 0, -5, 0]))
 function ObjWing(
     obj_path, dat_path;
     crease_frac=0.9, wind_vel=10., mass=1.0,
-    n_panels=56, n_sections=n_panels+1, n_groups=4, spanwise_distribution=UNCHANGED,
+    n_panels=56, n_sections=nothing, n_unrefined_sections=nothing, n_groups=nothing,
+    spanwise_distribution=LINEAR,
     spanwise_direction=[0.0, 1.0, 0.0], remove_nan=true, align_to_principal=false,
     alpha_range=deg2rad.(-5:1:20), delta_range=deg2rad.(-5:1:20), prn=true,
-    interp_steps=n_sections, grouping_method::PanelGroupingMethod=EQUAL_SIZE
+    interp_steps=n_panels+1, grouping_method::PanelGroupingMethod=EQUAL_SIZE
 )
-    !(n_groups == 0 || n_panels % n_groups == 0) && throw(ArgumentError("Number of panels should be divisible by number of groups"))
+    # Handle deprecated parameters
+    if !isnothing(n_groups)
+        if !isnothing(n_unrefined_sections)
+            error("Cannot specify both n_groups and n_unrefined_sections. Use n_unrefined_sections only.")
+        end
+        @warn "Parameter n_groups is deprecated. Use n_unrefined_sections instead." maxlog=1
+        n_unrefined_sections = n_groups
+    end
+
+    if !isnothing(n_sections)
+        @warn "Parameter n_sections is deprecated. It is now always n_panels+1 for refined sections. Use n_unrefined_sections to control initial sections." maxlog=1
+    end
+
+    if grouping_method != EQUAL_SIZE
+        @warn "Parameter grouping_method is deprecated and ignored. Grouping is now always by unrefined sections." maxlog=1
+    end
+
+    # Set default: evenly spaced unrefined sections including both tips
+    if isnothing(n_unrefined_sections)
+        # Default to having same number of unrefined sections as refined (no refinement)
+        n_unrefined_sections = n_panels + 1
+    end
+
     !isapprox(spanwise_direction, [0.0, 1.0, 0.0]) && throw(ArgumentError("Spanwise direction has to be [0.0, 1.0, 0.0], not $spanwise_direction"))
 
     # Load or create polars
@@ -472,28 +495,32 @@ function ObjWing(
             any(isnan.(cm_matrix)) && interpolate_matrix_nans!(cm_matrix; prn)
         end
 
-        # Create sections
+        # Create unrefined sections (evenly spaced including both tips)
         sections = Section[]
-        refined_sections = Section[]
-        non_deformed_sections = Section[]
-        for gamma in range(-gamma_tip, gamma_tip, n_sections)
-            aero_data = (collect(alpha_range), collect(delta_range), cl_matrix, cd_matrix, cm_matrix)
+        aero_data = (collect(alpha_range), collect(delta_range), cl_matrix, cd_matrix, cm_matrix)
+        for gamma in range(-gamma_tip, gamma_tip, n_unrefined_sections)
             LE_point = [le_interp[i](gamma) for i in 1:3]
             TE_point = [te_interp[i](gamma) for i in 1:3]
             push!(sections, Section(LE_point, TE_point, POLAR_MATRICES, aero_data))
-            push!(refined_sections, Section(LE_point, TE_point, POLAR_MATRICES, aero_data))
-            push!(non_deformed_sections, Section(LE_point, TE_point, POLAR_MATRICES, aero_data))
         end
+
+        # Initialize refined_sections (will be populated by reinit!)
+        refined_sections = [Section() for _ in 1:(n_panels+1)]
 
         panel_props = PanelProperties{n_panels}()
         cache = [PreallocationTools.LazyBufferCache()]
 
-        Wing(n_panels, n_groups, spanwise_distribution, panel_props, MVec3(spanwise_direction),
+        wing = Wing(n_panels, Int16(n_unrefined_sections), spanwise_distribution, panel_props, MVec3(spanwise_direction),
             sections, refined_sections, remove_nan,
-            grouping_method, Int16[],
-            non_deformed_sections, zeros(n_panels), zeros(n_panels),
+            Int16[],
+            Section[], zeros(n_panels), zeros(n_panels),
             mass, gamma_tip, inertia_tensor, T_cad_body, R_cad_body, radius,
             le_interp, te_interp, area_interp, cache)
+
+        # Refine mesh and update panel properties
+        reinit!(wing)
+
+        wing
 
     catch e
         if e isa BoundsError

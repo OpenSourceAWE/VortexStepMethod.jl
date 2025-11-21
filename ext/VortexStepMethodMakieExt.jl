@@ -310,8 +310,8 @@ function plot_line_segment_makie!(ax, segment, color, label; width=3)
 
     # Plot arrow
     dir = segment[2] - segment[1]
-    arrows!(ax, [Point3f(segment[1])], [Point3f(dir)];
-            color=color, arrowsize=0.1)
+    arrows3d!(ax, [Point3f(segment[1])], [Point3f(dir)];
+              color=color, shaftradius=0.01, tipradius=0.03, tiplength=0.1)
 end
 
 """
@@ -370,7 +370,7 @@ Create a 3D Makie plot of wing geometry including panels and filaments.
 - `zoom`: zoom factor (default: 1.8)
 """
 function create_geometry_plot_makie(body_aero::BodyAerodynamics, title,
-                                   view_elevation, view_azimuth; zoom=1.8)
+                                   view_elevation, view_azimuth; zoom=0.5)
     panels = body_aero.panels
     va = isa(body_aero.va, Tuple) ? body_aero.va[1] : body_aero.va
 

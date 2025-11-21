@@ -142,11 +142,14 @@ end
 """
    PanelGroupingMethod EQUAL_SIZE REFINE
 
-Enumeration of methods for grouping panels.
+**DEPRECATED**: This enum is deprecated and no longer used.
+Grouping is now automatically handled via unrefined section mapping.
+
+Enumeration of methods for grouping panels (legacy).
 
 # Elements
-- EQUAL_SIZE: Divide panels into equally-sized sequential groups
-- REFINE: Group refined panels back to their original unrefined section
+- EQUAL_SIZE: (Deprecated) Divide panels into equally-sized sequential groups
+- REFINE: (Deprecated) Group refined panels back to their original unrefined section
 """
 @enum PanelGroupingMethod EQUAL_SIZE REFINE
 

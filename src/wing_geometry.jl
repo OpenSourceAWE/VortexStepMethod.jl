@@ -196,7 +196,7 @@ Represents a wing composed of multiple sections with aerodynamic properties.
 
 # Core Fields (all wings)
 - `n_panels::Int16`: Number of panels in aerodynamic mesh
-- `n_groups::Int16`: Number of panel groups
+- `n_unrefined_sections::Int16`: Number of unrefined sections (sections before mesh refinement)
 - `spanwise_distribution`::PanelDistribution: [PanelDistribution](@ref)
 - `spanwise_direction::MVec3`: Wing span direction vector
 - `sections::Vector{Section}`: Vector of wing sections, see: [Section](@ref)
@@ -223,7 +223,7 @@ Represents a wing composed of multiple sections with aerodynamic properties.
 """
 mutable struct Wing <: AbstractWing
     n_panels::Int16
-    n_groups::Int16
+    n_unrefined_sections::Int16
     spanwise_distribution::PanelDistribution
     panel_props::PanelProperties
     spanwise_direction::MVec3
@@ -232,7 +232,6 @@ mutable struct Wing <: AbstractWing
     remove_nan::Bool
 
     # Grouping
-    grouping_method::PanelGroupingMethod
     refined_panel_mapping::Vector{Int16}  # Maps each refined panel to its original unrefined section index
 
     # Deformation fields
@@ -255,7 +254,8 @@ end
 
 """
     Wing(n_panels::Int;
-         n_groups=n_panels,
+         n_unrefined_sections=nothing,
+         n_groups=nothing,
          spanwise_distribution::PanelDistribution=LINEAR,
          spanwise_direction::PosVector=MVec3([0.0, 1.0, 0.0]),
          remove_nan::Bool=true,
@@ -266,32 +266,46 @@ and refined sections as empty arrays. Creates a basic wing suitable for YAML-bas
 
 # Parameters
 - `n_panels::Int`: Number of panels in aerodynamic mesh
-- `n_groups::Int`: Number of panel groups in aerodynamic mesh
+- `n_unrefined_sections::Int`: Number of unrefined sections (inferred from added sections for YAML wings)
+- `n_groups::Int`: DEPRECATED - use n_unrefined_sections instead
 - `spanwise_distribution`::PanelDistribution = LINEAR: [PanelDistribution](@ref)
 - `spanwise_direction::MVec3` = MVec3([0.0, 1.0, 0.0]): Wing span direction vector
 - `remove_nan::Bool`: Wether to remove the NaNs from interpolations or not
-- `grouping_method::PanelGroupingMethod` = EQUAL_SIZE: Method for grouping panels (EQUAL_SIZE or REFINE)
+- `grouping_method::PanelGroupingMethod` = EQUAL_SIZE: DEPRECATED - grouping is now always by unrefined sections
 """
 function Wing(n_panels::Int;
-        n_groups = n_panels,
+        n_unrefined_sections=nothing,
+        n_groups=nothing,
         spanwise_distribution::PanelDistribution=LINEAR,
         spanwise_direction::PosVector=MVec3([0.0, 1.0, 0.0]),
         remove_nan=true,
         grouping_method::PanelGroupingMethod=EQUAL_SIZE)
-    # Validate grouping parameters
-    if grouping_method == EQUAL_SIZE
-        !(n_groups == 0 || n_panels % n_groups == 0) && throw(ArgumentError("With EQUAL_SIZE grouping, number of panels should be divisible by number of groups"))
+
+    # Handle deprecated parameters
+    if !isnothing(n_groups)
+        if !isnothing(n_unrefined_sections)
+            error("Cannot specify both n_groups and n_unrefined_sections. Use n_unrefined_sections only.")
+        end
+        @warn "Parameter n_groups is deprecated. Use n_unrefined_sections instead." maxlog=1
+        n_unrefined_sections = n_groups
     end
-    # Note: For REFINE grouping, validation happens after refinement when we know the number of unrefined sections
+
+    if grouping_method != EQUAL_SIZE
+        @warn "Parameter grouping_method is deprecated and ignored. Grouping is now always by unrefined sections." maxlog=1
+    end
+
+    # For YAML wings, n_unrefined_sections will be set when sections are added
+    # Set to 0 as placeholder for now
+    n_unrefined_sections_value = isnothing(n_unrefined_sections) ? Int16(0) : Int16(n_unrefined_sections)
 
     panel_props = PanelProperties{n_panels}()
 
     # Initialize with default/empty values for optional fields
     Wing(
-        n_panels, n_groups, spanwise_distribution, panel_props, spanwise_direction,
+        n_panels, n_unrefined_sections_value, spanwise_distribution, panel_props, spanwise_direction,
         Section[], Section[], remove_nan,
         # Grouping
-        grouping_method, Int16[],
+        Int16[],
         # Deformation fields
         Section[], zeros(n_panels), zeros(n_panels),
         # Physical properties (defaults for non-OBJ wings)
@@ -679,17 +693,8 @@ function refine_aerodynamic_mesh!(wing::AbstractWing; recompute_mapping=true, so
     # Compute panel mapping by finding closest unrefined panel for each refined panel
     recompute_mapping && compute_refined_panel_mapping!(wing)
 
-    # Validate REFINE grouping method
-    if wing.grouping_method == REFINE && wing.n_groups > 0
-        n_unrefined_panels = length(wing.sections) - 1
-        if wing.n_groups != n_unrefined_panels
-            throw(ArgumentError(
-                "With REFINE grouping method, n_groups ($(wing.n_groups)) must equal " *
-                "the number of unrefined panels ($n_unrefined_panels). " *
-                "The wing has $(length(wing.sections)) unrefined sections, forming $n_unrefined_panels panels."
-            ))
-        end
-    end
+    # Update n_unrefined_sections based on actual sections
+    wing.n_unrefined_sections = Int16(length(wing.sections))
 
     # Create/update non_deformed_sections to match refined_sections
     update_non_deformed_sections!(wing)

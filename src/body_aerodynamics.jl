@@ -4,11 +4,12 @@
 Main structure for calculating aerodynamic properties of bodies. Use the constructor to initialize.
 
 # Fields
-- panels::Vector{Panel}: Vector of [Panel](@ref) structs
+- panels::Vector{Panel}: Vector of refined [Panel](@ref) structs
 - wings::Vector{Wing}: A vector of wings; a body can have multiple wings
+- unrefined::Vector{Panel}: Vector of unrefined panel representatives for aggregated results
 - `va::MVec3` = zeros(MVec3):   A vector of the apparent wind speed, see: [MVec3](@ref)
 - `omega`::MVec3 = zeros(MVec3): A vector of the turn rates around the kite body axes
-- `gamma_distribution`=zeros(Float64, P): A vector of the circulation 
+- `gamma_distribution`=zeros(Float64, P): A vector of the circulation
                         of the velocity field; Length: Number of segments. [m²/s]
 - `alpha_uncorrected`=zeros(Float64, P): angles of attack per panel
 - `alpha_corrected`=zeros(Float64, P):   corrected angles of attack per panel
@@ -24,7 +25,7 @@ Main structure for calculating aerodynamic properties of bodies. Use the constru
 @with_kw mutable struct BodyAerodynamics{P}
     panels::Vector{Panel}
     wings::Vector{Wing}
-    groups::Vector{Panel} = Panel[]
+    unrefined::Vector{Panel} = Panel[]
     _va::MVec3 = zeros(MVec3)
     omega::MVec3 = zeros(MVec3)
     gamma_distribution::MVector{P, Float64} = zeros(P)
@@ -74,7 +75,7 @@ function BodyAerodynamics(
 ) where T <: AbstractWing
     # Initialize panels
     panels = Panel[]
-    n_groups = 0
+    n_unrefined_total = 0
     for wing in wings
         for section in wing.sections
             section.LE_point .-= kite_body_origin
@@ -94,14 +95,14 @@ function BodyAerodynamics(
             push!(panels, panel)
         end
 
-        # Count total groups
-        n_groups += wing.n_groups
+        # Count total unrefined panels (sections - 1)
+        n_unrefined_total += (wing.n_unrefined_sections - 1)
     end
 
-    # Initialize groups (unrefined panel representatives)
-    groups = [Panel() for _ in 1:n_groups]
+    # Initialize unrefined panels (representatives for unrefined sections)
+    unrefined = [Panel() for _ in 1:n_unrefined_total]
 
-    body_aero = BodyAerodynamics{length(panels)}(; panels, wings, groups)
+    body_aero = BodyAerodynamics{length(panels)}(; panels, wings, unrefined)
     reinit!(body_aero; va, omega)
     return body_aero
 end
