@@ -79,17 +79,20 @@ function VSMSettings(filename; data_prefix=true)
                 wing.dat_file = wing_data["dat_file"]
             end
             wing.n_panels = wing_data["n_panels"]
-            wing.n_groups = wing_data["n_groups"]
+            # Handle deprecated n_groups parameter
+            if haskey(wing_data, "n_groups")
+                @warn "n_groups in settings file is deprecated and ignored. Use n_unrefined_sections or let it be inferred automatically." maxlog=1
+            end
             wing.spanwise_panel_distribution = eval(Symbol(wing_data["spanwise_panel_distribution"]))
             wing.spanwise_direction = MVec3(wing_data["spanwise_direction"])
             if haskey(wing_data, "grouping_method")
-                wing.grouping_method = eval(Symbol(wing_data["grouping_method"]))
+                @warn "grouping_method in settings file is deprecated and ignored." maxlog=1
             end
             wing.remove_nan = wing_data["remove_nan"]
 
             push!(vsm_settings.wings, wing)
             n_panels += wing.n_panels
-            n_groups += wing.n_groups
+            # n_unrefined_sections will be set when wing is created/initialized
         end
     end
     

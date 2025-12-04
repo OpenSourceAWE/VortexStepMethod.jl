@@ -96,11 +96,11 @@ function BodyAerodynamics(
         end
 
         # Count total unrefined panels (sections - 1)
-        n_unrefined_total += (wing.n_unrefined_sections - 1)
+        n_unrefined_total += max(0, wing.n_unrefined_sections - 1)
     end
 
     # Initialize unrefined panels (representatives for unrefined sections)
-    unrefined = [Panel() for _ in 1:n_unrefined_total]
+    unrefined = [Panel() for _ in 1:max(0, n_unrefined_total)]
 
     body_aero = BodyAerodynamics{length(panels)}(; panels, wings, unrefined)
     reinit!(body_aero; va, omega)
@@ -160,8 +160,10 @@ function reinit!(body_aero::BodyAerodynamics;
         
         # Create panels
         for i in 1:wing.n_panels
-            if !isnothing(wing.delta_dist)
-                delta = wing.delta_dist[i]
+            if !isnothing(wing.delta_dist) && length(wing.delta_dist) > 0
+                # Map refined panel to unrefined section to get delta value
+                unrefined_idx = wing.refined_panel_mapping[i]
+                delta = wing.delta_dist[unrefined_idx]
             else
                 delta = 0.0
             end
@@ -184,12 +186,23 @@ function reinit!(body_aero::BodyAerodynamics;
             idx += 1
         end
     end
-    
+
+    # Resize unrefined vector if needed (after wings are reinitialized and n_unrefined_sections is set)
+    n_unrefined_total = sum([max(0, wing.n_unrefined_sections - 1) for wing in body_aero.wings])
+    if length(body_aero.unrefined) != n_unrefined_total
+        resize!(body_aero.unrefined, n_unrefined_total)
+        for i in 1:n_unrefined_total
+            if !isassigned(body_aero.unrefined, i)
+                body_aero.unrefined[i] = Panel()
+            end
+        end
+    end
+
     # Initialize rest of the struct
     body_aero.projected_area = sum(calculate_projected_area, body_aero.wings)
     calculate_stall_angle_list!(body_aero.stall_angle_list, body_aero.panels)
     body_aero.alpha_array .= 0.0
-    body_aero.v_a_array .= 0.0 
+    body_aero.v_a_array .= 0.0
     body_aero.AIC .= 0.0
     set_va!(body_aero, va, omega)
     return nothing

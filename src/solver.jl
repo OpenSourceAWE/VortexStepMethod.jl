@@ -144,7 +144,7 @@ end
 
 function Solver(body_aero; kwargs...)
     P = length(body_aero.panels)
-    G = sum([(wing.n_unrefined_sections - 1) for wing in body_aero.wings])
+    G = sum([max(0, wing.n_unrefined_sections - 1) for wing in body_aero.wings])
     return Solver{P,G}(; kwargs...)
 end
 
@@ -739,7 +739,7 @@ Compute the Jacobian matrix for a deformable wing around an operating point usin
 
 # Returns
 - `jac`: Jacobian matrix (∂outputs/∂inputs)
-- `results`: Output vector at the operating point [Fx, Fy, Fz, Mx, My, Mz, group_moments...]
+- `results`: Output vector at the operating point [Fx, Fy, Fz, Mx, My, Mz, unrefined_moments...]
 
 # Example
 ```julia
@@ -773,17 +773,17 @@ function linearize(solver::Solver, body_aero::BodyAerodynamics, y::Vector{T};
     !(length(body_aero.wings) == 1) && throw(ArgumentError("Linearization only works for a body_aero with one wing"))
     wing = body_aero.wings[1]
 
-    # Validate that theta_idxs and delta_idxs match the number of groups
-    if !isnothing(theta_idxs) && wing.n_groups > 0
-        length(theta_idxs) != wing.n_groups && throw(ArgumentError(
-            "Length of theta_idxs ($(length(theta_idxs))) must match number of groups ($(wing.n_groups))"))
+    # Validate that theta_idxs and delta_idxs match the number of unrefined sections
+    if !isnothing(theta_idxs) && wing.n_unrefined_sections > 0
+        length(theta_idxs) != wing.n_unrefined_sections && throw(ArgumentError(
+            "Length of theta_idxs ($(length(theta_idxs))) must match number of unrefined sections ($(wing.n_unrefined_sections))"))
     end
-    if !isnothing(delta_idxs) && wing.n_groups > 0
-        length(delta_idxs) != wing.n_groups && throw(ArgumentError(
-            "Length of delta_idxs ($(length(delta_idxs))) must match number of groups ($(wing.n_groups))"))
+    if !isnothing(delta_idxs) && wing.n_unrefined_sections > 0
+        length(delta_idxs) != wing.n_unrefined_sections && throw(ArgumentError(
+            "Length of delta_idxs ($(length(delta_idxs))) must match number of unrefined sections ($(wing.n_unrefined_sections))"))
     end
-    if wing.n_groups == 0 && (!isnothing(theta_idxs) || !isnothing(delta_idxs))
-        throw(ArgumentError("Cannot use theta_idxs or delta_idxs when wing has n_groups=0 (no group functionality)"))
+    if wing.n_unrefined_sections == 0 && (!isnothing(theta_idxs) || !isnothing(delta_idxs))
+        throw(ArgumentError("Cannot use theta_idxs or delta_idxs when wing has no unrefined sections"))
     end
 
     init_va = body_aero.cache[1][body_aero.va]
@@ -835,16 +835,16 @@ function linearize(solver::Solver, body_aero::BodyAerodynamics, y::Vector{T};
         if !aero_coeffs
             results[1:3] .= solver.sol.force
             results[4:6] .= solver.sol.moment
-            results[7:end] .= solver.sol.group_moment_dist
+            results[7:end] .= solver.sol.unrefined_moment_dist
         else
             results[1:3] .= solver.sol.force_coeffs
             results[4:6] .= solver.sol.moment_coeffs
-            results[7:end] .= solver.sol.group_moment_coeff_dist
+            results[7:end] .= solver.sol.unrefined_moment_coeff_dist
         end
         return nothing
     end
 
-    results = zeros(3+3+length(solver.sol.group_moment_dist))
+    results = zeros(3+3+length(solver.sol.unrefined_moment_dist))
     jac = zeros(length(results), length(y))
     backend = AutoFiniteDiff(absstep=1e2solver.atol, relstep=1e2solver.rtol)
     prep = prepare_jacobian(calc_results!, results, backend, y)
