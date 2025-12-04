@@ -1,6 +1,6 @@
 using LinearAlgebra
 using VortexStepMethod
-using ControlPlots
+using GLMakie
 
 project_dir = dirname(dirname(pathof(VortexStepMethod)))  # Go up one level from src to project root#
 literature_paths = [

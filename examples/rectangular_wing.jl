@@ -1,5 +1,5 @@
 using LinearAlgebra
-using ControlPlots
+using GLMakie
 using VortexStepMethod
 
 PLOT = true

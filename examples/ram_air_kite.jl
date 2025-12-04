@@ -12,6 +12,7 @@ LINEARIZE = false
 wing = ObjWing(
     joinpath("data", "ram_air_kite", "ram_air_kite_body.obj"),
     joinpath("data", "ram_air_kite", "ram_air_kite_foil.dat");
+    n_unrefined_sections=4,
     prn=PRN
 )
 body_aero = BodyAerodynamics([wing];)
