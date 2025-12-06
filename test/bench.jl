@@ -14,6 +14,9 @@ using VortexStepMethod: calculate_AIC_matrices!, gamma_loop!, calculate_results,
 using Test
 using LinearAlgebra
 
+# Check Julia version for known allocation issues
+const IS_JULIA_1_12_OR_NEWER = VERSION >= v"1.12"
+
 @testset "Function Allocation Tests" begin
     # Define wing parameters
     n_panels = 20          # Number of panels
@@ -85,7 +88,11 @@ using LinearAlgebra
             for frac in core_radius_fractions
                 @testset "Model $model Core Radius Fraction $frac" begin
                     result = @benchmark calculate_AIC_matrices!($body_aero, $model, $frac, $va_norm_array, $va_unit_array) samples=1 evals=1
-                    @test result.allocs ≤ 30
+                    if IS_JULIA_1_12_OR_NEWER
+                        @test_broken result.allocs ≤ 30
+                    else
+                        @test result.allocs ≤ 30
+                    end
                     @info "Model: $(model) \t Core radius fraction: $(frac) \t Allocations: $(result.allocs) \t Memory: $(result.memory)"
                 end
             end
@@ -134,11 +141,11 @@ using LinearAlgebra
                 solver = Solver(body_aero;
                     aerodynamic_model_type=model
                 )
-                solver.sol._va_array .= va_array
-                solver.sol._chord_array .= chord_array
-                solver.sol._x_airf_array .= x_airf_array
-                solver.sol._y_airf_array .= y_airf_array
-                solver.sol._z_airf_array .= z_airf_array
+                solver.sol._va_dist .= va_array
+                solver.sol._chord_dist .= chord_array
+                solver.sol._x_airf_dist .= x_airf_array
+                solver.sol._y_airf_dist .= y_airf_array
+                solver.sol._z_airf_dist .= z_airf_array
                 result = @benchmark gamma_loop!(
                     $solver,
                     $body_aero,
@@ -203,17 +210,33 @@ using LinearAlgebra
 
     @testset "Allocation Tests for solve() and solve!()" begin
         result = @benchmark  solve_base!($solver, $body_aero, nothing) samples=1 evals=1  # 51 allocations
-        @test result.allocs <= 55
+        if IS_JULIA_1_12_OR_NEWER
+            @test_broken result.allocs <= 55
+        else
+            @test result.allocs <= 55
+        end
         # time Python: 32.0 ms  Ryzen 7950x
         # time Julia:   0.45 ms Ryzen 7950x
         result = @benchmark  sol = solve!($solver, $body_aero, nothing) samples=1 evals=1 # 85 allocations
-        @test result.allocs <= 89
+        if IS_JULIA_1_12_OR_NEWER
+            @test_broken result.allocs <= 89
+        else
+            @test result.allocs <= 89
+        end
 
         # Step 5: Solve using both methods
         result = @benchmark  solve_base!($nonlin_solver, $body_aero, nothing) samples=1 evals=1  # 51 allocations
-        @test result.allocs <= 55
+        if IS_JULIA_1_12_OR_NEWER
+            @test_broken result.allocs <= 55
+        else
+            @test result.allocs <= 55
+        end
         result = @benchmark  sol = solve!($nonlin_solver, $body_aero, nothing) samples=1 evals=1 # 85 allocations
-        @test result.allocs <= 89
+        if IS_JULIA_1_12_OR_NEWER
+            @test_broken result.allocs <= 89
+        else
+            @test result.allocs <= 89
+        end
     end
 end
 

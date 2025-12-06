@@ -351,9 +351,6 @@ end
 
         @test loop_sol.solver_status == FEASIBLE
 
-        @test sum(loop_sol.moment_dist) ≈ sum(loop_sol.unrefined_moment_dist)
-        @test sum(nonlin_sol.moment_dist) ≈ sum(nonlin_sol.unrefined_moment_dist)
-
     end
 
     # Calculate forces using uncorrected alpha

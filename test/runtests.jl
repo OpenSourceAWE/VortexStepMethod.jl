@@ -16,7 +16,7 @@ end
 function should_run_test(test_path::String)
     isempty(test_patterns) && return true
     for pattern in test_patterns
-        # Match directory (e.g., "solver") or specific file (e.g., "test_group_coefficients")
+        # Match directory (e.g., "solver") or specific file (e.g., "test_unrefined_dist")
         if occursin(pattern, test_path)
             return true
         end
@@ -45,7 +45,7 @@ end::Bool
     should_run_test("ram_geometry/test_kite_geometry.jl") && include("ram_geometry/test_kite_geometry.jl")
     should_run_test("settings/test_settings.jl") && include("settings/test_settings.jl")
     should_run_test("solver/test_solver.jl") && include("solver/test_solver.jl")
-    should_run_test("solver/test_group_coefficients.jl") && include("solver/test_group_coefficients.jl")
+    should_run_test("solver/test_unrefined_dist.jl") && include("solver/test_unrefined_dist.jl")
     should_run_test("VortexStepMethod/test_VortexStepMethod.jl") && include("VortexStepMethod/test_VortexStepMethod.jl")
     should_run_test("wake/test_wake.jl") && include("wake/test_wake.jl")
     should_run_test("wing_geometry/test_wing_geometry.jl") && include("wing_geometry/test_wing_geometry.jl")

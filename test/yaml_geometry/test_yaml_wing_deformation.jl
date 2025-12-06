@@ -14,9 +14,9 @@ using Test
         original_te_point = copy(body_aero.panels[i].TE_point_1)
         original_le_point = copy(body_aero.panels[i].LE_point_1)
 
-        # Apply deformation with non-zero angles
-        theta_dist = fill(deg2rad(30.0), wing.n_unrefined_sections)  # 30 degrees twist
-        delta_dist = fill(deg2rad(5.0), wing.n_unrefined_sections)   # 5 degrees trailing edge deflection
+        # Apply deformation with non-zero angles (panel-level)
+        theta_dist = fill(deg2rad(30.0), wing.n_panels)  # 30 degrees twist per panel
+        delta_dist = fill(deg2rad(5.0), wing.n_panels)   # 5 degrees TE deflection per panel
 
         VortexStepMethod.deform!(wing, theta_dist, delta_dist)
         VortexStepMethod.reinit!(body_aero; refine_mesh=false)
@@ -36,8 +36,8 @@ using Test
         @test body_aero.panels[i].delta ≈ deg2rad(5.0)
 
         # Reset deformation with zero angles
-        zero_theta_dist = zeros(wing.n_unrefined_sections)
-        zero_delta_dist = zeros(wing.n_unrefined_sections)
+        zero_theta_dist = zeros(wing.n_panels)
+        zero_delta_dist = zeros(wing.n_panels)
 
         VortexStepMethod.deform!(wing, zero_theta_dist, zero_delta_dist)
         VortexStepMethod.reinit!(body_aero; refine_mesh=false)
@@ -66,8 +66,8 @@ using Test
             ))
         end
 
-        # Apply spanwise-varying deformation
-        n = wing.n_unrefined_sections
+        # Apply spanwise-varying deformation (panel-level)
+        n = wing.n_panels
         theta_dist = [deg2rad(10.0 * i / n) for i in 1:n]  # Linear twist distribution
         delta_dist = [deg2rad(-5.0 + 10.0 * i / n) for i in 1:n]  # Varying deflection
 
@@ -130,8 +130,8 @@ using Test
         body_aero = BodyAerodynamics([wing])
 
         # Apply deformation
-        theta_dist = fill(deg2rad(15.0), wing.n_unrefined_sections)
-        delta_dist = fill(deg2rad(3.0), wing.n_unrefined_sections)
+        theta_dist = fill(deg2rad(15.0), wing.n_panels)
+        delta_dist = fill(deg2rad(3.0), wing.n_panels)
         VortexStepMethod.deform!(wing, theta_dist, delta_dist)
         VortexStepMethod.reinit!(body_aero; refine_mesh=false)
 
@@ -158,13 +158,13 @@ using Test
         body_aero = BodyAerodynamics([wing])
 
         # Test zero deformation
-        VortexStepMethod.deform!(wing, zeros(wing.n_unrefined_sections), zeros(wing.n_unrefined_sections))
+        VortexStepMethod.deform!(wing, zeros(wing.n_panels), zeros(wing.n_panels))
         VortexStepMethod.reinit!(body_aero; refine_mesh=false)
         @test all(p.delta ≈ 0.0 for p in body_aero.panels)
 
         # Test large deformation angles
-        theta_dist = fill(deg2rad(60.0), wing.n_unrefined_sections)
-        delta_dist = fill(deg2rad(30.0), wing.n_unrefined_sections)
+        theta_dist = fill(deg2rad(60.0), wing.n_panels)
+        delta_dist = fill(deg2rad(30.0), wing.n_panels)
 
         # Should not error even with large angles
         VortexStepMethod.deform!(wing, theta_dist, delta_dist)
@@ -172,10 +172,67 @@ using Test
         @test all(p.delta ≈ deg2rad(30.0) for p in body_aero.panels)
 
         # Test negative angles
-        theta_dist = fill(deg2rad(-20.0), wing.n_unrefined_sections)
-        delta_dist = fill(deg2rad(-10.0), wing.n_unrefined_sections)
+        theta_dist = fill(deg2rad(-20.0), wing.n_panels)
+        delta_dist = fill(deg2rad(-10.0), wing.n_panels)
         VortexStepMethod.deform!(wing, theta_dist, delta_dist)
         VortexStepMethod.reinit!(body_aero; refine_mesh=false)
         @test all(p.delta ≈ deg2rad(-10.0) for p in body_aero.panels)
+    end
+
+    @testset "Panel to Section Angle Mapping" begin
+        # Test that panel angles are correctly averaged to section angles
+        simple_wing_file = test_data_path("yaml_geometry", "simple_wing.yaml")
+        wing = Wing(simple_wing_file; n_panels=4)
+        body_aero = BodyAerodynamics([wing])
+
+        # Create varying panel angles
+        theta_panel = [10.0, 20.0, 30.0, 40.0]  # degrees per panel
+        delta_panel = [5.0, 10.0, 15.0, 20.0]   # degrees per panel
+
+        # Apply deformation
+        VortexStepMethod.deform!(wing, deg2rad.(theta_panel), deg2rad.(delta_panel))
+
+        # Verify section angles by checking the geometry
+        # Section 1: should use panel 1 angle = 10°
+        # Section 2: should avg panels 1,2 = (10+20)/2 = 15°
+        # Section 3: should avg panels 2,3 = (20+30)/2 = 25°
+        # Section 4: should avg panels 3,4 = (30+40)/2 = 35°
+        # Section 5: should use panel 4 angle = 40°
+
+        # We can verify this by checking that delta values are correct
+        VortexStepMethod.reinit!(body_aero; refine_mesh=false)
+
+        # Each panel gets its delta directly
+        @test body_aero.panels[1].delta ≈ deg2rad(5.0) atol=1e-6
+        @test body_aero.panels[2].delta ≈ deg2rad(10.0) atol=1e-6
+        @test body_aero.panels[3].delta ≈ deg2rad(15.0) atol=1e-6
+        @test body_aero.panels[4].delta ≈ deg2rad(20.0) atol=1e-6
+    end
+
+    @testset "unrefined_deform! Maps to Panels" begin
+        # Test that unrefined_deform! correctly maps unrefined sections to panels
+        # Use complex_wing which has 7 unrefined sections
+        complex_wing_file = test_data_path("yaml_geometry", "complex_wing.yaml")
+        wing = Wing(complex_wing_file; n_panels=12)
+        body_aero = BodyAerodynamics([wing])
+
+        # Verify we have 7 unrefined sections
+        @test wing.n_unrefined_sections == 7
+
+        # Create unrefined section angles (7 sections)
+        # These will be mapped to panels via refined_panel_mapping
+        theta_unrefined = deg2rad.([10.0, 15.0, 20.0, 25.0, 20.0, 15.0, 10.0])
+        delta_unrefined = deg2rad.([5.0, 7.5, 10.0, 12.5, 10.0, 7.5, 5.0])
+
+        # Apply using unrefined_deform!
+        VortexStepMethod.unrefined_deform!(wing, theta_unrefined, delta_unrefined)
+        VortexStepMethod.reinit!(body_aero; refine_mesh=false)
+
+        # Each panel should have the delta from its mapped unrefined section
+        for i in 1:wing.n_panels
+            unrefined_idx = wing.refined_panel_mapping[i]
+            expected_delta = delta_unrefined[unrefined_idx]
+            @test body_aero.panels[i].delta ≈ expected_delta atol=1e-6
+        end
     end
 end

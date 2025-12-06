@@ -85,8 +85,8 @@ end
     
     # Verify that linearization results match nonlinear results at operating point
     baseline_res = VortexStepMethod.solve!(solver, body_aero; log=false)
-    baseline_res = [solver.sol.force; solver.sol.moment; solver.sol.unrefined_moment_dist]
-    coeff_baseline_res = [solver.sol.force_coeffs; solver.sol.moment_coeffs; solver.sol.unrefined_moment_coeff_dist]
+    baseline_res = [solver.sol.force; solver.sol.moment; solver.sol.moment_unrefined_dist]
+    coeff_baseline_res = [solver.sol.force_coeffs; solver.sol.moment_coeffs; solver.sol.cm_unrefined_dist]
     @test baseline_res ≈ lin_res
     @test coeff_baseline_res ≈ coeff_lin_res
     
@@ -142,8 +142,8 @@ end
                     
                     # Get nonlinear solution
                     nonlin_res = VortexStepMethod.solve!(solver, body_aero, nothing; log=false)
-                    nonlin_res = [solver.sol.force; solver.sol.moment; solver.sol.unrefined_moment_dist]
-                    coeff_nonlin_res = [solver.sol.force_coeffs; solver.sol.moment_coeffs; solver.sol.unrefined_moment_coeff_dist]
+                    nonlin_res = [solver.sol.force; solver.sol.moment; solver.sol.moment_unrefined_dist]
+                    coeff_nonlin_res = [solver.sol.force_coeffs; solver.sol.moment_coeffs; solver.sol.cm_unrefined_dist]
                     @test nonlin_res ≉ baseline_res
                     @test coeff_nonlin_res ≉ baseline_res
                     
@@ -250,7 +250,7 @@ end
                 
                 # Get baseline results
                 baseline_res = VortexStepMethod.solve!(solver, body_aero; log=false)
-                baseline_res = [solver.sol.force; solver.sol.moment; solver.sol.unrefined_moment_dist]
+                baseline_res = [solver.sol.force; solver.sol.moment; solver.sol.moment_unrefined_dist]
                 
                 # Should match the linearization result
                 @test baseline_res ≈ lin_res_combo
@@ -277,7 +277,7 @@ end
                 
                 # Get nonlinear solution with perturbation
                 nonlin_res = VortexStepMethod.solve!(solver, body_aero; log=false)
-                nonlin_res = [solver.sol.force; solver.sol.moment; solver.sol.unrefined_moment_dist]
+                nonlin_res = [solver.sol.force; solver.sol.moment; solver.sol.moment_unrefined_dist]
                 
                 # Compute linearized prediction using our specialized Jacobian
                 lin_prediction = lin_res_combo + jac_combo * perturbation

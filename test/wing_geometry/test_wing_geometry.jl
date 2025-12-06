@@ -341,7 +341,7 @@ end
             span = 10.0
 
             wing = Wing(n_panels; spanwise_distribution=LINEAR)
-            # 3 sections = 2 unrefined panels
+            # 3 sections
             add_section!(wing, [0.0, span/2, 0.0], [1.0, span/2, 0.0], INVISCID)
             add_section!(wing, [0.0, 0.0, 0.0], [1.0, 0.0, 0.0], INVISCID)
             add_section!(wing, [0.0, -span/2, 0.0], [1.0, -span/2, 0.0], INVISCID)
@@ -350,8 +350,8 @@ end
 
             @test length(wing.refined_panel_mapping) == n_panels
 
-            # Manually verify each refined panel is mapped to its closest unrefined panel
-            n_unrefined_panels = length(wing.unrefined_sections) - 1
+            # Manually verify each refined panel is mapped to its closest unrefined section
+            n_unrefined_sections = length(wing.unrefined_sections)
             for refined_panel_idx in 1:n_panels
                 # Calculate refined panel center
                 le_mid = (wing.refined_sections[refined_panel_idx].LE_point +
@@ -360,20 +360,18 @@ end
                          wing.refined_sections[refined_panel_idx+1].TE_point) / 2
                 refined_center = (le_mid + te_mid) / 2
 
-                # Find closest unrefined panel manually
+                # Find closest unrefined section manually
                 min_dist = Inf
                 closest_idx = 1
-                for unrefined_panel_idx in 1:n_unrefined_panels
-                    le_mid_unref = (wing.unrefined_sections[unrefined_panel_idx].LE_point +
-                                   wing.unrefined_sections[unrefined_panel_idx+1].LE_point) / 2
-                    te_mid_unref = (wing.unrefined_sections[unrefined_panel_idx].TE_point +
-                                   wing.unrefined_sections[unrefined_panel_idx+1].TE_point) / 2
-                    unrefined_center = (le_mid_unref + te_mid_unref) / 2
+                for unrefined_section_idx in 1:n_unrefined_sections
+                    le_point = wing.unrefined_sections[unrefined_section_idx].LE_point
+                    te_point = wing.unrefined_sections[unrefined_section_idx].TE_point
+                    unrefined_center = (le_point + te_point) / 2
 
                     dist = norm(refined_center - unrefined_center)
                     if dist < min_dist
                         min_dist = dist
-                        closest_idx = unrefined_panel_idx
+                        closest_idx = unrefined_section_idx
                     end
                 end
 
@@ -387,7 +385,7 @@ end
             span = 20.0
 
             wing = Wing(n_panels; spanwise_distribution=COSINE)
-            # 4 sections = 3 unrefined panels
+            # 4 sections
             add_section!(wing, [0.0, span/2, 0.0], [1.0, span/2, 0.0], INVISCID)
             add_section!(wing, [0.0, span/6, 0.0], [1.0, span/6, 0.0], INVISCID)
             add_section!(wing, [0.0, -span/6, 0.0], [1.0, -span/6, 0.0], INVISCID)
@@ -397,8 +395,8 @@ end
 
             @test length(wing.refined_panel_mapping) == n_panels
 
-            # Verify each panel is mapped to its closest unrefined panel
-            n_unrefined_panels = length(wing.unrefined_sections) - 1
+            # Verify each panel is mapped to its closest unrefined section
+            n_unrefined_sections = length(wing.unrefined_sections)
             for refined_panel_idx in 1:n_panels
                 # Calculate refined panel center
                 le_mid = (wing.refined_sections[refined_panel_idx].LE_point +
@@ -407,20 +405,18 @@ end
                          wing.refined_sections[refined_panel_idx+1].TE_point) / 2
                 refined_center = (le_mid + te_mid) / 2
 
-                # Find closest unrefined panel manually
+                # Find closest unrefined section manually
                 min_dist = Inf
                 closest_idx = 1
-                for unrefined_panel_idx in 1:n_unrefined_panels
-                    le_mid_unref = (wing.unrefined_sections[unrefined_panel_idx].LE_point +
-                                   wing.unrefined_sections[unrefined_panel_idx+1].LE_point) / 2
-                    te_mid_unref = (wing.unrefined_sections[unrefined_panel_idx].TE_point +
-                                   wing.unrefined_sections[unrefined_panel_idx+1].TE_point) / 2
-                    unrefined_center = (le_mid_unref + te_mid_unref) / 2
+                for unrefined_section_idx in 1:n_unrefined_sections
+                    le_point = wing.unrefined_sections[unrefined_section_idx].LE_point
+                    te_point = wing.unrefined_sections[unrefined_section_idx].TE_point
+                    unrefined_center = (le_point + te_point) / 2
 
                     dist = norm(refined_center - unrefined_center)
                     if dist < min_dist
                         min_dist = dist
-                        closest_idx = unrefined_panel_idx
+                        closest_idx = unrefined_section_idx
                     end
                 end
 
@@ -433,7 +429,7 @@ end
             n_panels = 12
 
             wing = Wing(n_panels; spanwise_distribution=SPLIT_PROVIDED)
-            # 4 sections = 3 unrefined panels
+            # 4 sections
             add_section!(wing, [0.0, 6.0, 0.0], [1.0, 6.0, 0.0], INVISCID)
             add_section!(wing, [0.0, 2.0, 0.0], [1.0, 2.0, 0.0], INVISCID)
             add_section!(wing, [0.0, -2.0, 0.0], [1.0, -2.0, 0.0], INVISCID)
@@ -443,8 +439,8 @@ end
 
             @test length(wing.refined_panel_mapping) == n_panels
 
-            # Verify each panel is mapped to its closest unrefined panel
-            n_unrefined_panels = length(wing.unrefined_sections) - 1
+            # Verify each panel is mapped to its closest unrefined section
+            n_unrefined_sections = length(wing.unrefined_sections)
             for refined_panel_idx in 1:n_panels
                 # Calculate refined panel center
                 le_mid = (wing.refined_sections[refined_panel_idx].LE_point +
@@ -453,20 +449,18 @@ end
                          wing.refined_sections[refined_panel_idx+1].TE_point) / 2
                 refined_center = (le_mid + te_mid) / 2
 
-                # Find closest unrefined panel manually
+                # Find closest unrefined section manually
                 min_dist = Inf
                 closest_idx = 1
-                for unrefined_panel_idx in 1:n_unrefined_panels
-                    le_mid_unref = (wing.unrefined_sections[unrefined_panel_idx].LE_point +
-                                   wing.unrefined_sections[unrefined_panel_idx+1].LE_point) / 2
-                    te_mid_unref = (wing.unrefined_sections[unrefined_panel_idx].TE_point +
-                                   wing.unrefined_sections[unrefined_panel_idx+1].TE_point) / 2
-                    unrefined_center = (le_mid_unref + te_mid_unref) / 2
+                for unrefined_section_idx in 1:n_unrefined_sections
+                    le_point = wing.unrefined_sections[unrefined_section_idx].LE_point
+                    te_point = wing.unrefined_sections[unrefined_section_idx].TE_point
+                    unrefined_center = (le_point + te_point) / 2
 
                     dist = norm(refined_center - unrefined_center)
                     if dist < min_dist
                         min_dist = dist
-                        closest_idx = unrefined_panel_idx
+                        closest_idx = unrefined_section_idx
                     end
                 end
 

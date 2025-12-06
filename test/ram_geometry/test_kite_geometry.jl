@@ -195,8 +195,8 @@ using Serialization
         original_te_point = copy(body_aero.panels[i].TE_point_1)
 
         # Apply deformation with non-zero angles
-        theta_dist = fill(deg2rad(30.0), wing.n_unrefined_sections)  # 30 degrees twist for all sections
-        delta_dist = fill(deg2rad(5.0), wing.n_unrefined_sections)   # 5 degrees trailing edge deflection for all sections
+        theta_dist = fill(deg2rad(30.0), wing.n_panels)  # 30 degrees twist for all panels
+        delta_dist = fill(deg2rad(5.0), wing.n_panels)   # 5 degrees TE deflection for all panels
 
         VortexStepMethod.deform!(wing, theta_dist, delta_dist)
         VortexStepMethod.reinit!(body_aero)
