@@ -1,5 +1,5 @@
 using VortexStepMethod
-using ControlPlots
+using GLMakie
 using Test
 
 # Resolve repo data directory for ram air kite assets
@@ -63,17 +63,8 @@ function create_body_aero()
     body_aero
 end
 
-plt.ioff()
 @testset "Plotting" begin
-    fig = plt.figure(figsize=(14, 14))
-    res = plt.plot([1,2,3])
-    @test fig isa plt.PyPlot.Figure
-    @test res isa Vector{plt.PyObject}
     save_dir = tempdir()
-    save_plot(fig, save_dir, "plot")
-    @test isfile(joinpath(save_dir, "plot.pdf"))
-    safe_rm(joinpath(save_dir, "plot.pdf"))
-    show_plot(fig)
     body_aero = create_body_aero()
     if Sys.islinux()
         fig = plot_geometry(
@@ -83,7 +74,7 @@ plt.ioff()
             save_path=save_dir,
             is_save=true,
             is_show=false)
-        @test fig isa plt.PyPlot.Figure
+        @test fig isa Figure
         @test isfile(joinpath(save_dir, "Rectangular_wing_geometry_angled_view.pdf"))
         safe_rm(joinpath(save_dir, "Rectangular_wing_geometry_angled_view.pdf"))
         @test isfile(joinpath(save_dir, "Rectangular_wing_geometry_front_view.pdf"))
@@ -110,7 +101,7 @@ plt.ioff()
             ["VSM", "LLT"],
             title="Spanwise Distributions"
         )
-        @test fig isa plt.PyPlot.Figure
+        @test fig isa Figure
 
         # Step 8: Plot polar curves
         v_a = 20.0            # Magnitude of inflow velocity [m/s]
@@ -128,15 +119,14 @@ plt.ioff()
             is_save=true,
             is_show=false
         )
-        @test fig isa plt.PyPlot.Figure
+        @test fig isa Figure
         @test isfile(joinpath(save_dir, "Rectangular_Wing_Polars.pdf"))
         safe_rm(joinpath(save_dir, "Rectangular_Wing_Polars.pdf"))
 
         # Step 9: Test polar data plotting
         body_aero = BodyAerodynamics([ram_wing])
         fig = plot_polar_data(body_aero; is_show=false)
-        @test fig isa plt.PyPlot.Figure
+        @test fig isa Figure
     end
 end
-plt.ion()
 nothing

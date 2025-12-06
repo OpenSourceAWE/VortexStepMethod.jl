@@ -68,7 +68,6 @@ rm(settings_file)
 function create_temp_wing_settings(module_name, wing_file;
     name="test_wing",
     n_panels=4,
-    n_groups=2,
     spanwise_panel_distribution="COSINE",
     spanwise_direction=[0.0, 1.0, 0.0],
     remove_nan=true,
@@ -87,7 +86,6 @@ function create_temp_wing_settings(module_name, wing_file;
             "name" => name,
             "geometry_file" => wing_file_path,
             "n_panels" => n_panels,
-            "n_groups" => n_groups,
             "spanwise_panel_distribution" => spanwise_panel_distribution,
             "spanwise_direction" => spanwise_direction,
             "remove_nan" => remove_nan,

@@ -126,12 +126,12 @@ end
         body_aero = BodyAerodynamics([wing]; kite_body_origin=origin)
         
         # Check if sections are correctly translated
-        @test wing.sections[3].LE_point ≈ [-1.0, -2.0, -3.0]
-        @test wing.sections[3].TE_point ≈ [0.0, -2.0, -3.0]
-        @test wing.sections[2].LE_point ≈ [-1.0, -1.0, -3.0]
-        @test wing.sections[2].TE_point ≈ [0.0, -1.0, -3.0]
-        @test wing.sections[1].LE_point ≈ [-1.0, 0.0, -3.0]
-        @test wing.sections[1].TE_point ≈ [0.0, 0.0, -3.0]
+        @test wing.unrefined_sections[3].LE_point ≈ [-1.0, -2.0, -3.0]
+        @test wing.unrefined_sections[3].TE_point ≈ [0.0, -2.0, -3.0]
+        @test wing.unrefined_sections[2].LE_point ≈ [-1.0, -1.0, -3.0]
+        @test wing.unrefined_sections[2].TE_point ≈ [0.0, -1.0, -3.0]
+        @test wing.unrefined_sections[1].LE_point ≈ [-1.0, 0.0, -3.0]
+        @test wing.unrefined_sections[1].TE_point ≈ [0.0, 0.0, -3.0]
     end
 
     function create_geometry(; model=VSM, wing_type=:rectangular, plotting=false, N=40)
@@ -351,8 +351,8 @@ end
 
         @test loop_sol.solver_status == FEASIBLE
 
-        @test sum(loop_sol.moment_dist) ≈ sum(loop_sol.group_moment_dist)
-        @test sum(nonlin_sol.moment_dist) ≈ sum(nonlin_sol.group_moment_dist)
+        @test sum(loop_sol.moment_dist) ≈ sum(loop_sol.unrefined_moment_dist)
+        @test sum(nonlin_sol.moment_dist) ≈ sum(nonlin_sol.unrefined_moment_dist)
 
     end
 

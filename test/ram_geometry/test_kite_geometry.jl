@@ -171,18 +171,18 @@ using Serialization
         @test wing.n_panels == 56  # Default value
         @test wing.spanwise_distribution == UNCHANGED
         @test wing.spanwise_direction ≈ [0.0, 1.0, 0.0]
-        @test length(wing.sections) > 0  # Should have sections now
+        @test length(wing.unrefined_sections) > 0  # Should have sections now
         @test wing.mass ≈ 1.0
         @test wing.radius ≈ r rtol=1e-2
         @test wing.gamma_tip ≈ π/4 rtol=1e-2
-        @test !isnan(wing.sections[1].aero_data[3][end])
-        @test !isnan(wing.sections[1].aero_data[4][end])
-        @test !isnan(wing.sections[1].aero_data[5][end])
+        @test !isnan(wing.unrefined_sections[1].aero_data[3][end])
+        @test !isnan(wing.unrefined_sections[1].aero_data[4][end])
+        @test !isnan(wing.unrefined_sections[1].aero_data[5][end])
 
         wing = ObjWing(test_obj_path, test_dat_path; remove_nan=false)
-        @test isnan(wing.sections[1].aero_data[3][end])
-        @test isnan(wing.sections[1].aero_data[4][end])
-        @test isnan(wing.sections[1].aero_data[5][end])
+        @test isnan(wing.unrefined_sections[1].aero_data[3][end])
+        @test isnan(wing.unrefined_sections[1].aero_data[4][end])
+        @test isnan(wing.unrefined_sections[1].aero_data[5][end])
     end
 
     @testset "Wing Deformation" begin
@@ -195,8 +195,8 @@ using Serialization
         original_te_point = copy(body_aero.panels[i].TE_point_1)
 
         # Apply deformation with non-zero angles
-        theta_dist = fill(deg2rad(30.0), wing.n_panels)  # 10 degrees twist
-        delta_dist = fill(deg2rad(5.0), wing.n_panels)   # 5 degrees trailing edge deflection
+        theta_dist = fill(deg2rad(30.0), wing.n_unrefined_sections)  # 30 degrees twist for all sections
+        delta_dist = fill(deg2rad(5.0), wing.n_unrefined_sections)   # 5 degrees trailing edge deflection for all sections
 
         VortexStepMethod.deform!(wing, theta_dist, delta_dist)
         VortexStepMethod.reinit!(body_aero)
@@ -221,10 +221,10 @@ using Serialization
         @test original_te_point ≈ reset_te_point atol=1e-4
     end
 
-    @testset "First and Last Section Deformation with group_deform!" begin
-        # Create an ObjWing with a small number of panels and groups
+    @testset "First and Last Section Deformation with unrefined_deform!" begin
+        # Create an ObjWing with a small number of panels and unrefined sections
         wing = ObjWing(test_obj_path, test_dat_path;
-            n_panels=4, remove_nan=true)
+            n_panels=4, n_unrefined_sections=2, remove_nan=true)
 
         # Store original TE points from all refined_sections
         # Wing has n_panels+1 sections (5 sections for 4 panels)
@@ -232,11 +232,11 @@ using Serialization
         original_te_points = [copy(wing.refined_sections[i].TE_point)
             for i in 1:n_sections]
 
-        # Apply group_deform! with non-zero angles (2 groups, each controlling 2 panels)
+        # Apply unrefined_deform! with non-zero angles (2 groups, each controlling 2 panels)
         theta_angles = [deg2rad(15.0), deg2rad(20.0)]
         delta_angles = [deg2rad(5.0), deg2rad(10.0)]
 
-        VortexStepMethod.group_deform!(wing, theta_angles, delta_angles; smooth=false)
+        VortexStepMethod.unrefined_deform!(wing, theta_angles, delta_angles; smooth=false)
 
         # Check that all sections' TE points have been deformed
         for i in 1:n_sections

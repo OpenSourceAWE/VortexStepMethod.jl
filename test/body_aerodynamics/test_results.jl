@@ -31,7 +31,7 @@ if !@isdefined ram_wing_results
         error("Required data files not found: $body_src or $foil_src")
     end
     
-    ram_wing = ObjWing(body_path, foil_path; alpha_range=deg2rad.(-1:1), delta_range=deg2rad.(-1:1))
+    ram_wing = ObjWing(body_path, foil_path; alpha_range=deg2rad.(-1:1), delta_range=deg2rad.(-1:1), n_unrefined_sections=4)
 end
 
 @testset "Nonlinear vs Linear - Comprehensive Input Testing" begin
@@ -48,7 +48,7 @@ end
     domega_magnitudes = [deg2rad(0.1), deg2rad(0.5), deg2rad(1.0)]  # Angular rate perturbations (rad/s)
     
     # Create body aerodynamics and solver
-    VortexStepMethod.group_deform!(ram_wing, theta, delta; smooth=false)
+    VortexStepMethod.unrefined_deform!(ram_wing, theta, delta; smooth=false)
     body_aero = BodyAerodynamics([ram_wing]; va, omega)
     solver = Solver(body_aero;
         aerodynamic_model_type=VSM,
@@ -85,8 +85,8 @@ end
     
     # Verify that linearization results match nonlinear results at operating point
     baseline_res = VortexStepMethod.solve!(solver, body_aero; log=false)
-    baseline_res = [solver.sol.force; solver.sol.moment; solver.sol.group_moment_dist]
-    coeff_baseline_res = [solver.sol.force_coeffs; solver.sol.moment_coeffs; solver.sol.group_moment_coeff_dist]
+    baseline_res = [solver.sol.force; solver.sol.moment; solver.sol.unrefined_moment_dist]
+    coeff_baseline_res = [solver.sol.force_coeffs; solver.sol.moment_coeffs; solver.sol.unrefined_moment_coeff_dist]
     @test baseline_res ≈ lin_res
     @test coeff_baseline_res ≈ coeff_lin_res
     
@@ -137,13 +137,13 @@ end
                     else
                         throw(ArgumentError())
                     end
-                    VortexStepMethod.group_deform!(ram_wing, reset_theta, reset_delta; smooth=false)
+                    VortexStepMethod.unrefined_deform!(ram_wing, reset_theta, reset_delta; smooth=false)
                     reinit!(body_aero; init_aero=false, va=reset_va, omega=reset_omega)
                     
                     # Get nonlinear solution
                     nonlin_res = VortexStepMethod.solve!(solver, body_aero, nothing; log=false)
-                    nonlin_res = [solver.sol.force; solver.sol.moment; solver.sol.group_moment_dist]
-                    coeff_nonlin_res = [solver.sol.force_coeffs; solver.sol.moment_coeffs; solver.sol.group_moment_coeff_dist]
+                    nonlin_res = [solver.sol.force; solver.sol.moment; solver.sol.unrefined_moment_dist]
+                    coeff_nonlin_res = [solver.sol.force_coeffs; solver.sol.moment_coeffs; solver.sol.unrefined_moment_coeff_dist]
                     @test nonlin_res ≉ baseline_res
                     @test coeff_nonlin_res ≉ baseline_res
                     
@@ -220,7 +220,7 @@ end
         for (combo_name, active_indices, perturbation, idx_mappings) in combination_tests
             @testset "$combo_name" begin
                 # Start with a fresh model for each combination test
-                VortexStepMethod.group_deform!(ram_wing, theta, delta; smooth=false)
+                VortexStepMethod.unrefined_deform!(ram_wing, theta, delta; smooth=false)
                 reinit!(body_aero; init_aero=false, va, omega)
                 
                 # Create the appropriate input vector for this combination
@@ -250,7 +250,7 @@ end
                 
                 # Get baseline results
                 baseline_res = VortexStepMethod.solve!(solver, body_aero; log=false)
-                baseline_res = [solver.sol.force; solver.sol.moment; solver.sol.group_moment_dist]
+                baseline_res = [solver.sol.force; solver.sol.moment; solver.sol.unrefined_moment_dist]
                 
                 # Should match the linearization result
                 @test baseline_res ≈ lin_res_combo
@@ -272,12 +272,12 @@ end
                     perturbed_input[idx_mappings.delta_idxs] : delta
                 
                 # Apply to nonlinear model
-                VortexStepMethod.group_deform!(ram_wing, perturbed_theta, perturbed_delta; smooth=false)
+                VortexStepMethod.unrefined_deform!(ram_wing, perturbed_theta, perturbed_delta; smooth=false)
                 reinit!(body_aero; init_aero=false, va=perturbed_va, omega=perturbed_omega)
                 
                 # Get nonlinear solution with perturbation
                 nonlin_res = VortexStepMethod.solve!(solver, body_aero; log=false)
-                nonlin_res = [solver.sol.force; solver.sol.moment; solver.sol.group_moment_dist]
+                nonlin_res = [solver.sol.force; solver.sol.moment; solver.sol.unrefined_moment_dist]
                 
                 # Compute linearized prediction using our specialized Jacobian
                 lin_prediction = lin_res_combo + jac_combo * perturbation

@@ -6,7 +6,7 @@ using Test
     @testset "Simple Wing Deformation" begin
         # Load existing simple_wing.yaml
         simple_wing_file = test_data_path("yaml_geometry", "simple_wing.yaml")
-        wing = Wing(simple_wing_file; n_panels=4, # n_groups=2)
+        wing = Wing(simple_wing_file; n_panels=4)
         body_aero = BodyAerodynamics([wing])
 
         # Store original TE point for comparison
@@ -15,8 +15,8 @@ using Test
         original_le_point = copy(body_aero.panels[i].LE_point_1)
 
         # Apply deformation with non-zero angles
-        theta_dist = fill(deg2rad(30.0), wing.n_panels)  # 30 degrees twist
-        delta_dist = fill(deg2rad(5.0), wing.n_panels)   # 5 degrees trailing edge deflection
+        theta_dist = fill(deg2rad(30.0), wing.n_unrefined_sections)  # 30 degrees twist
+        delta_dist = fill(deg2rad(5.0), wing.n_unrefined_sections)   # 5 degrees trailing edge deflection
 
         VortexStepMethod.deform!(wing, theta_dist, delta_dist)
         VortexStepMethod.reinit!(body_aero; refine_mesh=false)
@@ -36,8 +36,8 @@ using Test
         @test body_aero.panels[i].delta ≈ deg2rad(5.0)
 
         # Reset deformation with zero angles
-        zero_theta_dist = zeros(wing.n_panels)
-        zero_delta_dist = zeros(wing.n_panels)
+        zero_theta_dist = zeros(wing.n_unrefined_sections)
+        zero_delta_dist = zeros(wing.n_unrefined_sections)
 
         VortexStepMethod.deform!(wing, zero_theta_dist, zero_delta_dist)
         VortexStepMethod.reinit!(body_aero; refine_mesh=false)
@@ -53,7 +53,7 @@ using Test
     @testset "Complex Wing Deformation" begin
         # Load existing complex_wing.yaml with multiple sections
         complex_wing_file = test_data_path("yaml_geometry", "complex_wing.yaml")
-        wing = Wing(complex_wing_file; n_panels=12, # n_groups=3)
+        wing = Wing(complex_wing_file; n_panels=12)
         body_aero = BodyAerodynamics([wing])
 
         # Store original points for multiple panels
@@ -67,8 +67,9 @@ using Test
         end
 
         # Apply spanwise-varying deformation
-        theta_dist = [deg2rad(10.0 * i / wing.n_panels) for i in 1:wing.n_panels]  # Linear twist distribution
-        delta_dist = [deg2rad(-5.0 + 10.0 * i / wing.n_panels) for i in 1:wing.n_panels]  # Varying deflection
+        n = wing.n_unrefined_sections
+        theta_dist = [deg2rad(10.0 * i / n) for i in 1:n]  # Linear twist distribution
+        delta_dist = [deg2rad(-5.0 + 10.0 * i / n) for i in 1:n]  # Varying deflection
 
         VortexStepMethod.deform!(wing, theta_dist, delta_dist)
         VortexStepMethod.reinit!(body_aero; refine_mesh=false)
@@ -89,7 +90,7 @@ using Test
         @test body_aero.panels[1].delta < body_aero.panels[end].delta
 
         # Reset and verify
-        VortexStepMethod.deform!(wing, zeros(wing.n_panels), zeros(wing.n_panels))
+        VortexStepMethod.deform!(wing, zeros(wing.n_unrefined_sections), zeros(wing.n_unrefined_sections))
         VortexStepMethod.reinit!(body_aero; refine_mesh=false)
 
         for (idx, i) in enumerate(test_indices)
@@ -104,11 +105,11 @@ using Test
     @testset "Multiple Reinit Calls with NTuple aero_data" begin
         # This test specifically checks the NTuple handling fix
         simple_wing_file = test_data_path("yaml_geometry", "simple_wing.yaml")
-        wing = Wing(simple_wing_file; n_panels=4, # n_groups=2)
+        wing = Wing(simple_wing_file; n_panels=4)
 
         # Verify that sections have NTuple aero_data (for wings with simple polars)
         # or other valid AeroData types
-        @test wing.sections[1].aero_data !== nothing
+        @test wing.unrefined_sections[1].aero_data !== nothing
 
         # Perform multiple reinit! calls to ensure NTuple handling works
         for _ in 1:5
@@ -116,7 +117,7 @@ using Test
         end
 
         # Wing should still be valid after multiple reinits
-        @test wing.sections[1].aero_data !== nothing
+        @test wing.unrefined_sections[1].aero_data !== nothing
         # Verify refined_sections and non_deformed_sections are properly populated
         @test length(wing.refined_sections) == wing.n_panels + 1
         @test length(wing.non_deformed_sections) == wing.n_panels + 1
@@ -125,12 +126,12 @@ using Test
     @testset "Deformation with BodyAerodynamics Reinit" begin
         # Test that reinit! on BodyAerodynamics properly handles deformed wings
         simple_wing_file = test_data_path("yaml_geometry", "simple_wing.yaml")
-        wing = Wing(simple_wing_file; n_panels=4, # n_groups=2)
+        wing = Wing(simple_wing_file; n_panels=4)
         body_aero = BodyAerodynamics([wing])
 
         # Apply deformation
-        theta_dist = fill(deg2rad(15.0), wing.n_panels)
-        delta_dist = fill(deg2rad(3.0), wing.n_panels)
+        theta_dist = fill(deg2rad(15.0), wing.n_unrefined_sections)
+        delta_dist = fill(deg2rad(3.0), wing.n_unrefined_sections)
         VortexStepMethod.deform!(wing, theta_dist, delta_dist)
         VortexStepMethod.reinit!(body_aero; refine_mesh=false)
 
@@ -153,17 +154,17 @@ using Test
 
     @testset "Edge Cases" begin
         simple_wing_file = test_data_path("yaml_geometry", "simple_wing.yaml")
-        wing = Wing(simple_wing_file; n_panels=2, # n_groups=1)
+        wing = Wing(simple_wing_file; n_panels=2)
         body_aero = BodyAerodynamics([wing])
 
         # Test zero deformation
-        VortexStepMethod.deform!(wing, zeros(wing.n_panels), zeros(wing.n_panels))
+        VortexStepMethod.deform!(wing, zeros(wing.n_unrefined_sections), zeros(wing.n_unrefined_sections))
         VortexStepMethod.reinit!(body_aero; refine_mesh=false)
         @test all(p.delta ≈ 0.0 for p in body_aero.panels)
 
         # Test large deformation angles
-        theta_dist = fill(deg2rad(60.0), wing.n_panels)
-        delta_dist = fill(deg2rad(30.0), wing.n_panels)
+        theta_dist = fill(deg2rad(60.0), wing.n_unrefined_sections)
+        delta_dist = fill(deg2rad(30.0), wing.n_unrefined_sections)
 
         # Should not error even with large angles
         VortexStepMethod.deform!(wing, theta_dist, delta_dist)
@@ -171,8 +172,8 @@ using Test
         @test all(p.delta ≈ deg2rad(30.0) for p in body_aero.panels)
 
         # Test negative angles
-        theta_dist = fill(deg2rad(-20.0), wing.n_panels)
-        delta_dist = fill(deg2rad(-10.0), wing.n_panels)
+        theta_dist = fill(deg2rad(-20.0), wing.n_unrefined_sections)
+        delta_dist = fill(deg2rad(-10.0), wing.n_unrefined_sections)
         VortexStepMethod.deform!(wing, theta_dist, delta_dist)
         VortexStepMethod.reinit!(body_aero; refine_mesh=false)
         @test all(p.delta ≈ deg2rad(-10.0) for p in body_aero.panels)
