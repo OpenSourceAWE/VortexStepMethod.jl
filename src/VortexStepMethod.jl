@@ -129,14 +129,16 @@ Enumeration of the implemented panel distributions.
 - COSINE               # Cosine distribution
 - `COSINE_VAN_GARREL`  # van Garrel cosine distribution
 - `SPLIT_PROVIDED`     # Split provided sections
-- UNCHANGED            # Keep original sections
+- `UNCHANGED`          # Keep original sections without interpolation
+- `NONE`               # No refinement - sections already refined
 """
 @enum PanelDistribution begin
    LINEAR             # Linear distribution
    COSINE             # Cosine distribution
    COSINE_VAN_GARREL  # van Garrel cosine distribution
    SPLIT_PROVIDED     # Split provided sections
-   UNCHANGED          # Keep original sections
+   UNCHANGED          # Keep original sections without interpolation
+   NONE               # No refinement - sections already refined
 end
 
 """

@@ -381,7 +381,7 @@ This constructor builds a complete aerodynamic model by:
 3. Computing inertial properties and coordinate transformations
 4. Setting up control surfaces and panel distribution
 
-The resulting Wing supports deformation through group_deform! and deform! functions.
+The resulting Wing supports deformation through unrefined_deform! and deform! functions.
 
 # Arguments
 - `obj_path`: Path to .obj file containing 3D wing geometry
@@ -395,7 +395,7 @@ The resulting Wing supports deformation through group_deform! and deform! functi
 - `n_groups=4`: Number of control groups for deformation
 - `n_sections=n_panels+1`: Number of spanwise cross-sections
 - `align_to_principal=false`: Align body frame to principal axes of inertia
-- `spanwise_distribution=UNCHANGED`: Panel distribution type
+- `spanwise_distribution=UNCHANGED`: Panel distribution type (forced to UNCHANGED for ObjWing)
 - `remove_nan=true`: Interpolate NaN values in aerodynamic data
 - `alpha_range=deg2rad.(-5:1:20)`: Angle of attack range for polars (rad)
 - `delta_range=deg2rad.(-5:1:20)`: Trailing edge deflection range for polars (rad)
@@ -416,14 +416,14 @@ wing = ObjWing(
 )
 
 # Apply deformation
-group_deform!(wing, deg2rad.([5, 10, 5, 0]), deg2rad.([-5, 0, -5, 0]))
+unrefined_deform!(wing, deg2rad.([5, 10, 5, 0]), deg2rad.([-5, 0, -5, 0]))
 ```
 """
 function ObjWing(
     obj_path, dat_path;
     crease_frac=0.9, wind_vel=10., mass=1.0,
     n_panels=56, n_sections=nothing, n_unrefined_sections=nothing, n_groups=nothing,
-    spanwise_distribution=LINEAR,
+    spanwise_distribution=UNCHANGED,
     spanwise_direction=[0.0, 1.0, 0.0], remove_nan=true, align_to_principal=false,
     alpha_range=deg2rad.(-5:1:20), delta_range=deg2rad.(-5:1:20), prn=true,
     interp_steps=n_panels+1, grouping_method::PanelGroupingMethod=EQUAL_SIZE
@@ -443,6 +443,12 @@ function ObjWing(
 
     if grouping_method != EQUAL_SIZE
         @warn "Parameter grouping_method is deprecated and ignored. Grouping is now always by unrefined sections." maxlog=1
+    end
+
+    # Force NONE distribution for ObjWing
+    if spanwise_distribution != NONE
+        @warn "ObjWing only supports spanwise_distribution=NONE. Overriding to NONE." maxlog=1
+        spanwise_distribution = NONE
     end
 
     # Set default: evenly spaced unrefined sections including both tips
@@ -504,8 +510,12 @@ function ObjWing(
             push!(sections, Section(LE_point, TE_point, POLAR_MATRICES, aero_data))
         end
 
-        # Initialize refined_sections (will be populated by reinit!)
-        refined_sections = [Section() for _ in 1:(n_panels+1)]
+        refined_sections = Section[]
+        for gamma in range(-gamma_tip, gamma_tip, n_panels+1)
+            LE_point = [le_interp[i](gamma) for i in 1:3]
+            TE_point = [te_interp[i](gamma) for i in 1:3]
+            push!(refined_sections, Section(LE_point, TE_point, POLAR_MATRICES, aero_data))
+        end
 
         panel_props = PanelProperties{n_panels}()
         cache = [PreallocationTools.LazyBufferCache()]
@@ -513,7 +523,7 @@ function ObjWing(
         wing = Wing(n_panels, Int16(n_unrefined_sections), spanwise_distribution, panel_props, MVec3(spanwise_direction),
             sections, refined_sections, remove_nan,
             Int16[],
-            Section[], zeros(n_panels), zeros(n_panels),
+            Section[], zeros(n_unrefined_sections), zeros(n_unrefined_sections),
             mass, gamma_tip, inertia_tensor, T_cad_body, R_cad_body, radius,
             le_interp, te_interp, area_interp, cache)
 

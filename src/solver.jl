@@ -22,15 +22,15 @@ Struct for storing the solution of the [solve!](@ref) function. Must contain all
 - `moment_coeffs`::MVec3: Aerodynamic moment coefficients [CMx, CMy, CMz] [-]
 - `moment_dist`::Vector{Float64}: Pitching moments around the spanwise vector of each panel. [Nm]
 - `moment_coeff_dist`::Vector{Float64}: Pitching moment coefficient around the spanwise vector of each panel. [-]
-- `unrefined_moment_dist`::MVector{G, Float64}: Aggregated moments for unrefined sections [Nm]
-- `unrefined_moment_coeff_dist`::MVector{G, Float64}: Aggregated moment coefficients for unrefined sections [-]
-- `cl_unrefined_array`::MVector{G, Float64}: Averaged lift coefficients for unrefined sections [-]
-- `cd_unrefined_array`::MVector{G, Float64}: Averaged drag coefficients for unrefined sections [-]
-- `cm_unrefined_array`::MVector{G, Float64}: Averaged moment coefficients for unrefined sections [-]
-- `alpha_unrefined_array`::MVector{G, Float64}: Averaged angles of attack for unrefined sections [rad]
+- `unrefined_moment_dist`::MVector{U, Float64}: Aggregated moments for unrefined sections [Nm]
+- `unrefined_moment_coeff_dist`::MVector{U, Float64}: Aggregated moment coefficients for unrefined sections [-]
+- `cl_unrefined_array`::MVector{U, Float64}: Averaged lift coefficients for unrefined sections [-]
+- `cd_unrefined_array`::MVector{U, Float64}: Averaged drag coefficients for unrefined sections [-]
+- `cm_unrefined_array`::MVector{U, Float64}: Averaged moment coefficients for unrefined sections [-]
+- `alpha_unrefined_array`::MVector{U, Float64}: Averaged angles of attack for unrefined sections [rad]
 - `solver_status`::SolverStatus: enum, see [SolverStatus](@ref)
 """
-@with_kw mutable struct VSMSolution{P,G}
+@with_kw mutable struct VSMSolution{P,U}
     ### private vectors of solve_base!
     _x_airf_array::Matrix{Float64} = zeros(P, 3)
     _y_airf_array::Matrix{Float64} = zeros(P, 3)
@@ -55,12 +55,12 @@ Struct for storing the solution of the [solve!](@ref) function. Must contain all
     moment_coeffs::MVec3 = zeros(MVec3)  
     moment_dist::MVector{P, Float64} = zeros(P)
     moment_coeff_dist::MVector{P, Float64} = zeros(P)
-    unrefined_moment_dist::MVector{G, Float64} = zeros(G)
-    unrefined_moment_coeff_dist::MVector{G, Float64} = zeros(G)
-    cl_unrefined_array::MVector{G, Float64} = zeros(G)
-    cd_unrefined_array::MVector{G, Float64} = zeros(G)
-    cm_unrefined_array::MVector{G, Float64} = zeros(G)
-    alpha_unrefined_array::MVector{G, Float64} = zeros(G)
+    unrefined_moment_dist::MVector{U, Float64} = zeros(U)
+    unrefined_moment_coeff_dist::MVector{U, Float64} = zeros(U)
+    cl_unrefined_array::MVector{U, Float64} = zeros(U)
+    cd_unrefined_array::MVector{U, Float64} = zeros(U)
+    cm_unrefined_array::MVector{U, Float64} = zeros(U)
+    alpha_unrefined_array::MVector{U, Float64} = zeros(U)
     solver_status::SolverStatus = FAILURE
 end
 
@@ -105,7 +105,7 @@ Main solver structure for the Vortex Step Method.See also: [solve](@ref)
 ## Solution
 sol::VSMSolution = VSMSolution(): The result of calling [solve!](@ref) 
 """
-@with_kw mutable struct Solver{P,G}
+@with_kw mutable struct Solver{P,U}
     # General settings
     solver_type::SolverType = LOOP
     aerodynamic_model_type::Model = VSM
@@ -139,13 +139,13 @@ sol::VSMSolution = VSMSolution(): The result of calling [solve!](@ref)
     cache_lin::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}} = [LazyBufferCache() for _ in 1:4]
     
     # Solution
-    sol::VSMSolution{P,G} = VSMSolution{P,G}()
+    sol::VSMSolution{P,U} = VSMSolution{P,U}()
 end
 
 function Solver(body_aero; kwargs...)
     P = length(body_aero.panels)
-    G = sum([max(0, wing.n_unrefined_sections - 1) for wing in body_aero.wings])
-    return Solver{P,G}(; kwargs...)
+    U = sum([wing.n_unrefined_sections for wing in body_aero.wings])
+    return Solver{P,U}(; kwargs...)
 end
 
 function Solver(body_aero, settings::VSMSettings)
@@ -719,47 +719,65 @@ function smooth_circulation!(
 end
 
 """
-    linearize(solver::Solver, body_aero::BodyAerodynamics, wing::Wing, y::Vector{T};
-        theta_idxs=1:4, delta_idxs=nothing, va_idxs=nothing, omega_idxs=nothing, kwargs...) where T
+    linearize(solver::Solver, body_aero::BodyAerodynamics, y::Vector{T};
+        theta_idxs=1:4, delta_idxs=nothing, va_idxs=nothing, omega_idxs=nothing,
+        aero_coeffs=false, kwargs...) where T
 
-Compute the Jacobian matrix for a deformable wing around an operating point using finite differences.
+Compute Jacobian matrix of aerodynamic outputs with respect to control and kinematic inputs using
+finite differences. Used for control system design and linear stability analysis.
+
+The function uses automatic differentiation with finite differences to compute ∂outputs/∂inputs.
+Deformations are applied to the wing's unrefined sections (the original sections before mesh
+refinement), with each control angle affecting one unrefined section.
 
 # Arguments
-- `solver`: VSM solver instance (must be initialized)
-- `body_aero`: Aerodynamic body representation
-- `wing`: Wing model to linearize (must support deformation, i.e., created with ObjWing())
-- `y`: Input vector at operating point, containing a combination of control angles and velocities
+- `solver::Solver`: Solver instance (must be configured for the wing)
+- `body_aero::BodyAerodynamics`: Body aerodynamics with exactly one wing
+- `y::Vector{T}`: Input vector at operating point containing control angles and/or kinematic states
 
 # Keyword Arguments
-- `theta_idxs`: Indices of twist angles in input vector (default: 1:4)
-- `delta_idxs`: Indices of trailing edge deflection angles (default: nothing)
-- `va_idxs`: Indices of velocity components `[vx, vy, vz]` (default: nothing)
-- `omega_idxs`: Indices of angular velocity components `[ωx, ωy, ωz]` (default: nothing)
-- `kwargs...`: Additional arguments passed to the `solve!` function
+- `theta_idxs`: Indices in `y` for twist angles (one per unrefined section, default: 1:4)
+- `delta_idxs`: Indices in `y` for trailing edge deflections (one per unrefined section, default: nothing)
+- `va_idxs`: Indices in `y` for apparent wind velocity [vx, vy, vz] (default: nothing)
+- `omega_idxs`: Indices in `y` for angular velocity [ωx, ωy, ωz] (default: nothing)
+- `aero_coeffs::Bool`: Return force/moment coefficients instead of dimensional values (default: false)
+- `kwargs...`: Additional arguments passed to `solve!`
+
+# Index Validation
+The lengths of `theta_idxs` and `delta_idxs` (if provided) must match `wing.n_unrefined_sections`.
+Unrefined sections are the original wing sections before mesh refinement for aerodynamic analysis.
+
+# Caching
+The function caches previous deformation angles to avoid redundant `unrefined_deform!` calls during
+Jacobian computation. When the same angles are encountered, geometry deformation is skipped.
 
 # Returns
-- `jac`: Jacobian matrix (∂outputs/∂inputs)
-- `results`: Output vector at the operating point [Fx, Fy, Fz, Mx, My, Mz, unrefined_moments...]
+- `jac::Matrix{Float64}`: Jacobian matrix (m×n) where m = 6 + n_unrefined_sections, n = length(y)
+- `results::Vector{Float64}`: Output vector at operating point
+  - If `aero_coeffs=false`: [Fx, Fy, Fz, Mx, My, Mz, unrefined_moment_dist...]
+  - If `aero_coeffs=true`: [CFx, CFy, CFz, CMx, CMy, CMz, unrefined_moment_coeff_dist...]
 
 # Example
 ```julia
-# Initialize wing and solver
-wing = ObjWing("path/to/body.obj", "path/to/foil.dat")
-body_aero = BodyAerodynamics([wing])
+# Create deformable wing with 4 unrefined sections
+wing = ObjWing("kite.obj", "airfoil.dat"; n_unrefined_sections=4)
+body_aero = BodyAerodynamics([wing], va=[15.0, 0, 0])
 solver = Solver(body_aero)
 
-# Define operating point with 4 control angles, velocity, and angular rates
-y_op = [zeros(4);        # 4 twist control angles (rad)
-       [15.0, 0.0, 0.0]; # Velocity vector (m/s)
-       zeros(3)]         # Angular velocity (rad/s)
+# Operating point: 4 twist angles + velocity + angular rates
+y_op = [zeros(4);        # theta angles [rad]
+        [15.0, 0.0, 0.0]; # va [m/s]
+        zeros(3)]         # omega [rad/s]
 
 # Compute Jacobian
-jac, results = linearize(
-    solver, body_aero, wing, y_op;
-    theta_idxs=1:4,      # Twist angles
-    va_idxs=5:7,         # Velocity components
-    omega_idxs=8:10      # Angular rates
+jac, results = linearize(solver, body_aero, y_op;
+    theta_idxs=1:4,
+    va_idxs=5:7,
+    omega_idxs=8:10,
+    aero_coeffs=true
 )
+
+# jac is (10×10): [6 force/moment coeffs + 4 unrefined moment coeffs] × [4 theta + 3 va + 3 omega]
 ```
 """
 function linearize(solver::Solver, body_aero::BodyAerodynamics, y::Vector{T};
@@ -804,20 +822,20 @@ function linearize(solver::Solver, body_aero::BodyAerodynamics, y::Vector{T};
 
         if !isnothing(theta_angles) && isnothing(delta_angles)
             if !all(theta_angles .== last_theta)
-                VortexStepMethod.group_deform!(wing, theta_angles, nothing; smooth=false)
+                VortexStepMethod.unrefined_deform!(wing, theta_angles, nothing; smooth=false)
                 VortexStepMethod.reinit!(body_aero; init_aero=false)
                 last_theta .= theta_angles
             end
         elseif !isnothing(theta_angles) && !isnothing(delta_angles)
             if !all(delta_angles .== last_delta) || !all(theta_angles .== last_theta)
-                VortexStepMethod.group_deform!(wing, theta_angles, delta_angles; smooth=false)
+                VortexStepMethod.unrefined_deform!(wing, theta_angles, delta_angles; smooth=false)
                 VortexStepMethod.reinit!(body_aero; init_aero=false)
                 last_theta .= theta_angles
                 last_delta .= delta_angles
             end
         elseif isnothing(theta_angles) && !isnothing(delta_angles)
             if !all(delta_angles .== last_delta)
-                VortexStepMethod.group_deform!(wing, nothing, delta_angles; smooth=false)
+                VortexStepMethod.unrefined_deform!(wing, nothing, delta_angles; smooth=false)
                 VortexStepMethod.reinit!(body_aero; init_aero=false)
                 last_delta .= delta_angles
             end

@@ -46,7 +46,7 @@ function reinit!(section::Section, LE_point, TE_point, aero_model=nothing, aero_
     if !isnothing(aero_data)
         # NTuple is immutable, so we must assign directly
         # For mutable types (Vector, Matrix), we can broadcast for efficiency
-        if aero_data isa NTuple || isnothing(section.aero_data)
+        if aero_data isa NTuple || aero_data isa Tuple || isnothing(section.aero_data)
             section.aero_data = aero_data
         else
             section.aero_data .= aero_data
@@ -344,7 +344,7 @@ function reinit!(wing::AbstractWing; refine_mesh=true, recompute_mapping=true, s
 end
 
 """
-    group_deform!(wing::Wing, theta_angles=nothing, delta_angles=nothing; smooth=false)
+    unrefined_deform!(wing::Wing, theta_angles=nothing, delta_angles=nothing; smooth=false)
 
 Apply deformation angles directly to unrefined wing sections.
 
@@ -372,7 +372,7 @@ if both angle inputs are nothing.
 # Returns
 - `nothing` (modifies wing in-place)
 """
-function group_deform!(wing::Wing, theta_angles=nothing, delta_angles=nothing; smooth=false)
+function unrefined_deform!(wing::Wing, theta_angles=nothing, delta_angles=nothing; smooth=false)
     # Check if deformation is supported
     can_deform = !isempty(wing.non_deformed_sections)
 
@@ -608,6 +608,17 @@ function refine_aerodynamic_mesh!(wing::AbstractWing; recompute_mapping=true, so
     # Only sort sections if requested (skip for REFINE wings with fixed structural order)
     sort_sections && sort!(wing.sections, by=s -> s.LE_point[2], rev=true)
     n_sections = wing.n_panels + 1
+
+    # Handle NONE distribution - sections already refined, just compute mapping
+    if wing.spanwise_distribution == NONE
+        if length(wing.refined_sections) != n_sections
+            throw(ArgumentError("NONE distribution requires refined_sections to be pre-populated"))
+        end
+        recompute_mapping && compute_refined_panel_mapping!(wing)
+        update_non_deformed_sections!(wing)
+        return nothing
+    end
+
     if length(wing.refined_sections) == 0
         if wing.spanwise_distribution == UNCHANGED || length(wing.sections) == n_sections
             wing.refined_sections = wing.sections
