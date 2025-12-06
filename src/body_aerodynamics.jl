@@ -13,8 +13,8 @@ Main structure for calculating aerodynamic properties of bodies. Use the constru
 - `alpha_uncorrected`=zeros(Float64, P): angles of attack per panel
 - `alpha_corrected`=zeros(Float64, P):   corrected angles of attack per panel
 - `stall_angle_list`=zeros(Float64, P):  stall angle per panel
-- `alpha_array::MVector{P, Float64}` = zeros(Float64, P)
-- `v_a_array::MVector{P, Float64}` = zeros(Float64, P)
+- `alpha_dist::MVector{P, Float64}` = zeros(Float64, P)
+- `v_a_dist::MVector{P, Float64}` = zeros(Float64, P)
 - `work_vectors`::NTuple{10, MVec3} = ntuple(_ -> zeros(MVec3), 10)
 - `AIC::Array{Float64, 3}` = zeros(3, P, P)
 - `projected_area::Float64` = 1.0: The area projected onto the xy-plane of the kite body reference frame [m²]
@@ -30,8 +30,8 @@ Main structure for calculating aerodynamic properties of bodies. Use the constru
     alpha_uncorrected::MVector{P, Float64} = zeros(P)
     alpha_corrected::MVector{P, Float64} = zeros(P)
     stall_angle_list::MVector{P, Float64} = zeros(P)
-    alpha_array::MVector{P, Float64} = zeros(P)
-    v_a_array::MVector{P, Float64} = zeros(P)
+    alpha_dist::MVector{P, Float64} = zeros(P)
+    v_a_dist::MVector{P, Float64} = zeros(P)
     work_vectors::NTuple{10,MVec3} = ntuple(_ -> zeros(MVec3), 10)
     AIC::Array{Float64, 3} = zeros(3, P, P)
     projected_area::Float64 = one(Float64)
@@ -186,8 +186,8 @@ function reinit!(body_aero::BodyAerodynamics;
     # Initialize rest of the struct
     body_aero.projected_area = sum(calculate_projected_area, body_aero.wings)
     calculate_stall_angle_list!(body_aero.stall_angle_list, body_aero.panels)
-    body_aero.alpha_array .= 0.0
-    body_aero.v_a_array .= 0.0
+    body_aero.alpha_dist .= 0.0
+    body_aero.v_a_dist .= 0.0
     body_aero.AIC .= 0.0
     set_va!(body_aero, va, omega)
     return nothing
@@ -418,7 +418,7 @@ end
     calculate_results(body_aero::BodyAerodynamics, gamma_new, 
                      density, aerodynamic_model_type::Model,
                      core_radius_fraction, mu,
-                     alpha_array, v_a_array,
+                     alpha_dist, v_a_dist,
                      chord_array, x_airf_array,
                      y_airf_array, z_airf_array,
                      va_array, va_norm_array,
@@ -438,8 +438,8 @@ function calculate_results(
     aerodynamic_model_type::Model,
     core_radius_fraction,
     mu,
-    alpha_array,
-    v_a_array,
+    alpha_dist,
+    v_a_dist,
     chord_array,
     x_airf_array,
     y_airf_array,
@@ -462,15 +462,15 @@ function calculate_results(
 
     # Calculate coefficients for each panel
     for (i, panel) in enumerate(panels)
-        cl_array[i] = calculate_cl(panel, alpha_array[i])
-        cd_array[i], cm_array[i] = calculate_cd_cm(panel, alpha_array[i])
+        cl_array[i] = calculate_cl(panel, alpha_dist[i])
+        cd_array[i], cm_array[i] = calculate_cd_cm(panel, alpha_dist[i])
         panel_width_array[i] = panel.width
     end
 
     # Calculate forces
-    lift = reshape((cl_array .* 0.5 .* density .* v_a_array.^2 .* chord_array), :, 1)
-    drag = reshape((cd_array .* 0.5 .* density .* v_a_array.^2 .* chord_array), :, 1)
-    moment = reshape((cm_array .* 0.5 .* density .* v_a_array.^2 .* chord_array), :, 1)
+    lift = reshape((cl_array .* 0.5 .* density .* v_a_dist.^2 .* chord_array), :, 1)
+    drag = reshape((cd_array .* 0.5 .* density .* v_a_dist.^2 .* chord_array), :, 1)
+    moment = reshape((cm_array .* 0.5 .* density .* v_a_dist.^2 .* chord_array), :, 1)
 
     # Calculate alpha corrections based on model type
     if correct_aoa
@@ -486,7 +486,7 @@ function calculate_results(
             va_unit_array
         )
     else
-        alpha_corrected .= alpha_array
+        alpha_corrected .= alpha_dist
     end
 
     # Verify va is not distributed
@@ -632,7 +632,7 @@ function calculate_results(
         "cfy" => (sum(f_body_3D[2,:]) / (q_inf * projected_area)),
         "cfz" => (sum(f_body_3D[3,:]) / (q_inf * projected_area)),
         "alpha_at_ac" => alpha_corrected,
-        "alpha_uncorrected" => alpha_array,
+        "alpha_uncorrected" => alpha_dist,
         "alpha_geometric" => alpha_geometric,
         "gamma_distribution" => gamma_new,
         "area_all_panels" => area_all_panels,

@@ -4,15 +4,19 @@
 
 Struct for storing the solution of the [solve!](@ref) function. Must contain all info needed by `KiteModels.jl`.
 
+# Naming Convention
+- Variables ending in `_dist`: Per-panel distributions (length P, one value per panel)
+- Variables ending in `_unrefined_dist`: Per-unrefined-section distributions (length U, averaged values per unrefined section)
+
 # Attributes
-- `panel_width_array`::Vector{Float64}: Width of the panels [m]
-- `alpha_array`::Vector{Float64}: Angle of attack of each panel relative to the apparent wind [rad]
-- cl_array::Vector{Float64}: Lift coefficients of the panels [-]
-- cd_array::Vector{Float64}: Drag coefficients of the panels [-]
-- cm_array::Vector{Float64}: Pitching moment coefficients of the panels [-]
-- panel_lift::Vector{Float64}: Lift force of the panels [N]
-- panel_drag::Vector{Float64}: Drag force of the panels [N]
-- panel_moment::Vector{Float64}: Pitching moment around the spanwise vector of the panels [Nm]
+- `width_dist`::Vector{Float64}: Width of the panels [m]
+- `alpha_dist`::Vector{Float64}: Angle of attack of each panel relative to the apparent wind [rad]
+- cl_dist::Vector{Float64}: Lift coefficients of the panels [-]
+- cd_dist::Vector{Float64}: Drag coefficients of the panels [-]
+- cm_dist::Vector{Float64}: Pitching moment coefficients of the panels [-]
+- lift_dist::Vector{Float64}: Lift force of the panels [N]
+- drag_dist::Vector{Float64}: Drag force of the panels [N]
+- panel_moment_dist::Vector{Float64}: Pitching moment around the spanwise vector of the panels [Nm]
 - `f_body_3D`::Matrix{Float64}: Matrix of the aerodynamic forces (x, y, z vectors) [N]
 - `m_body_3D`::Matrix{Float64}: Matrix of the aerodynamic moments [Nm]
 - `gamma_distribution`::Union{Nothing, Vector{Float64}}: Vector containing the panel circulations.
@@ -22,30 +26,29 @@ Struct for storing the solution of the [solve!](@ref) function. Must contain all
 - `moment_coeffs`::MVec3: Aerodynamic moment coefficients [CMx, CMy, CMz] [-]
 - `moment_dist`::Vector{Float64}: Pitching moments around the spanwise vector of each panel. [Nm]
 - `moment_coeff_dist`::Vector{Float64}: Pitching moment coefficient around the spanwise vector of each panel. [-]
-- `unrefined_moment_dist`::MVector{U, Float64}: Aggregated moments for unrefined sections [Nm]
-- `unrefined_moment_coeff_dist`::MVector{U, Float64}: Aggregated moment coefficients for unrefined sections [-]
-- `cl_unrefined_array`::MVector{U, Float64}: Averaged lift coefficients for unrefined sections [-]
-- `cd_unrefined_array`::MVector{U, Float64}: Averaged drag coefficients for unrefined sections [-]
-- `cm_unrefined_array`::MVector{U, Float64}: Averaged moment coefficients for unrefined sections [-]
-- `alpha_unrefined_array`::MVector{U, Float64}: Averaged angles of attack for unrefined sections [rad]
+- `moment_unrefined_dist`::MVector{U, Float64}: Averaged moments for unrefined sections [Nm]
+- `cl_unrefined_dist`::MVector{U, Float64}: Averaged lift coefficients for unrefined sections [-]
+- `cd_unrefined_dist`::MVector{U, Float64}: Averaged drag coefficients for unrefined sections [-]
+- `cm_unrefined_dist`::MVector{U, Float64}: Averaged moment coefficients for unrefined sections [-]
+- `alpha_unrefined_dist`::MVector{U, Float64}: Averaged angles of attack for unrefined sections [rad]
 - `solver_status`::SolverStatus: enum, see [SolverStatus](@ref)
 """
 @with_kw mutable struct VSMSolution{P,U}
     ### private vectors of solve_base!
-    _x_airf_array::Matrix{Float64} = zeros(P, 3)
-    _y_airf_array::Matrix{Float64} = zeros(P, 3)
-    _z_airf_array::Matrix{Float64} = zeros(P, 3)
-    _va_array::Matrix{Float64} = zeros(P, 3)
-    _chord_array::Vector{Float64} = zeros(P)
+    _x_airf_dist::Matrix{Float64} = zeros(P, 3)
+    _y_airf_dist::Matrix{Float64} = zeros(P, 3)
+    _z_airf_dist::Matrix{Float64} = zeros(P, 3)
+    _va_dist::Matrix{Float64} = zeros(P, 3)
+    _chord_dist::Vector{Float64} = zeros(P)
     ### end of private vectors
-    panel_width_array::Vector{Float64} = zeros(P)
-    alpha_array::Vector{Float64} = zeros(P)
-    cl_array::Vector{Float64} = zeros(P)
-    cd_array::Vector{Float64} = zeros(P)
-    cm_array::Vector{Float64} = zeros(P)
-    panel_lift::Vector{Float64} = zeros(P)
-    panel_drag::Vector{Float64} = zeros(P)
-    panel_moment::Vector{Float64} = zeros(P)
+    width_dist::Vector{Float64} = zeros(P)
+    alpha_dist::Vector{Float64} = zeros(P)
+    cl_dist::Vector{Float64} = zeros(P)
+    cd_dist::Vector{Float64} = zeros(P)
+    cm_dist::Vector{Float64} = zeros(P)
+    lift_dist::Vector{Float64} = zeros(P)
+    drag_dist::Vector{Float64} = zeros(P)
+    panel_moment_dist::Vector{Float64} = zeros(P)
     f_body_3D::Matrix{Float64} = zeros(3, P)
     m_body_3D::Matrix{Float64} = zeros(3, P)
     gamma_distribution::Union{Nothing, Vector{Float64}} = nothing
@@ -55,18 +58,17 @@ Struct for storing the solution of the [solve!](@ref) function. Must contain all
     moment_coeffs::MVec3 = zeros(MVec3)  
     moment_dist::MVector{P, Float64} = zeros(P)
     moment_coeff_dist::MVector{P, Float64} = zeros(P)
-    unrefined_moment_dist::MVector{U, Float64} = zeros(U)
-    unrefined_moment_coeff_dist::MVector{U, Float64} = zeros(U)
-    cl_unrefined_array::MVector{U, Float64} = zeros(U)
-    cd_unrefined_array::MVector{U, Float64} = zeros(U)
-    cm_unrefined_array::MVector{U, Float64} = zeros(U)
-    alpha_unrefined_array::MVector{U, Float64} = zeros(U)
-    x_airf_unrefined_array::Vector{MVec3} = [MVec3(0,0,0) for _ in 1:U]
-    y_airf_unrefined_array::Vector{MVec3} = [MVec3(0,0,0) for _ in 1:U]
-    z_airf_unrefined_array::Vector{MVec3} = [MVec3(0,0,0) for _ in 1:U]
-    va_unrefined_array::Vector{MVec3} = [MVec3(0,0,0) for _ in 1:U]
-    chord_unrefined_array::MVector{U, Float64} = zeros(U)
-    width_unrefined_array::MVector{U, Float64} = zeros(U)
+    moment_unrefined_dist::MVector{U, Float64} = zeros(U)
+    cl_unrefined_dist::MVector{U, Float64} = zeros(U)
+    cd_unrefined_dist::MVector{U, Float64} = zeros(U)
+    cm_unrefined_dist::MVector{U, Float64} = zeros(U)
+    alpha_unrefined_dist::MVector{U, Float64} = zeros(U)
+    x_airf_unrefined_dist::Vector{MVec3} = [MVec3(0,0,0) for _ in 1:U]
+    y_airf_unrefined_dist::Vector{MVec3} = [MVec3(0,0,0) for _ in 1:U]
+    z_airf_unrefined_dist::Vector{MVec3} = [MVec3(0,0,0) for _ in 1:U]
+    va_unrefined_dist::Vector{MVec3} = [MVec3(0,0,0) for _ in 1:U]
+    chord_unrefined_dist::MVector{U, Float64} = zeros(U)
+    width_unrefined_dist::MVector{U, Float64} = zeros(U)
     solver_status::SolverStatus = FAILURE
 end
 
@@ -74,13 +76,13 @@ end
 @with_kw mutable struct LoopResult{P}
     converged::Bool              = false
     gamma_new::MVector{P, Float64}   = zeros(P)
-    alpha_array::MVector{P, Float64} = zeros(P) # TODO: Is this different from BodyAerodynamics.alpha_array ?
-    v_a_array::MVector{P, Float64}   = zeros(P)
+    alpha_dist::MVector{P, Float64} = zeros(P) # TODO: Is this different from BodyAerodynamics.alpha_dist ?
+    v_a_dist::MVector{P, Float64}   = zeros(P)
 end
 
 @with_kw struct BaseResult{P}
-    va_norm_array::MVector{P, Float64} = zeros(P)
-    va_unit_array::Matrix{Float64} = zeros(P, 3)
+    va_norm_dist::MVector{P, Float64} = zeros(P)
+    va_unit_dist::Matrix{Float64} = zeros(P, 3)
 end
 
 """
@@ -200,16 +202,16 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
     end
 
     # Initialize arrays
-    cl_array = solver.sol.cl_array
-    cd_array = solver.sol.cd_array
-    cm_array = solver.sol.cm_array
+    cl_dist = solver.sol.cl_dist
+    cd_dist = solver.sol.cd_dist
+    cm_dist = solver.sol.cm_dist
     converged = solver.lr.converged
-    alpha_array = solver.lr.alpha_array
-    alpha_corrected = solver.sol.alpha_array
-    v_a_array = solver.lr.v_a_array
+    alpha_dist = solver.lr.alpha_dist
+    alpha_corrected = solver.sol.alpha_dist
+    v_a_dist = solver.lr.v_a_dist
     panels = body_aero.panels
    
-    panel_width_array = solver.sol.panel_width_array
+    width_dist = solver.sol.width_dist
     solver.sol.moment_dist .= 0
     solver.sol.moment_coeff_dist .= 0
     moment_dist = solver.sol.moment_dist
@@ -219,20 +221,20 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
 
     # Calculate coefficients for each panel
     for (i, panel) in enumerate(panels)                                               # zero bytes
-        cl_array[i] = calculate_cl(panel, alpha_array[i])
-        cd_array[i], cm_array[i] = calculate_cd_cm(panel, alpha_array[i])
-        panel_width_array[i] = panel.width
+        cl_dist[i] = calculate_cl(panel, alpha_dist[i])
+        cd_dist[i], cm_dist[i] = calculate_cd_cm(panel, alpha_dist[i])
+        width_dist[i] = panel.width
     end
 
     # create an alias for the three vertical output vectors
-    lift = solver.sol.panel_lift
-    drag = solver.sol.panel_drag
-    panel_moment = solver.sol.panel_moment
+    lift = solver.sol.lift_dist
+    drag = solver.sol.drag_dist
+    panel_moment_dist = solver.sol.panel_moment_dist
 
     # Compute using fused broadcasting (no intermediate allocations)
-    @. lift = cl_array * 0.5 * density * v_a_array^2 * solver.sol._chord_array
-    @. drag = cd_array * 0.5 * density * v_a_array^2 * solver.sol._chord_array
-    @. panel_moment = cm_array * 0.5 * density * v_a_array^2 * solver.sol._chord_array
+    @. lift = cl_dist * 0.5 * density * v_a_dist^2 * solver.sol._chord_dist
+    @. drag = cd_dist * 0.5 * density * v_a_dist^2 * solver.sol._chord_dist
+    @. panel_moment_dist = cm_dist * 0.5 * density * v_a_dist^2 * solver.sol._chord_dist
 
     # Calculate alpha corrections based on model type
     if aerodynamic_model_type == VSM                             # 64 bytes
@@ -241,14 +243,14 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
             body_aero,
             gamma_new,
             solver.core_radius_fraction,
-            solver.sol._z_airf_array,
-            solver.sol._x_airf_array,
-            solver.sol._va_array,
-            solver.br.va_norm_array,
-            solver.br.va_unit_array
+            solver.sol._z_airf_dist,
+            solver.sol._x_airf_dist,
+            solver.sol._va_dist,
+            solver.br.va_norm_dist,
+            solver.br.va_unit_dist
         )
     elseif aerodynamic_model_type == LLT
-        alpha_corrected .= alpha_array
+        alpha_corrected .= alpha_dist
     end
 
     # Initialize result arrays
@@ -296,7 +298,7 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
         #     Use the axis around which the moment is defined,
         #     which is the y-axis pointing "spanwise"
         moment_axis_body = panel.y_airf
-        M_local_3D = panel_moment[i] * moment_axis_body * panel.width
+        M_local_3D = panel_moment_dist[i] * moment_axis_body * panel.width
         # Vector from panel AC to the chosen reference point:
         r_vector = panel_ac_body - reference_point  # e.g. CG, wing root, etc.
         # Cross product to shift the force from panel AC to ref. point:
@@ -306,40 +308,38 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
 
         # Calculate the moment distribution (moment on each panel)
         arm = (moment_frac - 0.25) * panel.chord
-        moment_dist[i] = ((ftotal_induced_va ⋅ panel.z_airf) * arm + panel_moment[i]) * panel.width
+        moment_dist[i] = ((ftotal_induced_va ⋅ panel.z_airf) * arm + panel_moment_dist[i]) * panel.width
         moment_coeff_dist[i] = moment_dist[i] / (q_inf * projected_area)
     end
 
     # Only compute unrefined arrays if there are unrefined sections
-    if length(solver.sol.unrefined_moment_dist) > 0
-        unrefined_moment_dist = solver.sol.unrefined_moment_dist
-        unrefined_moment_coeff_dist = solver.sol.unrefined_moment_coeff_dist
-        cl_unrefined_array = solver.sol.cl_unrefined_array
-        cd_unrefined_array = solver.sol.cd_unrefined_array
-        cm_unrefined_array = solver.sol.cm_unrefined_array
-        alpha_unrefined_array = solver.sol.alpha_unrefined_array
-        x_airf_unrefined_array = solver.sol.x_airf_unrefined_array
-        y_airf_unrefined_array = solver.sol.y_airf_unrefined_array
-        z_airf_unrefined_array = solver.sol.z_airf_unrefined_array
-        va_unrefined_array = solver.sol.va_unrefined_array
-        chord_unrefined_array = solver.sol.chord_unrefined_array
-        width_unrefined_array = solver.sol.width_unrefined_array
+    if length(solver.sol.moment_unrefined_dist) > 0
+        moment_unrefined_dist = solver.sol.moment_unrefined_dist
+        cl_unrefined_dist = solver.sol.cl_unrefined_dist
+        cd_unrefined_dist = solver.sol.cd_unrefined_dist
+        cm_unrefined_dist = solver.sol.cm_unrefined_dist
+        alpha_unrefined_dist = solver.sol.alpha_unrefined_dist
+        x_airf_unrefined_dist = solver.sol.x_airf_unrefined_dist
+        y_airf_unrefined_dist = solver.sol.y_airf_unrefined_dist
+        z_airf_unrefined_dist = solver.sol.z_airf_unrefined_dist
+        va_unrefined_dist = solver.sol.va_unrefined_dist
+        chord_unrefined_dist = solver.sol.chord_unrefined_dist
+        width_unrefined_dist = solver.sol.width_unrefined_dist
 
         # Zero all unrefined arrays
-        unrefined_moment_dist .= 0.0
-        unrefined_moment_coeff_dist .= 0.0
-        cl_unrefined_array .= 0.0
-        cd_unrefined_array .= 0.0
-        cm_unrefined_array .= 0.0
-        alpha_unrefined_array .= 0.0
-        for i in eachindex(x_airf_unrefined_array)
-            x_airf_unrefined_array[i] .= 0.0
-            y_airf_unrefined_array[i] .= 0.0
-            z_airf_unrefined_array[i] .= 0.0
-            va_unrefined_array[i] .= 0.0
+        moment_unrefined_dist .= 0.0
+        cl_unrefined_dist .= 0.0
+        cd_unrefined_dist .= 0.0
+        cm_unrefined_dist .= 0.0
+        alpha_unrefined_dist .= 0.0
+        for i in eachindex(x_airf_unrefined_dist)
+            x_airf_unrefined_dist[i] .= 0.0
+            y_airf_unrefined_dist[i] .= 0.0
+            z_airf_unrefined_dist[i] .= 0.0
+            va_unrefined_dist[i] .= 0.0
         end
-        chord_unrefined_array .= 0.0
-        width_unrefined_array .= 0.0
+        chord_unrefined_dist .= 0.0
+        width_unrefined_dist .= 0.0
 
         panel_idx = 1
         unrefined_idx = 1
@@ -353,20 +353,19 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
                     target_unrefined_idx = unrefined_idx + original_section_idx - 1
 
                     # Accumulate coefficients and moments
-                    unrefined_moment_dist[target_unrefined_idx] += moment_dist[panel_idx]
-                    unrefined_moment_coeff_dist[target_unrefined_idx] += moment_coeff_dist[panel_idx]
-                    cl_unrefined_array[target_unrefined_idx] += solver.sol.cl_array[panel_idx]
-                    cd_unrefined_array[target_unrefined_idx] += solver.sol.cd_array[panel_idx]
-                    cm_unrefined_array[target_unrefined_idx] += solver.sol.cm_array[panel_idx]
-                    alpha_unrefined_array[target_unrefined_idx] += solver.sol.alpha_array[panel_idx]
+                    moment_unrefined_dist[target_unrefined_idx] += moment_dist[panel_idx]
+                    cl_unrefined_dist[target_unrefined_idx] += solver.sol.cl_dist[panel_idx]
+                    cd_unrefined_dist[target_unrefined_idx] += solver.sol.cd_dist[panel_idx]
+                    cm_unrefined_dist[target_unrefined_idx] += solver.sol.cm_dist[panel_idx]
+                    alpha_unrefined_dist[target_unrefined_idx] += solver.sol.alpha_dist[panel_idx]
 
                     # Accumulate geometry
-                    x_airf_unrefined_array[target_unrefined_idx] .+= panel.x_airf
-                    y_airf_unrefined_array[target_unrefined_idx] .+= panel.y_airf
-                    z_airf_unrefined_array[target_unrefined_idx] .+= panel.z_airf
-                    va_unrefined_array[target_unrefined_idx] .+= panel.va
-                    chord_unrefined_array[target_unrefined_idx] += panel.chord
-                    width_unrefined_array[target_unrefined_idx] += panel.width
+                    x_airf_unrefined_dist[target_unrefined_idx] .+= panel.x_airf
+                    y_airf_unrefined_dist[target_unrefined_idx] .+= panel.y_airf
+                    z_airf_unrefined_dist[target_unrefined_idx] .+= panel.z_airf
+                    va_unrefined_dist[target_unrefined_idx] .+= panel.va
+                    chord_unrefined_dist[target_unrefined_idx] += panel.chord
+                    width_unrefined_dist[target_unrefined_idx] += panel.width
 
                     unrefined_section_counts[original_section_idx] += 1
                     panel_idx += 1
@@ -377,16 +376,17 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
                     target_unrefined_idx = unrefined_idx + i - 1
                     if unrefined_section_counts[i] > 0
                         count = unrefined_section_counts[i]
-                        cl_unrefined_array[target_unrefined_idx] /= count
-                        cd_unrefined_array[target_unrefined_idx] /= count
-                        cm_unrefined_array[target_unrefined_idx] /= count
-                        alpha_unrefined_array[target_unrefined_idx] /= count
-                        x_airf_unrefined_array[target_unrefined_idx] ./= count
-                        y_airf_unrefined_array[target_unrefined_idx] ./= count
-                        z_airf_unrefined_array[target_unrefined_idx] ./= count
-                        va_unrefined_array[target_unrefined_idx] ./= count
-                        chord_unrefined_array[target_unrefined_idx] /= count
-                        width_unrefined_array[target_unrefined_idx] /= count
+                        moment_unrefined_dist[target_unrefined_idx] /= count
+                        cl_unrefined_dist[target_unrefined_idx] /= count
+                        cd_unrefined_dist[target_unrefined_idx] /= count
+                        cm_unrefined_dist[target_unrefined_idx] /= count
+                        alpha_unrefined_dist[target_unrefined_idx] /= count
+                        x_airf_unrefined_dist[target_unrefined_idx] ./= count
+                        y_airf_unrefined_dist[target_unrefined_idx] ./= count
+                        z_airf_unrefined_dist[target_unrefined_idx] ./= count
+                        va_unrefined_dist[target_unrefined_idx] ./= count
+                        chord_unrefined_dist[target_unrefined_idx] /= count
+                        width_unrefined_dist[target_unrefined_idx] /= count
                     end
                 end
                 unrefined_idx += wing.n_unrefined_sections
@@ -453,15 +453,15 @@ function solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=n
         solver.aerodynamic_model_type,
         solver.core_radius_fraction,
         solver.mu,
-        solver.lr.alpha_array,
-        solver.lr.v_a_array,
-        solver.sol._chord_array,
-        solver.sol._x_airf_array,
-        solver.sol._y_airf_array,
-        solver.sol._z_airf_array,
-        solver.sol._va_array,
-        solver.br.va_norm_array,
-        solver.br.va_unit_array,
+        solver.lr.alpha_dist,
+        solver.lr.v_a_dist,
+        solver.sol._chord_dist,
+        solver.sol._x_airf_dist,
+        solver.sol._y_airf_dist,
+        solver.sol._z_airf_dist,
+        solver.sol._va_dist,
+        solver.br.va_norm_dist,
+        solver.br.va_unit_dist,
         body_aero.panels,
         solver.is_only_f_and_gamma_output;
         correct_aoa=solver.correct_aoa
@@ -469,9 +469,9 @@ function solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=n
     return results
 end
 
-@inline @inbounds function calc_norm_array!(va_norm_array, va_array)
+@inline @inbounds function calc_norm_array!(va_norm_dist, va_array)
     for i in 1:size(va_array, 1)
-        va_norm_array[i] = norm(MVec3(view(va_array, i, :)))
+        va_norm_dist[i] = norm(MVec3(view(va_array, i, :)))
     end
 end
 
@@ -487,31 +487,31 @@ function solve_base!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribu
     relaxation_factor = solver.relaxation_factor
     
     # Clear arrays
-    solver.sol._x_airf_array .= 0
-    solver.sol._y_airf_array .= 0
-    solver.sol._z_airf_array .= 0
-    solver.sol._va_array .= 0
-    solver.sol._chord_array .= 0
+    solver.sol._x_airf_dist .= 0
+    solver.sol._y_airf_dist .= 0
+    solver.sol._z_airf_dist .= 0
+    solver.sol._va_dist .= 0
+    solver.sol._chord_dist .= 0
 
     # Fill arrays from panels
     for (i, panel) in enumerate(panels)
-        solver.sol._x_airf_array[i, :] .= panel.x_airf
-        solver.sol._y_airf_array[i, :] .= panel.y_airf
-        solver.sol._z_airf_array[i, :] .= panel.z_airf
-        solver.sol._va_array[i, :] .= panel.va
-        solver.sol._chord_array[i] = panel.chord
+        solver.sol._x_airf_dist[i, :] .= panel.x_airf
+        solver.sol._y_airf_dist[i, :] .= panel.y_airf
+        solver.sol._z_airf_dist[i, :] .= panel.z_airf
+        solver.sol._va_dist[i, :] .= panel.va
+        solver.sol._chord_dist[i] = panel.chord
     end
 
     # Calculate unit vectors
-    calc_norm_array!(solver.br.va_norm_array, solver.sol._va_array)
-    solver.br.va_unit_array .= solver.sol._va_array ./ solver.br.va_norm_array
+    calc_norm_array!(solver.br.va_norm_dist, solver.sol._va_dist)
+    solver.br.va_unit_dist .= solver.sol._va_dist ./ solver.br.va_norm_dist
 
     # Calculate AIC matrices
-    calculate_AIC_matrices!(body_aero, solver.aerodynamic_model_type, solver.core_radius_fraction, solver.br.va_norm_array,
-                            solver.br.va_unit_array)
+    calculate_AIC_matrices!(body_aero, solver.aerodynamic_model_type, solver.core_radius_fraction, solver.br.va_norm_dist,
+                            solver.br.va_unit_dist)
 
     # Initialize gamma distribution
-    gamma_initial = solver.cache_base[1][solver.sol._chord_array]
+    gamma_initial = solver.cache_base[1][solver.sol._chord_dist]
     if isnothing(gamma_distribution)
         if solver.type_initial_gamma_distribution == ELLIPTIC
             calculate_circulation_distribution_elliptical_wing(gamma_initial, body_aero)
@@ -552,24 +552,24 @@ function gamma_loop!(
     relaxation_factor::Float64;
     log::Bool = true
 )
-    va_array = solver.sol._va_array
-    chord_array = solver.sol._chord_array
-    x_airf_array = solver.sol._x_airf_array
-    y_airf_array = solver.sol._y_airf_array
-    z_airf_array = solver.sol._z_airf_array
+    va_array = solver.sol._va_dist
+    chord_array = solver.sol._chord_dist
+    x_airf_array = solver.sol._x_airf_dist
+    y_airf_array = solver.sol._y_airf_dist
+    z_airf_array = solver.sol._z_airf_dist
     solver.lr.converged   = false
     n_panels    = length(body_aero.panels)
-    solver.lr.alpha_array .= body_aero.alpha_array
-    solver.lr.v_a_array   .= body_aero.v_a_array
+    solver.lr.alpha_dist .= body_aero.alpha_dist
+    solver.lr.v_a_dist   .= body_aero.v_a_dist
     
-    va_magw_array            = solver.cache[1][solver.lr.v_a_array]
+    va_magw_array            = solver.cache[1][solver.lr.v_a_dist]
     gamma                    = solver.cache[2][solver.lr.gamma_new]
     abs_gamma_new            = solver.cache[3][solver.lr.gamma_new]
     induced_velocity_all     = solver.cache[4][va_array]
     relative_velocity_array  = solver.cache[5][va_array]
     relative_velocity_crossz = solver.cache[6][va_array]
     v_acrossz_array          = solver.cache[7][va_array]
-    cl_array                 = solver.cache[8][solver.lr.gamma_new]
+    cl_dist                 = solver.cache[8][solver.lr.gamma_new]
     damp                     = solver.cache[9][solver.lr.gamma_new]
     v_normal_array           = solver.cache[10][solver.lr.gamma_new]
     v_tangential_array       = solver.cache[11][solver.lr.gamma_new]
@@ -600,17 +600,17 @@ function gamma_loop!(
             v_normal_array[i] = view(z_airf_array, i, :) ⋅ view(relative_velocity_array, i, :)
             v_tangential_array[i] = view(x_airf_array, i, :) ⋅ view(relative_velocity_array, i, :)
         end
-        solver.lr.alpha_array .= atan.(v_normal_array, v_tangential_array)
+        solver.lr.alpha_dist .= atan.(v_normal_array, v_tangential_array)
 
         for i in 1:n_panels
-            @views solver.lr.v_a_array[i] = norm(relative_velocity_crossz[i, :])
+            @views solver.lr.v_a_dist[i] = norm(relative_velocity_crossz[i, :])
             @views va_magw_array[i] = norm(v_acrossz_array[i, :])
         end
         
-        for (i, (panel, alpha)) in enumerate(zip(panels, solver.lr.alpha_array))
-            cl_array[i] = calculate_cl(panel, alpha)
+        for (i, (panel, alpha)) in enumerate(zip(panels, solver.lr.alpha_dist))
+            cl_dist[i] = calculate_cl(panel, alpha)
         end
-        gamma_new .= 0.5 .* solver.lr.v_a_array.^2 ./ va_magw_array .* cl_array .* chord_array
+        gamma_new .= 0.5 .* solver.lr.v_a_dist.^2 ./ va_magw_array .* cl_dist .* chord_array
         nothing
     end
 
@@ -769,8 +769,8 @@ Jacobian computation. When the same angles are encountered, geometry deformation
 # Returns
 - `jac::Matrix{Float64}`: Jacobian matrix (m×n) where m = 6 + n_unrefined_sections, n = length(y)
 - `results::Vector{Float64}`: Output vector at operating point
-  - If `aero_coeffs=false`: [Fx, Fy, Fz, Mx, My, Mz, unrefined_moment_dist...]
-  - If `aero_coeffs=true`: [CFx, CFy, CFz, CMx, CMy, CMz, unrefined_moment_coeff_dist...]
+  - If `aero_coeffs=false`: [Fx, Fy, Fz, Mx, My, Mz, moment_unrefined_dist...]
+  - If `aero_coeffs=true`: [CFx, CFy, CFz, CMx, CMy, CMz, cm_unrefined_dist...]
 
 # Example
 ```julia
@@ -868,16 +868,16 @@ function linearize(solver::Solver, body_aero::BodyAerodynamics, y::Vector{T};
         if !aero_coeffs
             results[1:3] .= solver.sol.force
             results[4:6] .= solver.sol.moment
-            results[7:end] .= solver.sol.unrefined_moment_dist
+            results[7:end] .= solver.sol.moment_unrefined_dist
         else
             results[1:3] .= solver.sol.force_coeffs
             results[4:6] .= solver.sol.moment_coeffs
-            results[7:end] .= solver.sol.unrefined_moment_coeff_dist
+            results[7:end] .= solver.sol.cm_unrefined_dist
         end
         return nothing
     end
 
-    results = zeros(3+3+length(solver.sol.unrefined_moment_dist))
+    results = zeros(3+3+length(solver.sol.moment_unrefined_dist))
     jac = zeros(length(results), length(y))
     backend = AutoFiniteDiff(absstep=1e2solver.atol, relstep=1e2solver.rtol)
     prep = prepare_jacobian(calc_results!, results, backend, y)
