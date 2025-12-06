@@ -6,13 +6,13 @@ PLOT = true
 PRN = true
 USE_TEX = false
 DEFORM = true
-LINEARIZE = true
+LINEARIZE = false
 
 # Create wing geometry
 wing = ObjWing(
     joinpath("data", "ram_air_kite", "ram_air_kite_body.obj"),
     joinpath("data", "ram_air_kite", "ram_air_kite_foil.dat");
-    n_unrefined_sections=4,
+    n_unrefined_sections=2,
     prn=PRN
 )
 body_aero = BodyAerodynamics([wing];)
@@ -20,9 +20,8 @@ println("First init")
 @time VortexStepMethod.reinit!(body_aero)
 
 if DEFORM
-    # Linear interpolation of alpha from 10° at one tip to 0° at the other
     println("Deform")
-    @time VortexStepMethod.unrefined_deform!(wing, deg2rad.([10,20,10,0]), deg2rad.([-10,0,-10,0]); smooth=true)
+    @time VortexStepMethod.unrefined_deform!(wing, deg2rad.([-10,0]), deg2rad.([0,0]); smooth=true)
     println("Deform init")
     @time VortexStepMethod.reinit!(body_aero; init_aero=false)
 end
