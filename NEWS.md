@@ -1,3 +1,27 @@
+## VortexStepMethod [Unreleased]
+### Changed
+- Unified `Wing` and `RamAirWing` into single `Wing` type (`RamAirWing` now alias for `ObjWing`)
+- Renamed `ram_geometry.jl` to `obj_geometry.jl`
+- Wing geometry uses unrefined sections with automatic panel-to-section mapping
+- Consistent naming: variables ending in `_dist` are per-panel, `_unrefined_dist` per unrefined section
+- `VSMSolution` field names: `panel_width_array` → `width_dist`, `alpha_array` → `alpha_dist`, etc.
+- Enhanced Makie extension with `plot_combined_analysis` for combined plotting
+
+### Added
+- `n_unrefined_sections` field in `Wing` for tracking pre-refinement sections
+- `refined_panel_mapping` for automatic panel-to-section association
+- Unrefined distribution fields in `VSMSolution`: `cl_unrefined_dist`, `cd_unrefined_dist`, `cm_unrefined_dist`, `alpha_unrefined_dist`, `moment_unrefined_dist`
+- `PanelDistribution.NONE` for wings already refined
+- Kwarg `sort_sections` for section ordering
+- YAML wing deformation tests
+- Unrefined distribution tests
+
+### Removed
+- Panel grouping (replaced with unrefined section mapping)
+- `PanelGroupingMethod` enum (deprecated, grouping automatic via mapping)
+- `n_groups` and `grouping_method` from settings files and structs
+- `n_groups` field from `WingSettings` and `SolverSettings`
+
 ## VortexStepMethod v2.3.0 2025-10-16
 ### Added
 - A Makie plotting extension.
