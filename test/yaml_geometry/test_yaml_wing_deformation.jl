@@ -235,4 +235,70 @@ using Test
             @test body_aero.panels[i].delta ≈ expected_delta atol=1e-6
         end
     end
+
+    @testset "Smooth vs Non-Smooth Deformation" begin
+        # Create test wing with 2 unrefined sections, refined to 40 panels
+        simple_wing_file = test_data_path("yaml_geometry", "simple_wing.yaml")
+        wing = Wing(simple_wing_file; n_panels=40)
+        @test wing.n_unrefined_sections == 2
+
+        # Define varying input angles at unrefined section level
+        delta_input = deg2rad.([0.0, 10.0])
+
+        # Test 1: Non-smooth deformation has step-wise discontinuities
+        VortexStepMethod.unrefined_deform!(wing, nothing, delta_input; smooth=false)
+        delta_nonsmooth = copy(wing.delta_dist)
+
+        # Verify step-wise pattern: panels in same unrefined section have identical angles
+        for i in 1:wing.n_panels
+            unrefined_idx = wing.refined_panel_mapping[i]
+            @test delta_nonsmooth[i] ≈ delta_input[unrefined_idx] atol=1e-10
+        end
+
+        # Verify discontinuities exist at unrefined section boundaries
+        # Find boundary indices (where panel mapping changes)
+        max_gradient_nonsmooth = 0.0
+        for i in 1:(wing.n_panels-1)
+            if wing.refined_panel_mapping[i] != wing.refined_panel_mapping[i+1]
+                gradient = abs(delta_nonsmooth[i+1] - delta_nonsmooth[i])
+                max_gradient_nonsmooth = max(max_gradient_nonsmooth, gradient)
+            end
+        end
+        @test max_gradient_nonsmooth > deg2rad(5.0)  # Should have large jumps
+
+        # Test 2: Smooth deformation is continuous
+        VortexStepMethod.unrefined_deform!(wing, nothing, delta_input; smooth=true)
+        delta_smooth = copy(wing.delta_dist)
+
+        # Verify gradients between adjacent panels are small
+        max_gradient_smooth = maximum(abs.(diff(delta_smooth)))
+        @test max_gradient_smooth < deg2rad(3.0)  # Should be smooth
+
+        # Verify no sharp discontinuities
+        for i in 1:(wing.n_panels-1)
+            @test abs(delta_smooth[i+1] - delta_smooth[i]) < deg2rad(3.0)
+        end
+
+        # Test 3: Smoothing reduces maximum gradient
+        @test max_gradient_smooth < max_gradient_nonsmooth
+
+        # Test 4: Angles match input at unrefined section centers (both modes)
+        # For non-smooth: extract angle at center panel of each unrefined section
+        VortexStepMethod.unrefined_deform!(wing, nothing, delta_input; smooth=false)
+        for i in 1:wing.n_unrefined_sections
+            # Find panels belonging to this unrefined section
+            panel_indices = findall(==(i), wing.refined_panel_mapping)
+            center_panel_idx = panel_indices[div(length(panel_indices), 2) + 1]
+            @test wing.delta_dist[center_panel_idx] ≈ delta_input[i] atol=1e-10
+        end
+
+        # For smooth: angles at center should be close to input (tolerance larger due to smoothing)
+        VortexStepMethod.unrefined_deform!(wing, nothing, delta_input; smooth=true)
+        for i in 1:wing.n_unrefined_sections
+            panel_indices = findall(==(i), wing.refined_panel_mapping)
+            center_panel_idx = panel_indices[div(length(panel_indices), 2) + 1]
+            # Smoothing may shift values slightly, use absolute tolerance for small angles
+            @test wing.delta_dist[center_panel_idx] ≈ delta_input[i] atol=deg2rad(2.0)
+        end
+    end
 end
