@@ -157,9 +157,8 @@ function reinit!(body_aero::BodyAerodynamics;
         # Create panels
         for i in 1:wing.n_panels
             if !isnothing(wing.delta_dist) && length(wing.delta_dist) > 0
-                # Map refined panel to unrefined section to get delta value
-                unrefined_idx = wing.refined_panel_mapping[i]
-                delta = wing.delta_dist[unrefined_idx]
+                # Panel i gets its delta directly from delta_dist[i]
+                delta = wing.delta_dist[i]
             else
                 delta = 0.0
             end

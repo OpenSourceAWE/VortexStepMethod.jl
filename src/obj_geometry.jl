@@ -523,7 +523,7 @@ function ObjWing(
         wing = Wing(n_panels, Int16(n_unrefined_sections), spanwise_distribution, panel_props, MVec3(spanwise_direction),
             sections, refined_sections, remove_nan,
             Int16[],
-            Section[], zeros(n_unrefined_sections), zeros(n_unrefined_sections),
+            Section[], zeros(n_panels), zeros(n_panels),
             mass, gamma_tip, inertia_tensor, T_cad_body, R_cad_body, radius,
             le_interp, te_interp, area_interp, cache)
 

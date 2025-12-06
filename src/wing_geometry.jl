@@ -236,8 +236,8 @@ mutable struct Wing <: AbstractWing
 
     # Deformation fields
     non_deformed_sections::Vector{Section}
-    theta_dist::Vector{Float64}  # Length: n_unrefined_sections (section twist angles)
-    delta_dist::Vector{Float64}  # Length: n_unrefined_sections (section TE deflection angles)
+    theta_dist::Vector{Float64}  # Length: n_panels (panel twist angles)
+    delta_dist::Vector{Float64}  # Length: n_panels (panel TE deflection angles)
 
     # Physical properties (OBJ-based wings)
     mass::Float64
@@ -307,7 +307,7 @@ function Wing(n_panels::Int;
         # Grouping
         Int16[],
         # Deformation fields
-        Section[], zeros(max(0, n_unrefined_sections_value)), zeros(max(0, n_unrefined_sections_value)),
+        Section[], zeros(max(0, n_panels)), zeros(max(0, n_panels)),
         # Physical properties (defaults for non-OBJ wings)
         0.0, 0.0, zeros(0, 0), zeros(MVec3), Matrix{Float64}(I, 3, 3),
         0.0, nothing, nothing, nothing,
@@ -372,7 +372,8 @@ if both angle inputs are nothing.
 # Returns
 - `nothing` (modifies wing in-place)
 """
-function unrefined_deform!(wing::Wing, theta_angles=nothing, delta_angles=nothing; smooth=false)
+function unrefined_deform!(wing::Wing, theta_angles=nothing, delta_angles=nothing;
+                           smooth=false, smooth_window=nothing)
     # Check if deformation is supported
     can_deform = !isempty(wing.non_deformed_sections)
 
@@ -390,90 +391,155 @@ function unrefined_deform!(wing::Wing, theta_angles=nothing, delta_angles=nothin
     !isnothing(delta_angles) && length(delta_angles) != wing.n_unrefined_sections &&
         throw(ArgumentError("delta_angles must have length n_unrefined_sections = $(wing.n_unrefined_sections), got $(length(delta_angles))"))
 
-    # Copy angles to theta_dist and delta_dist
-    !isnothing(theta_angles) && (wing.theta_dist .= theta_angles)
-    !isnothing(delta_angles) && (wing.delta_dist .= delta_angles)
-
-    # Apply 3-point moving average smoothing if requested
-    if smooth && wing.n_unrefined_sections > 2
-        if !isnothing(theta_angles)
-            for i in 2:(wing.n_unrefined_sections-1)
-                wing.theta_dist[i] = (wing.theta_dist[i-1] + wing.theta_dist[i] + wing.theta_dist[i+1]) / 3.0
-            end
-        end
-        if !isnothing(delta_angles)
-            for i in 2:(wing.n_unrefined_sections-1)
-                wing.delta_dist[i] = (wing.delta_dist[i-1] + wing.delta_dist[i] + wing.delta_dist[i+1]) / 3.0
-            end
-        end
+    # Map unrefined sections → panels → sections (no smoothing yet)
+    if !isnothing(theta_angles)
+        map_unrefined_to_sections!(wing.theta_dist, theta_angles, wing.refined_panel_mapping, wing.n_panels)
+    end
+    if !isnothing(delta_angles)
+        map_unrefined_to_sections!(wing.delta_dist, delta_angles, wing.refined_panel_mapping, wing.n_panels)
     end
 
-    deform!(wing)
+    # Apply deformation with optional smoothing
+    deform!(wing, smooth=smooth, smooth_window=smooth_window)
     return nothing
 end
 
 """
-    deform!(wing::Wing, theta_dist::AbstractVector, delta_dist::AbstractVector)
+    map_unrefined_to_sections!(panel_dist, unrefined_angles, panel_mapping, n_panels)
 
-Deform wing by applying theta and delta distributions directly to unrefined sections.
+Map angles from unrefined sections to panels.
+Steps: unrefined[1:n_unrefined] → panels[1:n_panels]
 
 # Arguments
-- `wing::Wing`: Wing to deform (must support deformation)
-- `theta_dist::AbstractVector`: Twist angle in radians for each unrefined section (length = n_unrefined_sections)
-- `delta_dist::AbstractVector`: Trailing edge deflection for each unrefined section (length = n_unrefined_sections)
-
-# Effects
-Updates wing.unrefined_sections with deformed geometry based on wing.non_deformed_sections
+- `panel_dist::Vector{Float64}`: Output panel angles (length n_panels)
+- `unrefined_angles::Vector{Float64}`: Input unrefined section angles
+- `panel_mapping::Vector{Int16}`: Maps panel index to unrefined section index
+- `n_panels::Int`: Number of panels
 """
-function deform!(wing::Wing, theta_dist::AbstractVector, delta_dist::AbstractVector)
-    !isempty(wing.non_deformed_sections) || throw(ArgumentError("Wing does not support deformation"))
-    !(length(theta_dist) == wing.n_unrefined_sections) && throw(ArgumentError("theta_dist must have length $(wing.n_unrefined_sections), got $(length(theta_dist))"))
-    !(length(delta_dist) == wing.n_unrefined_sections) && throw(ArgumentError("delta_dist must have length $(wing.n_unrefined_sections), got $(length(delta_dist))"))
-    wing.theta_dist .= theta_dist
-    wing.delta_dist .= delta_dist
+function map_unrefined_to_sections!(panel_dist,
+                                     unrefined_angles,
+                                     panel_mapping,
+                                     n_panels)
+    # Map unrefined sections to panels
+    for i in 1:n_panels
+        unrefined_idx = panel_mapping[i]
+        panel_dist[i] = unrefined_angles[unrefined_idx]
+    end
 
-    deform!(wing)
+    return nothing
 end
 
 """
-    deform!(wing::Wing)
+    smooth_distribution!(dist, window_size)
+
+Apply moving average smoothing to a distribution in-place.
+Uses a centered window of size `window_size` (must be odd).
+
+# Arguments
+- `dist::Vector{Float64}`: Distribution to smooth (modified in-place)
+- `window_size::Int`: Size of smoothing window (must be odd)
+"""
+function smooth_distribution!(dist::Vector{Float64}, window_size::Int)
+    n = length(dist)
+    window_size <= 1 && return nothing
+    n <= window_size && return nothing
+
+    # Create temporary copy
+    dist_copy = copy(dist)
+    half_window = div(window_size, 2)
+
+    # Apply moving average
+    for i in 1:n
+        start_idx = max(1, i - half_window)
+        end_idx = min(n, i + half_window)
+        dist[i] = sum(dist_copy[start_idx:end_idx]) / (end_idx - start_idx + 1)
+    end
+
+    return nothing
+end
+
+"""
+    deform!(wing::Wing, theta_dist::AbstractVector, delta_dist::AbstractVector;
+            smooth=false, smooth_window=nothing)
+
+Deform wing by applying theta and delta distributions at the panel level.
+
+# Arguments
+- `wing::Wing`: Wing to deform (must support deformation)
+- `theta_dist::AbstractVector`: Twist angles for each panel (length = n_panels)
+- `delta_dist::AbstractVector`: TE deflections for each panel (length = n_panels)
+- `smooth::Bool`: Whether to apply smoothing (default: false)
+- `smooth_window::Union{Nothing, Int}`: Smoothing window size (default: auto-calculated)
+
+# Effects
+Updates wing.refined_sections with deformed geometry based on wing.non_deformed_sections
+"""
+function deform!(wing::Wing, theta_dist::AbstractVector, delta_dist::AbstractVector;
+                 smooth=false, smooth_window=nothing)
+    !isempty(wing.non_deformed_sections) || throw(ArgumentError("Wing does not support deformation"))
+
+    expected_len = wing.n_panels
+    !(length(theta_dist) == expected_len) && throw(ArgumentError("theta_dist must have length $(expected_len), got $(length(theta_dist))"))
+    !(length(delta_dist) == expected_len) && throw(ArgumentError("delta_dist must have length $(expected_len), got $(length(delta_dist))"))
+
+    wing.theta_dist .= theta_dist
+    wing.delta_dist .= delta_dist
+
+    deform!(wing, smooth=smooth, smooth_window=smooth_window)
+end
+
+"""
+    deform!(wing::Wing; smooth=false, smooth_window=nothing)
 
 Apply stored theta_dist and delta_dist to deform the wing geometry.
-
-Deformation works by:
-1. Applying theta/delta angles to unrefined sections (wing.unrefined_sections)
-2. Using refined_panel_mapping to determine which unrefined section each refined section came from
-3. Applying the corresponding angle to each refined section
+Converts panel angles (n_panels) to section angles (n_panels+1) by averaging adjacent panels.
 
 # Arguments
 - `wing::Wing`: Wing to deform (must have non_deformed_sections)
+- `smooth::Bool`: Whether to apply smoothing to theta_dist and delta_dist (default: false)
+- `smooth_window::Union{Nothing, Int}`: Smoothing window size (default: auto-calculated)
 
 # Effects
 Updates wing.refined_sections based on wing.non_deformed_sections and stored distributions
 """
-function deform!(wing::Wing)
+function deform!(wing::Wing; smooth=false, smooth_window=nothing)
     !isempty(wing.non_deformed_sections) || return nothing
+
+    # Apply smoothing if requested
+    if smooth
+        # Default window size based on refinement ratio
+        if isnothing(smooth_window)
+            smooth_window = max(3, round(Int, wing.n_panels / wing.n_unrefined_sections))
+        end
+
+        # Ensure window is odd for symmetric averaging
+        if smooth_window % 2 == 0
+            smooth_window += 1
+        end
+
+        # Apply moving average to theta_dist and delta_dist (panel-level)
+        smooth_distribution!(wing.theta_dist, smooth_window)
+        smooth_distribution!(wing.delta_dist, smooth_window)
+    end
 
     local_y = zeros(MVec3)
     chord = zeros(MVec3)
     normal = zeros(MVec3)
 
     # Process all refined sections (n_panels + 1)
-    # Each refined section gets the angle from its corresponding unrefined section
+    # Convert panel angles to section angles by averaging
     for i in 1:(wing.n_panels + 1)
-        # Determine which unrefined section this refined section belongs to
+        # Determine theta for this section by averaging adjacent panels
         if i == 1
-            # First section: use first unrefined section
-            unrefined_idx = 1
+            # First section: use panel 1 angle
+            theta = wing.theta_dist[1]
         elseif i == wing.n_panels + 1
-            # Last section: use last unrefined section
-            unrefined_idx = wing.n_unrefined_sections
+            # Last section: use last panel angle
+            theta = wing.theta_dist[wing.n_panels]
         else
-            # Middle sections: use the mapping from the panel to the left
-            unrefined_idx = wing.refined_panel_mapping[i-1]
+            # Middle sections: average of panels (i-1) and i
+            theta = (wing.theta_dist[i-1] + wing.theta_dist[i]) / 2.0
         end
-
-        theta = wing.theta_dist[unrefined_idx]
 
         section = wing.non_deformed_sections[i]
 
@@ -693,13 +759,14 @@ function refine_aerodynamic_mesh!(wing::AbstractWing; recompute_mapping=true, so
     # Update n_unrefined_sections based on actual sections
     wing.n_unrefined_sections = Int16(length(wing.unrefined_sections))
 
-    # Resize theta_dist and delta_dist to match n_unrefined_sections
-    if length(wing.theta_dist) != wing.n_unrefined_sections
-        resize!(wing.theta_dist, wing.n_unrefined_sections)
+    # Resize theta_dist and delta_dist to match n_panels
+    target_size = wing.n_panels
+    if length(wing.theta_dist) != target_size
+        resize!(wing.theta_dist, target_size)
         fill!(wing.theta_dist, 0.0)
     end
-    if length(wing.delta_dist) != wing.n_unrefined_sections
-        resize!(wing.delta_dist, wing.n_unrefined_sections)
+    if length(wing.delta_dist) != target_size
+        resize!(wing.delta_dist, target_size)
         fill!(wing.delta_dist, 0.0)
     end
 
