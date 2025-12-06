@@ -227,12 +227,12 @@ mutable struct Wing <: AbstractWing
     spanwise_distribution::PanelDistribution
     panel_props::PanelProperties
     spanwise_direction::MVec3
-    sections::Vector{Section}
+    unrefined_sections::Vector{Section}
     refined_sections::Vector{Section}
     remove_nan::Bool
 
     # Grouping
-    refined_panel_mapping::Vector{Int16}  # Maps each refined panel to its original unrefined section index
+    refined_panel_mapping::Vector{Int16}  # Maps each refined panel index to unrefined section index (1 to n_unrefined_sections)
 
     # Deformation fields
     non_deformed_sections::Vector{Section}
@@ -423,7 +423,7 @@ Deform wing by applying theta and delta distributions directly to unrefined sect
 - `delta_dist::AbstractVector`: Trailing edge deflection for each unrefined section (length = n_unrefined_sections)
 
 # Effects
-Updates wing.sections with deformed geometry based on wing.non_deformed_sections
+Updates wing.unrefined_sections with deformed geometry based on wing.non_deformed_sections
 """
 function deform!(wing::Wing, theta_dist::AbstractVector, delta_dist::AbstractVector)
     !isempty(wing.non_deformed_sections) || throw(ArgumentError("Wing does not support deformation"))
@@ -441,7 +441,7 @@ end
 Apply stored theta_dist and delta_dist to deform the wing geometry.
 
 Deformation works by:
-1. Applying theta/delta angles to unrefined sections (wing.sections)
+1. Applying theta/delta angles to unrefined sections (wing.unrefined_sections)
 2. Using refined_panel_mapping to determine which unrefined section each refined section came from
 3. Applying the corresponding angle to each refined section
 
@@ -545,7 +545,7 @@ function add_section!(wing::Wing, LE_point,
     elseif aero_model == POLAR_MATRICES && wing.remove_nan
         interpolate_matrix_nans!.(aero_data[3:5])
     end
-    push!(wing.sections, Section(LE_point, TE_point, aero_model, aero_data))
+    push!(wing.unrefined_sections, Section(LE_point, TE_point, aero_model, aero_data))
     return nothing
 end
 
@@ -606,7 +606,7 @@ Returns:
 """
 function refine_aerodynamic_mesh!(wing::AbstractWing; recompute_mapping=true, sort_sections=true)
     # Only sort sections if requested (skip for REFINE wings with fixed structural order)
-    sort_sections && sort!(wing.sections, by=s -> s.LE_point[2], rev=true)
+    sort_sections && sort!(wing.unrefined_sections, by=s -> s.LE_point[2], rev=true)
     n_sections = wing.n_panels + 1
 
     # Handle NONE distribution - sections already refined, just compute mapping
@@ -620,8 +620,8 @@ function refine_aerodynamic_mesh!(wing::AbstractWing; recompute_mapping=true, so
     end
 
     if length(wing.refined_sections) == 0
-        if wing.spanwise_distribution == UNCHANGED || length(wing.sections) == n_sections
-            wing.refined_sections = wing.sections
+        if wing.spanwise_distribution == UNCHANGED || length(wing.unrefined_sections) == n_sections
+            wing.refined_sections = wing.unrefined_sections
             update_non_deformed_sections!(wing)
             return nothing
         else
@@ -630,13 +630,13 @@ function refine_aerodynamic_mesh!(wing::AbstractWing; recompute_mapping=true, so
     end
     
     # Extract geometry data
-    n_current = length(wing.sections)
+    n_current = length(wing.unrefined_sections)
     LE = zeros(Float64, n_current, 3)
     TE = zeros(Float64, n_current, 3)
-    aero_model = Vector{typeof(wing.sections[1].aero_model)}()
-    aero_data = Vector{typeof(wing.sections[1].aero_data)}()
+    aero_model = Vector{typeof(wing.unrefined_sections[1].aero_model)}()
+    aero_data = Vector{typeof(wing.unrefined_sections[1].aero_data)}()
     
-    for (i, section) in enumerate(wing.sections)
+    for (i, section) in enumerate(wing.unrefined_sections)
         LE[i,:] = section.LE_point
         TE[i,:] = section.TE_point
         push!(aero_model, section.aero_model)
@@ -649,16 +649,16 @@ function refine_aerodynamic_mesh!(wing::AbstractWing; recompute_mapping=true, so
     end
     
     # Handle special cases
-    if wing.spanwise_distribution == UNCHANGED || length(wing.sections) == n_sections
-        for i in eachindex(wing.sections)
-            reinit!(wing.refined_sections[i], wing.sections[i])
+    if wing.spanwise_distribution == UNCHANGED || length(wing.unrefined_sections) == n_sections
+        for i in eachindex(wing.unrefined_sections)
+            reinit!(wing.refined_sections[i], wing.unrefined_sections[i])
         end
         recompute_mapping && compute_refined_panel_mapping!(wing)
         update_non_deformed_sections!(wing)
         return nothing
     end
 
-    @debug "Refining aerodynamic mesh from $(length(wing.sections)) sections to $n_sections sections."
+    @debug "Refining aerodynamic mesh from $(length(wing.unrefined_sections)) sections to $n_sections sections."
 
     # Handle two-section case
     if n_sections == 2
@@ -687,11 +687,11 @@ function refine_aerodynamic_mesh!(wing::AbstractWing; recompute_mapping=true, so
         throw(ArgumentError("Unsupported spanwise panel distribution: $(wing.spanwise_distribution)"))
     end
 
-    # Compute panel mapping by finding closest unrefined panel for each refined panel
+    # Compute panel mapping by finding closest unrefined section for each refined panel
     recompute_mapping && compute_refined_panel_mapping!(wing)
 
     # Update n_unrefined_sections based on actual sections
-    wing.n_unrefined_sections = Int16(length(wing.sections))
+    wing.n_unrefined_sections = Int16(length(wing.unrefined_sections))
 
     # Resize theta_dist and delta_dist to match n_unrefined_sections
     if length(wing.theta_dist) != wing.n_unrefined_sections
@@ -713,12 +713,14 @@ end
 """
     compute_refined_panel_mapping!(wing::AbstractWing)
 
-Compute the mapping from refined panels to unrefined panels by finding
-the closest unrefined panel for each refined panel (based on panel center distance).
+Compute the mapping from refined panels to unrefined sections by finding
+the closest unrefined section for each refined panel (based on section center distance).
+Maps each refined panel index to its corresponding unrefined section index
+(1 to n_unrefined_sections).
 This is non-allocating and works after refinement is complete.
 """
 function compute_refined_panel_mapping!(wing::AbstractWing)
-    n_unrefined_sections = length(wing.sections)
+    n_unrefined_sections = length(wing.unrefined_sections)
     n_refined_panels = wing.n_panels
 
     # Handle case where no refinement occurred
@@ -732,16 +734,15 @@ function compute_refined_panel_mapping!(wing::AbstractWing)
         wing.refined_panel_mapping = zeros(Int16, n_refined_panels)
     end
 
-    # Compute centers of unrefined panels
-    n_unrefined_panels = n_unrefined_sections - 1
-    unrefined_centers = Vector{MVec3}(undef, n_unrefined_panels)
-    for i in 1:n_unrefined_panels
-        le_mid = (wing.sections[i].LE_point + wing.sections[i+1].LE_point) / 2
-        te_mid = (wing.sections[i].TE_point + wing.sections[i+1].TE_point) / 2
-        unrefined_centers[i] = MVec3((le_mid + te_mid) / 2)
+    # Compute centers of unrefined sections
+    unrefined_centers = Vector{MVec3}(undef, n_unrefined_sections)
+    for i in 1:n_unrefined_sections
+        le_point = wing.unrefined_sections[i].LE_point
+        te_point = wing.unrefined_sections[i].TE_point
+        unrefined_centers[i] = MVec3((le_point + te_point) / 2)
     end
 
-    # For each refined panel, find closest unrefined panel
+    # For each refined panel, find closest unrefined section
     for refined_panel_idx in 1:n_refined_panels
         le_mid = (wing.refined_sections[refined_panel_idx].LE_point +
                   wing.refined_sections[refined_panel_idx+1].LE_point) / 2
@@ -749,14 +750,14 @@ function compute_refined_panel_mapping!(wing::AbstractWing)
                   wing.refined_sections[refined_panel_idx+1].TE_point) / 2
         refined_center = MVec3((le_mid + te_mid) / 2)
 
-        # Find closest unrefined panel
+        # Find closest unrefined section
         min_dist = Inf
         closest_idx = 1
-        for unrefined_panel_idx in 1:n_unrefined_panels
-            dist = norm(refined_center - unrefined_centers[unrefined_panel_idx])
+        for unrefined_section_idx in 1:n_unrefined_sections
+            dist = norm(refined_center - unrefined_centers[unrefined_section_idx])
             if dist < min_dist
                 min_dist = dist
-                closest_idx = unrefined_panel_idx
+                closest_idx = unrefined_section_idx
             end
         end
 
@@ -1039,7 +1040,7 @@ Returns:
     Vector{Section}: Refined sections
 """
 function refine_mesh_by_splitting_provided_sections!(wing::AbstractWing)
-    n_sections_provided = length(wing.sections)
+    n_sections_provided = length(wing.unrefined_sections)
     n_panels_provided = n_sections_provided - 1
     n_panels_desired = wing.n_panels
     
@@ -1047,7 +1048,7 @@ function refine_mesh_by_splitting_provided_sections!(wing::AbstractWing)
     
     # Check if refinement is needed
     if n_panels_provided == n_panels_desired
-        for (refined_section, section) in zip(wing.refined_sections, wing.sections)
+        for (refined_section, section) in zip(wing.refined_sections, wing.unrefined_sections)
             reinit!(refined_section, section)
         end
         return nothing
@@ -1067,16 +1068,16 @@ function refine_mesh_by_splitting_provided_sections!(wing::AbstractWing)
     new_sections_per_pair, remaining = divrem(n_new_sections, n_section_pairs)
     
     # Extract geometry data
-    LE = [section.LE_point for section in wing.sections]
-    TE = [section.TE_point for section in wing.sections]
-    aero_model = [section.aero_model for section in wing.sections]
-    aero_data = [section.aero_data for section in wing.sections]
+    LE = [section.LE_point for section in wing.unrefined_sections]
+    TE = [section.TE_point for section in wing.unrefined_sections]
+    aero_model = [section.aero_model for section in wing.unrefined_sections]
+    aero_data = [section.aero_data for section in wing.unrefined_sections]
     
     # Process each section pair
     idx = 1
     for left_section_index in 1:n_section_pairs
         # Add left section of pair
-        reinit!(wing.refined_sections[idx], wing.sections[left_section_index])
+        reinit!(wing.refined_sections[idx], wing.unrefined_sections[left_section_index])
         idx += 1
 
         # Calculate new sections for this pair
@@ -1111,7 +1112,7 @@ function refine_mesh_by_splitting_provided_sections!(wing::AbstractWing)
     end
     
     # Add final section
-    reinit!(wing.refined_sections[idx], wing.sections[end])
+    reinit!(wing.refined_sections[idx], wing.unrefined_sections[end])
     idx += 1
     
     # Validate result
@@ -1137,7 +1138,7 @@ function calculate_span(wing::AbstractWing)
     
     # Get all points
     all_points = reduce(vcat, [[section.LE_point, section.TE_point] 
-                              for section in wing.sections])
+                              for section in wing.unrefined_sections])
     
     # Project points and calculate span
     projections = [dot(point, vector_axis) for point in all_points]
@@ -1170,12 +1171,12 @@ function calculate_projected_area(wing::AbstractWing,
     
     # Calculate area by summing trapezoid areas
     projected_area = 0.0
-    for i in 1:(length(wing.sections)-1)
+    for i in 1:(length(wing.unrefined_sections)-1)
         # Get section points
-        LE_current = wing.sections[i].LE_point
-        TE_current = wing.sections[i].TE_point
-        LE_next = wing.sections[i+1].LE_point
-        TE_next = wing.sections[i+1].TE_point
+        LE_current = wing.unrefined_sections[i].LE_point
+        TE_current = wing.unrefined_sections[i].TE_point
+        LE_next = wing.unrefined_sections[i+1].LE_point
+        TE_next = wing.unrefined_sections[i+1].TE_point
         
         # Project points
         project_onto_plane!(LE_current_proj, LE_current, z_plane_vector)

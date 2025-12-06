@@ -6,7 +6,6 @@ Main structure for calculating aerodynamic properties of bodies. Use the constru
 # Fields
 - panels::Vector{Panel}: Vector of refined [Panel](@ref) structs
 - wings::Vector{Wing}: A vector of wings; a body can have multiple wings
-- unrefined::Vector{Panel}: Vector of unrefined panel representatives for aggregated results
 - `va::MVec3` = zeros(MVec3):   A vector of the apparent wind speed, see: [MVec3](@ref)
 - `omega`::MVec3 = zeros(MVec3): A vector of the turn rates around the kite body axes
 - `gamma_distribution`=zeros(Float64, P): A vector of the circulation
@@ -25,7 +24,6 @@ Main structure for calculating aerodynamic properties of bodies. Use the constru
 @with_kw mutable struct BodyAerodynamics{P}
     panels::Vector{Panel}
     wings::Vector{Wing}
-    unrefined::Vector{Panel} = Panel[]
     _va::MVec3 = zeros(MVec3)
     omega::MVec3 = zeros(MVec3)
     gamma_distribution::MVector{P, Float64} = zeros(P)
@@ -77,18 +75,18 @@ function BodyAerodynamics(
     panels = Panel[]
     n_unrefined_total = 0
     for wing in wings
-        for section in wing.sections
+        for section in wing.unrefined_sections
             section.LE_point .-= kite_body_origin
             section.TE_point .-= kite_body_origin
         end
         if wing.spanwise_distribution == NONE
             # NONE distribution: refined_sections already populated in constructor
             !(wing.n_panels == length(wing.refined_sections) - 1) &&
-                throw(ArgumentError("(wing.n_panels = $(wing.n_panels)) != (length(wing.refined_sections) - 1 = $(length(wing.sections) - 1))"))
+                throw(ArgumentError("(wing.n_panels = $(wing.n_panels)) != (length(wing.refined_sections) - 1 = $(length(wing.unrefined_sections) - 1))"))
         elseif wing.spanwise_distribution == UNCHANGED
-            wing.refined_sections = wing.sections
-            !(wing.n_panels == length(wing.sections) - 1) &&
-                throw(ArgumentError("(wing.n_panels = $(wing.n_panels)) != (length(wing.sections) - 1 = $(length(wing.sections) - 1))"))
+            wing.refined_sections = wing.unrefined_sections
+            !(wing.n_panels == length(wing.unrefined_sections) - 1) &&
+                throw(ArgumentError("(wing.n_panels = $(wing.n_panels)) != (length(wing.unrefined_sections) - 1 = $(length(wing.unrefined_sections) - 1))"))
         else
             wing.refined_sections = Section[Section() for _ in 1:wing.n_panels+1]
         end
@@ -98,15 +96,9 @@ function BodyAerodynamics(
             panel = Panel()
             push!(panels, panel)
         end
-
-        # Count total unrefined panels (sections - 1)
-        n_unrefined_total += max(0, wing.n_unrefined_sections - 1)
     end
 
-    # Initialize unrefined panels (representatives for unrefined sections)
-    unrefined = [Panel() for _ in 1:max(0, n_unrefined_total)]
-
-    body_aero = BodyAerodynamics{length(panels)}(; panels, wings, unrefined)
+    body_aero = BodyAerodynamics{length(panels)}(; panels, wings)
     reinit!(body_aero; va, omega)
     return body_aero
 end
@@ -188,17 +180,6 @@ function reinit!(body_aero::BodyAerodynamics;
                 init_aero
             )
             idx += 1
-        end
-    end
-
-    # Resize unrefined vector if needed (after wings are reinitialized and n_unrefined_sections is set)
-    n_unrefined_total = sum([max(0, wing.n_unrefined_sections - 1) for wing in body_aero.wings])
-    if length(body_aero.unrefined) != n_unrefined_total
-        resize!(body_aero.unrefined, n_unrefined_total)
-        for i in 1:n_unrefined_total
-            if !isassigned(body_aero.unrefined, i)
-                body_aero.unrefined[i] = Panel()
-            end
         end
     end
 

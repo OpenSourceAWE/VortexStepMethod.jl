@@ -61,6 +61,12 @@ Struct for storing the solution of the [solve!](@ref) function. Must contain all
     cd_unrefined_array::MVector{U, Float64} = zeros(U)
     cm_unrefined_array::MVector{U, Float64} = zeros(U)
     alpha_unrefined_array::MVector{U, Float64} = zeros(U)
+    x_airf_unrefined_array::Vector{MVec3} = [MVec3(0,0,0) for _ in 1:U]
+    y_airf_unrefined_array::Vector{MVec3} = [MVec3(0,0,0) for _ in 1:U]
+    z_airf_unrefined_array::Vector{MVec3} = [MVec3(0,0,0) for _ in 1:U]
+    va_unrefined_array::Vector{MVec3} = [MVec3(0,0,0) for _ in 1:U]
+    chord_unrefined_array::MVector{U, Float64} = zeros(U)
+    width_unrefined_array::MVector{U, Float64} = zeros(U)
     solver_status::SolverStatus = FAILURE
 end
 
@@ -312,69 +318,78 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
         cd_unrefined_array = solver.sol.cd_unrefined_array
         cm_unrefined_array = solver.sol.cm_unrefined_array
         alpha_unrefined_array = solver.sol.alpha_unrefined_array
+        x_airf_unrefined_array = solver.sol.x_airf_unrefined_array
+        y_airf_unrefined_array = solver.sol.y_airf_unrefined_array
+        z_airf_unrefined_array = solver.sol.z_airf_unrefined_array
+        va_unrefined_array = solver.sol.va_unrefined_array
+        chord_unrefined_array = solver.sol.chord_unrefined_array
+        width_unrefined_array = solver.sol.width_unrefined_array
+
+        # Zero all unrefined arrays
         unrefined_moment_dist .= 0.0
         unrefined_moment_coeff_dist .= 0.0
         cl_unrefined_array .= 0.0
         cd_unrefined_array .= 0.0
         cm_unrefined_array .= 0.0
         alpha_unrefined_array .= 0.0
+        for i in eachindex(x_airf_unrefined_array)
+            x_airf_unrefined_array[i] .= 0.0
+            y_airf_unrefined_array[i] .= 0.0
+            z_airf_unrefined_array[i] .= 0.0
+            va_unrefined_array[i] .= 0.0
+        end
+        chord_unrefined_array .= 0.0
+        width_unrefined_array .= 0.0
+
         panel_idx = 1
         unrefined_idx = 1
         for wing in body_aero.wings
-            n_unrefined_panels = wing.n_unrefined_sections - 1
-            if n_unrefined_panels > 0
-                # Initialize unrefined panels
-                for i in 1:n_unrefined_panels
-                    target_unrefined_idx = unrefined_idx + i - 1
-                    unrefined_panel = body_aero.unrefined[target_unrefined_idx]
-                    unrefined_panel.x_airf .= 0.0
-                    unrefined_panel.y_airf .= 0.0
-                    unrefined_panel.z_airf .= 0.0
-                    unrefined_panel.va .= 0.0
-                    unrefined_panel.chord = 0.0
-                    unrefined_panel.width = 0.0
-                end
-                # Accumulate values from refined panels
-                unrefined_panel_counts = zeros(Int, n_unrefined_panels)
+            if wing.n_unrefined_sections > 0
+                # Accumulate values from refined panels to unrefined sections
+                unrefined_section_counts = zeros(Int, wing.n_unrefined_sections)
                 for local_panel_idx in 1:wing.n_panels
                     panel = body_aero.panels[panel_idx]
-                    original_panel_idx = wing.refined_panel_mapping[local_panel_idx]
-                    target_unrefined_idx = unrefined_idx + original_panel_idx - 1
-                    unrefined_panel = body_aero.unrefined[target_unrefined_idx]
+                    original_section_idx = wing.refined_panel_mapping[local_panel_idx]
+                    target_unrefined_idx = unrefined_idx + original_section_idx - 1
+
+                    # Accumulate coefficients and moments
                     unrefined_moment_dist[target_unrefined_idx] += moment_dist[panel_idx]
                     unrefined_moment_coeff_dist[target_unrefined_idx] += moment_coeff_dist[panel_idx]
                     cl_unrefined_array[target_unrefined_idx] += solver.sol.cl_array[panel_idx]
                     cd_unrefined_array[target_unrefined_idx] += solver.sol.cd_array[panel_idx]
                     cm_unrefined_array[target_unrefined_idx] += solver.sol.cm_array[panel_idx]
                     alpha_unrefined_array[target_unrefined_idx] += solver.sol.alpha_array[panel_idx]
+
                     # Accumulate geometry
-                    unrefined_panel.x_airf .+= panel.x_airf
-                    unrefined_panel.y_airf .+= panel.y_airf
-                    unrefined_panel.z_airf .+= panel.z_airf
-                    unrefined_panel.va .+= panel.va
-                    unrefined_panel.chord += panel.chord
-                    unrefined_panel.width += panel.width
-                    unrefined_panel_counts[original_panel_idx] += 1
+                    x_airf_unrefined_array[target_unrefined_idx] .+= panel.x_airf
+                    y_airf_unrefined_array[target_unrefined_idx] .+= panel.y_airf
+                    z_airf_unrefined_array[target_unrefined_idx] .+= panel.z_airf
+                    va_unrefined_array[target_unrefined_idx] .+= panel.va
+                    chord_unrefined_array[target_unrefined_idx] += panel.chord
+                    width_unrefined_array[target_unrefined_idx] += panel.width
+
+                    unrefined_section_counts[original_section_idx] += 1
                     panel_idx += 1
                 end
+
                 # Average coefficients and geometry
-                for i in 1:n_unrefined_panels
+                for i in 1:wing.n_unrefined_sections
                     target_unrefined_idx = unrefined_idx + i - 1
-                    if unrefined_panel_counts[i] > 0
-                        unrefined_panel = body_aero.unrefined[target_unrefined_idx]
-                        cl_unrefined_array[target_unrefined_idx] /= unrefined_panel_counts[i]
-                        cd_unrefined_array[target_unrefined_idx] /= unrefined_panel_counts[i]
-                        cm_unrefined_array[target_unrefined_idx] /= unrefined_panel_counts[i]
-                        alpha_unrefined_array[target_unrefined_idx] /= unrefined_panel_counts[i]
-                        unrefined_panel.x_airf ./= unrefined_panel_counts[i]
-                        unrefined_panel.y_airf ./= unrefined_panel_counts[i]
-                        unrefined_panel.z_airf ./= unrefined_panel_counts[i]
-                        unrefined_panel.va ./= unrefined_panel_counts[i]
-                        unrefined_panel.chord /= unrefined_panel_counts[i]
-                        unrefined_panel.width /= unrefined_panel_counts[i]
+                    if unrefined_section_counts[i] > 0
+                        count = unrefined_section_counts[i]
+                        cl_unrefined_array[target_unrefined_idx] /= count
+                        cd_unrefined_array[target_unrefined_idx] /= count
+                        cm_unrefined_array[target_unrefined_idx] /= count
+                        alpha_unrefined_array[target_unrefined_idx] /= count
+                        x_airf_unrefined_array[target_unrefined_idx] ./= count
+                        y_airf_unrefined_array[target_unrefined_idx] ./= count
+                        z_airf_unrefined_array[target_unrefined_idx] ./= count
+                        va_unrefined_array[target_unrefined_idx] ./= count
+                        chord_unrefined_array[target_unrefined_idx] /= count
+                        width_unrefined_array[target_unrefined_idx] /= count
                     end
                 end
-                unrefined_idx += n_unrefined_panels
+                unrefined_idx += wing.n_unrefined_sections
             else
                 # Skip panels for wings with no unrefined sections
                 panel_idx += wing.n_panels

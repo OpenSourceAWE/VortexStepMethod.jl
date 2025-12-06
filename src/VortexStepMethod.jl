@@ -43,7 +43,8 @@ export SolverStatus, FEASIBLE, INFEASIBLE, FAILURE
 export SolverType, LOOP, NONLIN
 export load_polar_data
 
-export plot_geometry, plot_distribution, plot_circulation_distribution, plot_polars, save_plot, show_plot, plot_polar_data
+export plot_geometry, plot_distribution, plot_circulation_distribution, plot_polars,
+        save_plot, show_plot, plot_polar_data, plot_combined_analysis
 
 # the following functions are defined in ext/VortexStepMethodExt.jl
 function plot_geometry end
@@ -53,6 +54,7 @@ function plot_polars end
 function save_plot end
 function show_plot end
 function plot_polar_data end
+function plot_combined_analysis end
 
 """
    const MVec3    = MVector{3, Float64}
