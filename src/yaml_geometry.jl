@@ -148,7 +148,7 @@ function load_polar_data(csv_file_path::String)
 end
 
 """
-    Wing(geometry_file::String; n_panels=20, n_groups=1, spanwise_distribution=LINEAR,
+    Wing(geometry_file::String; n_panels=20, spanwise_distribution=LINEAR,
          spanwise_direction=[0.0, 1.0, 0.0], remove_nan=true, prn=false)
 
 Constructs a `Wing` object from a YAML geometry file.
@@ -158,7 +158,6 @@ Constructs a `Wing` object from a YAML geometry file.
 
 # Keyword Arguments
 - `n_panels::Int`: Number of spanwise panels (default: 20).
-- `n_groups::Int`: Number of grouped sections across the span (default: 1). Must divide `n_panels`.
 - `spanwise_distribution`: Spanwise panel distribution type (default: `LINEAR`).
 - `spanwise_direction::Vector{Float64}`: Direction of the spanwise axis (default: `[0.0, 1.0, 0.0]`). Must be the global Y axis.
 - `remove_nan::Bool`: Remove NaN values from the geometry (default: `true`).
@@ -171,43 +170,24 @@ Constructs a `Wing` object from a YAML geometry file.
 This function reads a YAML configuration file to define the geometry and airfoil data for a multi-section wing.
 Each section and corresponding airfoil is parsed from the YAML file, polar data is loaded, and each section is added
 to the wing. The geometry logic currently assumes the spanwise direction is `[0.0, 1.0, 0.0]` (aligned with the global Y axis).
+The number of unrefined sections is automatically inferred from the sections in the geometry file.
 
 # Errors
-- Throws an `ArgumentError` if `n_panels` is not divisible by `n_groups`.
 - Throws an `ArgumentError` if `spanwise_direction` is not `[0.0, 1.0, 0.0]`.
 
 # Example
 ```julia
-wing = Wing("wing_geometry.yaml"; n_panels=30, n_groups=2, prn=true)
+wing = Wing("wing_geometry.yaml"; n_panels=30, prn=true)
 ```
 """
 function Wing(
     geometry_file::String;
     n_panels=20,
-    n_unrefined_sections=nothing,
-    n_groups=nothing,
     spanwise_distribution=LINEAR,
     spanwise_direction=[0.0, 1.0, 0.0],
     remove_nan=true,
-    prn=false,
-    grouping_method::PanelGroupingMethod=EQUAL_SIZE
+    prn=false
 )
-    # Handle deprecated parameters
-    if !isnothing(n_groups)
-        if !isnothing(n_unrefined_sections)
-            error("Cannot specify both n_groups and n_unrefined_sections. Use n_unrefined_sections only.")
-        end
-        @warn "Parameter n_groups is deprecated. For YAML wings, n_unrefined_sections is inferred from added sections." maxlog=1
-    end
-
-    if grouping_method != EQUAL_SIZE
-        @warn "Parameter grouping_method is deprecated and ignored. Grouping is now always by unrefined sections." maxlog=1
-    end
-
-    # For YAML wings, n_unrefined_sections is inferred from the number of sections added
-    if !isnothing(n_unrefined_sections)
-        @warn "For YAML wings, n_unrefined_sections is automatically inferred from the sections in the geometry file. The parameter is ignored." maxlog=1
-    end
 
     !isapprox(spanwise_direction, [0.0, 1.0, 0.0]) && throw(ArgumentError("Spanwise direction has to be [0.0, 1.0, 0.0], not $spanwise_direction"))
 
@@ -348,7 +328,6 @@ function Wing(settings::VSMSettings)
         # Use YAML geometry constructor
         Wing(wing_settings.geometry_file;
             n_panels=wing_settings.n_panels,
-            n_groups=wing_settings.n_groups,
             spanwise_distribution=wing_settings.spanwise_panel_distribution,
             remove_nan=wing_settings.remove_nan
         )
@@ -358,7 +337,6 @@ function Wing(settings::VSMSettings)
             wing_settings.obj_file,
             wing_settings.dat_file;
             n_panels=wing_settings.n_panels,
-            n_groups=wing_settings.n_groups,
             spanwise_distribution=wing_settings.spanwise_panel_distribution,
             spanwise_direction=wing_settings.spanwise_direction,
             remove_nan=wing_settings.remove_nan

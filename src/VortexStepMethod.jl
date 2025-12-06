@@ -36,8 +36,7 @@ export calculate_span, calculate_projected_area
 export MVec3
 export Model, VSM, LLT
 export AeroModel, LEI_AIRFOIL_BREUKELS, POLAR_VECTORS, POLAR_MATRICES, INVISCID
-export PanelDistribution, LINEAR, COSINE, COSINE_VAN_GARREL, SPLIT_PROVIDED, UNCHANGED
-export PanelGroupingMethod, EQUAL_SIZE, REFINE
+export PanelDistribution, LINEAR, COSINE, COSINE_VAN_GARREL, SPLIT_PROVIDED, UNCHANGED, NONE
 export InitialGammaDistribution, ELLIPTIC, ZEROS
 export SolverStatus, FEASIBLE, INFEASIBLE, FAILURE
 export SolverType, LOOP, NONLIN
@@ -142,20 +141,6 @@ Enumeration of the implemented panel distributions.
    UNCHANGED          # Keep original sections without interpolation
    NONE               # No refinement - sections already refined
 end
-
-"""
-   PanelGroupingMethod EQUAL_SIZE REFINE
-
-**DEPRECATED**: This enum is deprecated and no longer used.
-Grouping is now automatically handled via unrefined section mapping.
-
-Enumeration of methods for grouping panels (legacy).
-
-# Elements
-- EQUAL_SIZE: (Deprecated) Divide panels into equally-sized sequential groups
-- REFINE: (Deprecated) Group refined panels back to their original unrefined section
-"""
-@enum PanelGroupingMethod EQUAL_SIZE REFINE
 
 """
    InitialGammaDistribution ELLIPTIC ZEROS

@@ -90,7 +90,7 @@ using Test
         @test body_aero.panels[1].delta < body_aero.panels[end].delta
 
         # Reset and verify
-        VortexStepMethod.deform!(wing, zeros(wing.n_unrefined_sections), zeros(wing.n_unrefined_sections))
+        VortexStepMethod.deform!(wing, zeros(wing.n_panels), zeros(wing.n_panels))
         VortexStepMethod.reinit!(body_aero; refine_mesh=false)
 
         for (idx, i) in enumerate(test_indices)

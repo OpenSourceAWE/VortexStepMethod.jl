@@ -11,16 +11,13 @@ end
     obj_file::String = ""               # path to .obj geometry file
     dat_file::String = ""               # path to .dat airfoil file
     n_panels::Int64 = 40
-    n_groups::Int64 = 40
     spanwise_panel_distribution::PanelDistribution = LINEAR
     spanwise_direction::MVec3 = [0.0, 1.0, 0.0]
-    grouping_method::PanelGroupingMethod = EQUAL_SIZE
     remove_nan = true
 end
 
 @with_kw mutable struct SolverSettings
     n_panels::Int64 = 40
-    n_groups::Int64 = 40 
     aerodynamic_model_type::Model = VSM
     solver_type::String = "LOOP"    # type of solver
     density::Float64 = 1.225                # air density  [kg/m³] 
@@ -63,8 +60,7 @@ function VSMSettings(filename; data_prefix=true)
     
     # Convert wing settings manually due to enum conversions
     n_panels = 0
-    n_groups = 0
-    
+
     if haskey(data, "wings")
         for wing_data in data["wings"]
             wing = WingSettings()
@@ -92,7 +88,6 @@ function VSMSettings(filename; data_prefix=true)
 
             push!(vsm_settings.wings, wing)
             n_panels += wing.n_panels
-            # n_unrefined_sections will be set when wing is created/initialized
         end
     end
     
@@ -119,7 +114,6 @@ function VSMSettings(filename; data_prefix=true)
 
         # Override with calculated totals
         vsm_settings.solver_settings.n_panels = n_panels
-        vsm_settings.solver_settings.n_groups = n_groups
     end
     
     return vsm_settings

@@ -237,7 +237,7 @@ function Makie.plot(body_aero::VortexStepMethod.BodyAerodynamics; size = (1200, 
 end
 
 """
-    save_plot(fig, save_path, title; data_type=".pdf")
+    save_plot(fig, save_path, title; data_type=".png")
 
 Save a Makie figure to a file.
 
@@ -247,9 +247,9 @@ Save a Makie figure to a file.
 - `title`: Title of the plot
 
 # Keyword arguments
-- `data_type`: File extension (default: ".pdf")
+- `data_type`: File extension (default: ".png", also supports ".jpeg")
 """
-function VortexStepMethod.save_plot(fig, save_path, title; data_type=".pdf")
+function VortexStepMethod.save_plot(fig, save_path, title; data_type=".png")
     isnothing(save_path) && throw(ArgumentError("save_path should be provided"))
 
     !isdir(save_path) && mkpath(save_path)
@@ -434,7 +434,7 @@ end
 
 """
     plot_geometry(body_aero::BodyAerodynamics, title;
-                  data_type=".pdf", save_path=nothing,
+                  data_type=".png", save_path=nothing,
                   is_save=false, is_show=false,
                   view_elevation=15, view_azimuth=-120, use_tex=false)
 
@@ -445,7 +445,7 @@ Plot wing geometry from different viewpoints using Makie.
 - `title`: plot title
 
 # Keyword arguments:
-- `data_type`: File extension (default: ".pdf")
+- `data_type`: File extension (default: ".png", also supports ".jpeg")
 - `save_path`: Path for saving (default: nothing)
 - `is_save`: Whether to save (default: false)
 - `is_show`: Whether to display (default: false)
@@ -454,7 +454,7 @@ Plot wing geometry from different viewpoints using Makie.
 - `use_tex`: Ignored for Makie (default: false)
 """
 function VortexStepMethod.plot_geometry(body_aero::BodyAerodynamics, title;
-    data_type=".pdf",
+    data_type=".png",
     save_path=nothing,
     is_save=false,
     is_show=false,
@@ -491,7 +491,7 @@ end
 
 """
     plot_distribution(y_coordinates_list, results_list, label_list;
-                      title="spanwise_distribution", data_type=".pdf",
+                      title="spanwise_distribution", data_type=".png",
                       save_path=nothing, is_save=false, is_show=true, use_tex=false)
 
 Plot spanwise distributions of aerodynamic properties using Makie.
@@ -503,7 +503,7 @@ Plot spanwise distributions of aerodynamic properties using Makie.
 
 # Keyword arguments
 - `title`: Plot title (default: "spanwise_distribution")
-- `data_type`: File extension (default: ".pdf")
+- `data_type`: File extension (default: ".png", also supports ".jpeg")
 - `save_path`: Path to save plots (default: nothing)
 - `is_save`: Whether to save (default: false)
 - `is_show`: Whether to display (default: true)
@@ -511,7 +511,7 @@ Plot spanwise distributions of aerodynamic properties using Makie.
 """
 function VortexStepMethod.plot_distribution(y_coordinates_list, results_list, label_list;
     title="spanwise_distribution",
-    data_type=".pdf",
+    data_type=".png",
     save_path=nothing,
     is_save=false,
     is_show=true,
@@ -703,7 +703,7 @@ end
                 literature_path_list=String[],
                 angle_range=range(0, 20, 2), angle_type="angle_of_attack",
                 angle_of_attack=0.0, side_slip=0.0, v_a=10.0,
-                title="polar", data_type=".pdf", save_path=nothing,
+                title="polar", data_type=".png", save_path=nothing,
                 is_save=true, is_show=true, use_tex=false)
 
 Plot polar data comparing different solvers using Makie.
@@ -721,7 +721,7 @@ Plot polar data comparing different solvers using Makie.
 - `side_slip`: Side slip angle [rad] (default: 0.0)
 - `v_a`: Wind speed [m/s] (default: 10.0)
 - `title`: Plot title
-- `data_type`: File extension (default: ".pdf")
+- `data_type`: File extension (default: ".png", also supports ".jpeg")
 - `save_path`: Path to save (default: nothing)
 - `is_save`: Whether to save (default: true)
 - `is_show`: Whether to display (default: true)
@@ -738,7 +738,7 @@ function VortexStepMethod.plot_polars(
     side_slip=0.0,
     v_a=10.0,
     title="polar",
-    data_type=".pdf",
+    data_type=".png",
     save_path=nothing,
     is_save=true,
     is_show=true,

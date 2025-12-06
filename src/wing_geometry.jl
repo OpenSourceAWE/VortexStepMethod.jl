@@ -255,11 +255,9 @@ end
 """
     Wing(n_panels::Int;
          n_unrefined_sections=nothing,
-         n_groups=nothing,
          spanwise_distribution::PanelDistribution=LINEAR,
          spanwise_direction::PosVector=MVec3([0.0, 1.0, 0.0]),
-         remove_nan::Bool=true,
-         grouping_method::PanelGroupingMethod=EQUAL_SIZE)
+         remove_nan::Bool=true)
 
 Constructor for a [Wing](@ref) struct with default values that initializes the sections
 and refined sections as empty arrays. Creates a basic wing suitable for YAML-based construction.
@@ -267,32 +265,15 @@ and refined sections as empty arrays. Creates a basic wing suitable for YAML-bas
 # Parameters
 - `n_panels::Int`: Number of panels in aerodynamic mesh
 - `n_unrefined_sections::Int`: Number of unrefined sections (inferred from added sections for YAML wings)
-- `n_groups::Int`: DEPRECATED - use n_unrefined_sections instead
 - `spanwise_distribution`::PanelDistribution = LINEAR: [PanelDistribution](@ref)
 - `spanwise_direction::MVec3` = MVec3([0.0, 1.0, 0.0]): Wing span direction vector
 - `remove_nan::Bool`: Wether to remove the NaNs from interpolations or not
-- `grouping_method::PanelGroupingMethod` = EQUAL_SIZE: DEPRECATED - grouping is now always by unrefined sections
 """
 function Wing(n_panels::Int;
         n_unrefined_sections=nothing,
-        n_groups=nothing,
         spanwise_distribution::PanelDistribution=LINEAR,
         spanwise_direction::PosVector=MVec3([0.0, 1.0, 0.0]),
-        remove_nan=true,
-        grouping_method::PanelGroupingMethod=EQUAL_SIZE)
-
-    # Handle deprecated parameters
-    if !isnothing(n_groups)
-        if !isnothing(n_unrefined_sections)
-            error("Cannot specify both n_groups and n_unrefined_sections. Use n_unrefined_sections only.")
-        end
-        @warn "Parameter n_groups is deprecated. Use n_unrefined_sections instead." maxlog=1
-        n_unrefined_sections = n_groups
-    end
-
-    if grouping_method != EQUAL_SIZE
-        @warn "Parameter grouping_method is deprecated and ignored. Grouping is now always by unrefined sections." maxlog=1
-    end
+        remove_nan=true)
 
     # For YAML wings, n_unrefined_sections will be set when sections are added
     # Set to 0 as placeholder for now

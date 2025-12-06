@@ -70,19 +70,19 @@ end
         fig = plot_geometry(
             body_aero,
             "Rectangular_wing_geometry";
-            data_type=".pdf",
+            data_type=".png",
             save_path=save_dir,
             is_save=true,
             is_show=false)
         @test fig isa Figure
-        @test isfile(joinpath(save_dir, "Rectangular_wing_geometry_angled_view.pdf"))
-        safe_rm(joinpath(save_dir, "Rectangular_wing_geometry_angled_view.pdf"))
-        @test isfile(joinpath(save_dir, "Rectangular_wing_geometry_front_view.pdf"))
-        safe_rm(joinpath(save_dir, "Rectangular_wing_geometry_front_view.pdf"))
-        @test isfile(joinpath(save_dir, "Rectangular_wing_geometry_side_view.pdf"))
-        safe_rm(joinpath(save_dir, "Rectangular_wing_geometry_side_view.pdf"))
-        @test isfile(joinpath(save_dir, "Rectangular_wing_geometry_top_view.pdf"))
-        safe_rm(joinpath(save_dir, "Rectangular_wing_geometry_top_view.pdf"))
+        @test isfile(joinpath(save_dir, "Rectangular_wing_geometry_angled_view.png"))
+        safe_rm(joinpath(save_dir, "Rectangular_wing_geometry_angled_view.png"))
+        @test isfile(joinpath(save_dir, "Rectangular_wing_geometry_front_view.png"))
+        safe_rm(joinpath(save_dir, "Rectangular_wing_geometry_front_view.png"))
+        @test isfile(joinpath(save_dir, "Rectangular_wing_geometry_side_view.png"))
+        safe_rm(joinpath(save_dir, "Rectangular_wing_geometry_side_view.png"))
+        @test isfile(joinpath(save_dir, "Rectangular_wing_geometry_top_view.png"))
+        safe_rm(joinpath(save_dir, "Rectangular_wing_geometry_top_view.png"))
 
         # Step 5: Initialize the solvers
         vsm_solver = Solver(body_aero; aerodynamic_model_type=VSM)
@@ -114,14 +114,14 @@ end
             angle_type="angle_of_attack",
             v_a=v_a,
             title="Rectangular Wing Polars",
-            data_type=".pdf",
+            data_type=".png",
             save_path=save_dir,
             is_save=true,
             is_show=false
         )
         @test fig isa Figure
-        @test isfile(joinpath(save_dir, "Rectangular_Wing_Polars.pdf"))
-        safe_rm(joinpath(save_dir, "Rectangular_Wing_Polars.pdf"))
+        @test isfile(joinpath(save_dir, "Rectangular_Wing_Polars.png"))
+        safe_rm(joinpath(save_dir, "Rectangular_Wing_Polars.png"))
 
         # Step 9: Test polar data plotting
         body_aero = BodyAerodynamics([ram_wing])

@@ -392,8 +392,7 @@ The resulting Wing supports deformation through unrefined_deform! and deform! fu
 - `wind_vel=10.0`: Reference wind velocity for XFoil analysis (m/s)
 - `mass=1.0`: Wing mass (kg)
 - `n_panels=56`: Number of aerodynamic panels across wingspan
-- `n_groups=4`: Number of control groups for deformation
-- `n_sections=n_panels+1`: Number of spanwise cross-sections
+- `n_unrefined_sections`: Number of unrefined sections for deformation control (default: inferred from geometry)
 - `align_to_principal=false`: Align body frame to principal axes of inertia
 - `spanwise_distribution=UNCHANGED`: Panel distribution type (forced to UNCHANGED for ObjWing)
 - `remove_nan=true`: Interpolate NaN values in aerodynamic data
@@ -412,7 +411,7 @@ wing = ObjWing(
     "path/to/airfoil.dat";
     mass=1.5,
     n_panels=40,
-    n_groups=4
+    n_unrefined_sections=4
 )
 
 # Apply deformation
@@ -422,28 +421,12 @@ unrefined_deform!(wing, deg2rad.([5, 10, 5, 0]), deg2rad.([-5, 0, -5, 0]))
 function ObjWing(
     obj_path, dat_path;
     crease_frac=0.9, wind_vel=10., mass=1.0,
-    n_panels=56, n_sections=nothing, n_unrefined_sections=nothing, n_groups=nothing,
+    n_panels=56, n_unrefined_sections=nothing,
     spanwise_distribution=UNCHANGED,
     spanwise_direction=[0.0, 1.0, 0.0], remove_nan=true, align_to_principal=false,
     alpha_range=deg2rad.(-5:1:20), delta_range=deg2rad.(-5:1:20), prn=true,
-    interp_steps=n_panels+1, grouping_method::PanelGroupingMethod=EQUAL_SIZE
+    interp_steps=n_panels+1
 )
-    # Handle deprecated parameters
-    if !isnothing(n_groups)
-        if !isnothing(n_unrefined_sections)
-            error("Cannot specify both n_groups and n_unrefined_sections. Use n_unrefined_sections only.")
-        end
-        @warn "Parameter n_groups is deprecated. Use n_unrefined_sections instead." maxlog=1
-        n_unrefined_sections = n_groups
-    end
-
-    if !isnothing(n_sections)
-        @warn "Parameter n_sections is deprecated. It is now always n_panels+1 for refined sections. Use n_unrefined_sections to control initial sections." maxlog=1
-    end
-
-    if grouping_method != EQUAL_SIZE
-        @warn "Parameter grouping_method is deprecated and ignored. Grouping is now always by unrefined sections." maxlog=1
-    end
 
     # Force NONE distribution for ObjWing
     if spanwise_distribution != NONE

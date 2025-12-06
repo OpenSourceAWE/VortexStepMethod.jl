@@ -89,7 +89,7 @@ PLOT && plot_distribution(
     [results, results_with_stall],
     ["VSM", "VSM with stall correction"];
     title="CAD_spanwise_distributions_alpha_$(round(aoa, digits=1))_delta_$(round(side_slip, digits=1))_yaw_$(round(yaw_rate, digits=1))_v_a_$(round(v_a, digits=1))",
-    data_type=".pdf",
+    data_type=".png",
     save_path=joinpath(save_folder, "spanwise_distributions"),
     is_save=false,
     is_show=true,
@@ -123,7 +123,7 @@ PLOT && plot_polars(
     side_slip=0,
     v_a=10,
     title="tutorial_testing_stall_model_n_panels_$(n_panels)_distribution_$(spanwise_distribution)_unrefined_$(CAD_wing.n_unrefined_sections)",
-    data_type=".pdf",
+    data_type=".png",
     save_path=joinpath(save_folder, "polars"),
     is_save=true,
     is_show=true,

@@ -39,7 +39,7 @@ PLOT && plot_polars(
     side_slip=sideslip_deg,
     v_a=wind_speed,
     title="$(wing.n_panels)_panels_$(wing.spanwise_distribution)_pyramid_model",
-    data_type=".pdf",
+    data_type=".png",
     is_save=false,
     is_show=true,
     use_tex=USE_TEX
@@ -67,7 +67,7 @@ PLOT && plot_distribution(
     [results],
     ["VSM"];
     title="pyramid_spanwise_distributions_alpha_$(round(angle_of_attack_deg, digits=1))_delta_$(round(sideslip_deg, digits=1))_yaw_$(round(yaw_rate, digits=1))_v_a_$(round(wind_speed, digits=1))",
-    data_type=".pdf",
+    data_type=".png",
     is_save=false,
     is_show=true,
     use_tex=USE_TEX
