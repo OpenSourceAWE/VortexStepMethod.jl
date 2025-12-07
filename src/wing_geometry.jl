@@ -297,25 +297,20 @@ function Wing(n_panels::Int;
 end
 
 """
-    reinit!(wing::AbstractWing; refine_mesh=true, recompute_mapping=true, sort_sections=true)
+    reinit!(wing::AbstractWing)
 
-Reinitialize wing geometry and panel properties.
+Reinitialize wing panel properties based on current refined_sections geometry.
 
-# Keyword Arguments
-- `refine_mesh::Bool=true`: Whether to refine the mesh. Set to `false` after
-  `deform!()` to preserve deformed geometry while updating panel properties.
-- `recompute_mapping::Bool=true`: Whether to recompute the refined panel mapping.
-  Set to `false` to skip mapping computation when it hasn't changed.
-- `sort_sections::Bool=true`: Whether to sort sections by spanwise position.
-  Set to `false` for REFINE wings where section order is determined by structural connectivity.
+This function only updates panel properties (chord, area, etc.) from the existing
+refined_sections. It does NOT refine the mesh - call refine_aerodynamic_mesh!(wing)
+first if needed.
+
+# Note
+After deformation via `unrefined_deform!()` or `deform!()`, call `reinit!` to update
+panel properties while preserving the deformed geometry.
 """
-function reinit!(wing::AbstractWing; refine_mesh=true, recompute_mapping=true, sort_sections=true)
-    # Refine mesh unless explicitly disabled (e.g., to preserve deformation)
-    if refine_mesh
-        refine_aerodynamic_mesh!(wing; recompute_mapping, sort_sections)
-    end
-
-    # Calculate panel properties
+function reinit!(wing::AbstractWing)
+    # Calculate panel properties from refined sections
     update_panel_properties!(
         wing.panel_props,
         wing.refined_sections,
@@ -620,16 +615,29 @@ end
 
 Create non_deformed_sections to match refined_sections.
 This enables deformation support for all wings (YAML and OBJ).
-Should be called after refined_sections are populated for the FIRST time only.
+Should be called after refined_sections are populated.
 Once populated, non_deformed_sections serves as the undeformed reference geometry.
 """
 function update_non_deformed_sections!(wing::AbstractWing)
     n_sections = wing.n_panels + 1
 
-    # Only populate non_deformed_sections if it's empty (initial setup)
-    # Once populated, it serves as the undeformed reference and should not be overwritten
+    # Populate or update non_deformed_sections
     if isempty(wing.non_deformed_sections)
+        @show length(wing.refined_sections) n_sections
+        # Initial setup
         wing.non_deformed_sections = [Section() for _ in 1:n_sections]
+        for i in 1:n_sections
+            reinit!(wing.non_deformed_sections[i], wing.refined_sections[i])
+        end
+    elseif length(wing.non_deformed_sections) != n_sections
+        # Size mismatch - error
+        throw(ArgumentError(
+            "non_deformed_sections has incorrect size. " *
+            "Expected $(n_sections) sections (n_panels+1), got $(length(wing.non_deformed_sections)). " *
+            "This indicates an inconsistent wing state."
+        ))
+    else
+        # Correct size - update all sections
         for i in 1:n_sections
             reinit!(wing.non_deformed_sections[i], wing.refined_sections[i])
         end
@@ -638,36 +646,68 @@ function update_non_deformed_sections!(wing::AbstractWing)
 end
 
 """
-    refine_aerodynamic_mesh!(wing::AbstractWing; recompute_mapping=true, sort_sections=true)
+    refine!(wing::AbstractWing; recompute_mapping=true, sort_sections=true)
 
-Refine the aerodynamic mesh of the wing based on spanwise panel distribution.
+Refine the wing aerodynamic mesh from unrefined sections to refined sections.
+
+This function interpolates the wing geometry from a coarse set of unrefined sections
+to a fine mesh of refined sections (n_panels+1 sections) based on the wing's
+spanwise_distribution setting. It also populates non_deformed_sections which
+enables deformation support via `unrefined_deform!`.
+
+# Required Workflow
+Must be called after wing construction and before creating `BodyAerodynamics`:
+```julia
+wing = Wing("wing.yaml"; n_panels=40)  # or ObjWing(...) or manual Wing
+refine!(wing)                          # Refine mesh
+body_aero = BodyAerodynamics([wing])   # Create aerodynamics
+```
+
+# Distribution Methods
+- `LINEAR`: Linear interpolation between sections
+- `COSINE`: Cosine spacing (more panels near tips)
+- `COSINE_VAN_GARREL`: van Garrel cosine distribution
+- `SPLIT_PROVIDED`: Split each unrefined section into sub-panels
+- `UNCHANGED`: 1:1 copy when n_unrefined_sections == n_panels+1
 
 # Keyword Arguments
-- `recompute_mapping::Bool=true`: Whether to recompute the refined panel mapping.
-  Set to `false` to skip mapping computation when it hasn't changed.
-- `sort_sections::Bool=true`: Whether to sort sections by spanwise position (y-coordinate).
-  Set to `false` for REFINE wings where section order is determined by structural connectivity.
+- `recompute_mapping::Bool=true`: Recompute the mapping from refined panels to unrefined sections
+- `sort_sections::Bool=true`: Sort sections by spanwise position (disable for structural ordering)
 
-Returns:
-    Vector{Section}: List of refined sections
+# Effects
+1. Populates `wing.refined_sections` (n_panels+1 sections)
+2. Populates `wing.non_deformed_sections` (copy of refined_sections for deformation reference)
+3. Computes `wing.refined_panel_mapping` (panel → unrefined section mapping)
+4. Resizes `wing.theta_dist` and `wing.delta_dist` to n_panels
+
+# Example
+```julia
+# YAML wing
+wing = Wing("wing.yaml"; n_panels=40)
+refine!(wing)
+body_aero = BodyAerodynamics([wing])
+
+# After refinement, deformation is supported
+unrefined_deform!(wing, theta_angles, delta_angles)
+```
 """
-function refine_aerodynamic_mesh!(wing::AbstractWing; recompute_mapping=true, sort_sections=true)
+function refine!(wing::AbstractWing; recompute_mapping=true, sort_sections=true)
+    # Validate unrefined_sections exist
+    if isempty(wing.unrefined_sections)
+        throw(ArgumentError(
+            "Cannot refine mesh: wing has no unrefined_sections. " *
+            "Add sections using add_section! or check wing construction."
+        ))
+    end
+
     # Only sort sections if requested (skip for REFINE wings with fixed structural order)
     sort_sections && sort!(wing.unrefined_sections, by=s -> s.LE_point[2], rev=true)
     n_sections = wing.n_panels + 1
 
-    # Handle NONE distribution - sections already refined, just compute mapping
-    if wing.spanwise_distribution == NONE
-        if length(wing.refined_sections) != n_sections
-            throw(ArgumentError("NONE distribution requires refined_sections to be pre-populated"))
-        end
-        recompute_mapping && compute_refined_panel_mapping!(wing)
-        update_non_deformed_sections!(wing)
-        return nothing
-    end
-
     if length(wing.refined_sections) == 0
-        if wing.spanwise_distribution == UNCHANGED || length(wing.unrefined_sections) == n_sections
+        @show wing.spanwise_distribution
+        if wing.spanwise_distribution == UNCHANGED ||
+               length(wing.unrefined_sections) == n_sections
             wing.refined_sections = wing.unrefined_sections
             update_non_deformed_sections!(wing)
             return nothing

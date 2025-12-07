@@ -27,7 +27,7 @@ using Xfoil
 
 # Export public interface
 export VSMSettings, WingSettings, SolverSettings
-export Wing, Section, ObjWing, reinit!
+export Wing, Section, ObjWing, reinit!, refine!
 export BodyAerodynamics
 export Solver, solve, solve_base!, solve!, VSMSolution, linearize
 export calculate_results
@@ -36,7 +36,7 @@ export calculate_span, calculate_projected_area
 export MVec3
 export Model, VSM, LLT
 export AeroModel, LEI_AIRFOIL_BREUKELS, POLAR_VECTORS, POLAR_MATRICES, INVISCID
-export PanelDistribution, LINEAR, COSINE, COSINE_VAN_GARREL, SPLIT_PROVIDED, UNCHANGED, NONE
+export PanelDistribution, LINEAR, COSINE, COSINE_VAN_GARREL, SPLIT_PROVIDED, UNCHANGED
 export InitialGammaDistribution, ELLIPTIC, ZEROS
 export SolverStatus, FEASIBLE, INFEASIBLE, FAILURE
 export SolverType, LOOP, NONLIN
@@ -130,16 +130,14 @@ Enumeration of the implemented panel distributions.
 - COSINE               # Cosine distribution
 - `COSINE_VAN_GARREL`  # van Garrel cosine distribution
 - `SPLIT_PROVIDED`     # Split provided sections
-- `UNCHANGED`          # Keep original sections without interpolation
-- `NONE`               # No refinement - sections already refined
+- `UNCHANGED`          # 1:1 copy of unrefined to refined sections (no interpolation)
 """
 @enum PanelDistribution begin
    LINEAR             # Linear distribution
    COSINE             # Cosine distribution
    COSINE_VAN_GARREL  # van Garrel cosine distribution
    SPLIT_PROVIDED     # Split provided sections
-   UNCHANGED          # Keep original sections without interpolation
-   NONE               # No refinement - sections already refined
+   UNCHANGED          # 1:1 copy of unrefined to refined sections
 end
 
 """

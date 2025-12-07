@@ -246,7 +246,7 @@ function Wing(
         # Get coordinates directly from struct fields
         le_coord = [section.LE_x, section.LE_y, section.LE_z]
         te_coord = [section.TE_x, section.TE_y, section.TE_z]
-        
+
         # Load polar data and create section
         csv_file_path = get(airfoil_csv_map, section.airfoil_id, "")
         if !isempty(csv_file_path) && !isabspath(csv_file_path)
@@ -256,15 +256,12 @@ function Wing(
             csv_file_path = joinpath(dirname(geometry_file), csv_file_path)
         end
         aero_data, aero_model = load_polar_data(csv_file_path)
-        
+
         prn && println("Section airfoil_id $(section.airfoil_id): Using $aero_model model")
-        
+
         add_section!(wing, le_coord, te_coord, aero_model, aero_data)
     end
-    
-    # Initialize the wing after adding all sections
-    reinit!(wing)
-    
+
     return wing
 end
 

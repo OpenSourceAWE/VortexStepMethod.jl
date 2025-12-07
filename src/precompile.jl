@@ -26,6 +26,7 @@
             INVISCID)
 
         # Step 3: Initialize aerodynamics (simplified)
+        refine!(wing)
         body_aero = BodyAerodynamics([wing])
 
         nothing

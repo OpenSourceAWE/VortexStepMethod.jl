@@ -71,6 +71,27 @@ function BodyAerodynamics(
     va=[15.0, 0.0, 0.0],
     omega=zeros(MVec3)
 ) where T <: AbstractWing
+    # Validate all wings are refined
+    for (i, wing) in enumerate(wings)
+        if isempty(wing.refined_sections) ||
+           length(wing.refined_sections) != wing.n_panels + 1
+            throw(ArgumentError(
+                "Wing $i has not been refined. " *
+                "Call refine!(wing) before creating BodyAerodynamics.\n\n" *
+                "Expected workflow:\n" *
+                "  wing = Wing(...)\n" *
+                "  refine!(wing)\n" *
+                "  body_aero = BodyAerodynamics([wing])"
+            ))
+        end
+
+        if isempty(wing.non_deformed_sections)
+            @warn "Wing $i has no non_deformed_sections. " *
+                  "Deformation (unrefined_deform!) will not work. " *
+                  "This should have been created by refine!." maxlog=1
+        end
+    end
+
     # Initialize panels
     panels = Panel[]
     n_unrefined_total = 0
@@ -78,17 +99,6 @@ function BodyAerodynamics(
         for section in wing.unrefined_sections
             section.LE_point .-= kite_body_origin
             section.TE_point .-= kite_body_origin
-        end
-        if wing.spanwise_distribution == NONE
-            # NONE distribution: refined_sections already populated in constructor
-            !(wing.n_panels == length(wing.refined_sections) - 1) &&
-                throw(ArgumentError("(wing.n_panels = $(wing.n_panels)) != (length(wing.refined_sections) - 1 = $(length(wing.unrefined_sections) - 1))"))
-        elseif wing.spanwise_distribution == UNCHANGED
-            wing.refined_sections = wing.unrefined_sections
-            !(wing.n_panels == length(wing.unrefined_sections) - 1) &&
-                throw(ArgumentError("(wing.n_panels = $(wing.n_panels)) != (length(wing.unrefined_sections) - 1 = $(length(wing.unrefined_sections) - 1))"))
-        else
-            wing.refined_sections = Section[Section() for _ in 1:wing.n_panels+1]
         end
 
         # Create panels
@@ -127,15 +137,9 @@ Initialize a BodyAerodynamics struct in-place by setting up panels and coefficie
 - `body_aero::BodyAerodynamics`: The structure to initialize
 
 # Keyword Arguments
-- `init_aero::Bool`: Wether to initialize the aero data or not
+- `init_aero::Bool`: Whether to initialize the aero data or not
 - `va=[15.0, 0.0, 0.0]`: Apparent wind vector
 - `omega=zeros(3)`: Turn rate in kite body frame x y and z
-- `refine_mesh=true`: Whether to refine wing meshes. Set to `false` after
-  `deform!()` to preserve deformed geometry.
-- `recompute_mapping=true`: Whether to recompute the refined panel mapping.
-  Set to `false` to skip mapping computation when it hasn't changed.
-- `sort_sections=true`: Whether to sort sections by spanwise position.
-  Set to `false` for REFINE wings where section order is determined by structural connectivity.
 
 # Returns
 nothing
@@ -143,15 +147,12 @@ nothing
 function reinit!(body_aero::BodyAerodynamics;
     init_aero=true,
     va=[15.0, 0.0, 0.0],
-    omega=zeros(MVec3),
-    refine_mesh=true,
-    recompute_mapping=true,
-    sort_sections=true
+    omega=zeros(MVec3)
 )
     idx = 1
     vec = @MVector zeros(3)
     for wing in body_aero.wings
-        reinit!(wing; refine_mesh, recompute_mapping, sort_sections)
+        reinit!(wing)
         panel_props = wing.panel_props
         
         # Create panels

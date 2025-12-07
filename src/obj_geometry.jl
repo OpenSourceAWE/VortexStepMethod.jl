@@ -428,15 +428,9 @@ function ObjWing(
     interp_steps=n_panels+1
 )
 
-    # Force NONE distribution for ObjWing
-    if spanwise_distribution != NONE
-        @warn "ObjWing only supports spanwise_distribution=NONE. Overriding to NONE." maxlog=1
-        spanwise_distribution = NONE
-    end
-
     # Set default: evenly spaced unrefined sections including both tips
     if isnothing(n_unrefined_sections)
-        # Default to having same number of unrefined sections as refined (no refinement)
+        # Default to having same number of unrefined sections as refined (no interpolation needed)
         n_unrefined_sections = n_panels + 1
     end
 
@@ -493,11 +487,18 @@ function ObjWing(
             push!(sections, Section(LE_point, TE_point, POLAR_MATRICES, aero_data))
         end
 
+        # Create refined sections (evenly spaced including both tips)
         refined_sections = Section[]
         for gamma in range(-gamma_tip, gamma_tip, n_panels+1)
             LE_point = [le_interp[i](gamma) for i in 1:3]
             TE_point = [te_interp[i](gamma) for i in 1:3]
             push!(refined_sections, Section(LE_point, TE_point, POLAR_MATRICES, aero_data))
+        end
+
+        # Create non_deformed_sections as copy of refined_sections for deformation support
+        non_deformed_sections = [Section() for _ in 1:n_panels+1]
+        for i in 1:n_panels+1
+            reinit!(non_deformed_sections[i], refined_sections[i])
         end
 
         panel_props = PanelProperties{n_panels}()
@@ -506,11 +507,14 @@ function ObjWing(
         wing = Wing(n_panels, Int16(n_unrefined_sections), spanwise_distribution, panel_props, MVec3(spanwise_direction),
             sections, refined_sections, remove_nan,
             Int16[],
-            Section[], zeros(n_panels), zeros(n_panels),
+            non_deformed_sections, zeros(n_panels), zeros(n_panels),
             mass, gamma_tip, inertia_tensor, T_cad_body, R_cad_body, radius,
             le_interp, te_interp, area_interp, cache)
 
-        # Refine mesh and update panel properties
+        # Compute panel mapping for deformation support
+        VortexStepMethod.compute_refined_panel_mapping!(wing)
+
+        # Update panel properties
         reinit!(wing)
 
         wing
