@@ -580,7 +580,7 @@ Add a new section to the wing.
 - `aero_model`::AeroModel: [AeroModel](@ref)
 - `aero_data`::AeroData: See [AeroData](@ref)  
 """
-function add_section!(wing::Wing, LE_point, 
+function add_section!(wing::Wing, LE_point,
                      TE_point, aero_model::AeroModel, aero_data::AeroData=nothing)
     if aero_model == POLAR_VECTORS && wing.remove_nan
         aero_data = remove_vector_nans(aero_data)
@@ -588,6 +588,7 @@ function add_section!(wing::Wing, LE_point,
         interpolate_matrix_nans!.(aero_data[3:5])
     end
     push!(wing.unrefined_sections, Section(LE_point, TE_point, aero_model, aero_data))
+    wing.n_unrefined_sections = Int16(length(wing.unrefined_sections))
     return nothing
 end
 
@@ -623,7 +624,6 @@ function update_non_deformed_sections!(wing::AbstractWing)
 
     # Populate or update non_deformed_sections
     if isempty(wing.non_deformed_sections)
-        @show length(wing.refined_sections) n_sections
         # Initial setup
         wing.non_deformed_sections = [Section() for _ in 1:n_sections]
         for i in 1:n_sections
@@ -705,10 +705,10 @@ function refine!(wing::AbstractWing; recompute_mapping=true, sort_sections=true)
     n_sections = wing.n_panels + 1
 
     if length(wing.refined_sections) == 0
-        @show wing.spanwise_distribution
         if wing.spanwise_distribution == UNCHANGED ||
                length(wing.unrefined_sections) == n_sections
             wing.refined_sections = wing.unrefined_sections
+            recompute_mapping && compute_refined_panel_mapping!(wing)
             update_non_deformed_sections!(wing)
             return nothing
         else

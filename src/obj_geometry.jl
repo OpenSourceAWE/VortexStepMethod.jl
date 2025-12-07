@@ -228,6 +228,94 @@ function create_interpolations(vertices, circle_center_z, radius, gamma_tip, R=I
 end
 
 """
+    refine_obj_wing!(wing::AbstractWing; recompute_mapping=true)
+
+Refine OBJ wing by computing position deltas and applying them to refined sections.
+
+This method enables deformation support for OBJ wings by:
+1. Recalculating evenly-spaced gammas for unrefined sections
+2. Computing what unrefined sections SHOULD be (from interpolations)
+3. Computing deltas between current and interpolated positions
+4. Creating refined sections from interpolations + interpolated deltas
+5. Computing panel mapping
+
+# Arguments
+- `wing::AbstractWing`: OBJ wing with le_interp/te_interp
+- `recompute_mapping::Bool=true`: Whether to recompute refined_panel_mapping
+
+# Effects
+Updates wing.refined_sections and wing.non_deformed_sections in-place.
+"""
+function refine_obj_wing!(wing::AbstractWing; recompute_mapping=true)
+    n_unrefined = wing.n_unrefined_sections
+    n_refined = wing.n_panels + 1
+
+    # 1. Calculate evenly spaced gammas for unrefined sections
+    unrefined_gammas = range(-wing.gamma_tip, wing.gamma_tip, n_unrefined)
+
+    # 2. Recalculate what unrefined sections SHOULD be from interpolations
+    interpolated_unrefined_le = Matrix{Float64}(undef, n_unrefined, 3)
+    interpolated_unrefined_te = Matrix{Float64}(undef, n_unrefined, 3)
+    for (i, gamma) in enumerate(unrefined_gammas)
+        interpolated_unrefined_le[i, :] .= [wing.le_interp[j](gamma) for j in 1:3]
+        interpolated_unrefined_te[i, :] .= [wing.te_interp[j](gamma) for j in 1:3]
+    end
+
+    # 3. Compute deltas: current - interpolated
+    deltas_le = Matrix{Float64}(undef, n_unrefined, 3)
+    deltas_te = Matrix{Float64}(undef, n_unrefined, 3)
+    for i in 1:n_unrefined
+        deltas_le[i, :] .= wing.unrefined_sections[i].LE_point -
+                           interpolated_unrefined_le[i, :]
+        deltas_te[i, :] .= wing.unrefined_sections[i].TE_point -
+                           interpolated_unrefined_te[i, :]
+    end
+
+    # 4. Create refined sections with interpolated deltas
+    refined_gammas = range(-wing.gamma_tip, wing.gamma_tip, n_refined)
+    if isempty(wing.refined_sections)
+        wing.refined_sections = [Section() for _ in 1:n_refined]
+    end
+
+    for (idx, gamma) in enumerate(refined_gammas)
+        # Get base position from interpolation
+        base_le = [wing.le_interp[i](gamma) for i in 1:3]
+        base_te = [wing.te_interp[i](gamma) for i in 1:3]
+
+        # Find surrounding unrefined sections for delta interpolation
+        unrefined_idx = searchsortedlast(collect(unrefined_gammas), gamma)
+        unrefined_idx = clamp(unrefined_idx, 1, n_unrefined - 1)
+
+        # Linear interpolation weight
+        gamma_left = unrefined_gammas[unrefined_idx]
+        gamma_right = unrefined_gammas[unrefined_idx + 1]
+        t = (gamma - gamma_left) / (gamma_right - gamma_left)
+
+        # Interpolate deltas
+        delta_le = (1 - t) * deltas_le[unrefined_idx, :] +
+                   t * deltas_le[unrefined_idx + 1, :]
+        delta_te = (1 - t) * deltas_te[unrefined_idx, :] +
+                   t * deltas_te[unrefined_idx + 1, :]
+
+        # Apply deltas to get final position
+        final_le = base_le + delta_le
+        final_te = base_te + delta_te
+
+        # Update refined section
+        aero_model = wing.unrefined_sections[1].aero_model
+        aero_data = wing.unrefined_sections[1].aero_data
+        VortexStepMethod.reinit!(wing.refined_sections[idx], final_le, final_te,
+                aero_model, aero_data)
+    end
+
+    # 5. Compute panel mapping and update non_deformed_sections
+    recompute_mapping && VortexStepMethod.compute_refined_panel_mapping!(wing)
+    VortexStepMethod.update_non_deformed_sections!(wing)
+
+    return nothing
+end
+
+"""
     center_to_com!(vertices, faces)
 
 Calculate center of mass of a mesh and translate vertices so that COM is at origin.
@@ -487,34 +575,18 @@ function ObjWing(
             push!(sections, Section(LE_point, TE_point, POLAR_MATRICES, aero_data))
         end
 
-        # Create refined sections (evenly spaced including both tips)
-        refined_sections = Section[]
-        for gamma in range(-gamma_tip, gamma_tip, n_panels+1)
-            LE_point = [le_interp[i](gamma) for i in 1:3]
-            TE_point = [te_interp[i](gamma) for i in 1:3]
-            push!(refined_sections, Section(LE_point, TE_point, POLAR_MATRICES, aero_data))
-        end
-
-        # Create non_deformed_sections as copy of refined_sections for deformation support
-        non_deformed_sections = [Section() for _ in 1:n_panels+1]
-        for i in 1:n_panels+1
-            reinit!(non_deformed_sections[i], refined_sections[i])
-        end
-
         panel_props = PanelProperties{n_panels}()
         cache = [PreallocationTools.LazyBufferCache()]
 
         wing = Wing(n_panels, Int16(n_unrefined_sections), spanwise_distribution, panel_props, MVec3(spanwise_direction),
-            sections, refined_sections, remove_nan,
-            Int16[],
-            non_deformed_sections, zeros(n_panels), zeros(n_panels),
+            sections, Section[], remove_nan,  # refined_sections empty
+            Int16[],  # refined_panel_mapping empty
+            Section[], zeros(n_panels), zeros(n_panels),  # non_deformed, theta, delta
             mass, gamma_tip, inertia_tensor, T_cad_body, R_cad_body, radius,
             le_interp, te_interp, area_interp, cache)
 
-        # Compute panel mapping for deformation support
-        VortexStepMethod.compute_refined_panel_mapping!(wing)
-
-        # Update panel properties
+        # Auto-refine for backward compatibility
+        refine_obj_wing!(wing; recompute_mapping=true)
         reinit!(wing)
 
         wing
