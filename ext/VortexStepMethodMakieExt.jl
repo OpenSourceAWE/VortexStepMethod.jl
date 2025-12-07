@@ -929,7 +929,9 @@ end
                           angle_of_attack=0.0, side_slip=0.0, v_a=10.0,
                           title="Combined Analysis",
                           view_elevation=15, view_azimuth=-120,
-                          is_show=true, use_tex=false)
+                          is_show=true, use_tex=false,
+                          literature_path_list=String[],
+                          data_type=".png", save_path=nothing, is_save=false)
 
 Create combined multi-panel figure with geometry, polar data, distributions, and polars.
 
@@ -950,6 +952,10 @@ Create combined multi-panel figure with geometry, polar data, distributions, and
 - `view_azimuth`: Geometry view azimuth [°] (default: -120)
 - `is_show`: Display figure (default: true)
 - `use_tex`: Ignored for Makie (default: false)
+- `literature_path_list`: Paths to literature CSV files (default: String[])
+- `data_type`: File extension (default: ".png", also supports ".jpeg")
+- `save_path`: Directory path to save files (default: nothing)
+- `is_save`: Save plots to files (default: false)
 """
 function VortexStepMethod.plot_combined_analysis(
     solver,
@@ -965,7 +971,11 @@ function VortexStepMethod.plot_combined_analysis(
     view_elevation=15,
     view_azimuth=-120,
     is_show=true,
-    use_tex=false
+    use_tex=false,
+    literature_path_list=String[],
+    data_type=".png",
+    save_path=nothing,
+    is_save=false
 )
     # Auto-detect screen size and use 80% of it
     fig = try

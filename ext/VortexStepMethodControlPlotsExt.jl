@@ -3,7 +3,8 @@ using ControlPlots, LaTeXStrings, VortexStepMethod, LinearAlgebra, Statistics, D
 import ControlPlots: plt
 import VortexStepMethod: calculate_filaments_for_plotting
 
-export plot_wing, plot_circulation_distribution, plot_geometry, plot_distribution, plot_polars, save_plot, show_plot, plot_polar_data
+export plot_wing, plot_circulation_distribution, plot_geometry, plot_distribution,
+       plot_polars, save_plot, show_plot, plot_polar_data, plot_combined_analysis
 
 """
     set_plot_style(titel_size=16; use_tex=false)
@@ -923,6 +924,95 @@ function VortexStepMethod.plot_polar_data(body_aero::BodyAerodynamics;
     else
         throw(ArgumentError("Plotting polar data for $(body_aero.panels[1].aero_model) is not implemented."))
     end
+end
+
+"""
+    plot_combined_analysis(solver, body_aero, results; kwargs...)
+
+Create combined analysis by calling plot_geometry, plot_distribution,
+and plot_polars sequentially. Each creates a separate matplotlib window.
+
+# Arguments
+- `solver`: Solver or array of solvers
+- `body_aero`: BodyAerodynamics object or array
+- `results`: Results dict or array of results dicts
+
+See individual functions for detailed parameter descriptions.
+"""
+function VortexStepMethod.plot_combined_analysis(
+    solver,
+    body_aero,
+    results;
+    solver_label="VSM",
+    angle_range=range(0, 20, length=20),
+    angle_type="angle_of_attack",
+    angle_of_attack=0.0,
+    side_slip=0.0,
+    v_a=10.0,
+    title="Combined Analysis",
+    data_type=".pdf",
+    save_path=nothing,
+    is_save=false,
+    is_show=true,
+    view_elevation=15,
+    view_azimuth=-120,
+    use_tex=false,
+    literature_path_list=String[]
+)
+    # Normalize inputs to arrays for consistent handling
+    solvers = solver isa Vector ? solver : [solver]
+    body_aeros = body_aero isa Vector ? body_aero : [body_aero]
+    results_list = results isa Vector ? results : [results]
+    labels = solver_label isa Vector ? solver_label : [solver_label]
+
+    # Extract y-coordinates for distribution plot (use first body_aero)
+    body_y_coordinates = [panel.aero_center[2] for panel in body_aeros[1].panels]
+    y_coords_list = [body_y_coordinates for _ in 1:length(solvers)]
+
+    # Plot geometry (only use first body_aero)
+    plot_geometry(
+        body_aeros[1],
+        title;
+        data_type=data_type,
+        save_path=save_path,
+        is_save=is_save,
+        is_show=is_show,
+        view_elevation=view_elevation,
+        view_azimuth=view_azimuth,
+        use_tex=use_tex
+    )
+
+    # Plot spanwise distributions
+    plot_distribution(
+        y_coords_list,
+        results_list,
+        labels;
+        title=title * " - Distributions",
+        data_type=data_type,
+        save_path=save_path,
+        is_save=is_save,
+        is_show=is_show,
+        use_tex=use_tex
+    )
+
+    # Plot polars
+    plot_polars(
+        solvers,
+        body_aeros,
+        labels;
+        literature_path_list=literature_path_list,
+        angle_range=angle_range,
+        angle_type=angle_type,
+        angle_of_attack=angle_of_attack,
+        side_slip=side_slip,
+        v_a=v_a,
+        title=title * " - Polars",
+        data_type=data_type,
+        save_path=save_path,
+        is_save=is_save,
+        is_show=is_show,
+        use_tex=use_tex
+    )
 end
 
 end
