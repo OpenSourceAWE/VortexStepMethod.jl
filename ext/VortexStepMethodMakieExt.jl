@@ -1037,7 +1037,7 @@ function VortexStepMethod.plot_combined_analysis(
     set_axes_equal_makie!(ax_geo, panels; zoom=0.5)
     axislegend(ax_geo; position=:lt)
 
-    # [1,2] Polar Data Surfaces
+    # [1,2] Polar Data Surfaces or Curves
     if body_aero.panels[1].aero_model == POLAR_MATRICES
         alphas = collect(deg2rad.(-5:0.3:25))
         delta_tes = collect(deg2rad.(-5:0.3:25))
@@ -1062,6 +1062,30 @@ function VortexStepMethod.plot_combined_analysis(
             wireframe!(ax, delta_tes, alphas, interp_matrix;
                       color=:blue, linewidth=0.5, transparency=true)
         end
+    elseif body_aero.panels[1].aero_model == POLAR_VECTORS
+        alphas_deg = collect(-5:0.5:25)
+        alphas = deg2rad.(alphas_deg)
+
+        ax_cl_curve = Axis(fig[1, 2][1, 1];
+                          title="Cl vs α",
+                          xlabel="α [°]",
+                          ylabel="Cl")
+        ax_cd_curve = Axis(fig[1, 2][1, 2];
+                          title="Cd vs α",
+                          xlabel="α [°]",
+                          ylabel="Cd")
+        ax_cm_curve = Axis(fig[1, 2][1, 3];
+                          title="Cm vs α",
+                          xlabel="α [°]",
+                          ylabel="Cm")
+
+        cl_vals = [body_aero.panels[1].cl_interp(a) for a in alphas]
+        cd_vals = [body_aero.panels[1].cd_interp(a) for a in alphas]
+        cm_vals = [body_aero.panels[1].cm_interp(a) for a in alphas]
+
+        lines!(ax_cl_curve, alphas_deg, cl_vals; color=:blue, linewidth=2)
+        lines!(ax_cd_curve, alphas_deg, cd_vals; color=:red, linewidth=2)
+        lines!(ax_cm_curve, alphas_deg, cm_vals; color=:green, linewidth=2)
     end
 
     # [2,1] Spanwise Distributions (3×3 grid)
@@ -1157,6 +1181,10 @@ function VortexStepMethod.plot_combined_analysis(
     scatterlines!(ax_polar, polar_data[3], polar_data[2];
                  label=label_with_re, marker=:star5, markersize=12)
     axislegend(ax_polar, position=:lt)
+
+    # Set column widths: left column wider for 3x3 grid
+    colsize!(fig.layout, 1, Relative(0.6))
+    colsize!(fig.layout, 2, Relative(0.4))
 
     if is_show
         display(fig)
