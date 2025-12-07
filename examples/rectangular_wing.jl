@@ -18,14 +18,17 @@ alpha = deg2rad(alpha_deg)
 wing = Wing(n_panels, spanwise_distribution=LINEAR)
 
 # Add wing sections - defining only tip sections with inviscid airfoil model
-add_section!(wing, 
-    [0.0, span/2, 0.0],   # Left tip LE 
+add_section!(wing,
+    [0.0, span/2, 0.0],   # Left tip LE
     [chord, span/2, 0.0],  # Left tip TE
     INVISCID)
-add_section!(wing, 
+add_section!(wing,
     [0.0, -span/2, 0.0],  # Right tip LE
     [chord, -span/2, 0.0], # Right tip TE
     INVISCID)
+
+# Refine mesh
+refine!(wing)
 
 # Step 3: Initialize aerodynamics
 body_aero = BodyAerodynamics([wing])
@@ -53,38 +56,18 @@ println("CL = $(round(results_vsm["cl"], digits=4))")
 println("CD = $(round(results_vsm["cd"], digits=4))")
 println("Projected area = $(round(results_vsm["projected_area"], digits=4)) m²")
 
-# Step 6: Plot geometry
-PLOT && plot_geometry(
-      body_aero,
-      "Rectangular_wing_geometry";
-      data_type=".png",
-      save_path=".",
-      is_save=false,
-      is_show=true,
-      use_tex=USE_TEX
-)
-
-# Step 7: Plot spanwise distributions
-y_coordinates = [panel.aero_center[2] for panel in body_aero.panels]
-
-PLOT && plot_distribution(
-    [y_coordinates, y_coordinates],
-    [results_vsm, results_llt],
-    ["VSM", "LLT"],
-    title="Spanwise Distributions",
-    use_tex=USE_TEX
-)
-
-# Step 8: Plot polar curves
+# Step 6: Plot combined analysis
 angle_range = range(0, 20, 20)
-PLOT && plot_polars(
+PLOT && plot_combined_analysis(
     [llt_solver, vsm_solver],
     [body_aero, body_aero],
-    ["LLT", "VSM"];
-    angle_range,
+    [results_llt, results_vsm];
+    solver_label=["LLT", "VSM"],
+    angle_range=angle_range,
     angle_type="angle_of_attack",
-    v_a,
-    title="Rectangular Wing Polars",
+    v_a=v_a,
+    title="Rectangular Wing",
+    is_show=true,
     use_tex=USE_TEX
 )
 nothing
