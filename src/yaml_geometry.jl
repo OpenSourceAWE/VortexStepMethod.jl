@@ -262,6 +262,7 @@ function Wing(
         add_section!(wing, le_coord, te_coord, aero_model, aero_data)
     end
 
+    refine!(wing)
     return wing
 end
 
