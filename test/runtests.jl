@@ -37,6 +37,7 @@ end::Bool
     end
     should_run_test("body_aerodynamics/test_body_aerodynamics.jl") && include("body_aerodynamics/test_body_aerodynamics.jl")
     should_run_test("body_aerodynamics/test_results.jl") && include("body_aerodynamics/test_results.jl")
+    should_run_test("test_refinement_validation.jl") && include("test_refinement_validation.jl")
     should_run_test("filament/test_bound_filament.jl") && include("filament/test_bound_filament.jl")
     should_run_test("filament/test_semi_infinite_filament.jl") && include("filament/test_semi_infinite_filament.jl")
     should_run_test("panel/test_panel.jl") && include("panel/test_panel.jl")

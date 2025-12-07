@@ -19,7 +19,9 @@ using Test
 
             # Create wing and solver
             wing = Wing(settings)
-            body_aero = BodyAerodynamics([wing])
+            refine!(wing)
+    refine!(wing)
+    body_aero = BodyAerodynamics([wing])
             solver = Solver(body_aero, settings)
 
             # Set conditions and solve
@@ -96,7 +98,9 @@ using Test
                 settings.solver_settings.n_panels = n_panels
 
                 wing = Wing(settings)
-                body_aero = BodyAerodynamics([wing])
+                refine!(wing)
+    refine!(wing)
+    body_aero = BodyAerodynamics([wing])
                 solver = Solver(body_aero, settings)
 
                 va = [10.0, 0.0, 0.0]

@@ -56,6 +56,7 @@ function create_body_aero()
         INVISCID)
 
     # Step 3: Initialize aerodynamics
+    refine!(wing)
     body_aero = BodyAerodynamics([wing])
     # Set inflow conditions
     vel_app = [cos(alpha), 0.0, sin(alpha)] .* v_a
@@ -124,6 +125,7 @@ end
         safe_rm(joinpath(save_dir, "Rectangular_Wing_Polars.png"))
 
         # Step 9: Test polar data plotting
+        # ram_wing is an ObjWing - no refine! needed
         body_aero = BodyAerodynamics([ram_wing])
         fig = plot_polar_data(body_aero; is_show=false)
         @test fig isa Figure

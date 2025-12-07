@@ -37,6 +37,8 @@ include("../utils.jl")
         )
     end
     
+    refine!(wing)
+    refine!(wing)
     body_aero = BodyAerodynamics([wing])
     set_va!(body_aero, v_a)
 
@@ -120,7 +122,8 @@ end
         add_section!(wing, [0.0, 0.0, 0.0], [1.0, 0.0, 0.0], INVISCID)
         add_section!(wing, [0.0, 1.0, 0.0], [1.0, 1.0, 0.0], INVISCID)
         add_section!(wing, [0.0, 2.0, 0.0], [1.0, 2.0, 0.0], INVISCID)
-    
+        refine!(wing)
+
         # Test non-zero origin translation
         origin = MVec3(1.0, 2.0, 3.0)
         body_aero = BodyAerodynamics([wing]; kite_body_origin=origin)
@@ -174,7 +177,9 @@ end
                 INVISCID
             )
         end
-        body_aero = BodyAerodynamics([wing])
+        refine!(wing)
+    refine!(wing)
+    body_aero = BodyAerodynamics([wing])
         set_va!(body_aero, v_a)
         
         return body_aero, coord, v_a, model
@@ -304,6 +309,8 @@ end
         )
     end
     
+    refine!(wing)
+    refine!(wing)
     body_aero = BodyAerodynamics([wing])
     set_va!(body_aero, v_a)
 
@@ -416,7 +423,9 @@ end
     try
         settings   = VSMSettings(settings_file)
         wing       = Wing(settings)
-        body_aero  = BodyAerodynamics([wing])
+        body_aero  = refine!(wing)
+    refine!(wing)
+    body_aero = BodyAerodynamics([wing])
 
         set_va!(body_aero, settings)
 

@@ -41,7 +41,6 @@ using Logging
 
         @test wing isa Wing
         @test wing.n_panels == 4
-        @test wing.n_unrefined_sections == 2
         @test wing.spanwise_distribution == LINEAR
         @test wing.spanwise_direction ≈ [0.0, 1.0, 0.0]
         @test length(wing.unrefined_sections) == 2  # simple_wing has 2 sections
@@ -77,7 +76,6 @@ using Logging
         )
 
         @test wing.n_panels == 8
-        @test wing.n_unrefined_sections == 2
         @test wing.spanwise_distribution == COSINE
         @test !wing.remove_nan
     end
@@ -188,7 +186,6 @@ wing_airfoils:
         wing = Wing(test_yaml_path; n_panels=12)
 
         @test wing.n_panels == 12
-        @test wing.n_unrefined_sections == 7
         @test length(wing.unrefined_sections) == 7
         
         # Test that different airfoil_ids get different polar data
@@ -219,7 +216,6 @@ wing_airfoils:
 
         @test wing isa Wing
         @test wing.n_panels == 6
-        @test wing.n_unrefined_sections == 2
         @test wing.spanwise_distribution == COSINE
         @test length(wing.unrefined_sections) == 2
         @test wing.unrefined_sections[1].aero_model == POLAR_VECTORS
@@ -235,17 +231,15 @@ wing_airfoils:
         wing = Wing(simple_wing_file; n_panels=4)
         @test wing isa Wing
         @test wing.n_panels == 4
-        @test wing.n_unrefined_sections == 2
         @test length(wing.unrefined_sections) == 2
-        
+
         # Test complex wing construction
         complex_wing_file = test_data_path("yaml_geometry", "complex_wing.yaml")
         @test isfile(complex_wing_file)
-        
+
         complex_wing = Wing(complex_wing_file; n_panels=12)
         @test complex_wing isa Wing
         @test complex_wing.n_panels == 12
-        @test complex_wing.n_unrefined_sections == 7
         @test length(complex_wing.unrefined_sections) == 7
         
         # Verify polar data is loaded from shared files

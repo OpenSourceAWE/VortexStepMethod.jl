@@ -51,10 +51,12 @@ const IS_JULIA_1_12_OR_NEWER = VERSION >= v"1.12"
         [chord, -span/2, 0.0], # Right tip TE
         INVISCID)
     
+    refine!(wing)
     body_aero = BodyAerodynamics([wing])
+    refine!(unchanged_wing)
     unchanged_body_aero = BodyAerodynamics([unchanged_wing])
     reinit!(unchanged_body_aero)
-    
+
     @testset "Re-initialization" begin
         result = @benchmark reinit!($unchanged_body_aero; init_aero=false) samples=1 evals=1
         @info "Re-initializing Allocations: $(result.allocs) \t Memory: $(result.memory)"
@@ -136,7 +138,9 @@ const IS_JULIA_1_12_OR_NEWER = VERSION >= v"1.12"
                     [chord, -span/2, 0.0], # Right tip TE
                     aero_model,
                     aero_data)
-                body_aero = BodyAerodynamics([wing])
+                refine!(wing)
+    refine!(wing)
+    body_aero = BodyAerodynamics([wing])
                 
                 solver = Solver(body_aero;
                     aerodynamic_model_type=model

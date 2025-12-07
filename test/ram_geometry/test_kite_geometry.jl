@@ -169,7 +169,7 @@ using Serialization
         wing = ObjWing(test_obj_path, test_dat_path; remove_nan=true)
 
         @test wing.n_panels == 56  # Default value
-        @test wing.spanwise_distribution == NONE
+        @test wing.spanwise_distribution == UNCHANGED
         @test wing.spanwise_direction ≈ [0.0, 1.0, 0.0]
         @test length(wing.unrefined_sections) > 0  # Should have sections now
         @test wing.mass ≈ 1.0
@@ -186,7 +186,7 @@ using Serialization
     end
 
     @testset "Wing Deformation" begin
-        # Create an ObjWing for testing
+        # Create an ObjWing for testing (no refine! needed - fully complete)
         wing = ObjWing(test_obj_path, test_dat_path; remove_nan=true)
         body_aero = BodyAerodynamics([wing])
 

@@ -11,7 +11,9 @@ using Test
             # Test Solver constructor with VSMSettings
             settings = VSMSettings(settings_file)
             wing = Wing(settings)
-            body_aero = BodyAerodynamics([wing])
+            refine!(wing)
+    refine!(wing)
+    body_aero = BodyAerodynamics([wing])
             solver = Solver(body_aero, settings)
             
             # Verify solver properties match settings

@@ -20,6 +20,7 @@ using VortexStepMethod
             
             try
                 # Create wing and body aerodynamics with known good geometry
+                # ObjWing is fully complete - no refine! needed
                 wing = ObjWing(body_path, foil_path; n_panels=56)  # Use default panels
                 body_aero = BodyAerodynamics([wing])
                 
