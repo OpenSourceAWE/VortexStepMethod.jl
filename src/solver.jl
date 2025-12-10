@@ -386,7 +386,6 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
                         z_airf_unrefined_dist[target_unrefined_idx] ./= count
                         va_unrefined_dist[target_unrefined_idx] ./= count
                         chord_unrefined_dist[target_unrefined_idx] /= count
-                        width_unrefined_dist[target_unrefined_idx] /= count
                     end
                 end
                 unrefined_idx += wing.n_unrefined_sections
