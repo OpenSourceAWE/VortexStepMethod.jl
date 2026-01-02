@@ -43,6 +43,7 @@ Struct for storing the solution of the [solve!](@ref) function. Must contain all
     ### end of private vectors
     width_dist::Vector{Float64} = zeros(P)
     alpha_dist::Vector{Float64} = zeros(P)
+    alpha_geometric_dist::Vector{Float64} = zeros(P)
     cl_dist::Vector{Float64} = zeros(P)
     cd_dist::Vector{Float64} = zeros(P)
     cm_dist::Vector{Float64} = zeros(P)
@@ -208,6 +209,7 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
     converged = solver.lr.converged
     alpha_dist = solver.lr.alpha_dist
     alpha_corrected = solver.sol.alpha_dist
+    alpha_geometric_dist = solver.sol.alpha_geometric_dist
     v_a_dist = solver.lr.v_a_dist
     panels = body_aero.panels
    
@@ -224,6 +226,28 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
         cl_dist[i] = calculate_cl(panel, alpha_dist[i])
         cd_dist[i], cm_dist[i] = calculate_cd_cm(panel, alpha_dist[i])
         width_dist[i] = panel.width
+
+        # Geometric AoA using panel-local axes and prescribed freestream
+        # @views makes slices like solver.sol._va_dist[i, :] return views instead of copies. 
+        #   Without it, each [...] would allocate a new array; with it, you reuse a lightweight 
+        #   window into the original array, which cuts allocations in this tight loop.
+        @views begin
+            va_panel = solver.sol._va_dist[i, :]
+            x_airf = solver.sol._x_airf_dist[i, :]
+            z_airf = solver.sol._z_airf_dist[i, :]
+            va_norm = norm(va_panel)
+            x_norm = norm(x_airf)
+            z_norm = norm(z_airf)
+            if va_norm == 0 || x_norm == 0 || z_norm == 0
+                alpha_geometric_dist[i] = NaN
+            else
+                v_unit = va_panel / va_norm
+                v_tangential = dot(x_airf, -v_unit) / x_norm
+                v_normal = dot(z_airf, -v_unit) / z_norm
+                alpha_geometric_dist[i] = pi + atan(v_normal, v_tangential)
+            end
+        end
+
     end
 
     # create an alias for the three vertical output vectors
@@ -465,6 +489,10 @@ function solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=n
         solver.is_only_f_and_gamma_output;
         correct_aoa=solver.correct_aoa
     )
+    # Attach geometric AoA (already computed in calculate_results) to solver.sol
+    if haskey(results, "alpha_geometric")
+        solver.sol.alpha_geometric_dist .= results["alpha_geometric"]
+    end
     return results
 end
 
@@ -885,4 +913,3 @@ function linearize(solver::Solver, body_aero::BodyAerodynamics, y::Vector{T};
     calc_results!(results, y)
     return jac, results
 end
-
