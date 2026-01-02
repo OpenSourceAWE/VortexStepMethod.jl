@@ -10,7 +10,7 @@ project_dir = dirname(dirname(pathof(VortexStepMethod)))  # Go up one level from
 literature_paths = [
     joinpath(project_dir, "data", "TUDELFT_V3_KITE", "literature_results","CFD_RANS_Rey_5e5_Poland2025_alpha_sweep_beta_0_NoStruts.csv"),
     joinpath(project_dir, "data", "TUDELFT_V3_KITE", "literature_results","CFD_RANS_Rey_10e5_Poland2025_alpha_sweep_beta_0.csv"),
-    joinpath(project_dir, "data", "TUDELFT_V3_KITE", "literature_results","Python_VSM_Rey_5e5_n36_CFD_PCHIP_polars_alpha_sweep.csv"),
+    joinpath(project_dir, "data", "TUDELFT_V3_KITE", "literature_results","Python_VSM_Rey_5e5_Poland2025_alpha_sweep_beta_0.csv"),
     joinpath(project_dir, "data", "TUDELFT_V3_KITE", "literature_results","WindTunnel_Re_5e5_Poland2025_alpha_sweep_beta_0.csv"),
     ]
 labels= [
@@ -63,14 +63,15 @@ PLOT && plot_combined_analysis(
     results;
     solver_label="VSM",
     literature_path_list=literature_paths,
-    angle_range=range(-5, 25, length=30),
+    angle_range=range(-5, 25, length=31),
     angle_type="angle_of_attack",
     angle_of_attack=angle_of_attack_deg,
     side_slip=sideslip_deg,
     v_a=wind_speed,
     title="TU Delft V3 Kite",
     is_show=true,
-    use_tex=USE_TEX
+    use_tex=USE_TEX,
+    angle_of_attack_for_spanwise_distribution=10.0,
 )
 
 

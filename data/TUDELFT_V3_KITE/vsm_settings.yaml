@@ -54,6 +54,7 @@ solver_settings:
     # --- Core Aerodynamic Model ---
     aerodynamic_model_type: VSM      # VSM=3D vortex method, LLT=lifting line theory
     solver_type: LOOP                # LOOP=fixed-point iteration, NEWTON=Newton-Raphson
+    #correct_aoa: false               # Defaults to false, meaning the computed AoA at 3/4c is used
     
     # --- Physical Properties ---
     density: 1.225                   # [kg/m³] Air density (ISA sea level)

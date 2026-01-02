@@ -107,10 +107,10 @@ function VSMSettings(filename; data_prefix=true)
         vsm_settings.solver_settings.aerodynamic_model_type = eval(Symbol(solver_data["aerodynamic_model_type"]))
         vsm_settings.solver_settings.type_initial_gamma_distribution = eval(Symbol(solver_data["type_initial_gamma_distribution"]))
 
-        # Set correct_aoa default based on model type if not explicitly provided
-        if !haskey(solver_data, "correct_aoa")
-            vsm_settings.solver_settings.correct_aoa = (vsm_settings.solver_settings.aerodynamic_model_type == VSM)
-        end
+        # # Set correct_aoa default based on model type if not explicitly provided
+        # if !haskey(solver_data, "correct_aoa")
+        #     vsm_settings.solver_settings.correct_aoa = (vsm_settings.solver_settings.aerodynamic_model_type == VSM)
+        # end
 
         # Override with calculated totals
         vsm_settings.solver_settings.n_panels = n_panels

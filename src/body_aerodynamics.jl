@@ -597,11 +597,24 @@ function calculate_results(
     wing_span = body_aero.wings[1].span
     aspect_ratio_projected = wing_span^2 / projected_area
 
-    # Calculate geometric angle of attack
-    horizontal_direction = [1.0, 0.0, 0.0]
-    alpha_geometric = [rad2deg(acos(dot(panel.x_airf, horizontal_direction) /
-                     (norm(panel.x_airf) * norm(horizontal_direction))))
-                     for panel in panels]
+    # Calculate geometric angle of attack relative to each panel's local axes (using prescribed freestream)
+    alpha_geometric = [
+        begin
+            va_norm = norm(panel.va)
+            x_norm = norm(panel.x_airf)
+            z_norm = norm(panel.z_airf)
+            # Guard against zero-length vectors
+            if va_norm == 0 || x_norm == 0 || z_norm == 0
+                NaN
+            else
+                v_unit = panel.va / va_norm
+                v_tangential = dot(panel.x_airf, -v_unit) / x_norm
+                v_normal = dot(panel.z_airf, -v_unit) / z_norm
+                pi + atan(v_normal, v_tangential)
+            end
+        end
+        for panel in panels
+    ]
 
     # Calculate Reynolds number
     max_chord = maximum(panel.chord for panel in panels)
@@ -746,4 +759,3 @@ function set_va!(body_aero::BodyAerodynamics, settings::VSMSettings)
     
     set_va!(body_aero, va)
 end
-

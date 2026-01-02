@@ -79,7 +79,7 @@ wing_airfoils:
   #   - inviscid:
   #       no further data is required 
   # ---------------------------------------------------------------
-  alpha_range: [-10, 31, 0.5] # [deg], in this range the polars are calculated
+  alpha_range: [-10, 25, 0.5] # [deg], in this range the polars are calculated
   reynolds: !!float 1e6 # Reynolds number
   headers: [airfoil_id, type, info_dict]
   data:

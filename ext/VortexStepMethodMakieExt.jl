@@ -699,6 +699,63 @@ function generate_polar_data_makie(
 end
 
 """
+    compute_polar_with_cmy(solver, body_aero, angle_range; angle_type=\"angle_of_attack\",
+                           angle_of_attack=0.0, side_slip=0.0, v_a=10.0)
+
+Compute CL/CD/CS polars and optional CMy for a sweep, reusing the previous gamma
+as initial guess for faster convergence. Returns a named tuple with angle,
+cl, cd, cs, cmy (NaN when unavailable) and per-sample Reynolds numbers.
+"""
+function compute_polar_with_cmy(
+    solver,
+    body_aero,
+    angle_range;
+    angle_type::String = "angle_of_attack",
+    angle_of_attack::Float64 = 0.0,
+    side_slip::Float64 = 0.0,
+    v_a::Float64 = 10.0
+)
+    n_angles = length(angle_range)
+    cl = zeros(n_angles)
+    cd = zeros(n_angles)
+    cs = zeros(n_angles)
+    cmy = fill(NaN, n_angles)  # moment coefficient about body y (pitch)
+    reynolds_number = zeros(n_angles)
+
+    gamma_prev = nothing
+    for (i, angle_i) in enumerate(angle_range)
+        if angle_type == "angle_of_attack"
+            α = deg2rad(angle_i)
+            β = deg2rad(side_slip)
+        elseif angle_type == "side_slip"
+            α = deg2rad(angle_of_attack)
+            β = deg2rad(angle_i)
+        else
+            throw(ArgumentError("angle_type must be 'angle_of_attack' or 'side_slip'"))
+        end
+
+        set_va!(body_aero, [cos(α) * cos(β), sin(β), sin(α)] * v_a)
+        results = solve(solver, body_aero, gamma_prev)
+
+        cl[i] = results["cl"]
+        cd[i] = results["cd"]
+        cs[i] = results["cs"]
+        cmy[i] = get(results, "cmy", NaN)
+        reynolds_number[i] = results["Rey"]
+        gamma_prev = results["gamma_distribution"]
+    end
+
+    return (
+        angle = collect(angle_range),
+        cl = cl,
+        cd = cd,
+        cs = cs,
+        cmy = cmy,
+        rey = reynolds_number,
+    )
+end
+
+"""
     plot_polars(solver_list, body_aero_list, label_list;
                 literature_path_list=String[],
                 angle_range=range(0, 20, 2), angle_type="angle_of_attack",
@@ -975,7 +1032,8 @@ function VortexStepMethod.plot_combined_analysis(
     literature_path_list=String[],
     data_type=".png",
     save_path=nothing,
-    is_save=false
+    is_save=false,
+    angle_of_attack_for_spanwise_distribution=5.0,
 )
     # Auto-detect screen size and use 80% of it
     fig = try
@@ -991,6 +1049,16 @@ function VortexStepMethod.plot_combined_analysis(
 
     panels = body_aero.panels
     va = isa(body_aero.va, Tuple) ? body_aero.va[1] : body_aero.va
+    # Choose results used for spanwise plots (optionally recompute at a requested AoA)
+    results_spanwise = results
+    if !isnothing(angle_of_attack_for_spanwise_distribution)
+        α_span = deg2rad(angle_of_attack_for_spanwise_distribution)
+        β_span = deg2rad(side_slip)
+        va_old = copy(body_aero.va)
+        set_va!(body_aero, [cos(α_span) * cos(β_span), sin(β_span), sin(α_span)] * v_a)
+        results_spanwise = solve(solver, body_aero, solver.sol.gamma_distribution)
+        set_va!(body_aero, va_old)
+    end
 
     # [1,1] Wing Geometry
     ax_geo = Axis3(fig[1, 1];
@@ -1039,8 +1107,8 @@ function VortexStepMethod.plot_combined_analysis(
 
     # [1,2] Polar Data Surfaces or Curves
     if body_aero.panels[1].aero_model == POLAR_MATRICES
-        alphas = collect(deg2rad.(-5:0.3:25))
-        delta_tes = collect(deg2rad.(-5:0.3:25))
+        alphas = collect(deg2rad.(-5:0.3:40))
+        delta_tes = collect(deg2rad.(-5:0.3:40))
 
         interp_data = [
             (body_aero.panels[1].cl_interp, "Cl"),
@@ -1063,19 +1131,19 @@ function VortexStepMethod.plot_combined_analysis(
                       color=:blue, linewidth=0.5, transparency=true)
         end
     elseif body_aero.panels[1].aero_model == POLAR_VECTORS
-        alphas_deg = collect(-5:0.5:25)
+        alphas_deg = collect(-5:0.5:40)
         alphas = deg2rad.(alphas_deg)
 
         ax_cl_curve = Axis(fig[1, 2][1, 1];
-                          title="Cl vs α",
+                          title="2D Cl vs α",
                           xlabel="α [°]",
                           ylabel="Cl")
         ax_cd_curve = Axis(fig[1, 2][1, 2];
-                          title="Cd vs α",
+                          title="2DCd vs α",
                           xlabel="α [°]",
                           ylabel="Cd")
         ax_cm_curve = Axis(fig[1, 2][1, 3];
-                          title="Cm vs α",
+                          title="2D Cm vs α",
                           xlabel="α [°]",
                           ylabel="Cm")
 
@@ -1091,71 +1159,119 @@ function VortexStepMethod.plot_combined_analysis(
     # [2,1] Spanwise Distributions (3×3 grid)
     y_coords = [panel.aero_center[2] for panel in body_aero.panels]
 
-    ax_cl = Axis(fig[2, 1][1, 1], title="CL Distribution",
-                 xlabel="Spanwise Position y/b", ylabel="CL")
-    ax_cd = Axis(fig[2, 1][1, 2], title="CD Distribution",
-                 xlabel="Spanwise Position y/b", ylabel="CD")
-    ax_gamma = Axis(fig[2, 1][1, 3], title="Γ Distribution",
-                    xlabel="Spanwise Position y/b", ylabel="Γ")
+    aoa_span = round(angle_of_attack_for_spanwise_distribution, digits=1)
 
-    ax_alpha_geo = Axis(fig[2, 1][2, 1], title="α Geometric",
-                        xlabel="Spanwise Position y/b", ylabel="α (deg)")
-    ax_alpha_ac = Axis(fig[2, 1][2, 2], title="α at aero center",
-                       xlabel="Spanwise Position y/b", ylabel="α (deg)")
-    ax_alpha_unc = Axis(fig[2, 1][2, 3], title="α Uncorrected",
-                        xlabel="Spanwise Position y/b", ylabel="α (deg)")
+    ax_cl = Axis(fig[2, 1][1, 1], title="CL Distribution (α=$aoa_span)",
+                 xlabel="Spanwise position y[m]", ylabel="CL")
+    ax_cd = Axis(fig[2, 1][1, 2], title="CD Distribution (α=$aoa_span)",
+                 xlabel="Spanwise position y[m]", ylabel="CD")
+    ax_gamma = Axis(fig[2, 1][1, 3], title="Γ Distribution (α=$aoa_span)",
+                    xlabel="Spanwise position y[m]", ylabel="Γ")
+    ax_alpha_geo = Axis(fig[2, 1][2, 1], title="α Geometric (α=$aoa_span)",
+                        xlabel="Spanwise position y[m]", ylabel="α (deg)")
+    ax_alpha_ac = Axis(fig[2, 1][2, 2], title="α at 1/4c aero center (α=$aoa_span)",
+                       xlabel="Spanwise position y[m]", ylabel="α (deg)")
+    ax_alpha_unc = Axis(fig[2, 1][2, 3], title="α at 3/4c uncorrected (α=$aoa_span)",
+                        xlabel="Spanwise position y[m]", ylabel="α (deg)")
 
-    ax_fx = Axis(fig[2, 1][3, 1], title="Force x",
-                 xlabel="Spanwise Position y/b", ylabel="Fx")
-    ax_fy = Axis(fig[2, 1][3, 2], title="Force y",
-                 xlabel="Spanwise Position y/b", ylabel="Fy")
-    ax_fz = Axis(fig[2, 1][3, 3], title="Force z",
-                 xlabel="Spanwise Position y/b", ylabel="Fz")
+    ax_fx = Axis(fig[2, 1][3, 1], title="Force x (α=$aoa_span)",
+                 xlabel="Spanwise position y[m]", ylabel="Fx")
+    ax_fy = Axis(fig[2, 1][3, 2], title="Force y(α=$aoa_span)",
+                 xlabel="Spanwise position y[m]", ylabel="Fy")
+    ax_fz = Axis(fig[2, 1][3, 3], title="Force z (α=$aoa_span)",
+                 xlabel="Spanwise position y[m]", ylabel="Fz")
 
-    cl_val = round(results["cl"], digits=2)
-    lines!(ax_cl, Vector(y_coords), Vector(results["cl_distribution"]),
+    cl_val = round(results_spanwise["cl"], digits=2)
+    lines!(ax_cl, Vector(y_coords), Vector(results_spanwise["cl_distribution"]),
            label="$solver_label CL: $cl_val")
     axislegend(ax_cl, position=:lt)
 
-    cd_val = round(results["cd"], digits=2)
-    lines!(ax_cd, Vector(y_coords), Vector(results["cd_distribution"]),
+    cd_val = round(results_spanwise["cd"], digits=2)
+    lines!(ax_cd, Vector(y_coords), Vector(results_spanwise["cd_distribution"]),
            label="$solver_label CD: $cd_val")
     axislegend(ax_cd, position=:lt)
 
-    lines!(ax_gamma, Vector(y_coords), Vector(results["gamma_distribution"]),
+    lines!(ax_gamma, Vector(y_coords), Vector(results_spanwise["gamma_distribution"]),
            label=solver_label)
     axislegend(ax_gamma, position=:lt)
 
-    lines!(ax_alpha_geo, Vector(y_coords), Vector(results["alpha_geometric"]),
+    lines!(ax_alpha_geo, Vector(y_coords), rad2deg.(Vector(results_spanwise["alpha_geometric"])),
            label=solver_label)
     axislegend(ax_alpha_geo, position=:lt)
 
-    lines!(ax_alpha_ac, Vector(y_coords), Vector(results["alpha_at_ac"]),
+    lines!(ax_alpha_ac, Vector(y_coords), rad2deg.(Vector(results_spanwise["alpha_at_ac"])),
            label=solver_label)
     axislegend(ax_alpha_ac, position=:lt)
 
     lines!(ax_alpha_unc, Vector(y_coords),
-           Vector(results["alpha_uncorrected"]), label=solver_label)
+           rad2deg.(Vector(results_spanwise["alpha_uncorrected"])), label=solver_label)
     axislegend(ax_alpha_unc, position=:lt)
+
+    # force y-limits
+    ylims!(ax_alpha_geo, -0.25 * aoa_span, 1.1 * aoa_span)
+
+
 
     force_axes = [ax_fx, ax_fy, ax_fz]
     components = ["x", "y", "z"]
     for (idx, (ax, comp)) in enumerate(zip(force_axes, components))
-        forces = results["F_distribution"][idx, :]
-        total_force = round(results["F$comp"], digits=2)
+        forces = results_spanwise["F_distribution"][idx, :]
+        total_force = round(results_spanwise["F$comp"], digits=2)
         lines!(ax, Vector(y_coords), Vector(forces),
                label="$solver_label ΣF$comp: $total_force N")
         axislegend(ax, position=:lt)
     end
 
     # [2,2] Polars (2×2 grid)
-    polar_data, rey = generate_polar_data_makie(
-        solver, body_aero, angle_range;
-        angle_type, angle_of_attack=deg2rad(angle_of_attack),
-        side_slip=deg2rad(side_slip), v_a
+    polar_solver = compute_polar_with_cmy(
+        solver,
+        body_aero,
+        angle_range;
+        angle_type=angle_type,
+        angle_of_attack=angle_of_attack,
+        side_slip=side_slip,
+        v_a=v_a
     )
 
-    label_with_re = "$solver_label Re = $(round(Int64, rey*1e-5))e5"
+    label_with_re = "$solver_label Re = $(round(Int64, first(polar_solver.rey)*1e-5))e5"
+
+    # Load literature data (if any)
+    polar_series = [(polar_solver, label_with_re)]
+    if !isempty(literature_path_list)
+        for path in literature_path_list
+            data = readdlm(path, ',')
+            header_raw = string.(data[1, :])
+            header = lowercase.(strip.(header_raw))
+            alpha_idx = findfirst(x -> occursin("alpha", x) || occursin("aoa", x), header)
+            cl_idx    = findfirst(x -> occursin("cl", x), header)
+            cd_idx    = findfirst(x -> occursin("cd", x), header)
+            cs_idx    = findfirst(x -> occursin("cs", x), header)
+            cmy_idx   = findfirst(x -> occursin("cmy", x), header)
+
+            parse_col(col) = begin
+                vals = Float64[]
+                for v in col
+                    if v isa Real
+                        push!(vals, Float64(v))
+                    else
+                        s = strip(String(v))
+                        y = tryparse(Float64, s)
+                        push!(vals, isnothing(y) ? NaN : y)
+                    end
+                end
+                vals
+            end
+
+            angles = parse_col(data[2:end, alpha_idx])
+            cl_vals = parse_col(data[2:end, cl_idx])
+            cd_vals = parse_col(data[2:end, cd_idx])
+            cs_vals = cs_idx === nothing ? zeros(size(data, 1) - 1) : parse_col(data[2:end, cs_idx])
+            cmy_vals = cmy_idx === nothing ? fill(NaN, length(angles)) : parse_col(data[2:end, cmy_idx])
+            lit_label = splitext(basename(path))[1]
+
+            push!(polar_series, ((angle=angles, cl=cl_vals, cd=cd_vals, cs=cs_vals, cmy=cmy_vals, rey=fill(NaN, length(angles))), lit_label))
+        end
+    end
 
     ax_cl_polar = Axis(fig[2, 2][1, 1], title="CL vs $angle_type [°]",
                        xlabel="$angle_type [°]", ylabel="CL")
@@ -1166,21 +1282,21 @@ function VortexStepMethod.plot_combined_analysis(
     ax_polar = Axis(fig[2, 2][2, 2], title="CL vs CD",
                     xlabel="CD", ylabel="CL")
 
-    scatterlines!(ax_cl_polar, polar_data[1], polar_data[2];
-                 label=label_with_re, marker=:star5, markersize=12)
-    axislegend(ax_cl_polar, position=:lt)
+    colors = Makie.wong_colors()
+    for (idx, (pd, lbl)) in enumerate(polar_series)
+        color = colors[mod1(idx, length(colors))]
+        marker = idx == 1 ? :star5 : :circle
+        markersize = idx == 1 ? 12 : 8
 
-    scatterlines!(ax_cd_polar, polar_data[1], polar_data[3];
-                 label=label_with_re, marker=:star5, markersize=12)
-    axislegend(ax_cd_polar, position=:lt)
-
-    scatterlines!(ax_cs_polar, polar_data[1], polar_data[4];
-                 label=label_with_re, marker=:star5, markersize=12)
-    axislegend(ax_cs_polar, position=:lt)
-
-    scatterlines!(ax_polar, polar_data[3], polar_data[2];
-                 label=label_with_re, marker=:star5, markersize=12)
-    axislegend(ax_polar, position=:lt)
+        scatterlines!(ax_cl_polar, pd.angle, pd.cl; label=lbl, marker, markersize, color)
+        scatterlines!(ax_cd_polar, pd.angle, pd.cd; label=lbl, marker, markersize, color)
+        scatterlines!(ax_cs_polar, pd.angle, pd.cs; label=lbl, marker, markersize, color)
+        scatterlines!(ax_polar, pd.cd, pd.cl; label=lbl, marker, markersize, color)
+    end
+    # axislegend(ax_cl_polar, position=:lt)
+    # axislegend(ax_cd_polar, position=:lt)
+    axislegend(ax_cs_polar, position=:lb)
+    # axislegend(ax_polar, position=:lt)
 
     # Set column widths: left column wider for 3x3 grid
     colsize!(fig.layout, 1, Relative(0.6))
