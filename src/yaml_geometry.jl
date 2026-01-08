@@ -186,7 +186,8 @@ function Wing(
     spanwise_distribution=LINEAR,
     spanwise_direction=[0.0, 1.0, 0.0],
     remove_nan=true,
-    prn=false
+    prn=false,
+    sort_sections=true
 )
 
     !isapprox(spanwise_direction, [0.0, 1.0, 0.0]) && throw(ArgumentError("Spanwise direction has to be [0.0, 1.0, 0.0], not $spanwise_direction"))
@@ -262,7 +263,7 @@ function Wing(
         add_section!(wing, le_coord, te_coord, aero_model, aero_data)
     end
 
-    refine!(wing)
+    refine!(wing; sort_sections)
     return wing
 end
 
@@ -296,7 +297,7 @@ wing = Wing(settings)
 # - obj_file + dat_file                  # OBJ-based
 ```
 """
-function Wing(settings::VSMSettings)
+function Wing(settings::VSMSettings; sort_sections::Bool=true)
     wing_settings = settings.wings[1]
 
     # Check which geometry format to use
@@ -327,10 +328,11 @@ function Wing(settings::VSMSettings)
         Wing(wing_settings.geometry_file;
             n_panels=wing_settings.n_panels,
             spanwise_distribution=wing_settings.spanwise_panel_distribution,
-            remove_nan=wing_settings.remove_nan
+            remove_nan=wing_settings.remove_nan,
+            sort_sections
         )
     elseif has_obj && has_dat
-        # Use ObjWing constructor
+        # Use ObjWing constructor (ObjWing doesn't sort sections internally)
         ObjWing(
             wing_settings.obj_file,
             wing_settings.dat_file;
