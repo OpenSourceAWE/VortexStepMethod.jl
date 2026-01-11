@@ -1360,15 +1360,45 @@ function VortexStepMethod.plot_airfoil_slices(obj_path::String; n_slices::Int=5,
             continue
         end
 
-        # Plot original slice points
-        scatter!(ax, x_slice, y_slice;
-                color=:blue, markersize=4, label="OBJ slice ($(length(x_slice)) pts)")
-
-        # Fit Kulfan parameters
+        # Fit Kulfan parameters (includes outlier filtering)
         try
             params = VortexStepMethod.fit_kulfan_parameters(x_slice, y_slice)
 
-            # Generate fitted curve
+            # Get normalized coordinates for visualization
+            x_norm, y_norm, _ = VortexStepMethod.normalize_airfoil(x_slice, y_slice)
+
+            # First pass fit to identify outliers
+            params_initial = VortexStepMethod._fit_kulfan_single_pass(x_norm, y_norm, 8)
+
+            # Filter outliers
+            x_clean, y_clean = VortexStepMethod.filter_airfoil_outliers(
+                x_norm, y_norm, params_initial, 0.05)
+
+            n_filtered = length(x_norm) - length(x_clean)
+
+            # Plot outliers in gray
+            if n_filtered > 0
+                # Find outlier points
+                x_fit_check, y_fit_check = VortexStepMethod.kulfan_to_coordinates(
+                    params_initial; n_points=200)
+                outlier_mask = Bool[]
+                for k in eachindex(x_norm)
+                    min_dist = minimum(sqrt.((x_norm[k] .- x_fit_check).^2 .+
+                                             (y_norm[k] .- y_fit_check).^2))
+                    push!(outlier_mask, min_dist >= 0.05)
+                end
+                x_outliers = x_norm[outlier_mask]
+                y_outliers = y_norm[outlier_mask]
+                scatter!(ax, x_outliers, y_outliers;
+                        color=:gray, markersize=3, alpha=0.5)
+            end
+
+            # Plot clean points
+            scatter!(ax, x_clean, y_clean;
+                    color=:blue, markersize=4,
+                    label="pts: $(length(x_clean)) (filtered $n_filtered)")
+
+            # Generate fitted curve from final params
             x_fit, y_fit = VortexStepMethod.kulfan_to_coordinates(params; n_points=100)
 
             # Plot fitted curve
@@ -1384,6 +1414,9 @@ function VortexStepMethod.plot_airfoil_slices(obj_path::String; n_slices::Int=5,
 
         catch e
             @warn "Kulfan fitting failed for slice $i: $e"
+            # Fallback: just plot raw points
+            scatter!(ax, x_slice, y_slice;
+                    color=:blue, markersize=4, label="OBJ slice")
             text!(ax, 0.5, 0.1;
                  text="Fit failed",
                  align=(:center, :center),

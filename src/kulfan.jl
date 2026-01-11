@@ -135,22 +135,51 @@ function split_airfoil_surfaces(x::Vector{T}, y::Vector{T}) where T
 end
 
 """
-    fit_kulfan_parameters(x::Vector, y::Vector; n_weights=8)
+    fit_kulfan_parameters(x::Vector, y::Vector; n_weights=8, outlier_threshold=0.05)
 
 Fit Kulfan CST parameters to airfoil coordinates using least squares.
+
+Uses a two-pass approach: first fit to identify outliers (interior mesh points),
+then refit with outliers removed.
 
 # Arguments
 - `x::Vector`: x-coordinates (normalized 0-1)
 - `y::Vector`: y-coordinates
 - `n_weights::Int=8`: Number of weights per surface (NeuralFoil uses 8)
+- `outlier_threshold::Real=0.05`: Distance threshold for outlier removal
 
 # Returns
 - `KulfanParameters`: Fitted parameters
 """
-function fit_kulfan_parameters(x::Vector{T}, y::Vector{T}; n_weights::Int=8) where T
+function fit_kulfan_parameters(x::Vector{T}, y::Vector{T}; n_weights::Int=8,
+                               outlier_threshold::Real=0.05) where T
     # Normalize coordinates
-    x_norm, y_norm, _ = normalize_airfoil(x, y)
+    x_norm, y_norm, transform = normalize_airfoil(x, y)
 
+    # First pass: fit to all points
+    params_initial = _fit_kulfan_single_pass(x_norm, y_norm, n_weights)
+
+    # Compute residuals and filter outliers
+    x_clean, y_clean = _filter_outliers(x_norm, y_norm, params_initial,
+                                        outlier_threshold)
+
+    # Second pass: fit to cleaned points
+    if length(x_clean) < length(x_norm) * 0.5
+        # Too many points filtered - use original
+        @warn "Outlier filtering removed too many points, using original"
+        return params_initial
+    end
+
+    return _fit_kulfan_single_pass(x_clean, y_clean, n_weights)
+end
+
+"""
+    _fit_kulfan_single_pass(x_norm, y_norm, n_weights)
+
+Internal: single pass Kulfan fitting.
+"""
+function _fit_kulfan_single_pass(x_norm::Vector{T}, y_norm::Vector{T},
+                                  n_weights::Int) where T
     # Split into upper and lower surfaces
     x_upper, y_upper, x_lower, y_lower = split_airfoil_surfaces(x_norm, y_norm)
 
@@ -171,6 +200,34 @@ function fit_kulfan_parameters(x::Vector{T}, y::Vector{T}; n_weights::Int=8) whe
     return KulfanParameters(upper_weights, lower_weights, leading_edge_weight,
                            max(0.0, TE_thickness))
 end
+
+"""
+    filter_airfoil_outliers(x, y, params, threshold)
+
+Filter points that are more than `threshold` away from the fitted Kulfan curve.
+Returns filtered (x, y) coordinates.
+"""
+function filter_airfoil_outliers(x::Vector{T}, y::Vector{T}, params::KulfanParameters,
+                                 threshold::Real) where T
+    # Generate dense Kulfan curve for distance computation
+    x_fit, y_fit = kulfan_to_coordinates(params; n_points=200)
+
+    # For each input point, find minimum distance to fitted curve
+    keep = Bool[]
+    for i in eachindex(x)
+        min_dist = Inf
+        for j in eachindex(x_fit)
+            dist = sqrt((x[i] - x_fit[j])^2 + (y[i] - y_fit[j])^2)
+            min_dist = min(min_dist, dist)
+        end
+        push!(keep, min_dist < threshold)
+    end
+
+    return x[keep], y[keep]
+end
+
+# Internal alias
+const _filter_outliers = filter_airfoil_outliers
 
 """
     fit_surface(x::Vector, y::Vector, n_weights::Int, is_upper::Bool)

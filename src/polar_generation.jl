@@ -11,7 +11,7 @@ using Printf: @sprintf
 """
     generate_neuralfoil_polars(obj_path::String, output_dir::String;
                                n_slices::Int, Re::Real,
-                               alpha_range=-10:0.5:24.5,
+                               alpha_range=-180:1:180,
                                model_size::String="xlarge",
                                weights_dir=nothing,
                                n_crit=9.0,
@@ -26,7 +26,7 @@ Generate aerodynamic polars for wing sections using NeuralFoil.
 # Keyword Arguments
 - `n_slices`: Number of spanwise slices (typically n_panels+1)
 - `Re`: Reynolds number for polar evaluation
-- `alpha_range`: Angle of attack range in degrees (default -10:0.5:24.5)
+- `alpha_range`: Angle of attack range in degrees (default -180:1:180)
 - `model_size`: NeuralFoil model size (default "xlarge")
 - `weights_dir`: Directory containing NeuralFoil weights
 - `n_crit`: Critical amplification factor (default 9.0)
@@ -36,13 +36,13 @@ Generate aerodynamic polars for wing sections using NeuralFoil.
 Writes CSV files to `output_dir/{n}.csv` in format:
 ```
 alpha,Cd,Cs,Cl,Cm
--10.0,0.05,0.0,0.5,-0.1
+-180.0,0.0,0.0,0.0,0.0
 ...
 ```
 """
 function generate_neuralfoil_polars(obj_path::String, output_dir::String;
                                     n_slices::Int, Re::Real,
-                                    alpha_range=-10:0.5:24.5,
+                                    alpha_range=-180:1:180,
                                     model_size::String="xlarge",
                                     weights_dir=nothing,
                                     n_crit=9.0,
@@ -128,7 +128,7 @@ end
 
 """
     generate_polar_from_coordinates(x::Vector, y::Vector, output_path::String;
-                                    Re::Real, alpha_range=-10:0.5:24.5, kwargs...)
+                                    Re::Real, alpha_range=-180:1:180, kwargs...)
 
 Generate a single polar from airfoil coordinates.
 
@@ -138,11 +138,11 @@ Generate a single polar from airfoil coordinates.
 - `Re`: Reynolds number
 
 # Keyword Arguments
-- `alpha_range`: Angle of attack range
+- `alpha_range`: Angle of attack range in degrees (default -180:1:180)
 - Additional kwargs passed to neuralfoil_aero
 """
 function generate_polar_from_coordinates(x::Vector, y::Vector, output_path::String;
-                                         Re::Real, alpha_range=-10:0.5:24.5, kwargs...)
+                                         Re::Real, alpha_range=-180:1:180, kwargs...)
     alphas = collect(Float64, alpha_range)
 
     params = fit_kulfan_parameters(x, y)

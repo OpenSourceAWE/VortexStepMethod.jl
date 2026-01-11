@@ -12,15 +12,13 @@ println("Plotting airfoil slices from OBJ mesh...")
 fig = plot_airfoil_slices(OBJ_PATH; n_slices=N_SLICES)
 display(fig)
 
-# Generate polars using NeuralFoil
+# Generate polars using NeuralFoil (default alpha_range is -180:1:180)
 println("\nGenerating NeuralFoil polars...")
 generate_neuralfoil_polars(
     OBJ_PATH,
     OUTPUT_DIR;
     n_slices=N_SLICES,
     Re=RE,
-    alpha_range=-10:0.5:20,
-    model_size="xlarge",
     verbose=true
 )
 
