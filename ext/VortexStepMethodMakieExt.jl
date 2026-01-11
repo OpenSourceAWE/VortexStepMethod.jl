@@ -3,7 +3,7 @@ using Makie, VortexStepMethod, LinearAlgebra, Statistics, DelimitedFiles
 import VortexStepMethod: calculate_filaments_for_plotting
 
 export plot_geometry, plot_distribution, plot_polars, save_plot, show_plot,
-       plot_polar_data, plot_combined_analysis
+       plot_polar_data, plot_combined_analysis, plot_airfoil_slices
 
 # Global storage for panel mesh observables (for dynamic plotting)
 const PANEL_MESH_OBSERVABLES = Ref{Union{Nothing, Dict}}(nothing)
@@ -1307,6 +1307,172 @@ function VortexStepMethod.plot_combined_analysis(
     end
 
     return fig
+end
+
+# ============================================================================
+# Airfoil Slice and Kulfan Fit Visualization
+# ============================================================================
+
+"""
+    plot_airfoil_slices(obj_path::String; n_slices=5, is_show=true,
+                        save_path=nothing, data_type=".png")
+
+Plot airfoil cross-sections extracted from OBJ mesh with Kulfan CST fits overlaid.
+
+# Arguments
+- `obj_path`: Path to OBJ file
+
+# Keyword Arguments
+- `n_slices`: Number of spanwise slices (default 5)
+- `is_show`: Display figure (default true)
+- `save_path`: Directory to save figure (default nothing)
+- `data_type`: Image format (default ".png")
+
+# Returns
+- Makie Figure object
+"""
+function VortexStepMethod.plot_airfoil_slices(obj_path::String; n_slices::Int=5,
+                                              is_show::Bool=true,
+                                              save_path=nothing,
+                                              data_type::String=".png")
+    # Slice the mesh
+    airfoils, y_positions = VortexStepMethod.slice_obj_wing(obj_path, n_slices)
+
+    # Determine grid layout
+    n_cols = min(3, n_slices)
+    n_rows = ceil(Int, n_slices / n_cols)
+
+    fig = Figure(size=(400 * n_cols, 350 * n_rows))
+    Label(fig[0, :], "Airfoil Slices from OBJ with Kulfan CST Fits", fontsize=16)
+
+    for (i, ((x_slice, y_slice), y_pos)) in enumerate(zip(airfoils, y_positions))
+        row = div(i - 1, n_cols) + 1
+        col = mod1(i, n_cols)
+
+        ax = Axis(fig[row, col];
+                  title="Slice $i (y=$(round(y_pos, digits=3)))",
+                  xlabel="x/c",
+                  ylabel="y/c",
+                  aspect=DataAspect())
+
+        if isempty(x_slice) || length(x_slice) < 5
+            text!(ax, 0.5, 0.5, text="No data", align=(:center, :center))
+            continue
+        end
+
+        # Plot original slice points
+        scatter!(ax, x_slice, y_slice;
+                color=:blue, markersize=4, label="OBJ slice ($(length(x_slice)) pts)")
+
+        # Fit Kulfan parameters
+        try
+            params = VortexStepMethod.fit_kulfan_parameters(x_slice, y_slice)
+
+            # Generate fitted curve
+            x_fit, y_fit = VortexStepMethod.kulfan_to_coordinates(params; n_points=100)
+
+            # Plot fitted curve
+            lines!(ax, x_fit, y_fit;
+                  color=:red, linewidth=2, label="Kulfan fit")
+
+            # Add parameter annotation
+            text!(ax, 0.02, 0.98;
+                 text="TE=$(round(params.TE_thickness, digits=4))",
+                 align=(:left, :top),
+                 fontsize=10,
+                 space=:relative)
+
+        catch e
+            @warn "Kulfan fitting failed for slice $i: $e"
+            text!(ax, 0.5, 0.1;
+                 text="Fit failed",
+                 align=(:center, :center),
+                 color=:red,
+                 space=:relative)
+        end
+
+        # Add legend only to first plot
+        if i == 1
+            axislegend(ax; position=:rt)
+        end
+    end
+
+    if !isnothing(save_path)
+        VortexStepMethod.save_plot(fig, save_path, "airfoil_slices"; data_type)
+    end
+
+    if is_show
+        display(fig)
+    end
+
+    return fig
+end
+
+"""
+    plot_airfoil_fit(x::Vector, y::Vector; title="Airfoil Fit", is_show=true)
+
+Plot a single airfoil with its Kulfan CST fit.
+
+# Arguments
+- `x, y`: Airfoil coordinates
+
+# Keyword Arguments
+- `title`: Plot title
+- `is_show`: Display figure
+
+# Returns
+- Makie Figure object
+- KulfanParameters
+"""
+function plot_airfoil_fit(x::Vector, y::Vector; title::String="Airfoil Fit",
+                          is_show::Bool=true)
+    fig = Figure(size=(800, 400))
+    ax = Axis(fig[1, 1];
+              title=title,
+              xlabel="x/c",
+              ylabel="y/c",
+              aspect=DataAspect())
+
+    # Normalize coordinates
+    x_norm, y_norm, _ = VortexStepMethod.normalize_airfoil(x, y)
+
+    # Plot original points
+    scatter!(ax, x_norm, y_norm;
+            color=:blue, markersize=6, label="Input ($(length(x)) pts)")
+
+    # Fit Kulfan parameters
+    params = VortexStepMethod.fit_kulfan_parameters(x, y)
+
+    # Generate fitted curve
+    x_fit, y_fit = VortexStepMethod.kulfan_to_coordinates(params; n_points=150)
+
+    # Plot fitted curve
+    lines!(ax, x_fit, y_fit;
+          color=:red, linewidth=2, linestyle=:dash, label="Kulfan fit")
+
+    # Add parameter info
+    info_text = """
+    Upper: $(round.(params.upper_weights[1:4], digits=3))...
+    Lower: $(round.(params.lower_weights[1:4], digits=3))...
+    LE: $(round(params.leading_edge_weight, digits=3))
+    TE: $(round(params.TE_thickness, digits=5))
+    """
+
+    ax_info = Axis(fig[1, 2]; title="Kulfan Parameters")
+    hidedecorations!(ax_info)
+    hidespines!(ax_info)
+    text!(ax_info, 0.1, 0.9;
+         text=info_text,
+         align=(:left, :top),
+         fontsize=12)
+
+    axislegend(ax; position=:rt)
+
+    if is_show
+        display(fig)
+    end
+
+    return fig, params
 end
 
 end

@@ -24,6 +24,7 @@ import SciMLBase: successful_retcode
 import YAML
 using StructMapping
 using Xfoil
+using NPZ
 
 # Export public interface
 export VSMSettings, WingSettings, SolverSettings
@@ -42,8 +43,14 @@ export SolverStatus, FEASIBLE, INFEASIBLE, FAILURE
 export SolverType, LOOP, NONLIN
 export load_polar_data
 
+# NeuralFoil exports
+export KulfanParameters, fit_kulfan_parameters, kulfan_to_coordinates
+export NeuralFoilModel, NeuralFoilResult, load_neuralfoil_model, neuralfoil_aero
+export slice_obj_wing, slice_obj_at_positions
+export generate_neuralfoil_polars, generate_polar_from_coordinates, generate_polar_from_dat
+
 export plot_geometry, plot_distribution, plot_circulation_distribution, plot_polars,
-        save_plot, show_plot, plot_polar_data, plot_combined_analysis
+        save_plot, show_plot, plot_polar_data, plot_combined_analysis, plot_airfoil_slices
 
 # the following functions are defined in ext/VortexStepMethodExt.jl
 function plot_geometry end
@@ -54,6 +61,7 @@ function save_plot end
 function show_plot end
 function plot_polar_data end
 function plot_combined_analysis end
+function plot_airfoil_slices end
 
 """
    const MVec3    = MVector{3, Float64}
@@ -281,6 +289,13 @@ include("panel.jl")
 include("body_aerodynamics.jl")
 include("wake.jl")
 include("solver.jl")
+
+# NeuralFoil integration
+include("kulfan.jl")
+include("neuralfoil.jl")
+include("obj_slice.jl")
+include("polar_generation.jl")
+
 include("precompile.jl")
 
 
