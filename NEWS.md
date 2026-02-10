@@ -1,26 +1,74 @@
 ## VortexStepMethod [Unreleased]
+
+### Breaking Changes
+
+#### Unified Wing type
+- `Wing` and `RamAirWing` merged into a single `Wing` struct
+- `RamAirWing` constructor replaced by `ObjWing` (returns a `Wing`
+  with OBJ-specific fields populated)
+- Renamed `ram_geometry.jl` → `obj_geometry.jl`
+
+#### Unrefined sections replace panel grouping
+- `n_groups` replaced by `n_unrefined_sections` in `Wing`,
+  `WingSettings`, and `SolverSettings`
+- `PanelGroupingMethod` enum removed
+- Each refined panel maps back to its unrefined section via
+  `refined_panel_mapping`
+- `n_groups` and `grouping_method` in YAML settings files emit a
+  deprecation warning and are ignored
+
+#### Renamed VSMSolution fields (`_array` → `_dist`)
+- `panel_width_array` → `width_dist`
+- `alpha_array` → `alpha_dist`
+- `cl_array` → `cl_dist`, `cd_array` → `cd_dist`,
+  `cm_array` → `cm_dist`
+- `panel_lift` → `lift_dist`, `panel_drag` → `drag_dist`
+- `panel_moment` → `panel_moment_dist`
+- `group_moment_dist` → `moment_unrefined_dist`
+- Type parameter `Solver{P,G}` / `VSMSolution{P,G}` changed to
+  `Solver{P,U}` / `VSMSolution{P,U}` (U = unrefined sections)
+
+#### Mesh refinement separated from reinit
+- `reinit!` no longer re-refines the mesh; it only updates panel
+  properties from existing `refined_sections`
+- New `refine!` function handles mesh refinement explicitly
+
 ### Changed
-- Unified `Wing` and `RamAirWing` into single `Wing` type (`RamAirWing` now alias for `ObjWing`)
-- Renamed `ram_geometry.jl` to `obj_geometry.jl`
-- Wing geometry uses unrefined sections with automatic panel-to-section mapping
-- Consistent naming: variables ending in `_dist` are per-panel, `_unrefined_dist` per unrefined section
-- `VSMSolution` field names: `panel_width_array` → `width_dist`, `alpha_array` → `alpha_dist`, etc.
-- Enhanced Makie extension with `plot_combined_analysis` for combined plotting
+- Consistent naming convention: `_dist` = per-panel,
+  `_unrefined_dist` = per-unrefined-section
+- `correct_aoa` solver setting added (default `false`)
+- `alpha_geometric` is now the angle between apparent wind and chord
+- Panel `width` calculation uses sum instead of average
+- `src/plotting.jl` removed; all plotting moved to Makie and
+  ControlPlots extensions
+- `TestEnv` no longer required as a global dependency
 
 ### Added
-- `n_unrefined_sections` field in `Wing` for tracking pre-refinement sections
+- `n_unrefined_sections` field in `Wing` for tracking
+  pre-refinement sections
 - `refined_panel_mapping` for automatic panel-to-section association
-- Unrefined distribution fields in `VSMSolution`: `cl_unrefined_dist`, `cd_unrefined_dist`, `cm_unrefined_dist`, `alpha_unrefined_dist`, `moment_unrefined_dist`
-- `PanelDistribution.NONE` for wings already refined
-- Kwarg `sort_sections` for section ordering
-- YAML wing deformation tests
-- Unrefined distribution tests
+- Unrefined distribution fields in `VSMSolution`:
+  `cl_unrefined_dist`, `cd_unrefined_dist`, `cm_unrefined_dist`,
+  `alpha_unrefined_dist`, `moment_unrefined_dist`,
+  `width_unrefined_dist`
+- `alpha_geometric_dist` field in `VSMSolution`
+- `unrefined_deform!` for applying twist and TE deflection to
+  unrefined sections; `non_deformed_sections` preserved for
+  reset/re-deformation
+- `refine!` function for explicit mesh refinement
+- `plot_combined_analysis` in the Makie extension
+- Literature comparison plotting in the Makie extension
+- `obj_file` and `dat_file` fields in `WingSettings`
+- `sort_sections` kwarg for section ordering control
+- Separate `test/Project.toml` and `examples/Project.toml`
+- New tests: `test_unrefined_dist.jl`,
+  `test_refinement_validation.jl`, `test_yaml_wing_deformation.jl`
 
 ### Removed
-- Panel grouping (replaced with unrefined section mapping)
-- `PanelGroupingMethod` enum (deprecated, grouping automatic via mapping)
-- `n_groups` and `grouping_method` from settings files and structs
-- `n_groups` field from `WingSettings` and `SolverSettings`
+- `RamAirWing` type (use `ObjWing` or `Wing` directly)
+- `PanelGroupingMethod` enum
+- `n_groups` from `WingSettings`, `SolverSettings`, and YAML files
+- `src/plotting.jl` (920 lines moved to extensions)
 
 ## VortexStepMethod v2.3.0 2025-10-16
 ### Added
