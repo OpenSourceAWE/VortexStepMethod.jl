@@ -1360,68 +1360,36 @@ function VortexStepMethod.plot_airfoil_slices(obj_path::String; n_slices::Int=5,
             continue
         end
 
-        # Fit Kulfan parameters (includes outlier filtering)
+        # Get normalized coordinates for visualization
+        x_norm, y_norm, _ = VortexStepMethod.normalize_airfoil(x_slice, y_slice)
+
+        # Plot slice points
+        scatter!(ax, x_norm, y_norm;
+                color=:blue, markersize=4,
+                label="$(length(x_norm)) pts")
+
+        # Try Kulfan fit
         try
             params = VortexStepMethod.fit_kulfan_parameters(x_slice, y_slice)
 
-            # Get normalized coordinates for visualization
-            x_norm, y_norm, _ = VortexStepMethod.normalize_airfoil(x_slice, y_slice)
+            # Check if fit is reasonable (TE thickness should be small)
+            if abs(params.TE_thickness) < 1.0
+                # Generate fitted curve
+                x_fit, y_fit = VortexStepMethod.kulfan_to_coordinates(params; n_points=100)
 
-            # First pass fit to identify outliers
-            params_initial = VortexStepMethod._fit_kulfan_single_pass(x_norm, y_norm, 8)
+                # Plot fitted curve
+                lines!(ax, x_fit, y_fit;
+                      color=:red, linewidth=2, label="Kulfan fit")
 
-            # Filter outliers
-            x_clean, y_clean = VortexStepMethod.filter_airfoil_outliers(
-                x_norm, y_norm, params_initial, 0.05)
-
-            n_filtered = length(x_norm) - length(x_clean)
-
-            # Plot outliers in gray
-            if n_filtered > 0
-                # Find outlier points
-                x_fit_check, y_fit_check = VortexStepMethod.kulfan_to_coordinates(
-                    params_initial; n_points=200)
-                outlier_mask = Bool[]
-                for k in eachindex(x_norm)
-                    min_dist = minimum(sqrt.((x_norm[k] .- x_fit_check).^2 .+
-                                             (y_norm[k] .- y_fit_check).^2))
-                    push!(outlier_mask, min_dist >= 0.05)
-                end
-                x_outliers = x_norm[outlier_mask]
-                y_outliers = y_norm[outlier_mask]
-                scatter!(ax, x_outliers, y_outliers;
-                        color=:gray, markersize=3, alpha=0.5)
+                # Add TE thickness annotation
+                text!(ax, 0.02, 0.98;
+                     text="TE=$(round(params.TE_thickness, digits=4))",
+                     align=(:left, :top),
+                     fontsize=10,
+                     space=:relative)
             end
-
-            # Plot clean points
-            scatter!(ax, x_clean, y_clean;
-                    color=:blue, markersize=4,
-                    label="pts: $(length(x_clean)) (filtered $n_filtered)")
-
-            # Generate fitted curve from final params
-            x_fit, y_fit = VortexStepMethod.kulfan_to_coordinates(params; n_points=100)
-
-            # Plot fitted curve
-            lines!(ax, x_fit, y_fit;
-                  color=:red, linewidth=2, label="Kulfan fit")
-
-            # Add parameter annotation
-            text!(ax, 0.02, 0.98;
-                 text="TE=$(round(params.TE_thickness, digits=4))",
-                 align=(:left, :top),
-                 fontsize=10,
-                 space=:relative)
-
         catch e
-            @warn "Kulfan fitting failed for slice $i: $e"
-            # Fallback: just plot raw points
-            scatter!(ax, x_slice, y_slice;
-                    color=:blue, markersize=4, label="OBJ slice")
-            text!(ax, 0.5, 0.1;
-                 text="Fit failed",
-                 align=(:center, :center),
-                 color=:red,
-                 space=:relative)
+            # Silently skip fit - just show points
         end
 
         # Add legend only to first plot

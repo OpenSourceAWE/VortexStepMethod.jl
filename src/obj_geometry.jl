@@ -513,7 +513,8 @@ function ObjWing(
     spanwise_distribution=UNCHANGED,
     spanwise_direction=[0.0, 1.0, 0.0], remove_nan=true, align_to_principal=false,
     alpha_range=deg2rad.(-5:1:20), delta_range=deg2rad.(-5:1:20), prn=true,
-    interp_steps=n_panels+1
+    interp_steps=n_panels+1,
+    polars_dir=nothing  # Optional: directory with per-section polars (1.csv, 2.csv, ...)
 )
 
     # Set default: evenly spaced unrefined sections including both tips
@@ -568,11 +569,33 @@ function ObjWing(
 
         # Create unrefined sections (evenly spaced including both tips)
         sections = Section[]
-        aero_data = (collect(alpha_range), collect(delta_range), cl_matrix, cd_matrix, cm_matrix)
-        for gamma in range(-gamma_tip, gamma_tip, n_unrefined_sections)
-            LE_point = [le_interp[i](gamma) for i in 1:3]
-            TE_point = [te_interp[i](gamma) for i in 1:3]
-            push!(sections, Section(LE_point, TE_point, POLAR_MATRICES, aero_data))
+
+        if !isnothing(polars_dir)
+            # Use per-section polars from directory (POLAR_VECTORS)
+            ! prn || @info "Using per-section polars from $polars_dir"
+            gamma_positions = range(-gamma_tip, gamma_tip, n_unrefined_sections)
+            for (i, gamma) in enumerate(gamma_positions)
+                LE_point = [le_interp[j](gamma) for j in 1:3]
+                TE_point = [te_interp[j](gamma) for j in 1:3]
+
+                polar_path = joinpath(polars_dir, "$i.csv")
+                if isfile(polar_path)
+                    aero_data_i, _ = load_polar_data(polar_path)
+                    push!(sections, Section(LE_point, TE_point, POLAR_VECTORS, aero_data_i))
+                else
+                    @warn "Polar file not found: $polar_path, using INVISCID"
+                    push!(sections, Section(LE_point, TE_point, INVISCID, nothing))
+                end
+            end
+        else
+            # Use single polar for all sections (POLAR_MATRICES)
+            aero_data = (collect(alpha_range), collect(delta_range),
+                         cl_matrix, cd_matrix, cm_matrix)
+            for gamma in range(-gamma_tip, gamma_tip, n_unrefined_sections)
+                LE_point = [le_interp[i](gamma) for i in 1:3]
+                TE_point = [te_interp[i](gamma) for i in 1:3]
+                push!(sections, Section(LE_point, TE_point, POLAR_MATRICES, aero_data))
+            end
         end
 
         panel_props = PanelProperties{n_panels}()
