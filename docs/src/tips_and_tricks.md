@@ -40,7 +40,7 @@ If running the example `ram_air_kite.jl` fails, try to run the `cleanup.jl` scri
 Currently, the `solve!()` function returns the results as [VSMSolution](@ref) struct. The function solve() returns a dictionary with the results. The `solve!()` function is faster, and the `solve()` contains many more entries, therefore the first function is good for integration in dynamic models and the second one better suited for aerodynamic analysis.
 
 ## Performance
-Calling `reinit!(body_aero; init_aero=false)` is very fast. After calling `deform!(wing)`, you have to run `reinit!(body_aero; init_aero=false)` to apply the deformed wing to the body aerodynamics. This is in turn necessary for the linearization from deformation to aerodynamic coefficients for RAM-air kites.
+Calling `reinit!(body_aero; init_aero=false)` is very fast. After calling `unrefined_deform!(wing, theta_angles, delta_angles)`, you have to run `reinit!(body_aero; init_aero=false)` to apply the deformed wing to the body aerodynamics. This is in turn necessary for the linearization from deformation to aerodynamic coefficients for RAM-air kites.
 
 ## Contributing
 Please, read [CONTRIBUTING.md](https://github.com/OpenSourceAWE/VortexStepMethod.jl/blob/main/CONTRIBUTING.md)

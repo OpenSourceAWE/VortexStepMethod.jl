@@ -4,6 +4,10 @@ CurrentModule = VortexStepMethod
 ## Functions for creating the geometry
 ```@docs
 add_section!
+refine!
+calculate_span
+calculate_projected_area
+load_polar_data
 ```
 
 ## Setting the inflow conditions and solving
@@ -13,6 +17,7 @@ solve
 solve!
 reinit!(body_aero::BodyAerodynamics)
 linearize
+calculate_results
 ```
 
 ## Main Plotting Functions
@@ -20,7 +25,10 @@ The plotting functions are implemented as [package extension](https://pkgdocs.ju
 ```@docs
 plot_geometry
 plot_distribution
+plot_circulation_distribution
 plot_polars
+plot_polar_data
+plot_combined_analysis
 ```
 
 ## Helper Functions

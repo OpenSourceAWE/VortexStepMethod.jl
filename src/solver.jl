@@ -887,7 +887,9 @@ function linearize(solver::Solver, body_aero::BodyAerodynamics, y::Vector{T};
             set_va!(body_aero, y[va_idxs])
         elseif !isnothing(va_idxs) && !isnothing(omega_idxs)
             set_va!(body_aero, y[va_idxs], y[omega_idxs])
-        elseif isnothing(va_idxs) && isnothing(omega_idxs)
+        elseif isnothing(va_idxs) && !isnothing(omega_idxs)
+            set_va!(body_aero, init_va, y[omega_idxs])
+        else
             set_va!(body_aero, init_va)
         end
 

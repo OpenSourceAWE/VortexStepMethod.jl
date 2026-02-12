@@ -1,5 +1,5 @@
 using VortexStepMethod
-using GLMakie
+using CairoMakie
 using Test
 
 # Resolve repo data directory for ram air kite assets
@@ -67,68 +67,67 @@ end
 @testset "Plotting" begin
     save_dir = tempdir()
     body_aero = create_body_aero()
-    if Sys.islinux()
-        fig = plot_geometry(
-            body_aero,
-            "Rectangular_wing_geometry";
-            data_type=".png",
-            save_path=save_dir,
-            is_save=true,
-            is_show=false)
-        @test fig isa Figure
-        @test isfile(joinpath(save_dir, "Rectangular_wing_geometry_angled_view.png"))
-        safe_rm(joinpath(save_dir, "Rectangular_wing_geometry_angled_view.png"))
-        @test isfile(joinpath(save_dir, "Rectangular_wing_geometry_front_view.png"))
-        safe_rm(joinpath(save_dir, "Rectangular_wing_geometry_front_view.png"))
-        @test isfile(joinpath(save_dir, "Rectangular_wing_geometry_side_view.png"))
-        safe_rm(joinpath(save_dir, "Rectangular_wing_geometry_side_view.png"))
-        @test isfile(joinpath(save_dir, "Rectangular_wing_geometry_top_view.png"))
-        safe_rm(joinpath(save_dir, "Rectangular_wing_geometry_top_view.png"))
 
-        # Step 5: Initialize the solvers
-        vsm_solver = Solver(body_aero; aerodynamic_model_type=VSM)
-        llt_solver = Solver(body_aero; aerodynamic_model_type=LLT)
+    fig = plot_geometry(
+        body_aero,
+        "Rectangular_wing_geometry";
+        data_type=".png",
+        save_path=save_dir,
+        is_save=true,
+        is_show=false)
+    @test fig isa Figure
+    @test isfile(joinpath(save_dir, "Rectangular_wing_geometry_angled_view.png"))
+    safe_rm(joinpath(save_dir, "Rectangular_wing_geometry_angled_view.png"))
+    @test isfile(joinpath(save_dir, "Rectangular_wing_geometry_front_view.png"))
+    safe_rm(joinpath(save_dir, "Rectangular_wing_geometry_front_view.png"))
+    @test isfile(joinpath(save_dir, "Rectangular_wing_geometry_side_view.png"))
+    safe_rm(joinpath(save_dir, "Rectangular_wing_geometry_side_view.png"))
+    @test isfile(joinpath(save_dir, "Rectangular_wing_geometry_top_view.png"))
+    safe_rm(joinpath(save_dir, "Rectangular_wing_geometry_top_view.png"))
 
-        # Step 6: Solve the VSM and LLT
-        results_vsm = solve(vsm_solver, body_aero)
-        results_llt = solve(llt_solver, body_aero)
+    # Step 5: Initialize the solvers
+    vsm_solver = Solver(body_aero; aerodynamic_model_type=VSM)
+    llt_solver = Solver(body_aero; aerodynamic_model_type=LLT)
 
-        # Step 7: Plot spanwise distributions
-        y_coordinates = [panel.aero_center[2] for panel in body_aero.panels]
+    # Step 6: Solve the VSM and LLT
+    results_vsm = solve(vsm_solver, body_aero)
+    results_llt = solve(llt_solver, body_aero)
 
-        fig = plot_distribution(
-            [y_coordinates, y_coordinates],
-            [results_vsm, results_llt],
-            ["VSM", "LLT"],
-            title="Spanwise Distributions"
-        )
-        @test fig isa Figure
+    # Step 7: Plot spanwise distributions
+    y_coordinates = [panel.aero_center[2] for panel in body_aero.panels]
 
-        # Step 8: Plot polar curves
-        v_a = 20.0            # Magnitude of inflow velocity [m/s]
-        angle_range = range(0, 20, 20)
-        fig = plot_polars(
-            [llt_solver, vsm_solver],
-            [body_aero, body_aero],
-            ["VSM", "LLT"],
-            angle_range=angle_range,
-            angle_type="angle_of_attack",
-            v_a=v_a,
-            title="Rectangular Wing Polars",
-            data_type=".png",
-            save_path=save_dir,
-            is_save=true,
-            is_show=false
-        )
-        @test fig isa Figure
-        @test isfile(joinpath(save_dir, "Rectangular_Wing_Polars.png"))
-        safe_rm(joinpath(save_dir, "Rectangular_Wing_Polars.png"))
+    fig = plot_distribution(
+        [y_coordinates, y_coordinates],
+        [results_vsm, results_llt],
+        ["VSM", "LLT"],
+        title="Spanwise Distributions"
+    )
+    @test fig isa Figure
 
-        # Step 9: Test polar data plotting
-        # ram_wing is an ObjWing - no refine! needed
-        body_aero = BodyAerodynamics([ram_wing])
-        fig = plot_polar_data(body_aero; is_show=false)
-        @test fig isa Figure
-    end
+    # Step 8: Plot polar curves
+    v_a = 20.0            # Magnitude of inflow velocity [m/s]
+    angle_range = range(0, 20, 20)
+    fig = plot_polars(
+        [llt_solver, vsm_solver],
+        [body_aero, body_aero],
+        ["VSM", "LLT"],
+        angle_range=angle_range,
+        angle_type="angle_of_attack",
+        v_a=v_a,
+        title="Rectangular Wing Polars",
+        data_type=".png",
+        save_path=save_dir,
+        is_save=true,
+        is_show=false
+    )
+    @test fig isa Figure
+    @test isfile(joinpath(save_dir, "Rectangular_Wing_Polars.png"))
+    safe_rm(joinpath(save_dir, "Rectangular_Wing_Polars.png"))
+
+    # Step 9: Test polar data plotting
+    # ram_wing is an ObjWing - no refine! needed
+    body_aero = BodyAerodynamics([ram_wing])
+    fig = plot_polar_data(body_aero; is_show=false)
+    @test fig isa Figure
 end
 nothing

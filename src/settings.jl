@@ -5,6 +5,24 @@
     yaw_rate::Float64 = 0.0         # yaw rate [°/s]
 end
 
+"""
+    WingSettings
+
+Settings for a single wing, used within [`VSMSettings`](@ref).
+
+# Fields
+- `name`: Wing identifier (default `"main_wing"`)
+- `geometry_file`: Path to wing geometry YAML file
+- `obj_file`: Path to `.obj` geometry file
+- `dat_file`: Path to `.dat` airfoil file
+- `n_panels`: Number of panels (default `40`)
+- `spanwise_panel_distribution`: Panel distribution type
+    (default [`LINEAR`](@ref PanelDistribution))
+- `spanwise_direction`: Spanwise direction vector
+    (default `[0, 1, 0]`)
+- `remove_nan`: Whether to remove NaN values from polar data
+    (default `true`)
+"""
 @with_kw mutable struct WingSettings
     name::String = "main_wing"
     geometry_file::String = ""          # path to wing geometry YAML file
@@ -16,6 +34,37 @@ end
     remove_nan = true
 end
 
+"""
+    SolverSettings
+
+Solver configuration, used within [`VSMSettings`](@ref).
+
+# Fields
+- `n_panels`: Total number of panels (default `40`)
+- `aerodynamic_model_type`: [`VSM`](@ref Model) or
+    [`LLT`](@ref Model) (default `VSM`)
+- `solver_type`: `"LOOP"` or `"NONLIN"` (default `"LOOP"`)
+- `density`: Air density [kg/m³] (default `1.225`)
+- `max_iterations`: Maximum solver iterations (default `1500`)
+- `rtol`: Relative tolerance (default `1e-5`)
+- `tol_reference_error`: Reference error tolerance
+    (default `0.001`)
+- `relaxation_factor`: Convergence relaxation factor
+    (default `0.03`)
+- `artificial_damping`: Enable artificial damping
+    (default `false`)
+- `k2`, `k4`: Artificial damping parameters
+- `type_initial_gamma_distribution`:
+    [`ELLIPTIC`](@ref InitialGammaDistribution) or `ZEROS`
+    (default `ELLIPTIC`)
+- `core_radius_fraction`: Vortex core radius fraction
+    (default `1e-20`)
+- `mu`: Dynamic viscosity [N·s/m²] (default `1.81e-5`)
+- `calc_only_f_and_gamma`: Only output forces and circulation
+    (default `false`)
+- `correct_aoa`: Perform angle of attack correction
+    (default `false`)
+"""
 @with_kw mutable struct SolverSettings
     n_panels::Int64 = 40
     aerodynamic_model_type::Model = VSM
@@ -35,6 +84,25 @@ end
     correct_aoa::Bool=false                 # perform aoa correction
 end
 
+"""
+    VSMSettings
+
+Top-level settings container for a VortexStepMethod simulation.
+Can be constructed from keyword arguments or loaded from a YAML
+file with `VSMSettings(filename)`.
+
+# Fields
+- `condition`: [`ConditionSettings`] (wind speed, alpha, beta,
+    yaw rate)
+- `wings`: Vector of [`WingSettings`](@ref)
+- `solver_settings`: [`SolverSettings`](@ref)
+
+# Example
+```julia
+settings = VSMSettings("vsm_settings.yaml")
+wing = Wing(settings)
+```
+"""
 @Base.kwdef mutable struct VSMSettings
     condition::ConditionSettings = ConditionSettings()
     wings::Vector{WingSettings} = []

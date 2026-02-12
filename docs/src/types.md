@@ -7,8 +7,8 @@ Model
 WingType
 AeroModel
 PanelDistribution
-PanelGroupingMethod
 InitialGammaDistribution
+SolverType
 SolverStatus
 ```
 
@@ -24,8 +24,15 @@ VelVector
 AeroData
 ```
 
+## Settings
+```@docs
+VSMSettings
+WingSettings
+SolverSettings
+```
+
 ## Wing Geometry, Panel and Aerodynamics
-A body is constructed of one or more abstract wings. All wings are of type Wing. 
+A body is constructed of one or more abstract wings. All wings are of type Wing.
 A Wing has one or more sections and can be created from YAML files or OBJ geometry.
 ```@docs
 Section

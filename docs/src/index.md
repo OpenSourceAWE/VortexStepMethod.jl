@@ -87,7 +87,7 @@ Three kinds of input data is needed:
   - how many panels  
     --> two sections make a panel.
 
-Apart from the wing geometry there is no input file yet, the input has to be defined in the code.
+Wing geometry can also be loaded from YAML files or `.obj` files. See the examples for details.
 
 ### Example for defining the required input:
 ```julia
@@ -119,7 +119,7 @@ body_aero = BodyAerodynamics([wing])
 
 # Set inflow conditions
 vel_app = [cos(alpha), 0.0, sin(alpha)] .* v_a
-set_va!(wa, vel_app)
+set_va!(body_aero, vel_app)
 ```
 It is possible to import the wing geometry using an `.obj` file as shown in the example `ram_air_kite.jl`. During the import the polars are calculated automatically using XFoil. This approach is valid for rigid wings and ram-air kites, but not for leading edge inflatable kites.
 
@@ -152,4 +152,4 @@ Copyright (c) 2022 Oriol Cayon
 
 Copyright (c) 2024 Oriol Cayon, Jelle Poland, TU Delft
 
-Copyright (c) 2025 Oriol Cayon, Jelle Poland, Bart van de Lint, Uwe Fechner
+Copyright (c) 2025, 2026 Oriol Cayon, Jelle Poland, Bart van de Lint, Uwe Fechner
