@@ -90,9 +90,6 @@ jobs:
         version: ${{ matrix.julia_version }}
     - uses: julia-actions/cache@v2
     - uses: julia-actions/julia-buildpkg@v1
-    - name: Build PyCall
-      run: julia --project -e 'ENV["PYTHON"]=""; using Pkg; Pkg.instantiate(); Pkg.add("PyCall"); Pkg.build("PyCall")'
-      shell: bash    
     - uses: julia-actions/julia-runtest@v1
       env:
         BUILD_IS_PRODUCTION_BUILD: false
@@ -109,9 +106,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: julia-actions/setup-julia@v2
-      - name: Build PyCall
-        run: julia --project=docs/ -e 'ENV["PYTHON"]=""; using Pkg; Pkg.develop(PackageSpec(path=pwd())); Pkg.instantiate(); Pkg.build("PyCall")'
-        shell: bash
       - uses: julia-actions/cache@v2
       - uses: julia-actions/julia-buildpkg@v1
       
