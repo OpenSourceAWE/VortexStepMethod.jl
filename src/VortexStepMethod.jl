@@ -228,20 +228,10 @@ end
 function install_examples(add_packages=true)
     copy_examples()
     if add_packages
-        if ! ("ControlPlots" ∈ keys(Pkg.project().dependencies))
-            Pkg.add("ControlPlots")
-        end
-        if ! ("LaTeXStrings" ∈ keys(Pkg.project().dependencies))
-            Pkg.add("LaTeXStrings")
-        end
-        if ! ("Xfoil" ∈ keys(Pkg.project().dependencies))
-            Pkg.add("Xfoil")
-        end
-        if ! ("CSV" ∈ keys(Pkg.project().dependencies))
-            Pkg.add("CSV")
-        end
-        if ! ("DataFrames" ∈ keys(Pkg.project().dependencies))
-            Pkg.add("DataFrames")
+        for pkg in ("GLMakie", "LaTeXStrings", "Xfoil", "CSV", "DataFrames")
+            if !(pkg ∈ keys(Pkg.project().dependencies))
+                Pkg.add(pkg)
+            end
         end
     end
 end
