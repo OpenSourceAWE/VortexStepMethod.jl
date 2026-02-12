@@ -100,7 +100,8 @@ end
         [y_coordinates, y_coordinates],
         [results_vsm, results_llt],
         ["VSM", "LLT"],
-        title="Spanwise Distributions"
+        title="Spanwise Distributions",
+        is_show=false
     )
     @test fig isa Figure
 
