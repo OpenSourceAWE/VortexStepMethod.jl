@@ -46,8 +46,9 @@ Calling `reinit!(body_aero; init_aero=false)` is very fast. After calling `unref
 Please, read [CONTRIBUTING.md](https://github.com/OpenSourceAWE/VortexStepMethod.jl/blob/main/CONTRIBUTING.md)
 
 ## Building the documentation locally
-You can build the documentation locally after checking out the source code with git, launching Julia and executing:
-```julia
-include("scripts/build_docu.jl")
+You can build and serve the documentation locally after checking out the
+source code with git:
+```bash
+julia --project=docs scripts/build_docu.jl
 ```
-A browser window should pop up automatically.
+A browser window should pop up automatically with live-reloading enabled.

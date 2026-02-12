@@ -21,11 +21,10 @@ calculate_results
 ```
 
 ## Main Plotting Functions
-The plotting functions are implemented as [package extension](https://pkgdocs.julialang.org/v1.11/creating-packages/#Conditional-loading-of-code-in-packages-(Extensions)). This means that they are only available if the package `ControlPlots.jl` was loaded BEFORE loading `VortexStepMethod.jl`.
+The plotting functions are implemented as [package extensions](https://pkgdocs.julialang.org/v1.11/creating-packages/#Conditional-loading-of-code-in-packages-(Extensions)). They are available when `GLMakie` (or `ControlPlots`) is loaded before `VortexStepMethod`. The examples use `GLMakie`.
 ```@docs
 plot_geometry
 plot_distribution
-plot_circulation_distribution
 plot_polars
 plot_polar_data
 plot_combined_analysis
