@@ -20,7 +20,7 @@ spanwise_distribution = SPLIT_PROVIDED
 # Load rib data from CSV
 csv_file_path = joinpath(
     root_dir,
-    "processed_data",
+    "data",
     "TUDELFT_V3_LEI_KITE",
     "rib_list_from_CAD_LE_TE_and_surfplan_d_tube_camber_19ribs.csv"
 )
