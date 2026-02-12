@@ -158,14 +158,23 @@ function Solver(body_aero; kwargs...)
 end
 
 function Solver(body_aero, settings::VSMSettings)
+    ss = settings.solver_settings
+    solver_type = ss.solver_type == "NONLIN" ? NONLIN : LOOP
     Solver(body_aero;
-        aerodynamic_model_type=settings.solver_settings.aerodynamic_model_type,
-        density=settings.solver_settings.density,
-        max_iterations=settings.solver_settings.max_iterations,
-        rtol=settings.solver_settings.rtol,
-        relaxation_factor=settings.solver_settings.relaxation_factor,
-        core_radius_fraction=settings.solver_settings.core_radius_fraction,
-        correct_aoa=settings.solver_settings.correct_aoa,
+        solver_type,
+        aerodynamic_model_type=ss.aerodynamic_model_type,
+        density=ss.density,
+        max_iterations=ss.max_iterations,
+        rtol=ss.rtol,
+        tol_reference_error=ss.tol_reference_error,
+        relaxation_factor=ss.relaxation_factor,
+        is_with_artificial_damping=ss.artificial_damping,
+        artificial_damping=(k2=ss.k2, k4=ss.k4),
+        type_initial_gamma_distribution=ss.type_initial_gamma_distribution,
+        core_radius_fraction=ss.core_radius_fraction,
+        mu=ss.mu,
+        is_only_f_and_gamma_output=ss.calc_only_f_and_gamma,
+        correct_aoa=ss.correct_aoa,
     )
 end
 
@@ -261,7 +270,7 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
     @. panel_moment_dist = cm_dist * 0.5 * density * v_a_dist^2 * solver.sol._chord_dist
 
     # Calculate alpha corrections based on model type
-    if aerodynamic_model_type == VSM                             # 64 bytes
+    if solver.correct_aoa && aerodynamic_model_type == VSM      # 64 bytes
         update_effective_angle_of_attack!(
             alpha_corrected,
             body_aero,
@@ -273,7 +282,7 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
             solver.br.va_norm_dist,
             solver.br.va_unit_dist
         )
-    elseif aerodynamic_model_type == LLT
+    else
         alpha_corrected .= alpha_dist
     end
 
@@ -395,7 +404,7 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
                     panel_idx += 1
                 end
 
-                # Average coefficients and geometry
+                # Average coefficients and geometry (width stays summed)
                 for i in 1:wing.n_unrefined_sections
                     target_unrefined_idx = unrefined_idx + i - 1
                     if unrefined_section_counts[i] > 0
@@ -410,6 +419,8 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
                         z_airf_unrefined_dist[target_unrefined_idx] ./= count
                         va_unrefined_dist[target_unrefined_idx] ./= count
                         chord_unrefined_dist[target_unrefined_idx] /= count
+                        # width_unrefined_dist is NOT averaged - it is the
+                        # sum of panel widths in the unrefined section
                     end
                 end
                 unrefined_idx += wing.n_unrefined_sections

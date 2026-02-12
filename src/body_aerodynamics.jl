@@ -61,7 +61,7 @@ aerodynamic properties, returning a fully initialized structure ready for simula
 
 # Example
 ```julia
-wing = RamAirWing("body.obj", "foil.dat")
+wing = ObjWing("body.obj", "foil.dat")
 body_aero = BodyAerodynamics([wing], va=[15.0, 0.0, 0.0], omega=zeros(3))
 ```
 """
@@ -94,7 +94,6 @@ function BodyAerodynamics(
 
     # Initialize panels
     panels = Panel[]
-    n_unrefined_total = 0
     for wing in wings
         for section in wing.unrefined_sections
             section.LE_point .-= kite_body_origin
@@ -157,7 +156,7 @@ function reinit!(body_aero::BodyAerodynamics;
         
         # Create panels
         for i in 1:wing.n_panels
-            if !isnothing(wing.delta_dist) && length(wing.delta_dist) > 0
+            if length(wing.delta_dist) > 0
                 # Panel i gets its delta directly from delta_dist[i]
                 delta = wing.delta_dist[i]
             else

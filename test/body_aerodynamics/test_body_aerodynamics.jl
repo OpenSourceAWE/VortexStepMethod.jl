@@ -38,12 +38,11 @@ include("../utils.jl")
     end
     
     refine!(wing)
-    refine!(wing)
     body_aero = BodyAerodynamics([wing])
     set_va!(body_aero, v_a)
 
     # Calculate reference matrices using thesis functions
-    controlpoints, rings, bladepanels, ringvec, coord_L = 
+    controlpoints, rings, bladepanels, ringvec, coord_L =
         create_geometry_general(coord, v_a, N, "5fil", LLT)
     
     # Test LLT matrices
@@ -178,10 +177,9 @@ end
             )
         end
         refine!(wing)
-    refine!(wing)
-    body_aero = BodyAerodynamics([wing])
+        body_aero = BodyAerodynamics([wing])
         set_va!(body_aero, v_a)
-        
+
         return body_aero, coord, v_a, model
     end
 
@@ -310,22 +308,23 @@ end
     end
     
     refine!(wing)
-    refine!(wing)
     body_aero = BodyAerodynamics([wing])
     set_va!(body_aero, v_a)
 
     # Run analysis
-    loop_solver = Solver(body_aero; 
-        aerodynamic_model_type=model, 
+    loop_solver = Solver(body_aero;
+        aerodynamic_model_type=model,
         core_radius_fraction=core_radius_fraction,
         solver_type=LOOP,
+        correct_aoa=true,
         atol=1e-8,
         rtol=1e-8
     )
-    nonlin_solver = Solver(body_aero; 
-        aerodynamic_model_type=model, 
+    nonlin_solver = Solver(body_aero;
+        aerodynamic_model_type=model,
         core_radius_fraction=core_radius_fraction,
         solver_type=NONLIN,
+        correct_aoa=true,
         atol=1e-8,
         rtol=1e-8
     )
@@ -423,9 +422,8 @@ end
     try
         settings   = VSMSettings(settings_file)
         wing       = Wing(settings)
-        body_aero  = refine!(wing)
-    refine!(wing)
-    body_aero = BodyAerodynamics([wing])
+        refine!(wing)
+        body_aero = BodyAerodynamics([wing])
 
         set_va!(body_aero, settings)
 

@@ -12,8 +12,7 @@ using Test
             settings = VSMSettings(settings_file)
             wing = Wing(settings)
             refine!(wing)
-    refine!(wing)
-    body_aero = BodyAerodynamics([wing])
+            body_aero = BodyAerodynamics([wing])
             solver = Solver(body_aero, settings)
             
             # Verify solver properties match settings

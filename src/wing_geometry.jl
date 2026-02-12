@@ -707,7 +707,7 @@ function refine!(wing::AbstractWing; recompute_mapping=true, sort_sections=true)
     if length(wing.refined_sections) == 0
         if wing.spanwise_distribution == UNCHANGED ||
                length(wing.unrefined_sections) == n_sections
-            wing.refined_sections = wing.unrefined_sections
+            wing.refined_sections = copy(wing.unrefined_sections)
             recompute_mapping && compute_refined_panel_mapping!(wing)
             update_non_deformed_sections!(wing)
             return nothing
@@ -805,7 +805,7 @@ Compute the mapping from refined panels to unrefined sections by finding
 the closest unrefined section for each refined panel (based on section center distance).
 Maps each refined panel index to its corresponding unrefined section index
 (1 to n_unrefined_sections).
-This is non-allocating and works after refinement is complete.
+Works after refinement is complete.
 """
 function compute_refined_panel_mapping!(wing::AbstractWing)
     n_unrefined_sections = length(wing.unrefined_sections)

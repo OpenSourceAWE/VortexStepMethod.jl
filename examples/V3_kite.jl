@@ -52,10 +52,6 @@ angle_of_attack_deg = settings.condition.alpha
 sideslip_deg = settings.condition.beta
 yaw_rate = settings.condition.yaw_rate
 
-# Using plotting modules, to create more comprehensive plots
-PLOT = true
-USE_TEX = false
-
 # Solve and plot combined analysis
 results = VortexStepMethod.solve(solver, body_aero; log=true)
 fig1 = plot_combined_analysis(
