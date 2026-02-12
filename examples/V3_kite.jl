@@ -75,7 +75,7 @@ fig1 = plot_combined_analysis(
     angle_of_attack_for_spanwise_distribution=10.0,
 )
 scr1 = display(fig1)
-wait(scr1)
+isinteractive() && wait(scr1)
 
 
 # Polar sweep including CMy, using solve! and calculate_results
@@ -275,7 +275,7 @@ fig2 = plot_polars_with_cmy(
     angle_xlim=(-5, 40)
 )
 scr2 = display(fig2)
-wait(scr2)
+isinteractive() && wait(scr2)
 
 
 nothing

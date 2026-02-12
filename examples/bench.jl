@@ -25,6 +25,9 @@ add_section!(wing,
     [chord, -span/2, 0.0], # Right tip TE
     INVISCID)
 
+# Refine mesh
+refine!(wing)
+
 # Step 3: Initialize aerodynamics
 body_aero = BodyAerodynamics([wing])
 
