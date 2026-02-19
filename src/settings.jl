@@ -1,3 +1,13 @@
+function parse_enum(::Type{T}, s::String) where T <: Enum
+    for instance in instances(T)
+        if string(instance) == s
+            return instance
+        end
+    end
+    throw(ArgumentError("Invalid $(T) value: \"$s\". " *
+          "Valid values: $(join(string.(instances(T)), ", "))"))
+end
+
 @with_kw mutable struct ConditionSettings
     wind_speed::Float64 = 10.0      # wind speed [m/s]
     alpha::Float64 = 5.0            # angle of attack [°]
@@ -150,7 +160,7 @@ function VSMSettings(filename; data_prefix=true)
             if haskey(wing_data, "n_groups")
                 @warn "n_groups in settings file is deprecated and ignored. Use n_unrefined_sections or let it be inferred automatically." maxlog=1
             end
-            wing.spanwise_panel_distribution = eval(Symbol(wing_data["spanwise_panel_distribution"]))
+            wing.spanwise_panel_distribution = parse_enum(PanelDistribution, wing_data["spanwise_panel_distribution"])
             wing.spanwise_direction = MVec3(wing_data["spanwise_direction"])
             if haskey(wing_data, "grouping_method")
                 @warn "grouping_method in settings file is deprecated and ignored." maxlog=1
@@ -180,8 +190,8 @@ function VSMSettings(filename; data_prefix=true)
         vsm_settings.solver_settings = convertdict(SolverSettings, solver_data_clean)
         
         # Handle enum conversions manually
-        vsm_settings.solver_settings.aerodynamic_model_type = eval(Symbol(solver_data["aerodynamic_model_type"]))
-        vsm_settings.solver_settings.type_initial_gamma_distribution = eval(Symbol(solver_data["type_initial_gamma_distribution"]))
+        vsm_settings.solver_settings.aerodynamic_model_type = parse_enum(Model, solver_data["aerodynamic_model_type"])
+        vsm_settings.solver_settings.type_initial_gamma_distribution = parse_enum(InitialGammaDistribution, solver_data["type_initial_gamma_distribution"])
 
         # Override with calculated totals
         vsm_settings.solver_settings.n_panels = n_panels
