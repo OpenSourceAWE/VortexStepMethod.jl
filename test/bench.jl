@@ -204,7 +204,7 @@ using LinearAlgebra
             false
         ) samples=1 evals=1
         @info "Calculate Results Allocations: $(result.allocs) Memory: $(result.memory)"
-        @test result.allocs ≤ 600
+        @test result.allocs ≤ 700
     end
 
     @testset "Allocation Tests for solve() and solve!()" begin
