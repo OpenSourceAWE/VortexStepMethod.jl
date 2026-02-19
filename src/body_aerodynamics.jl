@@ -491,24 +491,32 @@ function update_effective_angle_of_attack!(alpha_corrected,
     nothing
 end
 
-@inline function intersect_line_with_plane(x_cp, f_unit, plane_point, plane_normal; tol=1e-6)
-    numerator = dot(plane_normal, plane_point .- x_cp)
-    denominator = dot(plane_normal, f_unit)
+@inline function intersect_line_with_plane(
+    x_cp, f_unit, plane_point, plane_normal; tol=1e-6
+)
+    numerator = plane_normal[1]*(plane_point[1]-x_cp[1]) +
+                plane_normal[2]*(plane_point[2]-x_cp[2]) +
+                plane_normal[3]*(plane_point[3]-x_cp[3])
+    denominator = dot3(plane_normal, f_unit)
     abs(denominator) < tol && return nothing
     λ = numerator / denominator
-    return x_cp .+ λ .* f_unit
+    return MVec3(x_cp[1] + λ*f_unit[1],
+                 x_cp[2] + λ*f_unit[2],
+                 x_cp[3] + λ*f_unit[3])
 end
 
 @inline function point_in_triangle(pt, v0, v1, v2; tol=1e-8)
-    u = v1 .- v0
-    v = v2 .- v0
-    w = pt .- v0
-
-    uu = dot(u, u)
-    uv = dot(u, v)
-    vv = dot(v, v)
-    wu = dot(w, u)
-    wv = dot(w, v)
+    uu = 0.0; uv = 0.0; vv = 0.0; wu = 0.0; wv = 0.0
+    @inbounds for k in 1:3
+        uk = v1[k] - v0[k]
+        vk = v2[k] - v0[k]
+        wk = pt[k] - v0[k]
+        uu += uk * uk
+        uv += uk * vk
+        vv += vk * vk
+        wu += wk * uk
+        wv += wk * vk
+    end
 
     denom = uv * uv - uu * vv
     abs(denom) < 1e-12 && return false
@@ -519,13 +527,31 @@ end
 end
 
 @inline function point_in_quad(pt, corners)
-    @views begin
-        v0 = corners[:, 1]
-        v1 = corners[:, 2]
-        v2 = corners[:, 3]
-        v3 = corners[:, 4]
-        return point_in_triangle(pt, v0, v1, v2) || point_in_triangle(pt, v0, v2, v3)
+    return _point_in_triangle_col(pt, corners, 1, 2, 3) ||
+           _point_in_triangle_col(pt, corners, 1, 3, 4)
+end
+
+@inline function _point_in_triangle_col(
+    pt, corners, c0, c1, c2; tol=1e-8
+)
+    uu = 0.0; uv = 0.0; vv = 0.0; wu = 0.0; wv = 0.0
+    @inbounds for k in 1:3
+        uk = corners[k, c1] - corners[k, c0]
+        vk = corners[k, c2] - corners[k, c0]
+        wk = pt[k] - corners[k, c0]
+        uu += uk * uk
+        uv += uk * vk
+        vv += vk * vk
+        wu += wk * uk
+        wv += wk * vk
     end
+
+    denom = uv * uv - uu * vv
+    abs(denom) < 1e-12 && return false
+
+    s = (uv * wv - vv * wu) / denom
+    t = (uv * wu - uu * wv) / denom
+    return (s >= -tol) && (t >= -tol) && (s + t <= 1 + tol)
 end
 
 function find_center_of_pressure(
@@ -537,35 +563,55 @@ function find_center_of_pressure(
     F = force_array
     M0 = moment_array
     r0 = reference_point
-    F_norm_sq = dot(F, F)
-    F_norm_sq == 0 && throw(ArgumentError("Force vector must not be zero."))
+    F_norm_sq = dot3(F, F)
+    F_norm_sq == 0 && throw(ArgumentError(
+        "Force vector must not be zero."))
 
-    r0_moment = r0 .+ cross(F, M0) ./ F_norm_sq
-    f_unit = F ./ norm(F)
+    wv = body_aero.work_vectors
+    r0_moment = wv[1]
+    f_unit = wv[2]
+    normal = wv[3]
+    cross_tmp = wv[4]
+
+    cross3!(cross_tmp, F, M0)
+    F_norm = sqrt(F_norm_sq)
+    @inbounds for k in 1:3
+        r0_moment[k] = r0[k] + cross_tmp[k] / F_norm_sq
+        f_unit[k] = F[k] / F_norm
+    end
 
     for panel in body_aero.panels
         corners = panel.corner_points
-        @views begin
-            v1 = corners[:, 2] .- corners[:, 1]
-            v2 = corners[:, 3] .- corners[:, 1]
-            normal = cross(v1, v2)
-            normal_norm = norm(normal)
-            if normal_norm != 0
-                normal ./= normal_norm
-                intersection = intersect_line_with_plane(
-                    r0_moment,
-                    f_unit,
-                    corners[:, 1],
-                    normal
-                )
-                if !isnothing(intersection) && point_in_quad(intersection, corners)
-                    return MVec3(intersection)
-                end
+        # cross(v1, v2) where v1 = col2-col1, v2 = col3-col1
+        v1x = corners[1,2]-corners[1,1]
+        v1y = corners[2,2]-corners[2,1]
+        v1z = corners[3,2]-corners[3,1]
+        v2x = corners[1,3]-corners[1,1]
+        v2y = corners[2,3]-corners[2,1]
+        v2z = corners[3,3]-corners[3,1]
+        normal[1] = v1y*v2z - v1z*v2y
+        normal[2] = v1z*v2x - v1x*v2z
+        normal[3] = v1x*v2y - v1y*v2x
+        normal_norm = norm3(normal)
+        if normal_norm != 0
+            normal[1] /= normal_norm
+            normal[2] /= normal_norm
+            normal[3] /= normal_norm
+            # Avoid view allocation for plane point
+            cross_tmp[1] = corners[1, 1]
+            cross_tmp[2] = corners[2, 1]
+            cross_tmp[3] = corners[3, 1]
+            intersection = intersect_line_with_plane(
+                r0_moment, f_unit, cross_tmp, normal)
+            if !isnothing(intersection) &&
+               point_in_quad(intersection, corners)
+                return MVec3(intersection)
             end
         end
     end
 
-    @warn "No intersection found with any panel in center-of-pressure calculation."
+    @warn "No intersection found with any panel " *
+          "in center-of-pressure calculation."
     return nothing
 end
 
@@ -575,8 +621,8 @@ function compute_panel_center_of_pressures(
     m_distribution::AbstractMatrix,
     reference_point
 )
-    panel_cp_locations = MVec3[]
     n = length(body_aero.panels)
+    panel_cp_locations = Vector{MVec3}(undef, n)
     for i in 1:n
         panel = body_aero.panels[i]
         @views F = f_distribution[:, i]
@@ -586,19 +632,37 @@ function compute_panel_center_of_pressures(
         span_dir = panel.y_airf
         c = panel.chord
 
-        r = ac .- reference_point
-        M_local = M_ref .- cross(r, F)
-        m_pitch = dot(M_local, span_dir)
-        F_perp_mag = dot(cross(chord_dir, F), span_dir)
+        # cross(r, F) where r = ac - reference_point
+        rx = ac[1]-reference_point[1]
+        ry = ac[2]-reference_point[2]
+        rz = ac[3]-reference_point[3]
+        crx = ry*F[3] - rz*F[2]
+        cry = rz*F[1] - rx*F[3]
+        crz = rx*F[2] - ry*F[1]
+
+        # m_pitch = dot(M_ref - cross(r,F), span_dir)
+        m_pitch = (M_ref[1]-crx)*span_dir[1] +
+                  (M_ref[2]-cry)*span_dir[2] +
+                  (M_ref[3]-crz)*span_dir[3]
+
+        # F_perp_mag = dot(cross(chord_dir, F), span_dir)
+        cx = chord_dir[2]*F[3] - chord_dir[3]*F[2]
+        cy = chord_dir[3]*F[1] - chord_dir[1]*F[3]
+        cz = chord_dir[1]*F[2] - chord_dir[2]*F[1]
+        F_perp_mag = cx*span_dir[1] + cy*span_dir[2] +
+                     cz*span_dir[3]
 
         if abs(F_perp_mag) < 1e-12
-            push!(panel_cp_locations, MVec3(ac))
+            panel_cp_locations[i] = MVec3(ac)
             continue
         end
 
-        lever = clamp(m_pitch / F_perp_mag, -0.25 * c, 0.75 * c)
-        cp = ac .+ lever .* chord_dir
-        push!(panel_cp_locations, MVec3(cp))
+        lever = clamp(m_pitch / F_perp_mag,
+                      -0.25 * c, 0.75 * c)
+        panel_cp_locations[i] = MVec3(
+            ac[1] + lever*chord_dir[1],
+            ac[2] + lever*chord_dir[2],
+            ac[3] + lever*chord_dir[3])
     end
 
     return panel_cp_locations
@@ -666,17 +730,20 @@ function calculate_results(
     # Calculate coefficients and geometric AoA for each panel
     for (i, panel) in enumerate(panels)
         cl_array[i] = calculate_cl(panel, alpha_dist[i])
-        cd_array[i], cm_array[i] = calculate_cd_cm(panel, alpha_dist[i])
+        cd_array[i], cm_array[i] = calculate_cd_cm(
+            panel, alpha_dist[i])
         panel_width_array[i] = panel.width
         va_norm = va_norm_array[i]
-        x_norm = norm(panel.x_airf)
-        z_norm = norm(panel.z_airf)
+        x_norm = norm3(panel.x_airf)
+        z_norm = norm3(panel.z_airf)
         if va_norm == 0.0 || x_norm == 0.0 || z_norm == 0.0
             alpha_geometric[i] = NaN
         else
             inv_va_norm = 1.0 / va_norm
-            v_tangential = -dot(panel.x_airf, panel.va) * inv_va_norm / x_norm
-            v_normal = -dot(panel.z_airf, panel.va) * inv_va_norm / z_norm
+            v_tangential = -dot3(panel.x_airf, panel.va) *
+                           inv_va_norm / x_norm
+            v_normal = -dot3(panel.z_airf, panel.va) *
+                       inv_va_norm / z_norm
             alpha_geometric[i] = pi + atan(v_normal, v_tangential)
         end
     end
@@ -717,25 +784,35 @@ function calculate_results(
         va_ref_vector[2] += area_i * va_array[i, 2]
         va_ref_vector[3] += area_i * va_array[i, 3]
     end
-    total_area > 0.0 || throw(ArgumentError("Total panel area must be positive."))
+    total_area > 0.0 || throw(ArgumentError(
+        "Total panel area must be positive."))
     reference_speed = sqrt(weighted_speed_sq / total_area)
-    direction_norm = norm(va_ref_vector)
+    direction_norm = norm3(va_ref_vector)
     if direction_norm <= 0.0
         va_ref_vector .= (1.0, 0.0, 0.0)
         direction_norm = 1.0
     end
-    va_ref_vector .= va_ref_vector ./ direction_norm .* reference_speed
-    va_ref_mag = norm(va_ref_vector)
-    va_ref_mag > 0.0 || throw(ArgumentError("Reference freestream magnitude must be positive."))
+    @inbounds for k in 1:3
+        va_ref_vector[k] = va_ref_vector[k] / direction_norm *
+                           reference_speed
+    end
+    va_ref_mag = norm3(va_ref_vector)
+    va_ref_mag > 0.0 || throw(ArgumentError(
+        "Reference freestream magnitude must be positive."))
     va_ref_unit = body_aero.work_vectors[1]
-    va_ref_unit .= va_ref_vector ./ va_ref_mag
+    inv_va_ref = 1.0 / va_ref_mag
+    @inbounds for k in 1:3
+        va_ref_unit[k] = va_ref_vector[k] * inv_va_ref
+    end
     dir_lift_ref = body_aero.work_vectors[2]
     cross3!(dir_lift_ref, va_ref_vector, spanwise_direction)
-    dir_lift_ref_norm = norm(dir_lift_ref)
+    dir_lift_ref_norm = norm3(dir_lift_ref)
     dir_lift_ref_norm > 0.0 || throw(ArgumentError(
-        "Reference lift direction is undefined because reference flow is parallel to spanwise direction."
-    ))
-    dir_lift_ref ./= dir_lift_ref_norm
+        "Reference lift direction is undefined because " *
+        "reference flow is parallel to spanwise direction."))
+    @inbounds for k in 1:3
+        dir_lift_ref[k] /= dir_lift_ref_norm
+    end
     dir_side_ref = body_aero.work_vectors[3]
     cross3!(dir_side_ref, dir_lift_ref, va_ref_unit)
     q_ref = 0.5 * density * va_ref_mag^2
@@ -757,14 +834,17 @@ function calculate_results(
         c_alpha = cos(alpha_corrected_i)
         s_alpha = sin(alpha_corrected_i)
         @inbounds for k in 1:3
-            induced_va_airfoil[k] = c_alpha * panel.x_airf[k] + s_alpha * panel.z_airf[k]
+            induced_va_airfoil[k] = c_alpha * panel.x_airf[k] +
+                                    s_alpha * panel.z_airf[k]
         end
-        normalize!(induced_va_airfoil)
+        normalize3!(induced_va_airfoil)
 
-        cross3!(dir_lift_induced_va, induced_va_airfoil, panel.y_airf)
-        normalize!(dir_lift_induced_va)
-        cross3!(dir_drag_induced_va, spanwise_direction, dir_lift_induced_va)
-        normalize!(dir_drag_induced_va)
+        cross3!(dir_lift_induced_va,
+                induced_va_airfoil, panel.y_airf)
+        normalize3!(dir_lift_induced_va)
+        cross3!(dir_drag_induced_va,
+                spanwise_direction, dir_lift_induced_va)
+        normalize3!(dir_drag_induced_va)
 
         q_lift = 0.5 * density * v_a_dist[i]^2
         lift_i = cl_array[i] * q_lift * chord_array[i]
@@ -777,28 +857,41 @@ function calculate_results(
         end
 
         va_panel_mag = va_norm_array[i]
-        va_panel_mag > 0.0 || throw(ArgumentError("Panel $i has non-positive apparent velocity magnitude."))
+        va_panel_mag > 0.0 || throw(ArgumentError(
+            "Panel $i has non-positive apparent " *
+            "velocity magnitude."))
         q_panel = 0.5 * density * va_panel_mag^2
-        cross3!(dir_lift_prescribed_va, panel.va, spanwise_direction)
-        normalize!(dir_lift_prescribed_va)
+        cross3!(dir_lift_prescribed_va,
+                panel.va, spanwise_direction)
+        normalize3!(dir_lift_prescribed_va)
 
-        lift_prescribed_va = dot(lift_induced_va, dir_lift_prescribed_va) +
-                             dot(drag_induced_va, dir_lift_prescribed_va)
-        drag_prescribed_va = (dot(lift_induced_va, panel.va) +
-                              dot(drag_induced_va, panel.va)) / va_panel_mag
+        lift_prescribed_va =
+            dot3(lift_induced_va, dir_lift_prescribed_va) +
+            dot3(drag_induced_va, dir_lift_prescribed_va)
+        drag_prescribed_va =
+            (dot3(lift_induced_va, panel.va) +
+             dot3(drag_induced_va, panel.va)) / va_panel_mag
         cross3!(temp_vec, dir_lift_prescribed_va, panel.va)
-        temp_vec ./= va_panel_mag
-        side_prescribed_va = dot(lift_induced_va, temp_vec) +
-                             dot(drag_induced_va, temp_vec)
+        inv_vpm = 1.0 / va_panel_mag
+        @inbounds for k in 1:3
+            temp_vec[k] *= inv_vpm
+        end
+        side_prescribed_va =
+            dot3(lift_induced_va, temp_vec) +
+            dot3(drag_induced_va, temp_vec)
 
         width = panel.width
-        f_body_3D[1, i] = (lift_induced_va[1] + drag_induced_va[1]) * width
-        f_body_3D[2, i] = (lift_induced_va[2] + drag_induced_va[2]) * width
-        f_body_3D[3, i] = (lift_induced_va[3] + drag_induced_va[3]) * width
+        @inbounds for k in 1:3
+            f_body_3D[k, i] = (lift_induced_va[k] +
+                               drag_induced_va[k]) * width
+        end
 
-        lift_wing_3D_sum += lift_prescribed_va * width * dot(dir_lift_prescribed_va, dir_lift_ref)
-        drag_wing_3D_sum += drag_prescribed_va * width * (dot(panel.va, va_ref_unit) / va_panel_mag)
-        side_wing_3D_sum += side_prescribed_va * width * dot(temp_vec, dir_side_ref)
+        lift_wing_3D_sum += lift_prescribed_va * width *
+            dot3(dir_lift_prescribed_va, dir_lift_ref)
+        drag_wing_3D_sum += drag_prescribed_va * width *
+            (dot3(panel.va, va_ref_unit) / va_panel_mag)
+        side_wing_3D_sum += side_prescribed_va * width *
+            dot3(temp_vec, dir_side_ref)
 
         inv_qc = 1.0 / (q_panel * panel.chord)
         cl_prescribed_va[i] = lift_prescribed_va * inv_qc
@@ -806,38 +899,21 @@ function calculate_results(
         cs_prescribed_va[i] = side_prescribed_va * inv_qc
 
         ### Moment ###
-
-        # Python-style expanded steps kept as comments for traceability:
-        # (1) Panel aerodynamic center in body frame:
-        # panel_ac_body = panel.aero_center  # 3D [x, y, z]
-        #
-        # (2) Convert local (2D) pitching moment to a 3D vector in body coords.
-        #     Use the axis around which the moment is defined,
-        #     which is the y-axis pointing "spanwise".
-        # moment_axis_body = panel.y_airf
-        #
-        # (3) Scale by panel width if moment[i] is 2D moment-per-unit-span:
-        # M_local_3D = moment[i] * moment_axis_body * panel.width
-        #
-        # (4) Vector from panel AC to the chosen reference point:
-        # r_vector = panel_ac_body - reference_point  # e.g. CG, wing root, etc.
-        #
-        # (5) Cross product to shift the force from panel AC to reference point:
+        # r_vector = panel.aero_center - reference_point
         # M_shift = cross(r_vector, f_body_3D[:,i])
-        #
-        # (6) Total panel moment about the reference point:
-        # m_body_3D[:,i] = M_local_3D + M_shift
-
-        # Total panel moment about the reference point:
+        # m_body_3D[:,i] = moment_i * panel.y_airf * width + M_shift
         @inbounds for k in 1:3
-            dir_lift_prescribed_va[k] = panel.aero_center[k] - reference_point[k]
+            dir_lift_prescribed_va[k] = panel.aero_center[k] -
+                                        reference_point[k]
             drag_induced_va[k] = f_body_3D[k, i]
         end
-        cross3!(temp_vec, dir_lift_prescribed_va, drag_induced_va)
+        cross3!(temp_vec,
+                dir_lift_prescribed_va, drag_induced_va)
         local_moment_scale = moment_i * width
-        m_body_3D[1, i] = local_moment_scale * panel.y_airf[1] + temp_vec[1]
-        m_body_3D[2, i] = local_moment_scale * panel.y_airf[2] + temp_vec[2]
-        m_body_3D[3, i] = local_moment_scale * panel.y_airf[3] + temp_vec[3]
+        @inbounds for k in 1:3
+            m_body_3D[k, i] = local_moment_scale *
+                              panel.y_airf[k] + temp_vec[k]
+        end
     end
 
     if is_only_f_and_gamma_output
@@ -856,8 +932,10 @@ function calculate_results(
     c_ref = body_aero.c_ref
     reynolds_number = density * va_ref_mag * c_ref / mu
 
-    force_total = MVec3(0.0, 0.0, 0.0)
-    moment_total = MVec3(0.0, 0.0, 0.0)
+    force_total = body_aero.work_vectors[9]
+    moment_total = body_aero.work_vectors[10]
+    force_total .= 0.0
+    moment_total .= 0.0
     @inbounds for i in 1:n_panels
         force_total[1] += f_body_3D[1, i]
         force_total[2] += f_body_3D[2, i]

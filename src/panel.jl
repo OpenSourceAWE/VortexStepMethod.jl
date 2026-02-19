@@ -474,52 +474,57 @@ Calculate the velocity induced by a vortex ring at a control point.
     work_vectors::NTuple{10, MVec3}
 )
     velind .= 0.0
-    tempvel .= 0.0
-    # Process each filament
-    @inbounds for i in eachindex(filaments)
-        if filaments[i].initialized
-            if i == 1  # bound filament
-                if evaluation_point_on_bound
-                    tempvel .= 0.0
-                else
-                    velocity_3D_bound_vortex!(
-                        tempvel,
-                        filaments[i],
-                        evaluation_point,
-                        gamma,
-                        core_radius_fraction,
-                        work_vectors
-                    )
-                end
-            elseif i == 2 || i == 3  # trailing filaments
-                velocity_3D_trailing_vortex!(
-                    tempvel,
-                    filaments[i],
-                    evaluation_point,
-                    gamma,
-                    va_norm,
-                    work_vectors
-                )
-            elseif i == 4 || i == 5  # semi-infinite trailing filaments
-                velocity_3D_trailing_vortex_semiinfinite!(
-                    tempvel,
-                    filaments[i],
-                    va_unit,
-                    evaluation_point,
-                    gamma,
-                    va_norm,
-                    work_vectors
-                )
-            else
-                throw(ArgumentError("Too many filaments."))
-                tempvel .= 0.0
-            end
-            velind .+= tempvel
-        else
-            throw(ArgumentError("Filament not initialized: $i, $([filaments[j].initialized for j in 1:5]). 
-                Maybe you forgot to call set_va! before running solve."))
-        end
+
+    # Filament 1: bound filament (BoundFilament — compiler knows type)
+    f1 = filaments[1]
+    f1.initialized || throw(ArgumentError(
+        "Filament not initialized: 1. " *
+        "Maybe you forgot to call set_va! before running solve."))
+    if evaluation_point_on_bound
+        tempvel .= 0.0
+    else
+        velocity_3D_bound_vortex!(
+            tempvel, f1, evaluation_point, gamma,
+            core_radius_fraction, work_vectors)
     end
+    velind .+= tempvel
+
+    # Filament 2: trailing filament (BoundFilament)
+    f2 = filaments[2]
+    f2.initialized || throw(ArgumentError(
+        "Filament not initialized: 2."))
+    velocity_3D_trailing_vortex!(
+        tempvel, f2, evaluation_point, gamma,
+        va_norm, work_vectors)
+    velind .+= tempvel
+
+    # Filament 3: trailing filament (BoundFilament)
+    f3 = filaments[3]
+    f3.initialized || throw(ArgumentError(
+        "Filament not initialized: 3."))
+    velocity_3D_trailing_vortex!(
+        tempvel, f3, evaluation_point, gamma,
+        va_norm, work_vectors)
+    velind .+= tempvel
+
+    # Filament 4: semi-infinite trailing (SemiInfiniteFilament)
+    f4 = filaments[4]
+    f4.initialized || throw(ArgumentError(
+        "Filament not initialized: 4."))
+    velocity_3D_trailing_vortex_semiinfinite!(
+        tempvel, f4, va_unit, evaluation_point, gamma,
+        va_norm, work_vectors)
+    velind .+= tempvel
+
+    # Filament 5: semi-infinite trailing (SemiInfiniteFilament)
+    f5 = filaments[5]
+    f5.initialized || throw(ArgumentError(
+        "Filament not initialized: 5."))
+    velocity_3D_trailing_vortex_semiinfinite!(
+        tempvel, f5, va_unit, evaluation_point, gamma,
+        va_norm, work_vectors)
+    velind .+= tempvel
+
     return nothing
 end
 
@@ -537,22 +542,25 @@ Only needed for VSM, as LLT bound and filament align, thus no induced velocity.
 """
 function calculate_velocity_induced_bound_2D!(
     U_2D,
-    panel::Panel, 
+    panel::Panel,
     evaluation_point,
     work_vectors
 )
-    r3, r0, cross_, cross_square = work_vectors
+    r3, r0, cross_ = work_vectors
     # r3 perpendicular to the bound vortex
-    r3 .= evaluation_point .- (panel.bound_point_1 .+ panel.bound_point_2) ./ 2
-    
+    r3 .= evaluation_point .-
+          (panel.bound_point_1 .+ panel.bound_point_2) ./ 2
+
     # r0 is the direction of the bound vortex
     r0 .= panel.bound_point_1 .- panel.bound_point_2
-    
+
     # Calculate cross product
     cross3!(cross_, r0, r3)
-    
+
     # Calculate induced velocity
-    cross_square .= cross_.^2
-    U_2D .= (cross_ ./ sum(cross_square) ./ 2π) .* norm(r0)
+    coeff = norm3(r0) / (2π * norm3(cross_)^2)
+    @inbounds for k in 1:3
+        U_2D[k] = cross_[k] * coeff
+    end
     return nothing
 end
