@@ -1,4 +1,4 @@
-using GLMakie
+using Makie
 using VortexStepMethod
 using Documenter
 
