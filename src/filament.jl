@@ -68,7 +68,7 @@ function velocity_3D_bound_vortex!(
     if norm(r1Xr0) / norm(r0) > epsilon
         vel .= (gamma / (4π)) .* r1Xr2 ./ (norm(r1Xr2)^2) .* 
             dot(r0, r1r2norm)
-    elseif norm(r1Xr0) / norm(r0) == 0
+    elseif norm(r1Xr0) / norm(r0) < 1e-12 * epsilon
         vel .= 0.0
     else
         @debug "inside core radius"
@@ -134,7 +134,7 @@ as implemented in KiteAeroDyn".
     if norm(r1Xr0) / norm(r0) > epsilon
         vel .= (gamma / (4π)) .* r1Xr2 ./ (norm(r1Xr2)^2) .* 
             dot(r0, normr1r2)
-    elseif norm(r1Xr0) / norm(r0) == 0
+    elseif norm(r1Xr0) / norm(r0) < 1e-12 * epsilon
         vel .= 0.0
     else
         # Project onto core radius
@@ -210,7 +210,7 @@ function velocity_3D_trailing_vortex_semiinfinite!(
     if norm(r1XVf) / norm(Vf) > epsilon
         K = GAMMA / (4π) / norm(r1XVf)^2 * (1 + dot(r1, Vf) / norm(r1))
         vel .= K .* r1XVf
-    elseif norm(r1XVf) / norm(Vf) == 0
+    elseif norm(r1XVf) / norm(Vf) < 1e-12 * epsilon
         vel .= 0.0
     else
         r1_proj = dot(r1, Vf) * Vf + 

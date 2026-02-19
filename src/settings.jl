@@ -57,6 +57,8 @@ Solver configuration, used within [`VSMSettings`](@ref).
 - `type_initial_gamma_distribution`:
     [`ELLIPTIC`](@ref InitialGammaDistribution) or `ZEROS`
     (default `ELLIPTIC`)
+- `use_gamma_prev`: Reuse provided previous gamma as initial guess when
+    available (default `true`)
 - `core_radius_fraction`: Vortex core radius fraction
     (default `1e-20`)
 - `mu`: Dynamic viscosity [N·s/m²] (default `1.81e-5`)
@@ -78,6 +80,7 @@ Solver configuration, used within [`VSMSettings`](@ref).
     k2::Float64 = 0.1                       # artificial damping parameter
     k4::Float64 = 0.0                       # artificial damping parameter
     type_initial_gamma_distribution::InitialGammaDistribution = ELLIPTIC # see: [InitialGammaDistribution](@ref)
+    use_gamma_prev::Bool = true             # if false, always reinitialize gamma from type_initial_gamma_distribution
     core_radius_fraction::Float64 = 1e-20
     mu::Float64 = 1.81e-5                   # dynamic viscosity [N·s/m²]
     calc_only_f_and_gamma::Bool=false       # whether to only output f and gamma
@@ -165,6 +168,11 @@ function VSMSettings(filename; data_prefix=true)
         
         # Create a copy of solver_data with string fields for enums removed
         solver_data_clean = copy(solver_data)
+        # Backward-compatible alias from user-facing YAML key.
+        if haskey(solver_data_clean, "use_gamme_prev") && !haskey(solver_data_clean, "use_gamma_prev")
+            solver_data_clean["use_gamma_prev"] = solver_data_clean["use_gamme_prev"]
+        end
+        haskey(solver_data_clean, "use_gamme_prev") && delete!(solver_data_clean, "use_gamme_prev")
         delete!(solver_data_clean, "aerodynamic_model_type")
         delete!(solver_data_clean, "type_initial_gamma_distribution")
         

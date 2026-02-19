@@ -152,30 +152,45 @@ function init_aero!(
         end
 
         if panel.aero_model == POLAR_VECTORS
-            !all(isapprox.(aero_1[1], aero_2[1])) && @error "Make sure you use the same alpha range for all your interpolations."
+            alphas_1 = aero_1[1]
+            alphas_2 = aero_2[1]
+            (
+                length(alphas_1) == length(alphas_2) &&
+                all(isapprox.(diff(alphas_1), diff(alphas_2)))
+            ) || throw(ArgumentError("Alpha steps must be identical."))
 
             polar_data = (
                 Vector{Float64}((aero_1[2] + aero_2[2]) / 2),
                 Vector{Float64}((aero_1[3] + aero_2[3]) / 2),
                 Vector{Float64}((aero_1[4] + aero_2[4]) / 2)
             )
-            alphas = Vector{Float64}(aero_1[1])
+            alphas = Vector{Float64}(alphas_1)
 
             panel.cl_interp = linear_interpolation(alphas, polar_data[1]; extrapolation_bc=extrap_flat)
             panel.cd_interp = linear_interpolation(alphas, polar_data[2]; extrapolation_bc=extrap_line)
             panel.cm_interp = linear_interpolation(alphas, polar_data[3]; extrapolation_bc=extrap_flat)
 
         elseif panel.aero_model == POLAR_MATRICES
-            !all(isapprox.(aero_1[1], aero_2[1])) && @error "Make sure you use the same alpha range for all your interpolations."
-            !all(isapprox.(aero_1[2], aero_2[2])) && @error "Make sure you use the same delta range for all your interpolations."
+            alphas_1 = aero_1[1]
+            alphas_2 = aero_2[1]
+            deltas_1 = aero_1[2]
+            deltas_2 = aero_2[2]
+            (
+                length(alphas_1) == length(alphas_2) &&
+                all(isapprox.(diff(alphas_1), diff(alphas_2)))
+            ) || throw(ArgumentError("Alpha steps must be identical."))
+            (
+                length(deltas_1) == length(deltas_2) &&
+                all(isapprox.(diff(deltas_1), diff(deltas_2)))
+            ) || throw(ArgumentError("Delta steps must be identical."))
 
             polar_data = (
                 Matrix{Float64}((aero_1[3] + aero_2[3]) / 2),
                 Matrix{Float64}((aero_1[4] + aero_2[4]) / 2),
                 Matrix{Float64}((aero_1[5] + aero_2[5]) / 2)
             )
-            alphas = Vector{Float64}(aero_1[1])
-            deltas = Vector{Float64}(aero_1[2])
+            alphas = Vector{Float64}(alphas_1)
+            deltas = Vector{Float64}(deltas_1)
 
             panel.cl_interp = linear_interpolation((alphas, deltas), polar_data[1]; extrapolation_bc=extrap_flat)
             panel.cd_interp = linear_interpolation((alphas, deltas), polar_data[2]; extrapolation_bc=extrap_line)

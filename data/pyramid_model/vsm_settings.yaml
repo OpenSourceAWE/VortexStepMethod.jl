@@ -17,7 +17,6 @@
 # PANEL DISTRIBUTIONS:
 #   LINEAR:             Uniform panel spacing along wingspan
 #   COSINE:             Cosine clustering (more panels at tips)
-#   COSINE_VAN_GARREL:  Van Garrel's modified cosine distribution
 #   SPLIT_PROVIDED:     Use predefined section splits from geometry
 #   UNCHANGED:          Preserve original geometry discretization
 #
@@ -67,12 +66,13 @@ solver_settings:
     
     # --- Numerical Stability ---
     artificial_damping: false        # Enable artificial damping for unstable cases
-    k2: 0.1                          # 2nd-order damping coefficient
+    k2: 0.0                          # 2nd-order damping coefficient
     k4: 0.0                          # 4th-order damping coefficient
-    core_radius_fraction: 1e-20      # Vortex core radius (fraction of chord)
+    core_radius_fraction: 0.05      # Vortex core radius (fraction of chord)
     
     # --- Initial Conditions ---
     type_initial_gamma_distribution: ELLIPTIC  # Starting circulation distribution
+    use_gamme_prev: false               # true=reuse previous gamma between calls, false=always reinitialize from type_initial_gamma_distribution
     
     # --- Output Control ---
     calc_only_f_and_gamma: false     # true=compute only forces & circulation

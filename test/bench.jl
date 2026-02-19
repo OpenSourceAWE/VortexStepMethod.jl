@@ -176,15 +176,18 @@ const IS_JULIA_1_12_OR_NEWER = VERSION >= v"1.12"
         reference_point = zeros(3)
         
 
-        # # Fill arrays with data
-        # for (i, panel) in enumerate(body_aero.panels)
-        #     chord_array[i] = panel.chord
-        #     x_airf_array[i, :] .= panel.x_airf
-        #     y_airf_array[i, :] .= panel.y_airf
-        #     z_airf_array[i, :] .= panel.z_airf
-        #     va_array[i, :] .= panel.va
-        # end
         set_va!(body_aero, vel_app)
+        # Fill arrays with panel data to satisfy calculate_results preconditions.
+        for (i, panel) in enumerate(body_aero.panels)
+            chord_array[i] = panel.chord
+            x_airf_array[i, :] .= panel.x_airf
+            y_airf_array[i, :] .= panel.y_airf
+            z_airf_array[i, :] .= panel.z_airf
+            va_array[i, :] .= panel.va
+            va_norm_array[i] = norm(panel.va)
+            va_unit_array[i, :] .= va_norm_array[i] > 0.0 ? panel.va ./ va_norm_array[i] : [1.0, 0.0, 0.0]
+            v_a_array[i] = va_norm_array[i]
+        end
         results = @MVector zeros(3)
         
         result = @benchmark calculate_results(
@@ -242,4 +245,3 @@ const IS_JULIA_1_12_OR_NEWER = VERSION >= v"1.12"
         end
     end
 end
-

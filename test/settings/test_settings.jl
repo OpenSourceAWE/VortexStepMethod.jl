@@ -11,6 +11,6 @@ using Test
     @test vss.wings isa Vector{WingSettings}
     @test length(vss.wings) == 2
     io = IOBuffer(repr(vss))
-    @test countlines(io) == 42  # Updated to match new output format
+    @test countlines(io) == 43  # Updated to match new output format
 end
 nothing

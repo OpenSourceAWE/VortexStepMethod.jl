@@ -666,13 +666,12 @@ body_aero = BodyAerodynamics([wing])   # Create aerodynamics
 # Distribution Methods
 - `LINEAR`: Linear interpolation between sections
 - `COSINE`: Cosine spacing (more panels near tips)
-- `COSINE_VAN_GARREL`: van Garrel cosine distribution
 - `SPLIT_PROVIDED`: Split each unrefined section into sub-panels
 - `UNCHANGED`: 1:1 copy when n_unrefined_sections == n_panels+1
 
 # Keyword Arguments
 - `recompute_mapping::Bool=true`: Recompute the mapping from refined panels to unrefined sections
-- `sort_sections::Bool=true`: Sort sections by spanwise position (disable for structural ordering)
+- `sort_sections::Bool=true`: Sort sections by spanwise position using global `LE_point[2]` (Y-axis). Disable for structural ordering.
 
 # Effects
 1. Populates `wing.refined_sections` (n_panels+1 sections)
@@ -701,6 +700,7 @@ function refine!(wing::AbstractWing; recompute_mapping=true, sort_sections=true)
     end
 
     # Only sort sections if requested (skip for REFINE wings with fixed structural order)
+    #TODO: only works if can be sorted by global y position
     sort_sections && sort!(wing.unrefined_sections, by=s -> s.LE_point[2], rev=true)
     n_sections = wing.n_panels + 1
 
@@ -759,7 +759,7 @@ function refine!(wing::AbstractWing; recompute_mapping=true, sort_sections=true)
     # Handle different distribution types
     if wing.spanwise_distribution == SPLIT_PROVIDED
         refine_mesh_by_splitting_provided_sections!(wing)
-    elseif wing.spanwise_distribution in (LINEAR, COSINE, COSINE_VAN_GARREL)
+    elseif wing.spanwise_distribution in (LINEAR, COSINE)
         refine_mesh_for_linear_cosine_distribution!(
             wing,
             1,
@@ -889,9 +889,13 @@ function calculate_new_aero_data(aero_model,
             alpha_left, CL_left, CD_left, CM_left = polar_left
             alpha_right, CL_right, CD_right, CM_right = polar_right
 
-            # Create common alpha array
-            !all(isapprox.(alpha_left, alpha_right)) && @error "Make sure you use the same alpha range for all your interpolations."
-            !isa(CL_right, AbstractVector) && @error "Provide polar data in the correct format: (alpha, cl, cd, cm)"
+            (
+                length(alpha_left) == length(alpha_right) &&
+                all(isapprox.(diff(alpha_left), diff(alpha_right)))
+            ) || throw(ArgumentError("Alpha steps must be identical."))
+            isa(CL_right, AbstractVector) || throw(ArgumentError(
+                "Provide polar data in the correct format."
+            ))
             
             # Weighted interpolation
             CL_data = CL_left .* left_weight .+ CL_right .* right_weight
@@ -904,10 +908,17 @@ function calculate_new_aero_data(aero_model,
             alpha_left, delta_left, CL_left, CD_left, CM_left = polar_left
             alpha_right, delta_right, CL_right, CD_right, CM_right = polar_right
             
-            # Create common alpha array
-            !all(isapprox.(alpha_left, alpha_right)) && @error "Make sure you use the same alpha range for all your interpolations."
-            !all(isapprox.(delta_left, delta_right)) && @error "Make sure you use the same alpha range for all your interpolations."
-            !isa(CL_right, AbstractMatrix) && @error "Provide polar data in the correct format: (alpha, delta, cl, cd, cm)"
+            (
+                length(alpha_left) == length(alpha_right) &&
+                all(isapprox.(diff(alpha_left), diff(alpha_right)))
+            ) || throw(ArgumentError("Alpha steps must be identical."))
+            (
+                length(delta_left) == length(delta_right) &&
+                all(isapprox.(diff(delta_left), diff(delta_right)))
+            ) || throw(ArgumentError("Delta steps must be identical."))
+            isa(CL_right, AbstractMatrix) || throw(ArgumentError(
+                "Provide polar data in the correct format."
+            ))
 
             # Weighted interpolation
             CL_data = CL_left .* left_weight .+ CL_right .* right_weight
@@ -986,7 +997,7 @@ function refine_mesh_for_linear_cosine_distribution!(
     # 2. Define target lengths
     target_lengths = if spanwise_distribution == LINEAR
         range(0, qc_total_length, n_sections)
-    elseif spanwise_distribution in (COSINE, COSINE_VAN_GARREL)
+    elseif spanwise_distribution == COSINE
         theta = range(0, π, n_sections)
         qc_total_length .* (1 .- cos.(theta)) ./ 2
     else
@@ -1052,72 +1063,8 @@ function refine_mesh_for_linear_cosine_distribution!(
         end
     end
 
-    # Apply van Garrel distribution if requested
-    if spanwise_distribution == COSINE_VAN_GARREL
-        idx = calculate_cosine_van_Garrel!(wing, idx)
-    end
-
     return idx
 end
-
-
-"""
-    calculate_cosine_van_Garrel!(wing::AbstractWing, idx)
-
-Calculate van Garrel cosine distribution of sections.
-Reference: http://dx.doi.org/10.13140/RG.2.1.2773.8000
-
-Returns:
-    idx
-"""
-function calculate_cosine_van_Garrel!(wing::AbstractWing, idx)
-    n = length(sections)
-    
-    # Calculate chords and quarter chords
-    chords = [section.TE_point - section.LE_point for section in sections]
-    quarter_chords = [section.LE_point + 0.25 * chord for (section, chord) in zip(sections, chords)]
-    
-    # Calculate widths
-    widths = [norm(quarter_chords[i+1] - quarter_chords[i]) for i in 1:n-1]
-    
-    # Calculate correction factors
-    eta_cp = zeros(n-1)
-    
-    # First panel
-    eta_cp[1] = widths[1] / (widths[1] + widths[2])
-    
-    # Internal panels
-    for j in 2:n-2
-        eta_cp[j] = 0.25 * (
-            widths[j-1] / (widths[j-1] + widths[j]) +
-            widths[j] / (widths[j] + widths[j+1]) + 1
-        )
-    end
-    
-    # Last panel
-    eta_cp[end] = widths[end-1] / (widths[end-1] + widths[end])
-    
-    @debug "Correction factors" eta_cp
-    
-    # Calculate control points
-    control_points = [
-        quarter_chords[i] + eta * (quarter_chords[i+1] - quarter_chords[i])
-        for (i, eta) in enumerate(eta_cp)
-    ]
-    
-    # Generate new sections
-    for (i, (control_point, chord)) in enumerate(zip(control_points, chords))
-        @views reinit!(wing.refined_sections, 
-            control_point - 0.25 * chord, 
-            control_point + 0.75 * chord,
-            sections[i].aero_model, 
-            sections[i].aero_data
-        )
-        idx += 1
-    end
-    return idx
-end
-
 
 """
     refine_mesh_by_splitting_provided_sections!(wing::AbstractWing)
@@ -1257,7 +1204,8 @@ function calculate_projected_area(wing::AbstractWing,
     LE_next_proj = zeros(MVec3)
     TE_next_proj = zeros(MVec3)
     
-    # Calculate area by summing trapezoid areas
+    # Calculate area by decomposing each projected panel quadrilateral
+    # into two triangles: (A, B, C) and (A, C, D).
     projected_area = 0.0
     for i in 1:(length(wing.unrefined_sections)-1)
         # Get section points
@@ -1272,13 +1220,9 @@ function calculate_projected_area(wing::AbstractWing,
         project_onto_plane!(LE_next_proj, LE_next, z_plane_vector)
         project_onto_plane!(TE_next_proj, TE_next, z_plane_vector)
         
-        # Calculate projected dimensions
-        chord_current = norm(TE_current_proj - LE_current_proj)
-        chord_next = norm(TE_next_proj - LE_next_proj)
-        span = norm(LE_next_proj - LE_current_proj)
-        
-        # Add trapezoid area
-        projected_area += 0.5 * (chord_current + chord_next) * span
+        # Two triangles: A=LE_i, B=TE_i, C=TE_{i+1}, D=LE_{i+1}
+        projected_area += 0.5 * norm(cross(TE_current_proj - LE_current_proj, TE_next_proj - LE_current_proj))
+        projected_area += 0.5 * norm(cross(TE_next_proj - LE_current_proj, LE_next_proj - LE_current_proj))
     end
     
     return projected_area
