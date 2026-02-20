@@ -1,4 +1,4 @@
-## VortexStepMethod unreleased
+## VortexStepMethod v3.0.0
 
 ### Breaking Changes
 
