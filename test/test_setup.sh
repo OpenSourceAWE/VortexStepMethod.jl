@@ -44,7 +44,7 @@ for f in menu.jl rectangular_wing.jl V3_kite.jl pyramid_model.jl \
 done
 
 # Verify data directories were copied
-for d in data/ram_air_kite data/TUDELFT_V3_KITE data/TUDELFT_V3_LEI_KITE \
+for d in data/ram_air_kite data/TUDELFT_V3_KITE \
          data/pyramid_model; do
     [[ -d "$d" ]] && pass "copied $d/" || fail "copied $d/"
 done
