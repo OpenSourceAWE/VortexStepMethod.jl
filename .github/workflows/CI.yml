@@ -22,8 +22,8 @@ jobs:
       fail-fast: false
       matrix:
         version:
-          - '1.10'
-          - '1.11'
+          - 'lts'
+          - '1'
         os:
           - ubuntu-latest
         build_is_production_build:
@@ -71,9 +71,8 @@ jobs:
       fail-fast: false
       matrix:
         julia_version:
-          - "1.10"
-          - "1.11"
-          - "pre"
+          - "lts"
+          - "1"
         julia_arch:
           - x64
         os:
