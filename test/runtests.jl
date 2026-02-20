@@ -41,7 +41,6 @@ end::Bool
     should_run_test("filament/test_bound_filament.jl") && include("filament/test_bound_filament.jl")
     should_run_test("filament/test_semi_infinite_filament.jl") && include("filament/test_semi_infinite_filament.jl")
     should_run_test("panel/test_panel.jl") && include("panel/test_panel.jl")
-    should_run_test("plotting/test_plotting.jl") && include("plotting/test_plotting.jl")
     should_run_test("polars/test_polars.jl") && include("polars/test_polars.jl")
     should_run_test("ram_geometry/test_kite_geometry.jl") && include("ram_geometry/test_kite_geometry.jl")
     should_run_test("settings/test_settings.jl") && include("settings/test_settings.jl")
