@@ -484,6 +484,7 @@ The resulting Wing supports deformation through unrefined_deform! and deform! fu
 - `align_to_principal=false`: Align body frame to principal axes of inertia
 - `spanwise_distribution=UNCHANGED`: Panel distribution type (forced to UNCHANGED for ObjWing)
 - `remove_nan=true`: Interpolate NaN values in aerodynamic data
+- `use_prior_polar=false`: Reuse prior refined/panel polar mapping on geometry updates
 - `alpha_range=deg2rad.(-5:1:20)`: Angle of attack range for polars (rad)
 - `delta_range=deg2rad.(-5:1:20)`: Trailing edge deflection range for polars (rad)
 - `prn=true`: Print informational messages
@@ -511,7 +512,7 @@ function ObjWing(
     crease_frac=0.9, wind_vel=10., mass=1.0,
     n_panels=56, n_unrefined_sections=nothing,
     spanwise_distribution=UNCHANGED,
-    spanwise_direction=[0.0, 1.0, 0.0], remove_nan=true, align_to_principal=false,
+    spanwise_direction=[0.0, 1.0, 0.0], remove_nan=true, use_prior_polar=false, align_to_principal=false,
     alpha_range=deg2rad.(-5:1:20), delta_range=deg2rad.(-5:1:20), prn=true,
     interp_steps=n_panels+1
 )
@@ -579,7 +580,7 @@ function ObjWing(
         cache = [PreallocationTools.LazyBufferCache()]
 
         wing = Wing(n_panels, Int16(n_unrefined_sections), spanwise_distribution, panel_props, MVec3(spanwise_direction),
-            sections, Section[], remove_nan,  # refined_sections empty
+            sections, Section[], remove_nan, use_prior_polar,  # refined_sections empty
             Int16[],  # refined_panel_mapping empty
             Section[], zeros(n_panels), zeros(n_panels),  # non_deformed, theta, delta
             mass, gamma_tip, inertia_tensor, T_cad_body, R_cad_body, radius,

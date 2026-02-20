@@ -136,6 +136,29 @@ function Base.setproperty!(obj::BodyAerodynamics, sym::Symbol, val)
     end
 end
 
+@inline function _can_skip_panel_aero_reinit(wing::Wing, panels, panel_idx_start::Int)
+    wing.use_prior_polar || return false
+    wing.n_panels > 0 || return false
+    length(wing.refined_sections) == wing.n_panels + 1 || return false
+
+    # Only skip when panel interpolators are already initialized for polar models.
+    if isempty(wing.refined_sections)
+        return false
+    end
+    model = wing.refined_sections[1].aero_model
+    if !(model in (POLAR_VECTORS, POLAR_MATRICES))
+        return false
+    end
+
+    for i in 0:(wing.n_panels - 1)
+        panel = panels[panel_idx_start + i]
+        if panel.cl_interp === nothing || panel.cd_interp === nothing || panel.cm_interp === nothing
+            return false
+        end
+    end
+    return true
+end
+
 """
     reinit!(body_aero::BodyAerodynamics; init_aero, va, omega, refine_mesh, recompute_mapping, sort_sections)
 
@@ -162,6 +185,7 @@ function reinit!(body_aero::BodyAerodynamics;
     for wing in body_aero.wings
         reinit!(wing)
         panel_props = wing.panel_props
+        wing_init_aero = init_aero && !_can_skip_panel_aero_reinit(wing, body_aero.panels, idx)
         
         # Create panels
         for i in 1:wing.n_panels
@@ -185,7 +209,7 @@ function reinit!(body_aero::BodyAerodynamics;
                 delta,
                 vec;
                 remove_nan=wing.remove_nan,
-                init_aero
+                init_aero=wing_init_aero
             )
             idx += 1
         end

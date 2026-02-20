@@ -71,6 +71,7 @@ function create_temp_wing_settings(module_name, wing_file;
     spanwise_panel_distribution="COSINE",
     spanwise_direction=[0.0, 1.0, 0.0],
     remove_nan=true,
+    use_prior_polar=false,
     aerodynamic_model_type="VSM",
     density=1.225,
     type_initial_gamma_distribution="ZEROS",
@@ -89,6 +90,7 @@ function create_temp_wing_settings(module_name, wing_file;
             "spanwise_panel_distribution" => spanwise_panel_distribution,
             "spanwise_direction" => spanwise_direction,
             "remove_nan" => remove_nan,
+            "use_prior_polar" => use_prior_polar,
         )],
         "solver_settings" => Dict(
             "aerodynamic_model_type" => aerodynamic_model_type,
@@ -151,4 +153,3 @@ function get_complete_settings_file(module_name)
         return create_temp_wing_settings(module_name, basename(get_standard_wing_file(module_name)))
     end
 end
-

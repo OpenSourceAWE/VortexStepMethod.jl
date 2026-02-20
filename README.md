@@ -12,7 +12,8 @@ VSM is further refined by coupling it with 2D viscous airfoil polars, making it 
 The software presented here includes a couple of examples: a rectangular wing, a leading-edge inflatable kite and a ram-air kite.
 
 This package was translated from the Python code version 1.0.0 available at https://github.com/ocayon/Vortex-Step-Method with some extensions as documented in [News.md](https://github.com/OpenSourceAWE/VortexStepMethod.jl/blob/main/NEWS.md).
-Example output for the TUDELFT V3 LEI kite example, showing the comparison of Julia and Python VSM results with CFD and wind tunnel data, is shown in the figure below.
+
+Example output is shown in the figure below, where the aerodynamic predictions of the TU Delft V3 LEI kite obtained with the Julia and Python implementations of the VSM are compared against CFD simulations and wind tunnel measurements.
 
 ![Example output](docs/v3_example_output.png)
 
