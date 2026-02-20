@@ -17,7 +17,6 @@
 # PANEL DISTRIBUTIONS:
 #   LINEAR:             Uniform panel spacing along wingspan
 #   COSINE:             Cosine clustering (more panels at tips)
-#   COSINE_VAN_GARREL:  Van Garrel's modified cosine distribution
 #   SPLIT_PROVIDED:     Use predefined section splits from geometry
 #   UNCHANGED:          Preserve original geometry discretization
 #
@@ -30,14 +29,13 @@
 #   NEWTON:             Newton-Raphson nonlinear solver
 #
 # USAGE NOTES:
-# - n_panels should be divisible by n_groups for proper load balancing
 # - Higher n_panels improves accuracy but increases computation time
 # - Lower relaxation_factor if convergence issues occur
 
 # Define the flight state for the aerodynamic analysis
 condition:
-    wind_speed: 10.0     # [m/s] Free stream velocity magnitude
-    alpha: 5.0           # [°] Angle of attack (pitch angle relative to flow)
+    wind_speed: 2.82     # [m/s] Free stream velocity magnitude
+    alpha: 7.4           # [°] Angle of attack (pitch angle relative to flow)
     beta: 0.0            # [°] Sideslip angle (yaw angle relative to flow)
     yaw_rate: 0.0        # [°/s] Yaw rate (for dynamic analysis, 0 for static)
 
@@ -45,8 +43,7 @@ condition:
 wings:
     - name: V3_Kite                    # Wing identifier for output labeling
       geometry_file: data/TUDELFT_V3_KITE/aero_geometry.yaml
-      n_panels: 36                     # Total number of panels along wingspan
-      n_groups: 1                      # Number of panel groups (must divide n_panels)
+      n_panels: 50                     # Total number of panels along wingspan
       spanwise_panel_distribution: LINEAR    # Panel spacing algorithm
       spanwise_direction: [0.0, 1.0, 0.0]   # Unit vector defining wingspan direction
       remove_nan: true                 # Remove NaN values from polar data
@@ -56,6 +53,7 @@ solver_settings:
     # --- Core Aerodynamic Model ---
     aerodynamic_model_type: VSM      # VSM=3D vortex method, LLT=lifting line theory
     solver_type: LOOP                # LOOP=fixed-point iteration, NEWTON=Newton-Raphson
+    #correct_aoa: false               # Defaults to false, meaning the computed AoA at 3/4c is used
     
     # --- Physical Properties ---
     density: 1.225                   # [kg/m³] Air density (ISA sea level)
@@ -71,10 +69,11 @@ solver_settings:
     artificial_damping: false        # Enable artificial damping for unstable cases
     k2: 0.1                          # 2nd-order damping coefficient
     k4: 0.0                          # 4th-order damping coefficient
-    core_radius_fraction: 1e-20      # Vortex core radius (fraction of chord)
+    core_radius_fraction: 0.05      # Vortex core radius (fraction of chord)
     
     # --- Initial Conditions ---
     type_initial_gamma_distribution: ELLIPTIC  # Starting circulation distribution
+    use_gamme_prev: false               # true=reuse previous gamma between calls, false=always reinitialize from type_initial_gamma_distribution
     
     # --- Output Control ---
     calc_only_f_and_gamma: false     # true=compute only forces & circulation
