@@ -1,17 +1,17 @@
-backend = length(ARGS) >= 1 ? ARGS[1] : "Makie"
-if backend == "Makie"
-    using CairoMakie
-elseif backend == "ControlPlots"
+backend = if "plot-controlplots" in ARGS
     using ControlPlots
+    "ControlPlots"
 else
-    error("Unknown plotting backend: $backend. Use \"Makie\" or \"ControlPlots\".")
+    using CairoMakie
+    "Makie"
 end
 
 using VortexStepMethod
 using Test
 
 # Resolve repo data directory for ram air kite assets
-const _ram_data_dir = joinpath(dirname(dirname(@__DIR__)), "data", "ram_air_kite")
+const _ram_data_dir = joinpath(dirname(dirname(@__DIR__)),
+                               "data", "ram_air_kite")
 
 # Helper to robustly delete files on platforms with occasional file locks
 safe_rm(path) = begin
@@ -43,7 +43,6 @@ if !@isdefined ram_wing
 end
 
 function create_body_aero()
-    # Step 1: Define wing parameters
     n_panels = 20          # Number of panels
     span = 20.0            # Wing span [m]
     chord = 1.0            # Chord length [m]
@@ -51,10 +50,8 @@ function create_body_aero()
     alpha_deg = 30.0       # Angle of attack [degrees]
     alpha = deg2rad(alpha_deg)
 
-    # Step 2: Create wing geometry with linear panel distribution
     wing = Wing(n_panels, spanwise_distribution=LINEAR)
 
-    # Add wing sections
     add_section!(wing,
         [0.0, span/2, 0.0],
         [chord, span/2, 0.0],
@@ -64,7 +61,6 @@ function create_body_aero()
         [chord, -span/2, 0.0],
         INVISCID)
 
-    # Step 3: Initialize aerodynamics
     refine!(wing)
     body_aero = BodyAerodynamics([wing])
     vel_app = [cos(alpha), 0.0, sin(alpha)] .* v_a
@@ -105,15 +101,15 @@ end
     safe_rm(joinpath(save_dir,
                      "Rectangular_wing_geometry_top_view.png"))
 
-    # Step 5: Initialize the solvers
+    # Initialize the solvers
     vsm_solver = Solver(body_aero; aerodynamic_model_type=VSM)
     llt_solver = Solver(body_aero; aerodynamic_model_type=LLT)
 
-    # Step 6: Solve the VSM and LLT
+    # Solve the VSM and LLT
     results_vsm = solve(vsm_solver, body_aero)
     results_llt = solve(llt_solver, body_aero)
 
-    # Step 7: Plot spanwise distributions
+    # Plot spanwise distributions
     y_coordinates = [panel.aero_center[2]
                      for panel in body_aero.panels]
 
@@ -130,7 +126,7 @@ end
         @test fig !== nothing
     end
 
-    # Step 8: Plot polar curves
+    # Plot polar curves
     v_a = 20.0
     angle_range = range(0, 20, 20)
     fig = plot_polars(
@@ -154,7 +150,7 @@ end
     @test isfile(joinpath(save_dir, "Rectangular_Wing_Polars.png"))
     safe_rm(joinpath(save_dir, "Rectangular_Wing_Polars.png"))
 
-    # Step 9: Test polar data plotting
+    # Test polar data plotting
     body_aero = BodyAerodynamics([ram_wing])
     fig = plot_polar_data(body_aero; is_show=false)
     if backend == "Makie"
