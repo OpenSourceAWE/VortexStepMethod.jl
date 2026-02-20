@@ -208,7 +208,8 @@ wing_airfoils:
         settings.wings = [WingSettings(
             geometry_file=simple_wing_file,
             n_panels=6,
-            spanwise_panel_distribution=COSINE
+            spanwise_panel_distribution=COSINE,
+            use_prior_polar=true
         )]
 
         # Test Wing constructor with VSMSettings
@@ -217,11 +218,31 @@ wing_airfoils:
         @test wing isa Wing
         @test wing.n_panels == 6
         @test wing.spanwise_distribution == COSINE
+        @test wing.use_prior_polar
         @test length(wing.unrefined_sections) == 2
         @test wing.unrefined_sections[1].aero_model == POLAR_VECTORS
         @test wing.unrefined_sections[2].aero_model == POLAR_VECTORS
     end
-    
+
+    @testset "VSMSettings YAML use_prior_polar parsing" begin
+        settings_file = create_temp_wing_settings(
+            "yaml_geometry",
+            "simple_wing.yaml";
+            n_panels=4,
+            use_prior_polar=true
+        )
+
+        try
+            settings = VSMSettings(settings_file)
+            @test settings.wings[1].use_prior_polar
+
+            wing = Wing(settings)
+            @test wing.use_prior_polar
+        finally
+            rm(settings_file; force=true)
+        end
+    end
+
     @testset "Shared Test Data Usage" begin
         # Demonstrate using module-specific test data files
         simple_wing_file = test_data_path("yaml_geometry", "simple_wing.yaml")

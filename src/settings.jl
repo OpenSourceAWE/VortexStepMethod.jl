@@ -32,6 +32,8 @@ Settings for a single wing, used within [`VSMSettings`](@ref).
     (default `[0, 1, 0]`)
 - `remove_nan`: Whether to remove NaN values from polar data
     (default `true`)
+- `use_prior_polar`: Reuse prior refined/panel polar mapping on
+    reinit/refine updates (default `false`)
 """
 @with_kw mutable struct WingSettings
     name::String = "main_wing"
@@ -42,6 +44,7 @@ Settings for a single wing, used within [`VSMSettings`](@ref).
     spanwise_panel_distribution::PanelDistribution = LINEAR
     spanwise_direction::MVec3 = [0.0, 1.0, 0.0]
     remove_nan = true
+    use_prior_polar::Bool = false
 end
 
 """
@@ -166,6 +169,7 @@ function VSMSettings(filename; data_prefix=true)
                 @warn "grouping_method in settings file is deprecated and ignored." maxlog=1
             end
             wing.remove_nan = wing_data["remove_nan"]
+            wing.use_prior_polar = get(wing_data, "use_prior_polar", false)
 
             push!(vsm_settings.wings, wing)
             n_panels += wing.n_panels

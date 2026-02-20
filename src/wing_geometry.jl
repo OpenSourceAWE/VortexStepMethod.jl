@@ -202,6 +202,7 @@ Represents a wing composed of multiple sections with aerodynamic properties.
 - `sections::Vector{Section}`: Vector of wing sections, see: [Section](@ref)
 - `refined_sections::Vector{Section}`: Vector of refined wing sections, see: [Section](@ref)
 - `remove_nan::Bool`: Wether to remove the NaNs from interpolations or not
+- `use_prior_polar::Bool`: Keep previously-initialized section/panel polar data when refining geometry updates
 
 # Deformation Fields (optional, for deformable wings)
 - `non_deformed_sections::Vector{Section}`: Original undeformed sections
@@ -230,6 +231,7 @@ mutable struct Wing <: AbstractWing
     unrefined_sections::Vector{Section}
     refined_sections::Vector{Section}
     remove_nan::Bool
+    use_prior_polar::Bool
 
     # Grouping
     refined_panel_mapping::Vector{Int16}  # Maps each refined panel index to unrefined section index (1 to n_unrefined_sections)
@@ -257,7 +259,8 @@ end
          n_unrefined_sections=nothing,
          spanwise_distribution::PanelDistribution=LINEAR,
          spanwise_direction::PosVector=MVec3([0.0, 1.0, 0.0]),
-         remove_nan::Bool=true)
+         remove_nan::Bool=true,
+         use_prior_polar::Bool=false)
 
 Constructor for a [Wing](@ref) struct with default values that initializes the sections
 and refined sections as empty arrays. Creates a basic wing suitable for YAML-based construction.
@@ -268,12 +271,14 @@ and refined sections as empty arrays. Creates a basic wing suitable for YAML-bas
 - `spanwise_distribution`::PanelDistribution = LINEAR: [PanelDistribution](@ref)
 - `spanwise_direction::MVec3` = MVec3([0.0, 1.0, 0.0]): Wing span direction vector
 - `remove_nan::Bool`: Wether to remove the NaNs from interpolations or not
+- `use_prior_polar::Bool`: Reuse prior refined/panel polar mapping during geometry-only updates
 """
 function Wing(n_panels::Int;
         n_unrefined_sections=nothing,
         spanwise_distribution::PanelDistribution=LINEAR,
         spanwise_direction::PosVector=MVec3([0.0, 1.0, 0.0]),
-        remove_nan=true)
+        remove_nan=true,
+        use_prior_polar=false)
 
     # For YAML wings, n_unrefined_sections will be set when sections are added
     # Set to 0 as placeholder for now
@@ -284,7 +289,7 @@ function Wing(n_panels::Int;
     # Initialize with default/empty values for optional fields
     Wing(
         n_panels, n_unrefined_sections_value, spanwise_distribution, panel_props, spanwise_direction,
-        Section[], Section[], remove_nan,
+        Section[], Section[], remove_nan, use_prior_polar,
         # Grouping
         Int16[],
         # Deformation fields
@@ -645,6 +650,17 @@ function update_non_deformed_sections!(wing::AbstractWing)
     return nothing
 end
 
+@inline function _has_initialized_section_aero_data(section::Section)
+    section.aero_model == INVISCID && return true
+    return !isnothing(section.aero_data)
+end
+
+@inline function _can_reuse_prior_refined_polar_data(wing::AbstractWing, n_sections::Int)
+    wing.use_prior_polar || return false
+    length(wing.refined_sections) == n_sections || return false
+    return all(_has_initialized_section_aero_data, wing.refined_sections)
+end
+
 """
     refine!(wing::AbstractWing; recompute_mapping=true, sort_sections=true)
 
@@ -703,6 +719,7 @@ function refine!(wing::AbstractWing; recompute_mapping=true, sort_sections=true)
     #TODO: only works if can be sorted by global y position
     sort_sections && sort!(wing.unrefined_sections, by=s -> s.LE_point[2], rev=true)
     n_sections = wing.n_panels + 1
+    reuse_aero_data = _can_reuse_prior_refined_polar_data(wing, n_sections)
 
     if length(wing.refined_sections) == 0
         if wing.spanwise_distribution == UNCHANGED ||
@@ -738,7 +755,17 @@ function refine!(wing::AbstractWing; recompute_mapping=true, sort_sections=true)
     # Handle special cases
     if wing.spanwise_distribution == UNCHANGED || length(wing.unrefined_sections) == n_sections
         for i in eachindex(wing.unrefined_sections)
-            reinit!(wing.refined_sections[i], wing.unrefined_sections[i])
+            if reuse_aero_data
+                section = wing.unrefined_sections[i]
+                reinit!(
+                    wing.refined_sections[i],
+                    section.LE_point,
+                    section.TE_point,
+                    section.aero_model
+                )
+            else
+                reinit!(wing.refined_sections[i], wing.unrefined_sections[i])
+            end
         end
         recompute_mapping && compute_refined_panel_mapping!(wing)
         update_non_deformed_sections!(wing)
@@ -749,8 +776,20 @@ function refine!(wing::AbstractWing; recompute_mapping=true, sort_sections=true)
 
     # Handle two-section case
     if n_sections == 2
-        reinit!(wing.refined_sections[1], LE[1,:], TE[1,:], aero_model[1], aero_data[1])
-        reinit!(wing.refined_sections[2], LE[end,:], TE[end,:], aero_model[end], aero_data[end])
+        reinit!(
+            wing.refined_sections[1],
+            LE[1,:],
+            TE[1,:],
+            aero_model[1],
+            reuse_aero_data ? nothing : aero_data[1]
+        )
+        reinit!(
+            wing.refined_sections[2],
+            LE[end,:],
+            TE[end,:],
+            aero_model[end],
+            reuse_aero_data ? nothing : aero_data[end]
+        )
         recompute_mapping && compute_refined_panel_mapping!(wing)
         update_non_deformed_sections!(wing)
         return nothing
@@ -758,7 +797,7 @@ function refine!(wing::AbstractWing; recompute_mapping=true, sort_sections=true)
 
     # Handle different distribution types
     if wing.spanwise_distribution == SPLIT_PROVIDED
-        refine_mesh_by_splitting_provided_sections!(wing)
+        refine_mesh_by_splitting_provided_sections!(wing; reuse_aero_data)
     elseif wing.spanwise_distribution in (LINEAR, COSINE)
         refine_mesh_for_linear_cosine_distribution!(
             wing,
@@ -768,7 +807,8 @@ function refine!(wing::AbstractWing; recompute_mapping=true, sort_sections=true)
             LE,
             TE,
             aero_model,
-            aero_data
+            aero_data;
+            reuse_aero_data
         )
     else
         throw(ArgumentError("Unsupported spanwise panel distribution: $(wing.spanwise_distribution)"))
@@ -984,7 +1024,8 @@ function refine_mesh_for_linear_cosine_distribution!(
     TE,
     aero_model,
     aero_data;
-    endpoints=true)
+    endpoints=true,
+    reuse_aero_data::Bool=false)
 
     # 1. Compute quarter chord line
     quarter_chord = LE .+ 0.25 .* (TE .- LE)
@@ -1053,8 +1094,9 @@ function refine_mesh_for_linear_cosine_distribution!(
         new_LE[i,:] = new_quarter_chord[i,:] .- 0.25 .* avg_chord
         new_TE[i,:] = new_quarter_chord[i,:] .+ 0.75 .* avg_chord
 
-        # Interpolate aero properties
-        new_data = calculate_new_aero_data(aero_model, aero_data, section_index, left_weight, right_weight)
+        # Interpolate aero properties unless reusing prior refined section aero.
+        new_data = reuse_aero_data ? nothing :
+            calculate_new_aero_data(aero_model, aero_data, section_index, left_weight, right_weight)
 
         # Create new section
         if endpoints || (i != 1 && i != n_sections)
@@ -1074,7 +1116,7 @@ Refine mesh by splitting provided sections into desired number of panels.
 Returns:
     Vector{Section}: Refined sections
 """
-function refine_mesh_by_splitting_provided_sections!(wing::AbstractWing)
+function refine_mesh_by_splitting_provided_sections!(wing::AbstractWing; reuse_aero_data::Bool=false)
     n_sections_provided = length(wing.unrefined_sections)
     n_panels_provided = n_sections_provided - 1
     n_panels_desired = wing.n_panels
@@ -1084,7 +1126,11 @@ function refine_mesh_by_splitting_provided_sections!(wing::AbstractWing)
     # Check if refinement is needed
     if n_panels_provided == n_panels_desired
         for (refined_section, section) in zip(wing.refined_sections, wing.unrefined_sections)
-            reinit!(refined_section, section)
+            if reuse_aero_data
+                reinit!(refined_section, section.LE_point, section.TE_point, section.aero_model)
+            else
+                reinit!(refined_section, section)
+            end
         end
         return nothing
     end
@@ -1112,7 +1158,17 @@ function refine_mesh_by_splitting_provided_sections!(wing::AbstractWing)
     idx = 1
     for left_section_index in 1:n_section_pairs
         # Add left section of pair
-        reinit!(wing.refined_sections[idx], wing.unrefined_sections[left_section_index])
+        if reuse_aero_data
+            left_section = wing.unrefined_sections[left_section_index]
+            reinit!(
+                wing.refined_sections[idx],
+                left_section.LE_point,
+                left_section.TE_point,
+                left_section.aero_model
+            )
+        else
+            reinit!(wing.refined_sections[idx], wing.unrefined_sections[left_section_index])
+        end
         idx += 1
 
         # Calculate new sections for this pair
@@ -1141,13 +1197,24 @@ function refine_mesh_by_splitting_provided_sections!(wing::AbstractWing)
                 TE_pair,
                 aero_model_pair,
                 aero_data_pair;
-                endpoints=false
+                endpoints=false,
+                reuse_aero_data
             )
         end
     end
     
     # Add final section
-    reinit!(wing.refined_sections[idx], wing.unrefined_sections[end])
+    if reuse_aero_data
+        last_section = wing.unrefined_sections[end]
+        reinit!(
+            wing.refined_sections[idx],
+            last_section.LE_point,
+            last_section.TE_point,
+            last_section.aero_model
+        )
+    else
+        reinit!(wing.refined_sections[idx], wing.unrefined_sections[end])
+    end
     idx += 1
     
     # Validate result

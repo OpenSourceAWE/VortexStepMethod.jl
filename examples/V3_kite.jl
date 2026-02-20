@@ -9,18 +9,18 @@ DEFORM = false
 
 project_dir = dirname(dirname(pathof(VortexStepMethod)))  # Go up one level from src to project root#
 literature_paths = [
-    joinpath(project_dir, "data", "TUDELFT_V3_KITE", "literature_results","CFD_RANS_Rey_5e5_Poland2025_alpha_sweep_beta_0_NoStruts.csv"),
-    joinpath(project_dir, "data", "TUDELFT_V3_KITE", "literature_results","CFD_RANS_Rey_10e5_Poland2025_alpha_sweep_beta_0.csv"),
-    joinpath(project_dir, "data", "TUDELFT_V3_KITE", "literature_results","python_alpha_sweep.csv"),
-    joinpath(project_dir, "data", "TUDELFT_V3_KITE", "literature_results","windtunnel_alpha_sweep_beta_00_0_Poland_2025_Rey_5e5.csv"),
-    ]
-labels= [
-    "Julia VSM 2D CFD PCHIP NF",
-    "CFD RANS Re=5e5",
-    "CFD RANS Re=10e5 (With Struts)",
-    "Python VSM 2D CFD PCHIP NF Re=5e5",
-    "Wind Tunnel Re=5e5 (With Struts)"
-    ]
+    joinpath(project_dir, "data", "TUDELFT_V3_KITE", "literature_results", "CFD_RANS_Rey_5e5_Poland2025_alpha_sweep_beta_0_NoStruts.csv"),
+    joinpath(project_dir, "data", "TUDELFT_V3_KITE", "literature_results", "CFD_RANS_Rey_10e5_Poland2025_alpha_sweep_beta_0.csv"),
+    joinpath(project_dir, "data", "TUDELFT_V3_KITE", "literature_results", "python_alpha_sweep.csv"),
+    joinpath(project_dir, "data", "TUDELFT_V3_KITE", "literature_results", "windtunnel_alpha_sweep_beta_00_0_Poland_2025_Rey_5e5.csv"),
+]
+labels = [
+    "VSM Julia Re=5e5",
+    "CFD Re=5e5",
+    "CFD Re=10e5", #with struts
+    "VSM Python Re=5e5",
+    "WindTunnel Re=5e5" #with struts
+]
 beta_literature_paths = [
     joinpath(project_dir, "data", "TUDELFT_V3_KITE", "literature_results", "windtunnel_beta_sweep_alpha_07_4_Poland_2025_Rey_5e5.csv"),
     # joinpath(project_dir, "data", "TUDELFT_V3_KITE", "literature_results", "windtunnel_beta_sweep_alpha_12_5_Poland_2025_Rey_5e5.csv"),
@@ -99,7 +99,7 @@ fig1 = plot_combined_analysis(
     solver,
     body_aero,
     results;
-    solver_label="VSM",
+    labels=labels,
     literature_path_list=literature_paths,
     angle_range=range(-5, 25, length=31),
     angle_type="angle_of_attack",
@@ -224,7 +224,7 @@ function plot_polars(
             v_a=v_a,
             use_solve=use_solve
         )
-        @info "polar sample (solver)" label=lbl first_cl=pd.cl[1] first_cd=pd.cd[1] first_cs=pd.cs[1] first_cmy=pd.cmy[1]
+        @info "polar sample (solver)" label = lbl first_cl = pd.cl[1] first_cd = pd.cd[1] first_cs = pd.cs[1] first_cmy = pd.cmy[1]
         push!(polar_data_list, pd)
         re_tag = round(Int, first(pd.rey) * 1e-5)
         push!(labels_full, "$(lbl) Re=$(re_tag)e5")
@@ -245,12 +245,12 @@ function plot_polars(
         isnothing(angle_idx) && throw(ArgumentError(
             "Could not find angle column for angle_type='$angle_type' in literature file: $path"
         ))
-        cl_idx    = findfirst(x -> occursin("cl", x), header)
-        cd_idx    = findfirst(x -> occursin("cd", x), header)
-        cs_idx    = findfirst(x -> occursin("cs", x), header)
-        cmx_idx   = findfirst(x -> occursin("cmx", x), header)
-        cmy_idx   = findfirst(x -> occursin("cmy", x), header)
-        cmz_idx   = findfirst(x -> occursin("cmz", x), header)
+        cl_idx = findfirst(x -> occursin("cl", x), header)
+        cd_idx = findfirst(x -> occursin("cd", x), header)
+        cs_idx = findfirst(x -> occursin("cs", x), header)
+        cmx_idx = findfirst(x -> occursin("cmx", x), header)
+        cmy_idx = findfirst(x -> occursin("cmy", x), header)
+        cmz_idx = findfirst(x -> occursin("cmz", x), header)
 
         parse_col(col) = begin
             vals = Float64[]
@@ -267,12 +267,12 @@ function plot_polars(
         end
 
         angle_col = parse_col(data[2:end, angle_idx])
-        cl_col    = parse_col(data[2:end, cl_idx])
-        cd_col    = parse_col(data[2:end, cd_idx])
-        cs_col    = cs_idx === nothing ? zeros(size(data, 1)-1) : parse_col(data[2:end, cs_idx])
-        cmx_col   = cmx_idx === nothing ? fill(NaN, size(data, 1)-1) : parse_col(data[2:end, cmx_idx])
-        cmy_col   = cmy_idx === nothing ? fill(NaN, size(data, 1)-1) : parse_col(data[2:end, cmy_idx])
-        cmz_col   = cmz_idx === nothing ? fill(NaN, size(data, 1)-1) : parse_col(data[2:end, cmz_idx])
+        cl_col = parse_col(data[2:end, cl_idx])
+        cd_col = parse_col(data[2:end, cd_idx])
+        cs_col = cs_idx === nothing ? zeros(size(data, 1) - 1) : parse_col(data[2:end, cs_idx])
+        cmx_col = cmx_idx === nothing ? fill(NaN, size(data, 1) - 1) : parse_col(data[2:end, cmx_idx])
+        cmy_col = cmy_idx === nothing ? fill(NaN, size(data, 1) - 1) : parse_col(data[2:end, cmy_idx])
+        cmz_col = cmz_idx === nothing ? fill(NaN, size(data, 1) - 1) : parse_col(data[2:end, cmz_idx])
 
         push!(polar_data_list, (angle=angle_col, cl=cl_col, cd=cd_col, cs=cs_col, cmx=cmx_col, cmy=cmy_col, cmz=cmz_col, rey=fill(NaN, length(angle_col))))
         push!(labels_full, lbl)
@@ -281,17 +281,17 @@ function plot_polars(
     fig = Figure(size=fig_size)
     Label(fig[0, :], title; fontsize=20, font=:bold)
 
-    ax_cl  = Axis(fig[1, 1], title="CL vs $angle_type [deg]",  xlabel="$angle_type [deg]", ylabel="CL [-]")
-    ax_cd  = Axis(fig[1, 2], title="CD vs $angle_type [deg]",  xlabel="$angle_type [deg]", ylabel="CD [-]")
-    ax_cs  = Axis(fig[1, 3], title="CS vs $angle_type [deg]",  xlabel="$angle_type [deg]", ylabel="CS [-]")
+    ax_cl = Axis(fig[1, 1], title="CL vs $angle_type [deg]", xlabel="$angle_type [deg]", ylabel="CL [-]")
+    ax_cd = Axis(fig[1, 2], title="CD vs $angle_type [deg]", xlabel="$angle_type [deg]", ylabel="CD [-]")
+    ax_cs = Axis(fig[1, 3], title="CS vs $angle_type [deg]", xlabel="$angle_type [deg]", ylabel="CS [-]")
     ax_cmx = Axis(fig[2, 1], title="CMx vs $angle_type [deg]", xlabel="$angle_type [deg]", ylabel="CMx [-]")
     ax_cmy = Axis(fig[2, 2], title="CMy vs $angle_type [deg]", xlabel="$angle_type [deg]", ylabel="CMy [-]")
     ax_cmz = Axis(fig[2, 3], title="CMz vs $angle_type [deg]", xlabel="$angle_type [deg]", ylabel="CMz [-]")
 
     # Force truly equal columns independent of axis decoration sizes.
-    colsize!(fig.layout, 1, Relative(1/3))
-    colsize!(fig.layout, 2, Relative(1/3))
-    colsize!(fig.layout, 3, Relative(1/3))
+    colsize!(fig.layout, 1, Relative(1 / 3))
+    colsize!(fig.layout, 2, Relative(1 / 3))
+    colsize!(fig.layout, 3, Relative(1 / 3))
 
     # Keep the inner plotting rectangles aligned as well.
     for ax in (ax_cl, ax_cd, ax_cs, ax_cmx, ax_cmy, ax_cmz)
