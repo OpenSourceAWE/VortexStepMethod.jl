@@ -202,6 +202,24 @@ Represents a wing composed of multiple sections with aerodynamic properties.
 - `sections::Vector{Section}`: Vector of wing sections, see: [Section](@ref)
 - `refined_sections::Vector{Section}`: Vector of refined wing sections, see: [Section](@ref)
 - `remove_nan::Bool`: Wether to remove the NaNs from interpolations or not
+- `use_prior_polar::Bool`: Keep previously-initialized section/panel polar data when refining geometry updates
+
+# Deformation Fields (optional, for deformable wings)
+- `non_deformed_sections::Vector{Section}`: Original undeformed sections
+- `theta_dist::Vector{Float64}`: Panel twist angle distribution
+- `delta_dist::Vector{Float64}`: Trailing edge deflection distribution
+
+# Physical Properties (optional, for OBJ-based wings)
+- `mass::Float64`: Total wing mass in kg (0.0 if not applicable)
+- `gamma_tip::Float64`: Angular extent from center to wing tip (0.0 if not applicable)
+- `inertia_tensor::Matrix{Float64}`: 3x3 inertia tensor (empty if not applicable)
+- `T_cad_body::MVec3`: Translation from CAD to body frame (zeros if not applicable)
+- `R_cad_body::MMat3`: Rotation from CAD to body frame (identity if not applicable)
+- `radius::Float64`: Wing curvature radius (0.0 if not applicable)
+- `le_interp::Union{Nothing, NTuple{3, Extrapolation}}`: Leading edge interpolation
+- `te_interp::Union{Nothing, NTuple{3, Extrapolation}}`: Trailing edge interpolation
+- `area_interp::Union{Nothing, Extrapolation}`: Area interpolation
+- `cache::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}}`: Preallocated buffers
 
 # Deformation Fields (optional, for deformable wings)
 - `non_deformed_sections::Vector{Section}`: Original undeformed sections
@@ -230,6 +248,7 @@ mutable struct Wing <: AbstractWing
     unrefined_sections::Vector{Section}
     refined_sections::Vector{Section}
     remove_nan::Bool
+    use_prior_polar::Bool
 
     # Grouping
     refined_panel_mapping::Vector{Int16}  # Maps each refined panel index to unrefined section index (1 to n_unrefined_sections)
@@ -257,7 +276,8 @@ end
          n_unrefined_sections=nothing,
          spanwise_distribution::PanelDistribution=LINEAR,
          spanwise_direction::PosVector=MVec3([0.0, 1.0, 0.0]),
-         remove_nan::Bool=true)
+         remove_nan::Bool=true,
+         use_prior_polar::Bool=false)
 
 Constructor for a [Wing](@ref) struct with default values that initializes the sections
 and refined sections as empty arrays. Creates a basic wing suitable for YAML-based construction.
@@ -268,12 +288,14 @@ and refined sections as empty arrays. Creates a basic wing suitable for YAML-bas
 - `spanwise_distribution`::PanelDistribution = LINEAR: [PanelDistribution](@ref)
 - `spanwise_direction::MVec3` = MVec3([0.0, 1.0, 0.0]): Wing span direction vector
 - `remove_nan::Bool`: Wether to remove the NaNs from interpolations or not
+- `use_prior_polar::Bool`: Reuse prior refined/panel polar mapping during geometry-only updates
 """
 function Wing(n_panels::Int;
         n_unrefined_sections=nothing,
         spanwise_distribution::PanelDistribution=LINEAR,
         spanwise_direction::PosVector=MVec3([0.0, 1.0, 0.0]),
-        remove_nan=true)
+        remove_nan=true,
+        use_prior_polar=false)
 
     # For YAML wings, n_unrefined_sections will be set when sections are added
     # Set to 0 as placeholder for now
@@ -284,7 +306,7 @@ function Wing(n_panels::Int;
     # Initialize with default/empty values for optional fields
     Wing(
         n_panels, n_unrefined_sections_value, spanwise_distribution, panel_props, spanwise_direction,
-        Section[], Section[], remove_nan,
+        Section[], Section[], remove_nan, use_prior_polar,
         # Grouping
         Int16[],
         # Deformation fields
@@ -645,6 +667,17 @@ function update_non_deformed_sections!(wing::AbstractWing)
     return nothing
 end
 
+@inline function _has_initialized_section_aero_data(section::Section)
+    section.aero_model == INVISCID && return true
+    return !isnothing(section.aero_data)
+end
+
+@inline function _can_reuse_prior_refined_polar_data(wing::AbstractWing, n_sections::Int)
+    wing.use_prior_polar || return false
+    length(wing.refined_sections) == n_sections || return false
+    return all(_has_initialized_section_aero_data, wing.refined_sections)
+end
+
 """
     refine!(wing::AbstractWing; recompute_mapping=true, sort_sections=true)
 
@@ -666,13 +699,12 @@ body_aero = BodyAerodynamics([wing])   # Create aerodynamics
 # Distribution Methods
 - `LINEAR`: Linear interpolation between sections
 - `COSINE`: Cosine spacing (more panels near tips)
-- `COSINE_VAN_GARREL`: van Garrel cosine distribution
 - `SPLIT_PROVIDED`: Split each unrefined section into sub-panels
 - `UNCHANGED`: 1:1 copy when n_unrefined_sections == n_panels+1
 
 # Keyword Arguments
 - `recompute_mapping::Bool=true`: Recompute the mapping from refined panels to unrefined sections
-- `sort_sections::Bool=true`: Sort sections by spanwise position (disable for structural ordering)
+- `sort_sections::Bool=true`: Sort sections by spanwise position using global `LE_point[2]` (Y-axis). Disable for structural ordering.
 
 # Effects
 1. Populates `wing.refined_sections` (n_panels+1 sections)
@@ -701,13 +733,15 @@ function refine!(wing::AbstractWing; recompute_mapping=true, sort_sections=true)
     end
 
     # Only sort sections if requested (skip for REFINE wings with fixed structural order)
+    #TODO: only works if can be sorted by global y position
     sort_sections && sort!(wing.unrefined_sections, by=s -> s.LE_point[2], rev=true)
     n_sections = wing.n_panels + 1
+    reuse_aero_data = _can_reuse_prior_refined_polar_data(wing, n_sections)
 
     if length(wing.refined_sections) == 0
         if wing.spanwise_distribution == UNCHANGED ||
                length(wing.unrefined_sections) == n_sections
-            wing.refined_sections = wing.unrefined_sections
+            wing.refined_sections = copy(wing.unrefined_sections)
             recompute_mapping && compute_refined_panel_mapping!(wing)
             update_non_deformed_sections!(wing)
             return nothing
@@ -738,7 +772,17 @@ function refine!(wing::AbstractWing; recompute_mapping=true, sort_sections=true)
     # Handle special cases
     if wing.spanwise_distribution == UNCHANGED || length(wing.unrefined_sections) == n_sections
         for i in eachindex(wing.unrefined_sections)
-            reinit!(wing.refined_sections[i], wing.unrefined_sections[i])
+            if reuse_aero_data
+                section = wing.unrefined_sections[i]
+                reinit!(
+                    wing.refined_sections[i],
+                    section.LE_point,
+                    section.TE_point,
+                    section.aero_model
+                )
+            else
+                reinit!(wing.refined_sections[i], wing.unrefined_sections[i])
+            end
         end
         recompute_mapping && compute_refined_panel_mapping!(wing)
         update_non_deformed_sections!(wing)
@@ -749,8 +793,20 @@ function refine!(wing::AbstractWing; recompute_mapping=true, sort_sections=true)
 
     # Handle two-section case
     if n_sections == 2
-        reinit!(wing.refined_sections[1], LE[1,:], TE[1,:], aero_model[1], aero_data[1])
-        reinit!(wing.refined_sections[2], LE[end,:], TE[end,:], aero_model[end], aero_data[end])
+        reinit!(
+            wing.refined_sections[1],
+            LE[1,:],
+            TE[1,:],
+            aero_model[1],
+            reuse_aero_data ? nothing : aero_data[1]
+        )
+        reinit!(
+            wing.refined_sections[2],
+            LE[end,:],
+            TE[end,:],
+            aero_model[end],
+            reuse_aero_data ? nothing : aero_data[end]
+        )
         recompute_mapping && compute_refined_panel_mapping!(wing)
         update_non_deformed_sections!(wing)
         return nothing
@@ -758,8 +814,8 @@ function refine!(wing::AbstractWing; recompute_mapping=true, sort_sections=true)
 
     # Handle different distribution types
     if wing.spanwise_distribution == SPLIT_PROVIDED
-        refine_mesh_by_splitting_provided_sections!(wing)
-    elseif wing.spanwise_distribution in (LINEAR, COSINE, COSINE_VAN_GARREL)
+        refine_mesh_by_splitting_provided_sections!(wing; reuse_aero_data)
+    elseif wing.spanwise_distribution in (LINEAR, COSINE)
         refine_mesh_for_linear_cosine_distribution!(
             wing,
             1,
@@ -768,7 +824,8 @@ function refine!(wing::AbstractWing; recompute_mapping=true, sort_sections=true)
             LE,
             TE,
             aero_model,
-            aero_data
+            aero_data;
+            reuse_aero_data
         )
     else
         throw(ArgumentError("Unsupported spanwise panel distribution: $(wing.spanwise_distribution)"))
@@ -805,7 +862,7 @@ Compute the mapping from refined panels to unrefined sections by finding
 the closest unrefined section for each refined panel (based on section center distance).
 Maps each refined panel index to its corresponding unrefined section index
 (1 to n_unrefined_sections).
-This is non-allocating and works after refinement is complete.
+Works after refinement is complete.
 """
 function compute_refined_panel_mapping!(wing::AbstractWing)
     n_unrefined_sections = length(wing.unrefined_sections)
@@ -889,9 +946,13 @@ function calculate_new_aero_data(aero_model,
             alpha_left, CL_left, CD_left, CM_left = polar_left
             alpha_right, CL_right, CD_right, CM_right = polar_right
 
-            # Create common alpha array
-            !all(isapprox.(alpha_left, alpha_right)) && @error "Make sure you use the same alpha range for all your interpolations."
-            !isa(CL_right, AbstractVector) && @error "Provide polar data in the correct format: (alpha, cl, cd, cm)"
+            (
+                length(alpha_left) == length(alpha_right) &&
+                all(isapprox.(diff(alpha_left), diff(alpha_right)))
+            ) || throw(ArgumentError("Alpha steps must be identical."))
+            isa(CL_right, AbstractVector) || throw(ArgumentError(
+                "Provide polar data in the correct format."
+            ))
             
             # Weighted interpolation
             CL_data = CL_left .* left_weight .+ CL_right .* right_weight
@@ -904,10 +965,17 @@ function calculate_new_aero_data(aero_model,
             alpha_left, delta_left, CL_left, CD_left, CM_left = polar_left
             alpha_right, delta_right, CL_right, CD_right, CM_right = polar_right
             
-            # Create common alpha array
-            !all(isapprox.(alpha_left, alpha_right)) && @error "Make sure you use the same alpha range for all your interpolations."
-            !all(isapprox.(delta_left, delta_right)) && @error "Make sure you use the same alpha range for all your interpolations."
-            !isa(CL_right, AbstractMatrix) && @error "Provide polar data in the correct format: (alpha, delta, cl, cd, cm)"
+            (
+                length(alpha_left) == length(alpha_right) &&
+                all(isapprox.(diff(alpha_left), diff(alpha_right)))
+            ) || throw(ArgumentError("Alpha steps must be identical."))
+            (
+                length(delta_left) == length(delta_right) &&
+                all(isapprox.(diff(delta_left), diff(delta_right)))
+            ) || throw(ArgumentError("Delta steps must be identical."))
+            isa(CL_right, AbstractMatrix) || throw(ArgumentError(
+                "Provide polar data in the correct format."
+            ))
 
             # Weighted interpolation
             CL_data = CL_left .* left_weight .+ CL_right .* right_weight
@@ -973,7 +1041,8 @@ function refine_mesh_for_linear_cosine_distribution!(
     TE,
     aero_model,
     aero_data;
-    endpoints=true)
+    endpoints=true,
+    reuse_aero_data::Bool=false)
 
     # 1. Compute quarter chord line
     quarter_chord = LE .+ 0.25 .* (TE .- LE)
@@ -986,7 +1055,7 @@ function refine_mesh_for_linear_cosine_distribution!(
     # 2. Define target lengths
     target_lengths = if spanwise_distribution == LINEAR
         range(0, qc_total_length, n_sections)
-    elseif spanwise_distribution in (COSINE, COSINE_VAN_GARREL)
+    elseif spanwise_distribution == COSINE
         theta = range(0, π, n_sections)
         qc_total_length .* (1 .- cos.(theta)) ./ 2
     else
@@ -1042,8 +1111,9 @@ function refine_mesh_for_linear_cosine_distribution!(
         new_LE[i,:] = new_quarter_chord[i,:] .- 0.25 .* avg_chord
         new_TE[i,:] = new_quarter_chord[i,:] .+ 0.75 .* avg_chord
 
-        # Interpolate aero properties
-        new_data = calculate_new_aero_data(aero_model, aero_data, section_index, left_weight, right_weight)
+        # Interpolate aero properties unless reusing prior refined section aero.
+        new_data = reuse_aero_data ? nothing :
+            calculate_new_aero_data(aero_model, aero_data, section_index, left_weight, right_weight)
 
         # Create new section
         if endpoints || (i != 1 && i != n_sections)
@@ -1052,72 +1122,8 @@ function refine_mesh_for_linear_cosine_distribution!(
         end
     end
 
-    # Apply van Garrel distribution if requested
-    if spanwise_distribution == COSINE_VAN_GARREL
-        idx = calculate_cosine_van_Garrel!(wing, idx)
-    end
-
     return idx
 end
-
-
-"""
-    calculate_cosine_van_Garrel!(wing::AbstractWing, idx)
-
-Calculate van Garrel cosine distribution of sections.
-Reference: http://dx.doi.org/10.13140/RG.2.1.2773.8000
-
-Returns:
-    idx
-"""
-function calculate_cosine_van_Garrel!(wing::AbstractWing, idx)
-    n = length(sections)
-    
-    # Calculate chords and quarter chords
-    chords = [section.TE_point - section.LE_point for section in sections]
-    quarter_chords = [section.LE_point + 0.25 * chord for (section, chord) in zip(sections, chords)]
-    
-    # Calculate widths
-    widths = [norm(quarter_chords[i+1] - quarter_chords[i]) for i in 1:n-1]
-    
-    # Calculate correction factors
-    eta_cp = zeros(n-1)
-    
-    # First panel
-    eta_cp[1] = widths[1] / (widths[1] + widths[2])
-    
-    # Internal panels
-    for j in 2:n-2
-        eta_cp[j] = 0.25 * (
-            widths[j-1] / (widths[j-1] + widths[j]) +
-            widths[j] / (widths[j] + widths[j+1]) + 1
-        )
-    end
-    
-    # Last panel
-    eta_cp[end] = widths[end-1] / (widths[end-1] + widths[end])
-    
-    @debug "Correction factors" eta_cp
-    
-    # Calculate control points
-    control_points = [
-        quarter_chords[i] + eta * (quarter_chords[i+1] - quarter_chords[i])
-        for (i, eta) in enumerate(eta_cp)
-    ]
-    
-    # Generate new sections
-    for (i, (control_point, chord)) in enumerate(zip(control_points, chords))
-        @views reinit!(wing.refined_sections, 
-            control_point - 0.25 * chord, 
-            control_point + 0.75 * chord,
-            sections[i].aero_model, 
-            sections[i].aero_data
-        )
-        idx += 1
-    end
-    return idx
-end
-
 
 """
     refine_mesh_by_splitting_provided_sections!(wing::AbstractWing)
@@ -1127,7 +1133,7 @@ Refine mesh by splitting provided sections into desired number of panels.
 Returns:
     Vector{Section}: Refined sections
 """
-function refine_mesh_by_splitting_provided_sections!(wing::AbstractWing)
+function refine_mesh_by_splitting_provided_sections!(wing::AbstractWing; reuse_aero_data::Bool=false)
     n_sections_provided = length(wing.unrefined_sections)
     n_panels_provided = n_sections_provided - 1
     n_panels_desired = wing.n_panels
@@ -1137,7 +1143,11 @@ function refine_mesh_by_splitting_provided_sections!(wing::AbstractWing)
     # Check if refinement is needed
     if n_panels_provided == n_panels_desired
         for (refined_section, section) in zip(wing.refined_sections, wing.unrefined_sections)
-            reinit!(refined_section, section)
+            if reuse_aero_data
+                reinit!(refined_section, section.LE_point, section.TE_point, section.aero_model)
+            else
+                reinit!(refined_section, section)
+            end
         end
         return nothing
     end
@@ -1165,7 +1175,17 @@ function refine_mesh_by_splitting_provided_sections!(wing::AbstractWing)
     idx = 1
     for left_section_index in 1:n_section_pairs
         # Add left section of pair
-        reinit!(wing.refined_sections[idx], wing.unrefined_sections[left_section_index])
+        if reuse_aero_data
+            left_section = wing.unrefined_sections[left_section_index]
+            reinit!(
+                wing.refined_sections[idx],
+                left_section.LE_point,
+                left_section.TE_point,
+                left_section.aero_model
+            )
+        else
+            reinit!(wing.refined_sections[idx], wing.unrefined_sections[left_section_index])
+        end
         idx += 1
 
         # Calculate new sections for this pair
@@ -1194,13 +1214,24 @@ function refine_mesh_by_splitting_provided_sections!(wing::AbstractWing)
                 TE_pair,
                 aero_model_pair,
                 aero_data_pair;
-                endpoints=false
+                endpoints=false,
+                reuse_aero_data
             )
         end
     end
     
     # Add final section
-    reinit!(wing.refined_sections[idx], wing.unrefined_sections[end])
+    if reuse_aero_data
+        last_section = wing.unrefined_sections[end]
+        reinit!(
+            wing.refined_sections[idx],
+            last_section.LE_point,
+            last_section.TE_point,
+            last_section.aero_model
+        )
+    else
+        reinit!(wing.refined_sections[idx], wing.unrefined_sections[end])
+    end
     idx += 1
     
     # Validate result
@@ -1257,7 +1288,8 @@ function calculate_projected_area(wing::AbstractWing,
     LE_next_proj = zeros(MVec3)
     TE_next_proj = zeros(MVec3)
     
-    # Calculate area by summing trapezoid areas
+    # Calculate area by decomposing each projected panel quadrilateral
+    # into two triangles: (A, B, C) and (A, C, D).
     projected_area = 0.0
     for i in 1:(length(wing.unrefined_sections)-1)
         # Get section points
@@ -1272,13 +1304,9 @@ function calculate_projected_area(wing::AbstractWing,
         project_onto_plane!(LE_next_proj, LE_next, z_plane_vector)
         project_onto_plane!(TE_next_proj, TE_next, z_plane_vector)
         
-        # Calculate projected dimensions
-        chord_current = norm(TE_current_proj - LE_current_proj)
-        chord_next = norm(TE_next_proj - LE_next_proj)
-        span = norm(LE_next_proj - LE_current_proj)
-        
-        # Add trapezoid area
-        projected_area += 0.5 * (chord_current + chord_next) * span
+        # Two triangles: A=LE_i, B=TE_i, C=TE_{i+1}, D=LE_{i+1}
+        projected_area += 0.5 * norm(cross(TE_current_proj - LE_current_proj, TE_next_proj - LE_current_proj))
+        projected_area += 0.5 * norm(cross(TE_next_proj - LE_current_proj, LE_next_proj - LE_current_proj))
     end
     
     return projected_area

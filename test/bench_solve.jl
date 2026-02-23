@@ -30,24 +30,23 @@ add_section!(wing,
     INVISCID)
 
 # Step 3: Initialize aerodynamics
-wa = refine!(wing)
-    refine!(wing)
-    body_aero = BodyAerodynamics([wing])
+refine!(wing)
+body_aero = BodyAerodynamics([wing])
 
 # Set inflow conditions
 vel_app = [cos(alpha), 0.0, sin(alpha)] .* v_a
-set_va!(wa, vel_app)
+set_va!(body_aero, vel_app)
 
 # Step 4: Initialize solvers for both LLT and VSM methods
-vsm_solver = Solver(wa; aerodynamic_model_type=VSM)
+vsm_solver = Solver(body_aero; aerodynamic_model_type=VSM)
 
 # Step 5: Solve using both methods
-result = @benchmark  solve_base!($vsm_solver, $wa, nothing)  # 34 allocations
+result = @benchmark  solve_base!($vsm_solver, $body_aero, nothing)  # 34 allocations
 println("solve_base():")
 println("Allocations: ", result.allocs, ", Mean time: ", round(mean(result.times)/1000), " µs")
 # time Python: 32.0 ms  Ryzen 7950x
 # time Julia:   0.45 ms Ryzen 7950x
-result = @benchmark  sol = solve!($vsm_solver, $wa, nothing) # 68 allocations
+result = @benchmark  sol = solve!($vsm_solver, $body_aero, nothing) # 68 allocations
 println("solve!()")
 println("Allocations: ", result.allocs, ", Mean time: ", round(mean(result.times)/1000), " µs")
 nothing

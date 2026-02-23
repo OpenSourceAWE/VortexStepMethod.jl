@@ -13,6 +13,10 @@ The software presented here includes a couple of examples: a rectangular wing, a
 
 This package was translated from the Python code version 1.0.0 available at https://github.com/ocayon/Vortex-Step-Method with some extensions as documented in [News.md](https://github.com/OpenSourceAWE/VortexStepMethod.jl/blob/main/NEWS.md).
 
+Example output is shown in the figure below, where the aerodynamic predictions of the TU Delft V3 LEI kite obtained with the Julia and Python implementations of the VSM are compared against CFD simulations and wind tunnel measurements.
+
+![Example output](docs/v3_example_output.png)
+
 ## Installation
 Install [Julia 1.10](https://ufechner7.github.io/2024/08/09/installing-julia-with-juliaup.html) or later, 
 if you haven't already. On Linux, make sure that Python3 and Matplotlib are installed:

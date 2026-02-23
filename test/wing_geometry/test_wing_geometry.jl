@@ -333,6 +333,42 @@ end
         end
     end
 
+    @testset "use_prior_polar reuses refined aero data" begin
+        alpha = deg2rad.([-5.0, 0.0, 5.0])
+        left_aero = (collect(alpha), [1.0, 1.2, 1.4], [0.1, 0.11, 0.12], [0.01, 0.02, 0.03])
+        right_aero = (collect(alpha), [3.0, 3.2, 3.4], [0.3, 0.31, 0.32], [0.03, 0.04, 0.05])
+
+        wing = Wing(4; spanwise_distribution=LINEAR, use_prior_polar=true)
+        add_section!(wing, [0.0, 1.0, 0.0], [1.0, 1.0, 0.0], POLAR_VECTORS, left_aero)
+        add_section!(wing, [0.0, -1.0, 0.0], [1.0, -1.0, 0.0], POLAR_VECTORS, right_aero)
+        refine!(wing)
+
+        baseline_section_aero = deepcopy(wing.refined_sections[3].aero_data)
+        baseline_le = copy(wing.refined_sections[1].LE_point)
+
+        wing.unrefined_sections[1].aero_data = (collect(alpha), fill(99.0, 3), fill(9.0, 3), fill(0.9, 3))
+        wing.unrefined_sections[2].aero_data = (collect(alpha), fill(-99.0, 3), fill(8.0, 3), fill(-0.8, 3))
+        wing.unrefined_sections[1].LE_point .+= [0.2, 0.0, 0.0]
+        wing.unrefined_sections[1].TE_point .+= [0.2, 0.0, 0.0]
+        refine!(wing)
+
+        @test wing.refined_sections[3].aero_data == baseline_section_aero
+        @test !isapprox(wing.refined_sections[1].LE_point[1], baseline_le[1])
+
+        wing_no_reuse = Wing(4; spanwise_distribution=LINEAR, use_prior_polar=false)
+        add_section!(wing_no_reuse, [0.0, 1.0, 0.0], [1.0, 1.0, 0.0], POLAR_VECTORS, left_aero)
+        add_section!(wing_no_reuse, [0.0, -1.0, 0.0], [1.0, -1.0, 0.0], POLAR_VECTORS, right_aero)
+        refine!(wing_no_reuse)
+        no_reuse_baseline = deepcopy(wing_no_reuse.refined_sections[3].aero_data)
+
+        wing_no_reuse.unrefined_sections[1].aero_data = (collect(alpha), fill(99.0, 3), fill(9.0, 3), fill(0.9, 3))
+        wing_no_reuse.unrefined_sections[2].aero_data = (collect(alpha), fill(-99.0, 3), fill(8.0, 3), fill(-0.8, 3))
+        refine!(wing_no_reuse)
+
+        @test wing_no_reuse.refined_sections[3].aero_data != no_reuse_baseline
+    end
+
+
     @testset "Refined panel mapping" begin
         # Test that refined panel mapping actually maps each panel to its closest unrefined panel
 

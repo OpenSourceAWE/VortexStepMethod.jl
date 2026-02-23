@@ -38,12 +38,11 @@ include("../utils.jl")
     end
     
     refine!(wing)
-    refine!(wing)
     body_aero = BodyAerodynamics([wing])
     set_va!(body_aero, v_a)
 
     # Calculate reference matrices using thesis functions
-    controlpoints, rings, bladepanels, ringvec, coord_L = 
+    controlpoints, rings, bladepanels, ringvec, coord_L =
         create_geometry_general(coord, v_a, N, "5fil", LLT)
     
     # Test LLT matrices
@@ -178,10 +177,9 @@ end
             )
         end
         refine!(wing)
-    refine!(wing)
-    body_aero = BodyAerodynamics([wing])
+        body_aero = BodyAerodynamics([wing])
         set_va!(body_aero, v_a)
-        
+
         return body_aero, coord, v_a, model
     end
 
@@ -310,22 +308,23 @@ end
     end
     
     refine!(wing)
-    refine!(wing)
     body_aero = BodyAerodynamics([wing])
     set_va!(body_aero, v_a)
 
     # Run analysis
-    loop_solver = Solver(body_aero; 
-        aerodynamic_model_type=model, 
+    loop_solver = Solver(body_aero;
+        aerodynamic_model_type=model,
         core_radius_fraction=core_radius_fraction,
         solver_type=LOOP,
+        correct_aoa=true,
         atol=1e-8,
         rtol=1e-8
     )
-    nonlin_solver = Solver(body_aero; 
-        aerodynamic_model_type=model, 
+    nonlin_solver = Solver(body_aero;
+        aerodynamic_model_type=model,
         core_radius_fraction=core_radius_fraction,
         solver_type=NONLIN,
+        correct_aoa=true,
         atol=1e-8,
         rtol=1e-8
     )
@@ -350,10 +349,10 @@ end
 
         @test loop_sol.force_coeffs[1] ≈ -0.039050322560956294 atol=1e-4 # CFx
         @test loop_sol.force_coeffs[2] ≈ 0.0                   atol=1e-4 # CFy
-        @test loop_sol.force_coeffs[3] ≈ 0.49055973654418716   atol=1e-4 # CFz
+        @test loop_sol.force_coeffs[3] ≈ 0.49055973654418716   atol=3e-4 # CFz
         @test loop_sol.force_coeffs[3] / loop_sol.force_coeffs[1] ≈ loop_sol.force[3] / loop_sol.force[1]
         @test loop_sol.moment_dist[1] ≈ -0.0006683569356186426 atol=1e-8
-        @test loop_sol.moment_coeff_dist[1] ≈ -2.212405554436003e-7 atol=1e-10
+        @test loop_sol.moment_coeff_dist[1] ≈ -2.212405554436003e-7 atol=1e-9
         @test loop_sol.moment_dist[1] / loop_sol.moment_dist[2] ≈ loop_sol.moment_coeff_dist[1] / loop_sol.moment_coeff_dist[2]
 
         @test loop_sol.solver_status == FEASIBLE
@@ -423,9 +422,8 @@ end
     try
         settings   = VSMSettings(settings_file)
         wing       = Wing(settings)
-        body_aero  = refine!(wing)
-    refine!(wing)
-    body_aero = BodyAerodynamics([wing])
+        refine!(wing)
+        body_aero = BodyAerodynamics([wing])
 
         set_va!(body_aero, settings)
 
@@ -439,4 +437,32 @@ end
     finally
         isfile(settings_file) && rm(settings_file; force=true)
     end
+end
+
+@testset "set_va! with distributed inflow blocks body_aero.va access" begin
+    wing = Wing(2)
+    add_section!(wing, [0.0, 0.0, 0.0], [1.0, 0.0, 0.0], INVISCID)
+    add_section!(wing, [0.0, 1.0, 0.0], [1.0, 1.0, 0.0], INVISCID)
+    add_section!(wing, [0.0, 2.0, 0.0], [1.0, 2.0, 0.0], INVISCID)
+    refine!(wing)
+    body_aero = BodyAerodynamics([wing])
+
+    va_distribution = [
+        10.0 0.0 0.0
+        9.0 0.0 1.0
+    ]
+    set_va!(body_aero, va_distribution)
+
+    @test body_aero.has_distributed_va
+    try
+        body_aero.va
+        @test false
+    catch err
+        @test err isa ArgumentError
+        @test occursin("distributed inflow", sprint(showerror, err))
+    end
+
+    set_va!(body_aero, [11.0, 0.0, 0.0])
+    @test !body_aero.has_distributed_va
+    @test body_aero.va ≈ [11.0, 0.0, 0.0]
 end

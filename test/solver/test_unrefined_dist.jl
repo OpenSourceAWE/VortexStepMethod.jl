@@ -20,8 +20,7 @@ using Test
             # Create wing and solver
             wing = Wing(settings)
             refine!(wing)
-    refine!(wing)
-    body_aero = BodyAerodynamics([wing])
+            body_aero = BodyAerodynamics([wing])
             solver = Solver(body_aero, settings)
 
             # Set conditions and solve
@@ -81,6 +80,76 @@ using Test
         end
     end
 
+    @testset "Unrefined force consistency: coeff*width*chord" begin
+        # Verify that for each unrefined section:
+        # coeff_unrefined * width_unrefined * chord_unrefined ≈
+        #   sum(coeff_panel * width_panel * chord_panel) for all panels in section
+        settings_file = create_temp_wing_settings(
+            "solver", "solver_test_wing.yaml";
+            alpha=5.0, beta=0.0, wind_speed=10.0)
+
+        try
+            settings = VSMSettings(settings_file)
+            settings.wings[1].n_panels = 20
+            settings.solver_settings.n_panels = 20
+
+            wing = Wing(settings)
+            refine!(wing)
+            body_aero = BodyAerodynamics([wing])
+            solver = Solver(body_aero, settings)
+
+            va = [10.0, 0.0, 0.0]
+            set_va!(body_aero, va)
+            sol = solve!(solver, body_aero)
+
+            panels = body_aero.panels
+            for unrefined_idx in 1:wing.n_unrefined_sections
+                pidxs = findall(
+                    x -> x == unrefined_idx,
+                    wing.refined_panel_mapping)
+                isempty(pidxs) && continue
+
+                # Panel-level sums: coeff * chord * width
+                sum_cl_cw = sum(
+                    sol.cl_dist[i] * panels[i].chord * panels[i].width
+                    for i in pidxs)
+                sum_cd_cw = sum(
+                    sol.cd_dist[i] * panels[i].chord * panels[i].width
+                    for i in pidxs)
+                sum_cm_cw = sum(
+                    sol.cm_dist[i] * panels[i].chord * panels[i].width
+                    for i in pidxs)
+
+                # Unrefined-level product
+                cl_u = sol.cl_unrefined_dist[unrefined_idx]
+                cd_u = sol.cd_unrefined_dist[unrefined_idx]
+                cm_u = sol.cm_unrefined_dist[unrefined_idx]
+                c_u  = sol.chord_unrefined_dist[unrefined_idx]
+                w_u  = sol.width_unrefined_dist[unrefined_idx]
+
+                # Width should be the exact sum of panel widths
+                expected_width = sum(
+                    panels[i].width for i in pidxs)
+                @test w_u ≈ expected_width rtol=1e-12
+
+                # Force-like quantities should be approximately
+                # equal (not exact due to averaging)
+                if !isnan(cl_u)
+                    @test cl_u * c_u * w_u ≈ sum_cl_cw rtol=0.05
+                end
+                if !isnan(cd_u)
+                    @test cd_u * c_u * w_u ≈ sum_cd_cw rtol=0.05
+                end
+                if !isnan(cm_u)
+                    @test cm_u * c_u * w_u ≈ sum_cm_cw rtol=0.05
+                end
+            end
+        finally
+            rm(settings_file; force=true)
+        end
+    end
+
+
     @testset "Unrefined arrays with different panel counts" begin
         # Test with various panel/section combinations
         test_cases = [
@@ -99,8 +168,7 @@ using Test
 
                 wing = Wing(settings)
                 refine!(wing)
-    refine!(wing)
-    body_aero = BodyAerodynamics([wing])
+                body_aero = BodyAerodynamics([wing])
                 solver = Solver(body_aero, settings)
 
                 va = [10.0, 0.0, 0.0]

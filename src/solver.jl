@@ -57,6 +57,8 @@ Struct for storing the solution of the [solve!](@ref) function. Must contain all
     moment::MVec3 = zeros(MVec3)       
     force_coeffs::MVec3 = zeros(MVec3)  
     moment_coeffs::MVec3 = zeros(MVec3)  
+    center_of_pressure::Union{Nothing, MVec3} = nothing
+    panel_cp_locations::Vector{MVec3} = MVec3[]
     moment_dist::MVector{P, Float64} = zeros(P)
     moment_coeff_dist::MVector{P, Float64} = zeros(P)
     moment_unrefined_dist::MVector{U, Float64} = zeros(U)
@@ -86,6 +88,18 @@ end
     va_unit_dist::Matrix{Float64} = zeros(P, 3)
 end
 
+@inline function check_reference_point(reference_point)
+    msg = "reference_point must be a list/array with 3 numbers."
+    reference_point isa AbstractVector || throw(ArgumentError(msg))
+    length(reference_point) == 3 || throw(ArgumentError(msg))
+    all(x -> x isa Number, reference_point) || throw(ArgumentError(msg))
+    try
+        return MVec3(Float64(reference_point[1]), Float64(reference_point[2]), Float64(reference_point[3]))
+    catch
+        throw(ArgumentError(msg))
+    end
+end
+
 """
     Solver
 
@@ -107,9 +121,11 @@ Main solver structure for the Vortex Step Method.See also: [solve](@ref)
 
 ## Additional settings
 - `type_initial_gamma_distribution`::InitialGammaDistribution = ELLIPTIC: see: [InitialGammaDistribution](@ref)
+- `use_gamma_prev`::Bool = true: reuse provided previous gamma as initial guess when available
 - `core_radius_fraction`::Float64 = 1e-20: 
 - mu::Float64 = 1.81e-5: Dynamic viscosity [N·s/m²]
 - `is_only_f_and_gamma_output`::Bool = false: Whether to only output f and gamma
+- `reference_point`::MVec3 = [0.0, 0.0, 0.0]: Moment reference point in body frame
 
 ## Solution
 sol::VSMSolution = VSMSolution(): The result of calling [solve!](@ref) 
@@ -135,10 +151,12 @@ sol::VSMSolution = VSMSolution(): The result of calling [solve!](@ref)
     
     # Additional settings
     type_initial_gamma_distribution::InitialGammaDistribution = ZEROS
-    core_radius_fraction::Float64 = 1e-20
+    use_gamma_prev::Bool = true
+    core_radius_fraction::Float64 = 0.05
     mu::Float64 = 1.81e-5
     is_only_f_and_gamma_output::Bool = false
     correct_aoa::Bool = false
+    reference_point::MVec3 = zeros(MVec3)
 
     # Intermediate results
     lr::LoopResult{P} = LoopResult{P}()
@@ -151,27 +169,40 @@ sol::VSMSolution = VSMSolution(): The result of calling [solve!](@ref)
     sol::VSMSolution{P,U} = VSMSolution{P,U}()
 end
 
-function Solver(body_aero; kwargs...)
+function Solver(body_aero; reference_point=[0.0, 0.0, 0.0], kwargs...)
     P = length(body_aero.panels)
     U = sum([wing.n_unrefined_sections for wing in body_aero.wings])
-    return Solver{P,U}(; kwargs...)
+    reference_point_checked = check_reference_point(reference_point)
+    return Solver{P,U}(; reference_point=reference_point_checked, kwargs...)
 end
 
 function Solver(body_aero, settings::VSMSettings)
+    ss = settings.solver_settings
+    solver_type = ss.solver_type == "NONLIN" ? NONLIN : LOOP
+    reference_point = hasproperty(ss, :reference_point) ? ss.reference_point : [0.0, 0.0, 0.0]
     Solver(body_aero;
-        aerodynamic_model_type=settings.solver_settings.aerodynamic_model_type,
-        density=settings.solver_settings.density,
-        max_iterations=settings.solver_settings.max_iterations,
-        rtol=settings.solver_settings.rtol,
-        relaxation_factor=settings.solver_settings.relaxation_factor,
-        core_radius_fraction=settings.solver_settings.core_radius_fraction,
-        correct_aoa=settings.solver_settings.correct_aoa,
+        solver_type,
+        aerodynamic_model_type=ss.aerodynamic_model_type,
+        density=ss.density,
+        max_iterations=ss.max_iterations,
+        rtol=ss.rtol,
+        tol_reference_error=ss.tol_reference_error,
+        relaxation_factor=ss.relaxation_factor,
+        is_with_artificial_damping=ss.artificial_damping,
+        artificial_damping=(k2=ss.k2, k4=ss.k4),
+        type_initial_gamma_distribution=ss.type_initial_gamma_distribution,
+        use_gamma_prev=ss.use_gamma_prev,
+        core_radius_fraction=ss.core_radius_fraction,
+        mu=ss.mu,
+        is_only_f_and_gamma_output=ss.calc_only_f_and_gamma,
+        correct_aoa=ss.correct_aoa,
+        reference_point=reference_point,
     )
 end
 
 """
     solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=solver.sol.gamma_distribution; 
-          log=false, reference_point=zeros(MVec3), moment_frac=0.1)
+          log=false, reference_point=solver.reference_point, moment_frac=0.1)
 
 Main solving routine for the aerodynamic model. Reference point is in the kite body (KB) frame.
 This version is modifying the `solver.sol` struct and is faster than the `solve` function which returns
@@ -184,17 +215,17 @@ a dictionary.
 
 # Keyword Arguments:
 - log=false: If true, print the number of iterations and other info.
-- reference_point=zeros(MVec3)
+- reference_point=solver.reference_point
 - moment_frac=0.1: X-coordinate of normalized panel around which the moment distribution should be calculated.
 
 # Returns
 The solution of type [VSMSolution](@ref)
 """
 function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=solver.sol.gamma_distribution; 
-        log=false, reference_point=zeros(MVec3), moment_frac=0.1)
+        log=false, reference_point=solver.reference_point, moment_frac=0.1)
 
     # calculate intermediate result
-    solve_base!(solver, body_aero, gamma_distribution; log, reference_point)
+    solve_base!(solver, body_aero, gamma_distribution; log, reference_point=reference_point)
     gamma_new = solver.lr.gamma_new
     if !isnothing(solver.sol.gamma_distribution)
         solver.sol.gamma_distribution .= gamma_new
@@ -227,24 +258,32 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
         cd_dist[i], cm_dist[i] = calculate_cd_cm(panel, alpha_dist[i])
         width_dist[i] = panel.width
 
-        # Geometric AoA using panel-local axes and prescribed freestream
-        # @views makes slices like solver.sol._va_dist[i, :] return views instead of copies. 
-        #   Without it, each [...] would allocate a new array; with it, you reuse a lightweight 
-        #   window into the original array, which cuts allocations in this tight loop.
-        @views begin
-            va_panel = solver.sol._va_dist[i, :]
-            x_airf = solver.sol._x_airf_dist[i, :]
-            z_airf = solver.sol._z_airf_dist[i, :]
-            va_norm = norm(va_panel)
-            x_norm = norm(x_airf)
-            z_norm = norm(z_airf)
+        # Geometric AoA using panel-local axes and prescribed
+        # freestream — scalar ops to avoid allocations
+        begin
+            va1 = solver.sol._va_dist[i,1]
+            va2 = solver.sol._va_dist[i,2]
+            va3 = solver.sol._va_dist[i,3]
+            va_norm = sqrt(va1^2 + va2^2 + va3^2)
+            x1 = solver.sol._x_airf_dist[i,1]
+            x2 = solver.sol._x_airf_dist[i,2]
+            x3 = solver.sol._x_airf_dist[i,3]
+            x_norm = sqrt(x1^2 + x2^2 + x3^2)
+            z1 = solver.sol._z_airf_dist[i,1]
+            z2 = solver.sol._z_airf_dist[i,2]
+            z3 = solver.sol._z_airf_dist[i,3]
+            z_norm = sqrt(z1^2 + z2^2 + z3^2)
             if va_norm == 0 || x_norm == 0 || z_norm == 0
                 alpha_geometric_dist[i] = NaN
             else
-                v_unit = va_panel / va_norm
-                v_tangential = dot(x_airf, -v_unit) / x_norm
-                v_normal = dot(z_airf, -v_unit) / z_norm
-                alpha_geometric_dist[i] = pi + atan(v_normal, v_tangential)
+                inv_va = -1.0 / va_norm
+                vu1 = va1 * inv_va
+                vu2 = va2 * inv_va
+                vu3 = va3 * inv_va
+                v_tangential = (x1*vu1+x2*vu2+x3*vu3) / x_norm
+                v_normal = (z1*vu1+z2*vu2+z3*vu3) / z_norm
+                alpha_geometric_dist[i] = pi + atan(
+                    v_normal, v_tangential)
             end
         end
 
@@ -258,10 +297,10 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
     # Compute using fused broadcasting (no intermediate allocations)
     @. lift = cl_dist * 0.5 * density * v_a_dist^2 * solver.sol._chord_dist
     @. drag = cd_dist * 0.5 * density * v_a_dist^2 * solver.sol._chord_dist
-    @. panel_moment_dist = cm_dist * 0.5 * density * v_a_dist^2 * solver.sol._chord_dist
+    @. panel_moment_dist = cm_dist * 0.5 * density * v_a_dist^2 * solver.sol._chord_dist^2
 
     # Calculate alpha corrections based on model type
-    if aerodynamic_model_type == VSM                             # 64 bytes
+    if solver.correct_aoa && aerodynamic_model_type == VSM      # 64 bytes
         update_effective_angle_of_attack!(
             alpha_corrected,
             body_aero,
@@ -273,68 +312,103 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
             solver.br.va_norm_dist,
             solver.br.va_unit_dist
         )
-    elseif aerodynamic_model_type == LLT
+    else
         alpha_corrected .= alpha_dist
     end
 
     # Initialize result arrays
     area_all_panels = 0.0
+    panel_areas = zeros(length(panels))
 
     # Get wing properties
     spanwise_direction = body_aero.wings[1].spanwise_direction
-    va_mag = norm(body_aero.va)
-    q_inf = 0.5 * density * va_mag^2
 
     # Calculate wing geometry properties
     projected_area = body_aero.projected_area
+    c_ref = body_aero.c_ref
     
-    for (i, panel) in enumerate(panels)                                               # 8000 bytes
+    wv = body_aero.work_vectors
+    dir_iva = wv[1]
+    dir_lift = wv[2]
+    dir_drag = wv[3]
+    lift_va = wv[4]
+    drag_va = wv[5]
+    r_vec = wv[6]
+    f_tmp = wv[7]
+    cross_tmp = wv[8]
+
+    for (i, panel) in enumerate(panels)
 
         ### Lift and Drag ###
-        # Panel geometry
         panel_area = panel.chord * panel.width
         area_all_panels += panel_area
+        panel_areas[i] = panel_area
 
         # Calculate induced velocity direction
         alpha_corrected_i = alpha_corrected[i]
-        dir_induced_va_airfoil = cos(alpha_corrected_i) * panel.x_airf + 
-                                 sin(alpha_corrected_i) * panel.z_airf
-        normalize!(dir_induced_va_airfoil)
+        c_alpha = cos(alpha_corrected_i)
+        s_alpha = sin(alpha_corrected_i)
+        @inbounds for k in 1:3
+            dir_iva[k] = c_alpha * panel.x_airf[k] +
+                         s_alpha * panel.z_airf[k]
+        end
+        normalize3!(dir_iva)
 
         # Calculate lift and drag directions
-        dir_lift_induced_va = dir_induced_va_airfoil × panel.y_airf
-        normalize!(dir_lift_induced_va)
-        dir_drag_induced_va = spanwise_direction × dir_lift_induced_va
-        normalize!(dir_drag_induced_va)
+        cross3!(dir_lift, dir_iva, panel.y_airf)
+        normalize3!(dir_lift)
+        cross3!(dir_drag, spanwise_direction, dir_lift)
+        normalize3!(dir_drag)
 
         # Calculate force vectors
-        lift_induced_va = lift[i] * dir_lift_induced_va
-        drag_induced_va = drag[i] * dir_drag_induced_va
-        ftotal_induced_va = lift_induced_va + drag_induced_va
+        li = lift[i]
+        di = drag[i]
+        @inbounds for k in 1:3
+            lift_va[k] = li * dir_lift[k]
+            drag_va[k] = di * dir_drag[k]
+        end
 
         # Body frame forces
-        solver.sol.f_body_3D[:,i] .= ftotal_induced_va .* panel.width
+        width = panel.width
+        @inbounds for k in 1:3
+            solver.sol.f_body_3D[k, i] = (lift_va[k] +
+                                          drag_va[k]) * width
+        end
 
         # Calculate the moments
-        # (1) Panel aerodynamic center in body frame:
-        panel_ac_body = panel.aero_center  # 3D [x, y, z]
-        # (2) Convert local (2D) pitching moment to a 3D vector in body coords.
-        #     Use the axis around which the moment is defined,
-        #     which is the y-axis pointing "spanwise"
-        moment_axis_body = panel.y_airf
-        M_local_3D = panel_moment_dist[i] * moment_axis_body * panel.width
-        # Vector from panel AC to the chosen reference point:
-        r_vector = panel_ac_body - reference_point  # e.g. CG, wing root, etc.
-        # Cross product to shift the force from panel AC to ref. point:
-        M_shift = r_vector × MVec3(solver.sol.f_body_3D[:,i])
-        # Total panel moment about the reference point:
-        solver.sol.m_body_3D[:,i] .= M_local_3D + M_shift
+        m_scale = panel_moment_dist[i] * width
+        @inbounds for k in 1:3
+            r_vec[k] = panel.aero_center[k] -
+                       reference_point[k]
+            f_tmp[k] = solver.sol.f_body_3D[k, i]
+        end
+        cross3!(cross_tmp, r_vec, f_tmp)
+        @inbounds for k in 1:3
+            solver.sol.m_body_3D[k, i] = m_scale *
+                panel.y_airf[k] + cross_tmp[k]
+        end
 
-        # Calculate the moment distribution (moment on each panel)
+        # Moment distribution (moment on each panel)
         arm = (moment_frac - 0.25) * panel.chord
-        moment_dist[i] = ((ftotal_induced_va ⋅ panel.z_airf) * arm + panel_moment_dist[i]) * panel.width
-        moment_coeff_dist[i] = moment_dist[i] / (q_inf * projected_area)
+        ftotal_dot_z = 0.0
+        @inbounds for k in 1:3
+            ftotal_dot_z += (lift_va[k] + drag_va[k]) *
+                            panel.z_airf[k]
+        end
+        moment_dist[i] = (ftotal_dot_z * arm +
+                          panel_moment_dist[i]) * width
     end
+
+    # Python parity: normalize with area-weighted reference velocity for distributed inflow.
+    va_ref_vector = _compute_reference_velocity_from_distribution(
+        solver.sol._va_dist,
+        length(panels),
+        panel_areas
+    )
+    va_ref_mag = norm(va_ref_vector)
+    va_ref_mag > 0.0 || throw(ArgumentError("Reference freestream magnitude must be positive."))
+    q_ref = 0.5 * density * va_ref_mag^2
+    moment_coeff_dist .= moment_dist ./ (q_ref * projected_area * c_ref)
 
     # Only compute unrefined arrays if there are unrefined sections
     if length(solver.sol.moment_unrefined_dist) > 0
@@ -395,7 +469,7 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
                     panel_idx += 1
                 end
 
-                # Average coefficients and geometry
+                # Average coefficients and geometry (width stays summed)
                 for i in 1:wing.n_unrefined_sections
                     target_unrefined_idx = unrefined_idx + i - 1
                     if unrefined_section_counts[i] > 0
@@ -410,6 +484,8 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
                         z_airf_unrefined_dist[target_unrefined_idx] ./= count
                         va_unrefined_dist[target_unrefined_idx] ./= count
                         chord_unrefined_dist[target_unrefined_idx] /= count
+                        # width_unrefined_dist is NOT averaged - it is the
+                        # sum of panel widths in the unrefined section
                     end
                 end
                 unrefined_idx += wing.n_unrefined_sections
@@ -421,18 +497,19 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
     end
 
     # update the result struct
-    solver.sol.force .= MVec3(
-        sum(solver.sol.f_body_3D[1,:]),
-        sum(solver.sol.f_body_3D[2,:]),
-        sum(solver.sol.f_body_3D[3,:])
-    )
-    solver.sol.moment .= MVec3(
-        sum(solver.sol.m_body_3D[1,:]),
-        sum(solver.sol.m_body_3D[2,:]),
-        sum(solver.sol.m_body_3D[3,:])
-    )
-    solver.sol.force_coeffs .= solver.sol.force ./ (q_inf * projected_area)
-    solver.sol.moment_coeffs .= solver.sol.moment ./ (q_inf * projected_area)
+    solver.sol.force .= 0.0
+    solver.sol.moment .= 0.0
+    @inbounds for i in 1:length(panels)
+        for k in 1:3
+            solver.sol.force[k] += solver.sol.f_body_3D[k, i]
+            solver.sol.moment[k] += solver.sol.m_body_3D[k, i]
+        end
+    end
+    solver.sol.force_coeffs .= solver.sol.force ./ (q_ref * projected_area)
+    solver.sol.moment_coeffs .= solver.sol.moment ./ (q_ref * projected_area * c_ref)
+    # Keep solve! fast: center-of-pressure is only computed in solve() dictionary path.
+    solver.sol.center_of_pressure = nothing
+    empty!(solver.sol.panel_cp_locations)
     if converged
         # TODO: Check if the result if feasible if converged
         solver.sol.solver_status = FEASIBLE
@@ -445,7 +522,7 @@ end
 
 """
     solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=nothing; 
-          log=false, reference_point=zeros(MVec3))
+          log=false, reference_point=solver.reference_point)
 
 Main solving routine for the aerodynamic model. Reference point is in the kite body (KB) frame.
 See also: [solve!](@ref)
@@ -457,21 +534,22 @@ See also: [solve!](@ref)
 
 # Keyword Arguments:
 - log=false: If true, print the number of iterations and other info.
-- reference_point=zeros(MVec3)
+- reference_point=solver.reference_point
 
 # Returns
 A dictionary with the results.
 """
 function solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=nothing; 
-    log=false, reference_point=zeros(MVec3))
+    log=false, reference_point=solver.reference_point)
+    reference_point_checked = check_reference_point(reference_point)
     # calculate intermediate result
-    solve_base!(solver, body_aero, gamma_distribution; log, reference_point)
+    solve_base!(solver, body_aero, gamma_distribution; log, reference_point=reference_point_checked)
 
     # Calculate final results as dictionary
     results = calculate_results(
         body_aero,
         solver.lr.gamma_new,
-        reference_point,
+        reference_point_checked,
         solver.density,
         solver.aerodynamic_model_type,
         solver.core_radius_fraction,
@@ -498,12 +576,14 @@ end
 
 @inline @inbounds function calc_norm_array!(va_norm_dist, va_array)
     for i in 1:size(va_array, 1)
-        va_norm_dist[i] = norm(MVec3(view(va_array, i, :)))
+        va_norm_dist[i] = sqrt(
+            va_array[i,1]^2 + va_array[i,2]^2 +
+            va_array[i,3]^2)
     end
 end
 
 function solve_base!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=nothing; 
-               log=false, reference_point=zeros(MVec3))
+               log=false, reference_point=solver.reference_point)
     
     # check arguments
     isnothing(body_aero.panels[1].va) && throw(ArgumentError("Inflow conditions are not set, use set_va!(body_aero, va)"))
@@ -522,16 +602,24 @@ function solve_base!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribu
 
     # Fill arrays from panels
     for (i, panel) in enumerate(panels)
-        solver.sol._x_airf_dist[i, :] .= panel.x_airf
-        solver.sol._y_airf_dist[i, :] .= panel.y_airf
-        solver.sol._z_airf_dist[i, :] .= panel.z_airf
-        solver.sol._va_dist[i, :] .= panel.va
+        @inbounds for k in 1:3
+            solver.sol._x_airf_dist[i, k] = panel.x_airf[k]
+            solver.sol._y_airf_dist[i, k] = panel.y_airf[k]
+            solver.sol._z_airf_dist[i, k] = panel.z_airf[k]
+            solver.sol._va_dist[i, k] = panel.va[k]
+        end
         solver.sol._chord_dist[i] = panel.chord
     end
 
     # Calculate unit vectors
     calc_norm_array!(solver.br.va_norm_dist, solver.sol._va_dist)
-    solver.br.va_unit_dist .= solver.sol._va_dist ./ solver.br.va_norm_dist
+    @inbounds for i in 1:n_panels
+        inv_norm = 1.0 / solver.br.va_norm_dist[i]
+        for k in 1:3
+            solver.br.va_unit_dist[i, k] =
+                solver.sol._va_dist[i, k] * inv_norm
+        end
+    end
 
     # Calculate AIC matrices
     calculate_AIC_matrices!(body_aero, solver.aerodynamic_model_type, solver.core_radius_fraction, solver.br.va_norm_dist,
@@ -539,7 +627,10 @@ function solve_base!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribu
 
     # Initialize gamma distribution
     gamma_initial = solver.cache_base[1][solver.sol._chord_dist]
-    if isnothing(gamma_distribution)
+    if isnothing(gamma_distribution) || !solver.use_gamma_prev
+        if !isnothing(gamma_distribution) && !solver.use_gamma_prev
+            @debug "Ignoring provided gamma_distribution because use_gamma_prev=false"
+        end
         if solver.type_initial_gamma_distribution == ELLIPTIC
             calculate_circulation_distribution_elliptical_wing(gamma_initial, body_aero)
         else
@@ -601,7 +692,9 @@ function gamma_loop!(
     v_normal_array           = solver.cache[10][solver.lr.gamma_new]
     v_tangential_array       = solver.cache[11][solver.lr.gamma_new]
 
-    AIC_x, AIC_y, AIC_z = body_aero.AIC[1, :, :], body_aero.AIC[2, :, :], body_aero.AIC[3, :, :]
+    AIC_x = @view body_aero.AIC[1, :, :]
+    AIC_y = @view body_aero.AIC[2, :, :]
+    AIC_z = @view body_aero.AIC[3, :, :]
 
     velocity_view_x = @view induced_velocity_all[:, 1]
     velocity_view_y = @view induced_velocity_all[:, 2]
@@ -616,22 +709,46 @@ function gamma_loop!(
         mul!(velocity_view_z, AIC_z, gamma)
         
         relative_velocity_array .= va_array .+ induced_velocity_all
-        for i in 1:n_panels
-            relative_velocity_crossz[i, :] .=  MVec3(view(relative_velocity_array, i, :)) ×
-                                            MVec3(view(y_airf_array, i, :))
-            v_acrossz_array[i, :]          .=  MVec3(view(va_array, i, :)) ×
-                                            MVec3(view(y_airf_array, i, :))
+        @inbounds for i in 1:n_panels
+            ax = relative_velocity_array[i,1]
+            ay = relative_velocity_array[i,2]
+            az = relative_velocity_array[i,3]
+            bx = y_airf_array[i,1]
+            by = y_airf_array[i,2]
+            bz = y_airf_array[i,3]
+            relative_velocity_crossz[i,1] = ay*bz - az*by
+            relative_velocity_crossz[i,2] = az*bx - ax*bz
+            relative_velocity_crossz[i,3] = ax*by - ay*bx
+            ax = va_array[i,1]
+            ay = va_array[i,2]
+            az = va_array[i,3]
+            v_acrossz_array[i,1] = ay*bz - az*by
+            v_acrossz_array[i,2] = az*bx - ax*bz
+            v_acrossz_array[i,3] = ax*by - ay*bx
         end
 
-        for i in 1:n_panels
-            v_normal_array[i] = view(z_airf_array, i, :) ⋅ view(relative_velocity_array, i, :)
-            v_tangential_array[i] = view(x_airf_array, i, :) ⋅ view(relative_velocity_array, i, :)
+        @inbounds for i in 1:n_panels
+            v_normal_array[i] =
+                z_airf_array[i,1]*relative_velocity_array[i,1] +
+                z_airf_array[i,2]*relative_velocity_array[i,2] +
+                z_airf_array[i,3]*relative_velocity_array[i,3]
+            v_tangential_array[i] =
+                x_airf_array[i,1]*relative_velocity_array[i,1] +
+                x_airf_array[i,2]*relative_velocity_array[i,2] +
+                x_airf_array[i,3]*relative_velocity_array[i,3]
         end
-        solver.lr.alpha_dist .= atan.(v_normal_array, v_tangential_array)
+        solver.lr.alpha_dist .= atan.(
+            v_normal_array, v_tangential_array)
 
-        for i in 1:n_panels
-            @views solver.lr.v_a_dist[i] = norm(relative_velocity_crossz[i, :])
-            @views va_magw_array[i] = norm(v_acrossz_array[i, :])
+        @inbounds for i in 1:n_panels
+            solver.lr.v_a_dist[i] = sqrt(
+                relative_velocity_crossz[i,1]^2 +
+                relative_velocity_crossz[i,2]^2 +
+                relative_velocity_crossz[i,3]^2)
+            va_magw_array[i] = sqrt(
+                v_acrossz_array[i,1]^2 +
+                v_acrossz_array[i,2]^2 +
+                v_acrossz_array[i,3]^2)
         end
         
         for (i, (panel, alpha)) in enumerate(zip(panels, solver.lr.alpha_dist))
@@ -887,7 +1004,9 @@ function linearize(solver::Solver, body_aero::BodyAerodynamics, y::Vector{T};
             set_va!(body_aero, y[va_idxs])
         elseif !isnothing(va_idxs) && !isnothing(omega_idxs)
             set_va!(body_aero, y[va_idxs], y[omega_idxs])
-        elseif isnothing(va_idxs) && isnothing(omega_idxs)
+        elseif isnothing(va_idxs) && !isnothing(omega_idxs)
+            set_va!(body_aero, init_va, y[omega_idxs])
+        else
             set_va!(body_aero, init_va)
         end
 

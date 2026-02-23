@@ -10,7 +10,7 @@ USE_TEX = false
 
 # Find root directory
 root_dir = dirname(@__DIR__)
-save_folder = joinpath(root_dir, "results", "TUDELFT_V3_LEI_KITE")
+save_folder = joinpath(root_dir, "results", "TUDELFT_V3_KITE")
 mkpath(save_folder)
 
 # Defining discretisation
@@ -20,8 +20,8 @@ spanwise_distribution = SPLIT_PROVIDED
 # Load rib data from CSV
 csv_file_path = joinpath(
     root_dir,
-    "processed_data",
-    "TUDELFT_V3_LEI_KITE",
+    "data",
+    "TUDELFT_V3_KITE",
     "rib_list_from_CAD_LE_TE_and_surfplan_d_tube_camber_19ribs.csv"
 )
 
@@ -43,11 +43,11 @@ refine!(CAD_wing)
 body_aero = BodyAerodynamics([CAD_wing])
 
 # Create solvers
-vsm_solver = Solver(body_aero; 
+vsm_solver = Solver(body_aero;
     aerodynamic_model_type=VSM,
     is_with_artificial_damping=false
 )
-VSM_with_stall_correction = Solver(body_aero; 
+VSM_with_stall_correction = Solver(body_aero;
     aerodynamic_model_type=VSM,
     is_with_artificial_damping=true
 )
@@ -74,7 +74,7 @@ results = solve(vsm_solver, body_aero)
 path_cfd_lebesque = joinpath(
     root_dir,
     "data",
-    "TUDELFT_V3_LEI_KITE",
+    "TUDELFT_V3_KITE",
     "literature_results",
     "V3_CL_CD_RANS_Lebesque_2024_Rey_300e4.csv"
 )

@@ -177,42 +177,51 @@ end
     
     # Test combinations of input variations
     @testset "Combined Input Variations" begin
+        # Smaller perturbations for combination tests to stay within linear regime.
+        # The new deform! averages theta at section boundaries, introducing coupling
+        # that makes combined perturbations less linear than individual ones.
+        combo_scale = 0.25
+        combo_dtheta = dtheta_magnitudes .* combo_scale
+        combo_dva = dva_magnitudes .* combo_scale
+        combo_domega = domega_magnitudes .* combo_scale
+        combo_ddelta = ddelta_magnitudes .* combo_scale
+
         # For combination testing, we'll create targeted test cases
         # that use only the specific indices we want to test together
         combination_tests = [
             # Name, active indices, perturbation vector, indices mappings
             (
-                "Theta + VA", 
+                "Theta + VA",
                 # Use only theta and va indices
-                [1:4; 5:7],  
+                [1:4; 5:7],
                 # Perturbation values for these indices
-                [dtheta_magnitudes; dva_magnitudes],
+                [combo_dtheta; combo_dva],
                 # Mappings for linearize function
                 (theta_idxs=1:4, va_idxs=5:7, omega_idxs=nothing, delta_idxs=nothing)
             ),
             (
-                "Theta + Omega", 
+                "Theta + Omega",
                 [1:4; 8:10],
-                [dtheta_magnitudes; domega_magnitudes],
+                [combo_dtheta; combo_domega],
                 (theta_idxs=1:4, va_idxs=nothing, omega_idxs=5:7, delta_idxs=nothing)
             ),
             (
-                "VA + Omega", 
+                "VA + Omega",
                 [5:7; 8:10],
-                [dva_magnitudes; domega_magnitudes],
+                [combo_dva; combo_domega],
                 (theta_idxs=nothing, va_idxs=1:3, omega_idxs=4:6, delta_idxs=nothing)
             ),
             (
-                "Delta + VA", 
+                "Delta + VA",
                 [5:7; 11:14],
-                [dva_magnitudes; ddelta_magnitudes],
+                [combo_dva; combo_ddelta],
                 (theta_idxs=nothing, va_idxs=1:3, omega_idxs=nothing, delta_idxs=4:7)
             ),
             (
-                "All Inputs", 
+                "All Inputs",
                 [1:4; 5:7; 8:10; 11:14],
-                [dtheta_magnitudes; dva_magnitudes; 
-                domega_magnitudes; ddelta_magnitudes],
+                [combo_dtheta; combo_dva;
+                combo_domega; combo_ddelta],
                 (theta_idxs=1:4, va_idxs=5:7, omega_idxs=8:10, delta_idxs=11:14)
             )
         ]
@@ -293,8 +302,8 @@ end
                 @info "$combo_name error metrics" prediction_error baseline_difference error_ratio
                 
                 # Validate the prediction
-                @test lin_prediction ≈ nonlin_res rtol=0.1 atol=1e-3
-                @test error_ratio < 0.05
+                @test lin_prediction ≈ nonlin_res rtol=0.01 atol=1e-3
+                @test error_ratio < 0.005
             end
         end
     end

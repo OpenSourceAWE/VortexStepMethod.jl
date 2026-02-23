@@ -37,7 +37,7 @@ export calculate_span, calculate_projected_area
 export MVec3
 export Model, VSM, LLT
 export AeroModel, LEI_AIRFOIL_BREUKELS, POLAR_VECTORS, POLAR_MATRICES, INVISCID
-export PanelDistribution, LINEAR, COSINE, COSINE_VAN_GARREL, SPLIT_PROVIDED, UNCHANGED
+export PanelDistribution, LINEAR, COSINE, SPLIT_PROVIDED, UNCHANGED
 export InitialGammaDistribution, ELLIPTIC, ZEROS
 export SolverStatus, FEASIBLE, INFEASIBLE, FAILURE
 export SolverType, LOOP, NONLIN
@@ -129,21 +129,19 @@ where `alpha` is the angle of attack, `delta` is trailing edge angle.
 end
 
 """
-   PanelDistribution `LINEAR` `COSINE` `COSINE_VAN_GARREL` `SPLIT_PROVIDED` `UNCHANGED`
+   PanelDistribution `LINEAR` `COSINE` `SPLIT_PROVIDED` `UNCHANGED`
 
 Enumeration of the implemented panel distributions.
 
 # Elements
 - LINEAR               # Linear distribution
 - COSINE               # Cosine distribution
-- `COSINE_VAN_GARREL`  # van Garrel cosine distribution
 - `SPLIT_PROVIDED`     # Split provided sections
 - `UNCHANGED`          # 1:1 copy of unrefined to refined sections (no interpolation)
 """
 @enum PanelDistribution begin
    LINEAR             # Linear distribution
    COSINE             # Cosine distribution
-   COSINE_VAN_GARREL  # van Garrel cosine distribution
    SPLIT_PROVIDED     # Split provided sections
    UNCHANGED          # 1:1 copy of unrefined to refined sections
 end
@@ -235,21 +233,14 @@ end
 
 function install_examples(add_packages=true)
     copy_examples()
+    pkg_root = joinpath(dirname(pathof(@__MODULE__)), "..")
+    src = joinpath(pkg_root, "data")
+    isdir(src) && cp(src, "data"; force=true)
     if add_packages
-        if ! ("ControlPlots" ∈ keys(Pkg.project().dependencies))
-            Pkg.add("ControlPlots")
-        end
-        if ! ("LaTeXStrings" ∈ keys(Pkg.project().dependencies))
-            Pkg.add("LaTeXStrings")
-        end
-        if ! ("Xfoil" ∈ keys(Pkg.project().dependencies))
-            Pkg.add("Xfoil")
-        end
-        if ! ("CSV" ∈ keys(Pkg.project().dependencies))
-            Pkg.add("CSV")
-        end
-        if ! ("DataFrames" ∈ keys(Pkg.project().dependencies))
-            Pkg.add("DataFrames")
+        for pkg in ("GLMakie", "LaTeXStrings", "Xfoil", "CSV", "DataFrames")
+            if !(pkg ∈ keys(Pkg.project().dependencies))
+                Pkg.add(pkg)
+            end
         end
     end
 end

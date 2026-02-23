@@ -2,7 +2,10 @@ using GLMakie
 using VortexStepMethod
 using LinearAlgebra
 
+PLOT = true
 PRN = false
+USE_TEX = false
+DEFORM = true
 v_a = 15.0
 
 # Create wing with XFoil polars
@@ -31,13 +34,17 @@ VortexStepMethod.reinit!(body_nf)
 solver_nf = Solver(body_nf; aerodynamic_model_type=VSM, rtol=1e-5, solver_type=NONLIN)
 
 # Compare using plot_polars
-println("Computing and plotting polars...")
-plot_polars(
-    [solver_xfoil, solver_nf],
-    [body_xfoil, body_nf],
-    ["XFoil", "NeuralFoil"];
-    angle_range=range(-5, 25, length=31),
-    v_a=v_a,
-    title="Ram Air Kite: XFoil vs NeuralFoil",
-    is_save=false
-)
+if PLOT
+    println("Computing and plotting polars...")
+    plot_polars(
+        [solver_xfoil, solver_nf],
+        [body_xfoil, body_nf],
+        ["XFoil", "NeuralFoil"];
+        angle_range=range(-5, 25, length=31),
+        v_a=v_a,
+        title="Ram Air Kite: XFoil vs NeuralFoil",
+        is_save=false,
+        use_tex=USE_TEX
+    )
+end
+nothing

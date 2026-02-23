@@ -13,64 +13,58 @@ The software presented here includes a couple of examples: a rectangular wing, a
 This package was translated from the Python code version 1.0.0 available at [https://github.com/ocayon/Vortex-Step-Method](https://github.com/ocayon/Vortex-Step-Method) with some extensions as documented in [News.md](https://github.com/OpenSourceAWE/VortexStepMethod.jl/blob/main/NEWS.md).
 
 ## Installation
-Install [Julia 1.10](https://ufechner7.github.io/2024/08/09/installing-julia-with-juliaup.html) or later, 
-if you haven't already. On Linux, make sure that Python3 and Matplotlib are installed:
-```
-sudo apt install python3-matplotlib
-```
-Furthermore, the package `ControlPlots` must be installed globally:
-```
-julia -e 'using Pkg; Pkg.add("ControlPlots")'
-```
+Install [Julia 1.10](https://ufechner7.github.io/2024/08/09/installing-julia-with-juliaup.html)
+or later, if you haven't already.
 
-Before installing this software it is suggested to create a new project, for example like this:
+Before installing this software it is suggested to create a new project, for
+example like this:
 ```bash
 mkdir vsm
 cd vsm
 julia --project=.
 ```
-Then add VortexStepMethod from  Julia's package manager, by typing:
-```julia
-using Pkg
-pkg"add VortexStepMethod"
-``` 
-at the Julia prompt. You can run the unit tests with the command:
-```julia
-pkg"test VortexStepMethod"
+Then add VortexStepMethod from Julia's package manager, by typing `]` to enter
+the package manager (`pkg>` prompt), then:
 ```
-To run the examples, type:
-```julia
-using VortexStepMethod
-VortexStepMethod.install_examples()
-include("examples/menu.jl")
+(vsm) pkg> add VortexStepMethod
 ```
+Press backspace to return to the `julia>` prompt. You can run the unit tests
+from the `pkg>` prompt with:
+```
+(vsm) pkg> test VortexStepMethod
+```
+You can also type `?` to enter help mode (`help?>` prompt) to look up
+documentation for any function.
+
+To run the examples, type at the `julia>` prompt:
+```julia
+julia> using VortexStepMethod
+julia> VortexStepMethod.install_examples()
+julia> include("examples/menu.jl")
+```
+This copies the example scripts to an `examples/` folder and installs the
+required packages ([GLMakie](https://docs.makie.org/stable/), CSV, etc.).
 
 ## Running the examples as developer
-If you have git installed, check out this repo because it makes it easier to understand the code:
+Clone the repository and use the examples project environment:
 ```bash
-mkdir repos
-cd repos
 git clone https://github.com/OpenSourceAWE/VortexStepMethod.jl
 cd VortexStepMethod.jl
+julia --project=examples
 ```
-You can launch Julia with:
-```bash
-julia --project
+In the Julia package manager (press `]` for the `pkg>` prompt), install all
+dependencies:
 ```
-or with:
-```bash
-./bin/run_julia
+(examples) pkg> dev .
+(examples) pkg> instantiate
 ```
-In Julia, first update the packages:
+Press backspace to return to the `julia>` prompt, then run the interactive
+menu:
 ```julia
-using Pkg
-Pkg.update()
+julia> include("examples/menu.jl")
 ```
-and then you can display a menu with the available examples:
-```julia
-include("examples/menu.jl")
-```
-To browse the code, it is suggested to use [VSCode](https://code.visualstudio.com/) with the Julia plugin.
+To browse the code, it is suggested to use
+[VSCode](https://code.visualstudio.com/) with the Julia plugin.
 
 ## Input
 Three kinds of input data is needed:
@@ -87,17 +81,15 @@ Three kinds of input data is needed:
   - how many panels  
     --> two sections make a panel.
 
-Apart from the wing geometry there is no input file yet, the input has to be defined in the code.
+Wing geometry can also be loaded from YAML files or `.obj` files. See the examples for details.
 
 ### Example for defining the required input:
 ```julia
-
 # Step 1: Define wing parameters
 n_panels = 20          # Number of panels
 span = 20.0            # Wing span [m]
 chord = 1.0            # Chord length [m]
 v_a = 20.0             # Magnitude of inflow velocity [m/s]
-density = 1.225        # Air density [kg/m³]
 alpha_deg = 30.0       # Angle of attack [degrees]
 alpha = deg2rad(alpha_deg)
 
@@ -105,21 +97,24 @@ alpha = deg2rad(alpha_deg)
 wing = Wing(n_panels, spanwise_distribution=LINEAR)
 
 # Add wing sections - defining only tip sections with inviscid airfoil model
-add_section!(wing, 
-    [0.0, span/2, 0.0],    # Left tip LE 
+add_section!(wing,
+    [0.0, span/2, 0.0],   # Left tip LE
     [chord, span/2, 0.0],  # Left tip TE
     INVISCID)
-add_section!(wing, 
-    [0.0, -span/2, 0.0],   # Right tip LE
+add_section!(wing,
+    [0.0, -span/2, 0.0],  # Right tip LE
     [chord, -span/2, 0.0], # Right tip TE
     INVISCID)
+
+# Refine the mesh
+refine!(wing)
 
 # Step 3: Initialize aerodynamics
 body_aero = BodyAerodynamics([wing])
 
 # Set inflow conditions
 vel_app = [cos(alpha), 0.0, sin(alpha)] .* v_a
-set_va!(wa, vel_app)
+set_va!(body_aero, vel_app)
 ```
 It is possible to import the wing geometry using an `.obj` file as shown in the example `ram_air_kite.jl`. During the import the polars are calculated automatically using XFoil. This approach is valid for rigid wings and ram-air kites, but not for leading edge inflatable kites.
 
@@ -152,4 +147,4 @@ Copyright (c) 2022 Oriol Cayon
 
 Copyright (c) 2024 Oriol Cayon, Jelle Poland, TU Delft
 
-Copyright (c) 2025 Oriol Cayon, Jelle Poland, Bart van de Lint, Uwe Fechner
+Copyright (c) 2025, 2026 Oriol Cayon, Jelle Poland, Bart van de Lint, Uwe Fechner
