@@ -15,8 +15,8 @@ title: "VortexStepMethod.jl"
 keywords:
   - Airborne Wind Energy, AWE, AWES, Vortex step methods
 version: 1.0.0
-# doi: "11.1111/11111"
-# date-released: YYYY-MM-DD
+doi: "10.5281/zenodo.XXXXX"
+date-released: "YYYY-MM-DD"
 license: MIT
 url: "https://github.com/OpenSourceAWE/VortexStepMethod.jl"
 preferred-citation:

@@ -1,0 +1,37 @@
+{
+  "title": "VortexStepMethod.jl",
+  "description": "Aerodynamic models of 3D wings using the Vortex Step Method.",
+  "upload_type": "software",
+  "license": "MIT",
+  "access_right": "open",
+  "creators": [
+    {
+      "name": "Cayon, Oriol",
+      "orcid": "0000-0002-2065-8673"
+    },
+    {
+      "name": "Poland, Jelle Agatho Wilhelm",
+      "orcid": "0000-0003-3164-5648"
+    },
+    {
+      "name": "van de Lint, Bart"
+    },
+    {
+      "name": "Fechner, Uwe"
+    }
+  ],
+  "keywords": [
+    "Airborne Wind Energy",
+    "AWE",
+    "AWES",
+    "Vortex Step Method",
+    "Julia"
+  ],
+  "related_identifiers": [
+    {
+      "identifier": "10.3390/en16073061",
+      "relation": "isSupplementTo",
+      "resource_type": "publication-article"
+    }
+  ]
+}

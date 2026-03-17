@@ -3,6 +3,7 @@
 [![Build Status](https://github.com/OpenSourceAWE/VortexStepMethod.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/OpenSourceAWE/VortexStepMethod.jl/actions/workflows/CI.yml?query=branch%3Amain) 
 [![codecov](https://codecov.io/gh/OpenSourceAWE/VortexStepMethod.jl/graph/badge.svg?token=NykTlxGOrZ)](https://codecov.io/gh/OpenSourceAWE/VortexStepMethod.jl)
 [![Aqua QA](https://raw.githubusercontent.com/JuliaTesting/Aqua.jl/master/badge.svg)](https://github.com/JuliaTesting/Aqua.jl)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.XXXXX.svg)](https://doi.org/10.5281/zenodo.XXXXX)
 
 
 # Aerodynamic models of 3D wings using the Vortex Step Method 
@@ -143,6 +144,7 @@ See also the [documentation](https://OpenSourceAWE.github.io/VortexStepMethod.jl
 ## Citation
 If you use this project in your research, please consider citing it. 
 Citation details can be found in the [CITATION.cff](https://github.com/OpenSourceAWE/VortexStepMethod.jl/blob/main/CITATION.cff) file included in this repository.
+After the first Zenodo-backed GitHub release, replace `XXXXX` in the DOI badge with your Zenodo record ID.
 
 ## License
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
