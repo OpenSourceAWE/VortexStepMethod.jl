@@ -1,3 +1,9 @@
+## VortexStepMethod v3.0.1 2025-03-17
+### Changed
+- the file `CITATION.cff`
+### Added
+- the file `.zenodo.json`
+
 ## VortexStepMethod v3.0.0
 
 ### Breaking Changes
