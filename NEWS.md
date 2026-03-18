@@ -1,3 +1,20 @@
+## VortexStepMethod v3.1.0 2026-03-18
+
+### Added
+- `BILLOWING` panel distribution with circular arc TE billowing between ribs
+- `billowing_angle` field on `Wing` and `WingSettings`
+- `billowing_angle_from_percentage()` utility function
+- `billowing.jl` example comparing flat vs billowed V3 kite
+- Coarse V3 kite geometry, settings, and combined CFD polar data
+- `cl_over_cd` keyword for `plot_polars` and `plot_combined_analysis`
+
+### Changed
+- Plot legends moved to shared horizontal legend at bottom of grid layouts
+
+### Fixed
+- Domain error in elliptical gamma distribution when control points lie
+  outside the nominal span envelope
+
 ## VortexStepMethod v3.0.1 2025-03-17
 ### Changed
 - the file `CITATION.cff`

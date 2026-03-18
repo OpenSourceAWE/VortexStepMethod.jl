@@ -121,6 +121,7 @@ You should see the following menu:
 ```
 Choose function to execute or `q` to quit:
  > V3_kite = include("V3_kite.jl")
+   billowing = include("billowing.jl")
    pyramid_model = include("pyramid_model.jl")
    rectangular_wing = include("rectangular_wing.jl")
    ram_air_kite = include("ram_air_kite.jl")
