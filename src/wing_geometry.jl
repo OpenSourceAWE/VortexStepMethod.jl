@@ -232,6 +232,7 @@ mutable struct Wing <: AbstractWing
     refined_sections::Vector{Section}
     remove_nan::Bool
     use_prior_polar::Bool
+    billowing_angle::Float64  # Half-angle of circular arc [rad] (0=straight, π/2=semicircle)
 
     # Grouping
     refined_panel_mapping::Vector{Int16}  # Maps each refined panel index to unrefined section index (1 to n_unrefined_sections)
@@ -260,7 +261,8 @@ end
          spanwise_distribution::PanelDistribution=LINEAR,
          spanwise_direction::PosVector=MVec3([0.0, 1.0, 0.0]),
          remove_nan::Bool=true,
-         use_prior_polar::Bool=false)
+         use_prior_polar::Bool=false,
+         billowing_angle::Float64=0.0)
 
 Constructor for a [Wing](@ref) struct with default values that initializes the sections
 and refined sections as empty arrays. Creates a basic wing suitable for YAML-based construction.
@@ -270,15 +272,17 @@ and refined sections as empty arrays. Creates a basic wing suitable for YAML-bas
 - `n_unrefined_sections::Int`: Number of unrefined sections (inferred from added sections for YAML wings)
 - `spanwise_distribution`::PanelDistribution = LINEAR: [PanelDistribution](@ref)
 - `spanwise_direction::MVec3` = MVec3([0.0, 1.0, 0.0]): Wing span direction vector
-- `remove_nan::Bool`: Wether to remove the NaNs from interpolations or not
+- `remove_nan::Bool`: Whether to remove the NaNs from interpolations or not
 - `use_prior_polar::Bool`: Reuse prior refined/panel polar mapping during geometry-only updates
+- `billowing_angle::Float64`: Half-angle of billowing arc in radians (0=straight, π/2=semicircle)
 """
 function Wing(n_panels::Int;
         n_unrefined_sections=nothing,
         spanwise_distribution::PanelDistribution=LINEAR,
         spanwise_direction::PosVector=MVec3([0.0, 1.0, 0.0]),
         remove_nan=true,
-        use_prior_polar=false)
+        use_prior_polar=false,
+        billowing_angle=0.0)
 
     # For YAML wings, n_unrefined_sections will be set when sections are added
     # Set to 0 as placeholder for now
@@ -289,7 +293,7 @@ function Wing(n_panels::Int;
     # Initialize with default/empty values for optional fields
     Wing(
         n_panels, n_unrefined_sections_value, spanwise_distribution, panel_props, spanwise_direction,
-        Section[], Section[], remove_nan, use_prior_polar,
+        Section[], Section[], remove_nan, use_prior_polar, Float64(billowing_angle),
         # Grouping
         Int16[],
         # Deformation fields
@@ -810,6 +814,11 @@ function refine!(wing::AbstractWing; recompute_mapping=true, sort_sections=true)
             aero_data;
             reuse_aero_data
         )
+    elseif wing.spanwise_distribution == BILLOWING
+        refine_mesh_with_billowing!(
+            wing, LE, TE, aero_model, aero_data;
+            reuse_aero_data
+        )
     else
         throw(ArgumentError("Unsupported spanwise panel distribution: $(wing.spanwise_distribution)"))
     end
@@ -1225,6 +1234,159 @@ function refine_mesh_by_splitting_provided_sections!(wing::AbstractWing; reuse_a
     return nothing
 end
 
+
+"""
+    billowing_angle_from_percentage(percentage)
+
+Compute the billowing half-angle θ (in radians) such that the chord between two
+circle intersections is `percentage`% shorter than the minor arc.
+
+Solves `sin(θ) = θ * (1 - percentage / 100)` using Newton's method.
+
+# Arguments
+- `percentage::Real`: How much shorter the chord is relative to the arc (0–100).
+    0 means chord equals arc (θ → 0), ~36.3 means a semicircle (θ = π/2).
+
+# Returns
+- `Float64`: The half-angle θ in radians (same convention as `Wing.billowing_angle`).
+
+# Example
+```julia
+julia> rad2deg(billowing_angle_from_percentage(10))
+43.66…
+```
+"""
+function billowing_angle_from_percentage(percentage::Real)
+    percentage == 0 && return 0.0
+    0 < percentage || throw(ArgumentError(
+        "percentage must be ≥ 0, got $percentage"))
+    percentage < 100 * (1 - 2 / π) || throw(ArgumentError(
+        "percentage must be < $(100 * (1 - 2/π)) (semicircle limit), " *
+        "got $percentage"))
+    factor = 1 - percentage / 100
+    # Initial guess from Taylor expansion: sin(θ) ≈ θ - θ³/6
+    θ = sqrt(6 * percentage / 100)
+    for _ in 1:100
+        f  = sin(θ) - θ * factor
+        df = cos(θ) - factor
+        δ  = f / df
+        θ -= δ
+        abs(δ) < 1e-12 && break
+    end
+    return θ
+end
+
+"""
+    refine_mesh_with_billowing!(wing, LE, TE, aero_model, aero_data; reuse_aero_data)
+
+Refine wing mesh using linear spacing, then apply circular arc billowing to TE positions.
+
+Between each pair of unrefined (rib) sections, the trailing edge follows a circular arc
+that bulges in the direction perpendicular to the chord and span (simulating fabric
+billowing between ribs on a ram-air kite). The leading edge stays linearly interpolated.
+
+The arc half-angle is `wing.billowing_angle` (0 = straight line, π/2 = semicircle).
+"""
+function refine_mesh_with_billowing!(wing, LE, TE, aero_model, aero_data;
+                                     reuse_aero_data::Bool=false)
+    n_sections = wing.n_panels + 1
+
+    # Step 1: Do standard LINEAR refinement first
+    refine_mesh_for_linear_cosine_distribution!(
+        wing, 1, LINEAR, n_sections, LE, TE, aero_model, aero_data;
+        reuse_aero_data
+    )
+
+    angle = wing.billowing_angle
+    if angle ≈ 0.0
+        return nothing  # No billowing needed
+    end
+
+    n_unrefined = length(wing.unrefined_sections)
+
+    # Collect unrefined LE positions for rib detection
+    unrefined_LEs = [s.LE_point for s in wing.unrefined_sections]
+
+    # Iterate over each pair of adjacent unrefined sections (ribs)
+    for rib_idx in 1:(n_unrefined - 1)
+        LE_1 = wing.unrefined_sections[rib_idx].LE_point
+        TE_1 = wing.unrefined_sections[rib_idx].TE_point
+        LE_2 = wing.unrefined_sections[rib_idx + 1].LE_point
+        TE_2 = wing.unrefined_sections[rib_idx + 1].TE_point
+
+        # Build local coordinate frame
+        chord_1 = TE_1 - LE_1
+        chord_2 = TE_2 - LE_2
+        x_hat = (chord_1 + chord_2) / 2
+        x_hat = x_hat / max(norm(x_hat), 1e-12)
+
+        y_vec = LE_1 - LE_2  # spanwise: from section 2 toward section 1
+        y_hat = y_vec / max(norm(y_vec), 1e-12)
+
+        z_hat = cross(x_hat, y_hat)
+        z_hat = z_hat / max(norm(z_hat), 1e-12)
+
+        # Project unrefined TEs into the local yz plane
+        TE_mid = (TE_1 + TE_2) / 2
+        y1 = dot(TE_1 - TE_mid, y_hat)
+        y2 = dot(TE_2 - TE_mid, y_hat)
+        d = abs(y1 - y2)  # chord length of the arc in yz plane
+
+        if d < 1e-12
+            continue  # degenerate: both TEs at same spanwise position
+        end
+
+        # Circular arc parameters
+        R = (d / 2) / sin(angle)
+        h = (d / 2) / tan(angle)  # center offset from midpoint along z
+
+        # Spanwise extent of this rib pair (for checking membership)
+        span_len = dot(LE_1 - LE_2, y_hat)
+
+        # Rib chord lengths for interpolation
+        chord_len_1 = norm(chord_1)
+        chord_len_2 = norm(chord_2)
+
+        # Displace TE of refined sections that fall between this rib pair
+        for sec in wing.refined_sections
+            # Skip sections at any unrefined rib position
+            is_rib = any(norm(sec.LE_point - ule) < 0.01 for ule in unrefined_LEs)
+            if is_rib
+                continue
+            end
+
+            # Project refined section's LE onto the spanwise direction
+            frac_vec = sec.LE_point - LE_2
+            t = dot(frac_vec, y_hat) / span_len
+
+            # Skip sections outside this rib pair
+            if t < 0.01 || t > 0.99
+                continue
+            end
+
+            # Arc parametrization: t=1 -> TE_1, t=0 -> TE_2
+            # In local coords centered at TE midpoint:
+            #   y(t) = -R * sin(angle * (1 - 2t))
+            #   z(t) = -h + R * cos(angle * (1 - 2t))
+            arc_y = -R * sin(angle * (1 - 2t))
+            arc_z = -h + R * cos(angle * (1 - 2t))
+
+            # Transform arc position back to global coords
+            arc_TE = TE_mid + arc_y * y_hat + arc_z * z_hat
+
+            # Preserve chord length: use the arc TE to define the chord
+            # direction, but enforce the interpolated chord length
+            chord_dir = arc_TE - sec.LE_point
+            chord_dir_len = norm(chord_dir)
+            if chord_dir_len > 1e-12
+                target_chord = t * chord_len_1 + (1 - t) * chord_len_2
+                sec.TE_point .= sec.LE_point + (target_chord / chord_dir_len) * chord_dir
+            end
+        end
+    end
+
+    return nothing
+end
 
 """
     calculate_span(wing::AbstractWing)

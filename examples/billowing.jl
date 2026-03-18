@@ -1,0 +1,147 @@
+using LinearAlgebra
+using VortexStepMethod
+using GLMakie
+using DelimitedFiles
+
+PLOT = true
+USE_TEX = false
+BILLOWING_ANGLE = billowing_angle_from_percentage(5)  # Half-angle of billowing arc [rad]
+
+# Data paths (all within this repo)
+project_dir = dirname(dirname(pathof(VortexStepMethod)))
+v3_dir = joinpath(project_dir, "data", "TUDELFT_V3_KITE")
+polar_dir = joinpath(v3_dir, "polars_CFD_NF_combined")
+
+# Literature results
+lit_dir = joinpath(v3_dir, "literature_results")
+literature_paths = [
+    joinpath(lit_dir, "CFD_RANS_Rey_5e5_Poland2025_alpha_sweep_beta_0_NoStruts.csv"),
+    joinpath(lit_dir, "CFD_RANS_Rey_10e5_Poland2025_alpha_sweep_beta_0.csv"),
+    joinpath(lit_dir, "python_alpha_sweep.csv"),
+    joinpath(lit_dir, "windtunnel_alpha_sweep_beta_00_0_Poland_2025_Rey_5e5.csv"),
+]
+labels = [
+    "VSM flat",
+    "VSM billowing $(round(Int, rad2deg(BILLOWING_ANGLE)))°",
+    "CFD Re=5e5",
+    "CFD Re=10e5",
+    "VSM Python Re=5e5",
+    "WindTunnel Re=5e5",
+]
+
+# Load solver settings (coarse: 36 panels, matches 10-section geometry)
+settings_data = VortexStepMethod.YAML.load_file(
+    joinpath(v3_dir, "vsm_settings_coarse.yaml"))
+condition_cfg = settings_data["condition"]
+solver_cfg = settings_data["solver_settings"]
+n_panels = settings_data["wings"][1]["n_panels"]
+
+# Load coarse geometry (10 structural rib sections)
+geom_data = VortexStepMethod.YAML.load_file(
+    joinpath(v3_dir, "aero_geometry_coarse_discretisation.yaml"))
+section_headers = geom_data["wing_sections"]["headers"]
+section_rows = geom_data["wing_sections"]["data"]
+
+function build_wing(; distribution=SPLIT_PROVIDED, billowing_angle=0.0)
+    wing = Wing(n_panels;
+        spanwise_distribution=distribution,
+        billowing_angle=billowing_angle)
+    for row in section_rows
+        d = Dict(zip(section_headers, row))
+        le = [d["LE_x"], d["LE_y"], d["LE_z"]]
+        te = [d["TE_x"], d["TE_y"], d["TE_z"]]
+        csv_path = joinpath(polar_dir, "$(d["airfoil_id"]).csv")
+        aero_data, aero_model = load_polar_data(csv_path)
+        add_section!(wing, le, te, aero_model, aero_data)
+    end
+    refine!(wing)
+    return wing
+end
+
+# --- Wing without billowing ---
+wing_flat = build_wing()
+body_aero_flat = BodyAerodynamics([wing_flat])
+VortexStepMethod.reinit!(body_aero_flat)
+
+# --- Wing with billowing ---
+wing_bill = build_wing(distribution=BILLOWING,
+                       billowing_angle=BILLOWING_ANGLE)
+body_aero_bill = BodyAerodynamics([wing_bill])
+VortexStepMethod.reinit!(body_aero_bill)
+
+# --- Build solvers ---
+function make_solver(body_aero)
+    Solver(body_aero;
+        solver_type=(solver_cfg["solver_type"] == "NONLIN" ? NONLIN : LOOP),
+        aerodynamic_model_type=getproperty(
+            VortexStepMethod,
+            Symbol(solver_cfg["aerodynamic_model_type"])),
+        density=solver_cfg["density"],
+        max_iterations=solver_cfg["max_iterations"],
+        rtol=solver_cfg["rtol"],
+        tol_reference_error=solver_cfg["tol_reference_error"],
+        relaxation_factor=solver_cfg["relaxation_factor"],
+        is_with_artificial_damping=solver_cfg["artificial_damping"],
+        artificial_damping=(k2=solver_cfg["k2"], k4=solver_cfg["k4"]),
+        type_initial_gamma_distribution=getproperty(
+            VortexStepMethod,
+            Symbol(solver_cfg["type_initial_gamma_distribution"])),
+        use_gamma_prev=get(solver_cfg, "use_gamma_prev",
+                           get(solver_cfg, "use_gamme_prev", true)),
+        core_radius_fraction=solver_cfg["core_radius_fraction"],
+        mu=solver_cfg["mu"],
+        is_only_f_and_gamma_output=get(
+            solver_cfg, "calc_only_f_and_gamma", false),
+        correct_aoa=get(solver_cfg, "correct_aoa", false),
+        reference_point=get(solver_cfg, "reference_point",
+                            [0.422646, 0.0, 9.3667]),
+    )
+end
+
+solver_flat = make_solver(body_aero_flat)
+solver_bill = make_solver(body_aero_bill)
+
+# --- Set flight conditions ---
+wind_speed = condition_cfg["wind_speed"]
+angle_of_attack_deg = condition_cfg["alpha"]
+sideslip_deg = condition_cfg["beta"]
+
+α0 = deg2rad(angle_of_attack_deg)
+β0 = deg2rad(sideslip_deg)
+va = wind_speed .* [cos(α0) * cos(β0), sin(β0), sin(α0) * cos(β0)]
+set_va!(body_aero_flat, va)
+set_va!(body_aero_bill, va)
+
+# --- Solve and compare ---
+results_flat = VortexStepMethod.solve(solver_flat, body_aero_flat; log=true)
+results_bill = VortexStepMethod.solve(solver_bill, body_aero_bill; log=true)
+
+println("\nFlat wing: CL=$(round(results_flat["cl"]; digits=4)), " *
+        "CD=$(round(results_flat["cd"]; digits=4))")
+println("Billowed:  CL=$(round(results_bill["cl"]; digits=4)), " *
+        "CD=$(round(results_bill["cd"]; digits=4))")
+
+if PLOT
+    fig1 = plot_combined_analysis(
+        [solver_flat, solver_bill],
+        [body_aero_flat, body_aero_bill],
+        [results_flat, results_bill];
+        solver_label=["VSM flat", "VSM billowing"],
+        labels=labels,
+        literature_path_list=literature_paths,
+        angle_range=range(-5, 25, length=31),
+        angle_type="angle_of_attack",
+        angle_of_attack=angle_of_attack_deg,
+        side_slip=sideslip_deg,
+        v_a=wind_speed,
+        title="V3 Kite: flat vs billowing " *
+              "$(round(Int, rad2deg(BILLOWING_ANGLE)))°",
+        is_show=false,
+        use_tex=USE_TEX,
+        angle_of_attack_for_spanwise_distribution=10.0,
+    )
+    scr1 = display(fig1)
+    isinteractive() && wait(scr1)
+end
+
+nothing

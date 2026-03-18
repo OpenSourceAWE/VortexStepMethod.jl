@@ -34,6 +34,8 @@ Settings for a single wing, used within [`VSMSettings`](@ref).
     (default `true`)
 - `use_prior_polar`: Reuse prior refined/panel polar mapping on
     reinit/refine updates (default `false`)
+- `billowing_angle`: Half-angle of circular arc billowing in radians
+    (default `0.0`; only used with `BILLOWING` distribution)
 """
 @with_kw mutable struct WingSettings
     name::String = "main_wing"
@@ -45,6 +47,7 @@ Settings for a single wing, used within [`VSMSettings`](@ref).
     spanwise_direction::MVec3 = [0.0, 1.0, 0.0]
     remove_nan = true
     use_prior_polar::Bool = false
+    billowing_angle::Float64 = 0.0     # half-angle of billowing arc [rad]
 end
 
 """
@@ -170,6 +173,7 @@ function VSMSettings(filename; data_prefix=true)
             end
             wing.remove_nan = wing_data["remove_nan"]
             wing.use_prior_polar = get(wing_data, "use_prior_polar", false)
+            wing.billowing_angle = get(wing_data, "billowing_angle", 0.0)
 
             push!(vsm_settings.wings, wing)
             n_panels += wing.n_panels

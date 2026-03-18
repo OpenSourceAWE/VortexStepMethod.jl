@@ -374,8 +374,9 @@ function calculate_circulation_distribution_elliptical_wing(gamma_i, body_aero::
         y[i] = panel.control_point[2] 
     end
     
-    # Calculate elliptical distribution
-    gamma_i .= gamma_0 * sqrt.(1 .- (2 .* y ./ wing_span).^2)
+    # Calculate elliptical distribution (clamp to avoid sqrt of negative
+    # when control points lie outside the nominal span envelope)
+    gamma_i .= gamma_0 * sqrt.(max.(0.0, 1 .- (2 .* y ./ wing_span).^2))
     
     @debug "Calculated circulation distribution: $gamma_i"
     nothing

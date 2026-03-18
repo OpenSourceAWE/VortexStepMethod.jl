@@ -1,0 +1,171 @@
+wing_sections:
+  # ---------------------------------------------------------------
+  # headers:
+  #   - airfoil_id: integer, unique identifier for the airfoil (matches wing_airfoils)
+  #   - LE_x: x-coordinate of leading edge
+  #   - LE_y: y-coordinate of leading edge
+  #   - LE_z: z-coordinate of leading edge
+  #   - TE_x: x-coordinate of trailing edge
+  #   - TE_y: y-coordinate of trailing edge
+  #   - TE_z: z-coordinate of trailing edge
+  # ---------------------------------------------------------------
+  # NOTE: Reduced to 10 sections to match 20 structural WING points (10 LE/TE pairs)
+  # Constraint: n_structural_points (20) == 2 * n_vsm_sections (10)
+  # Selected sections match structural point spanwise positions
+  headers: [airfoil_id, LE_x, LE_y, LE_z, TE_x, TE_y, TE_z]
+  data:
+    # Sections match structural points exactly from struc_geometry.yaml
+    # Section 1: points 2 (LE) and 3 (TE)
+    - [
+        18,
+        -0.16686417,
+        4.07190711,
+        8.25938552,
+        0.8950856,
+        4.23504033,
+        8.28564737,
+      ]
+    # Section 2: points 4 (LE) and 5 (TE)
+    - [
+        15,
+        -0.66385373,
+        3.97158462,
+        9.10345727,
+        0.84466799,
+        4.04893109,
+        9.16869541,
+      ]
+    # Section 3: points 6 (LE) and 7 (TE)
+    - [
+        11,
+        -1.00179344,
+        3.13938093,
+        10.08117033,
+        0.95411064,
+        3.19044693,
+        10.20618443,
+      ]
+    # Section 4: points 8 (LE) and 9 (TE)
+    - [
+        7,
+        -1.11933902,
+        1.96778538,
+        10.69146438,
+        1.03150699,
+        1.98490264,
+        10.81013669,
+      ]
+    # Section 5: points 10 (LE) and 11 (TE)
+    - [
+        3,
+        -1.16537227,
+        0.67379745,
+        10.96630823,
+        1.09790203,
+        0.6605361,
+        11.06585663,
+      ]
+    # Section 6: points 12 (LE) and 13 (TE) - mirror of section 5
+    - [
+        3,
+        -1.16537227,
+        -0.67379745,
+        10.96630823,
+        1.09790203,
+        -0.6605361,
+        11.06585663,
+      ]
+    # Section 7: points 14 (LE) and 15 (TE) - mirror of section 4
+    - [
+        7,
+        -1.11933902,
+        -1.96778538,
+        10.69146438,
+        1.03150699,
+        -1.98490264,
+        10.81013669,
+      ]
+    # Section 8: points 16 (LE) and 17 (TE) - mirror of section 3
+    - [
+        11,
+        -1.00179344,
+        -3.13938093,
+        10.08117033,
+        0.95411064,
+        -3.19044693,
+        10.20618443,
+      ]
+    # Section 9: points 18 (LE) and 19 (TE) - mirror of section 2
+    - [
+        15,
+        -0.66385373,
+        -3.97158462,
+        9.10345727,
+        0.84466799,
+        -4.04893109,
+        9.16869541,
+      ]
+    # Section 10: points 20 (LE) and 21 (TE) - mirror of section 1
+    - [
+        18,
+        -0.16686417,
+        -4.07190711,
+        8.25938552,
+        0.8950856,
+        -4.23504033,
+        8.28564737,
+      ]
+
+wing_airfoils:
+  # ---------------------------------------------------------------
+  # headers:
+  #   - airfoil_id: integer, unique identifier for the airfoil
+  #   - type: one of [neuralfoil, breukels_regression, masure_regression, polars]
+  #   - info_dict: dictionary with parameters depending on 'type'
+  #
+  # info_dict fields by type:
+  #   - breukels_regression:
+  #       t: Tube diameter non-dimensionalized by chord (required)
+  #       kappa: Maximum camber height/magnitude, non-dimensionalized by chord (required)
+  #   - neuralfoil:
+  #       dat_file_path: Path to airfoil .dat file (x, y columns)
+  #       model_size: NeuralFoil model size (e.g., "xxxlarge")
+  #       xtr_lower: Lower transition location (0=forced, 1=free)
+  #       xtr_upper: Upper transition location
+  #       n_crit: Critical amplification factor (see guidelines below)
+  #         n_crit guidelines:
+  #           Sailplane:           12–14
+  #           Motorglider:         11–13
+  #           Clean wind tunnel:   10–12
+  #           Average wind tunnel: 9   (standard "e^9 method")
+  #           Dirty wind tunnel:   4–8
+  #   - polars:
+  #       csv_file_path: Path to polar CSV file (columns: alpha [rad], cl, cd, cm)
+  #   - masure_regression:
+  #       t, eta, kappa, delta, lamba, phi: Regression parameters
+  #   - inviscid:
+  #       no further data is required
+  # ---------------------------------------------------------------
+  alpha_range: [-15, 50, 0.5] # [deg], in this range the polars are calculated
+  reynolds: !!float 1e6 # Reynolds number
+  headers: [airfoil_id, type, info_dict]
+  data:
+    - [1, polars, { csv_file_path: '2D_polars_drag_adjusted/1.csv' }]
+    - [2, polars, { csv_file_path: '2D_polars_drag_adjusted/2.csv' }]
+    - [3, polars, { csv_file_path: '2D_polars_drag_adjusted/3.csv' }]
+    - [4, polars, { csv_file_path: '2D_polars_drag_adjusted/4.csv' }]
+    - [5, polars, { csv_file_path: '2D_polars_drag_adjusted/5.csv' }]
+    - [6, polars, { csv_file_path: '2D_polars_drag_adjusted/6.csv' }]
+    - [7, polars, { csv_file_path: '2D_polars_drag_adjusted/7.csv' }]
+    - [8, polars, { csv_file_path: '2D_polars_drag_adjusted/8.csv' }]
+    - [9, polars, { csv_file_path: '2D_polars_drag_adjusted/9.csv' }]
+    - [10, polars, { csv_file_path: '2D_polars_drag_adjusted/10.csv' }]
+    - [11, polars, { csv_file_path: '2D_polars_drag_adjusted/11.csv' }]
+    - [12, polars, { csv_file_path: '2D_polars_drag_adjusted/12.csv' }]
+    - [13, polars, { csv_file_path: '2D_polars_drag_adjusted/13.csv' }]
+    - [14, polars, { csv_file_path: '2D_polars_drag_adjusted/14.csv' }]
+    - [15, polars, { csv_file_path: '2D_polars_drag_adjusted/15.csv' }]
+    - [16, polars, { csv_file_path: '2D_polars_drag_adjusted/16.csv' }]
+    - [17, polars, { csv_file_path: '2D_polars_drag_adjusted/17.csv' }]
+    - [18, polars, { csv_file_path: '2D_polars_drag_adjusted/18.csv' }]
+    - [19, polars, { csv_file_path: '2D_polars_drag_adjusted/19.csv' }]

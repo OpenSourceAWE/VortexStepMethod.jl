@@ -32,11 +32,11 @@ export BodyAerodynamics
 export Solver, solve, solve_base!, solve!, VSMSolution, linearize
 export calculate_results
 export add_section!, set_va!
-export calculate_span, calculate_projected_area
+export calculate_span, calculate_projected_area, billowing_angle_from_percentage
 export MVec3
 export Model, VSM, LLT
 export AeroModel, LEI_AIRFOIL_BREUKELS, POLAR_VECTORS, POLAR_MATRICES, INVISCID
-export PanelDistribution, LINEAR, COSINE, SPLIT_PROVIDED, UNCHANGED
+export PanelDistribution, LINEAR, COSINE, SPLIT_PROVIDED, UNCHANGED, BILLOWING
 export InitialGammaDistribution, ELLIPTIC, ZEROS
 export SolverStatus, FEASIBLE, INFEASIBLE, FAILURE
 export SolverType, LOOP, NONLIN
@@ -121,7 +121,7 @@ where `alpha` is the angle of attack, `delta` is trailing edge angle.
 end
 
 """
-   PanelDistribution `LINEAR` `COSINE` `SPLIT_PROVIDED` `UNCHANGED`
+   PanelDistribution `LINEAR` `COSINE` `SPLIT_PROVIDED` `UNCHANGED` `BILLOWING`
 
 Enumeration of the implemented panel distributions.
 
@@ -130,12 +130,14 @@ Enumeration of the implemented panel distributions.
 - COSINE               # Cosine distribution
 - `SPLIT_PROVIDED`     # Split provided sections
 - `UNCHANGED`          # 1:1 copy of unrefined to refined sections (no interpolation)
+- `BILLOWING`          # Linear distribution with circular arc TE billowing
 """
 @enum PanelDistribution begin
    LINEAR             # Linear distribution
    COSINE             # Cosine distribution
    SPLIT_PROVIDED     # Split provided sections
    UNCHANGED          # 1:1 copy of unrefined to refined sections
+   BILLOWING          # Linear + circular arc TE billowing
 end
 
 """
