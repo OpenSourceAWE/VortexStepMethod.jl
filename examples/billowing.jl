@@ -5,7 +5,6 @@ using DelimitedFiles
 
 PLOT = true
 USE_TEX = false
-BILLOWING_ANGLE = billowing_angle_from_percentage(5)  # Half-angle of billowing arc [rad]
 
 # Data paths (all within this repo)
 project_dir = dirname(dirname(pathof(VortexStepMethod)))
@@ -20,6 +19,23 @@ literature_paths = [
     joinpath(lit_dir, "python_alpha_sweep.csv"),
     joinpath(lit_dir, "windtunnel_alpha_sweep_beta_00_0_Poland_2025_Rey_5e5.csv"),
 ]
+
+# Load solver settings (coarse: 36 panels, matches 10-section geometry)
+settings_data = VortexStepMethod.YAML.load_file(
+    joinpath(v3_dir, "vsm_settings_coarse.yaml"))
+condition_cfg = settings_data["condition"]
+solver_cfg = settings_data["solver_settings"]
+wing_cfg = settings_data["wings"][1]
+n_panels = wing_cfg["n_panels"]
+
+# Read billowing angle from settings (degrees → radians, or from percentage)
+if haskey(wing_cfg, "billowing_percentage")
+    BILLOWING_ANGLE = billowing_angle_from_percentage(
+        wing_cfg["billowing_percentage"])
+else
+    BILLOWING_ANGLE = deg2rad(get(wing_cfg, "billowing_angle", 0.0))
+end
+
 labels = [
     "VSM flat",
     "VSM billowing $(round(Int, rad2deg(BILLOWING_ANGLE)))°",
@@ -28,13 +44,6 @@ labels = [
     "VSM Python Re=5e5",
     "WindTunnel Re=5e5",
 ]
-
-# Load solver settings (coarse: 36 panels, matches 10-section geometry)
-settings_data = VortexStepMethod.YAML.load_file(
-    joinpath(v3_dir, "vsm_settings_coarse.yaml"))
-condition_cfg = settings_data["condition"]
-solver_cfg = settings_data["solver_settings"]
-n_panels = settings_data["wings"][1]["n_panels"]
 
 # Load coarse geometry (10 structural rib sections)
 geom_data = VortexStepMethod.YAML.load_file(

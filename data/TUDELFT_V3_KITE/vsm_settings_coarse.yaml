@@ -50,6 +50,7 @@ wings:
     spanwise_direction: [0.0, 1.0, 0.0] # Unit vector defining wingspan direction
     remove_nan: true # Remove NaN values from polar data
     use_prior_polar: true # Use previously computed polars if available
+    billowing_angle: 5 # [deg] Half-angle of circular arc billowing
 
 # Numerical method settings and convergence criteria
 solver_settings:

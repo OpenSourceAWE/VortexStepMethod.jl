@@ -34,8 +34,13 @@ Settings for a single wing, used within [`VSMSettings`](@ref).
     (default `true`)
 - `use_prior_polar`: Reuse prior refined/panel polar mapping on
     reinit/refine updates (default `false`)
-- `billowing_angle`: Half-angle of circular arc billowing in radians
-    (default `0.0`; only used with `BILLOWING` distribution)
+- `billowing_angle`: Half-angle of circular arc billowing in degrees
+    (default `0.0`; only used with `BILLOWING` distribution).
+    Converted to radians internally.
+    Mutually exclusive with `billowing_percentage`.
+- `billowing_percentage`: Percentage by which the chord is shorter than
+    the minor arc (default `nothing`; converted to `billowing_angle`).
+    Mutually exclusive with `billowing_angle`.
 """
 @with_kw mutable struct WingSettings
     name::String = "main_wing"
@@ -173,7 +178,21 @@ function VSMSettings(filename; data_prefix=true)
             end
             wing.remove_nan = wing_data["remove_nan"]
             wing.use_prior_polar = get(wing_data, "use_prior_polar", false)
-            wing.billowing_angle = get(wing_data, "billowing_angle", 0.0)
+
+            has_angle = haskey(wing_data, "billowing_angle")
+            has_pct   = haskey(wing_data, "billowing_percentage")
+            if has_angle && has_pct
+                throw(ArgumentError(
+                    "Wing '$(wing.name)': specify either " *
+                    "billowing_angle or billowing_percentage, " *
+                    "not both"))
+            elseif has_pct
+                wing.billowing_angle =
+                    billowing_angle_from_percentage(
+                        wing_data["billowing_percentage"])
+            elseif has_angle
+                wing.billowing_angle = deg2rad(wing_data["billowing_angle"])
+            end
 
             push!(vsm_settings.wings, wing)
             n_panels += wing.n_panels
