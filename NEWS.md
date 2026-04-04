@@ -1,6 +1,7 @@
-## VortexStepMethod v3.0.1 2025-03-17
+## VortexStepMethod v3.0.1 2025-04-04
 ### Changed
 - the file `CITATION.cff`
+- compat entry for RecursiveArrayTools
 ### Added
 - the file `.zenodo.json`
 
