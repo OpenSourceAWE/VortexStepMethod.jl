@@ -815,10 +815,7 @@ function refine!(wing::AbstractWing; recompute_mapping=true, sort_sections=true)
             reuse_aero_data
         )
     elseif wing.spanwise_distribution == BILLOWING
-        refine_mesh_with_billowing!(
-            wing, LE, TE, aero_model, aero_data;
-            reuse_aero_data
-        )
+        refine_mesh_with_billowing!(wing; reuse_aero_data)
     else
         throw(ArgumentError("Unsupported spanwise panel distribution: $(wing.spanwise_distribution)"))
     end
@@ -1118,14 +1115,18 @@ function refine_mesh_for_linear_cosine_distribution!(
 end
 
 """
-    refine_mesh_by_splitting_provided_sections!(wing::AbstractWing)
+    refine_mesh_by_splitting_provided_sections!(wing; reuse_aero_data, billowing_angle)
 
 Refine mesh by splitting provided sections into desired number of panels.
 
-Returns:
-    Vector{Section}: Refined sections
+When `billowing_angle > 0`, applies circular arc TE displacement to intermediate
+sections within each rib pair (simulating fabric billowing between ribs).
 """
-function refine_mesh_by_splitting_provided_sections!(wing::AbstractWing; reuse_aero_data::Bool=false)
+function refine_mesh_by_splitting_provided_sections!(
+    wing::AbstractWing;
+    reuse_aero_data::Bool=false,
+    billowing_angle::Float64=0.0
+)
     n_sections_provided = length(wing.unrefined_sections)
     n_panels_provided = n_sections_provided - 1
     n_panels_desired = wing.n_panels
@@ -1197,6 +1198,7 @@ function refine_mesh_by_splitting_provided_sections!(wing::AbstractWing; reuse_a
             ]
 
             # Generate sections for this pair
+            start_idx = idx
             idx = refine_mesh_for_linear_cosine_distribution!(
                 wing,
                 idx,
@@ -1209,6 +1211,61 @@ function refine_mesh_by_splitting_provided_sections!(wing::AbstractWing; reuse_a
                 endpoints=false,
                 reuse_aero_data
             )
+
+            # Apply billowing arc to the just-created sections
+            if billowing_angle > 0 && idx > start_idx
+                LE_1 = LE[left_section_index]
+                TE_1 = TE[left_section_index]
+                LE_2 = LE[left_section_index + 1]
+                TE_2 = TE[left_section_index + 1]
+
+                chord_1 = TE_1 - LE_1
+                chord_2 = TE_2 - LE_2
+                x_hat = normalize((chord_1 + chord_2) / 2)
+                y_hat = normalize(LE_1 - LE_2)
+                z_hat = cross(x_hat, y_hat)
+                z_norm = norm(z_hat)
+                if z_norm > 1e-10
+                    z_hat = z_hat / z_norm
+
+                    TE_mid = (TE_1 + TE_2) / 2
+                    d = abs(dot(TE_1 - TE_2, y_hat))
+                    span_len = norm(LE_1 - LE_2)
+                    chord_len_1 = norm(chord_1)
+                    chord_len_2 = norm(chord_2)
+
+                    if d > 1e-12
+                        R = (d / 2) / sin(billowing_angle)
+                        h = (d / 2) / tan(billowing_angle)
+
+                        for si in start_idx:(idx - 1)
+                            sec = wing.refined_sections[si]
+                            t = dot(sec.LE_point - LE_2,
+                                    y_hat) / span_len
+
+                            arc_y = -R * sin(
+                                billowing_angle * (1 - 2t))
+                            arc_z = -h + R * cos(
+                                billowing_angle * (1 - 2t))
+                            arc_TE = TE_mid +
+                                arc_y * y_hat + arc_z * z_hat
+
+                            chord_dir = arc_TE - sec.LE_point
+                            chord_dir_len = norm(chord_dir)
+                            if chord_dir_len > 1e-12
+                                target_chord = (
+                                    t * chord_len_1 +
+                                    (1 - t) * chord_len_2)
+                                sec.TE_point .= (
+                                    sec.LE_point +
+                                    (target_chord /
+                                     chord_dir_len) *
+                                    chord_dir)
+                            end
+                        end
+                    end
+                end
+            end
         end
     end
     
@@ -1277,115 +1334,23 @@ function billowing_angle_from_percentage(percentage::Real)
 end
 
 """
-    refine_mesh_with_billowing!(wing, LE, TE, aero_model, aero_data; reuse_aero_data)
+    refine_mesh_with_billowing!(wing; reuse_aero_data)
 
-Refine wing mesh using linear spacing, then apply circular arc billowing to TE positions.
+Refine wing mesh using SPLIT_PROVIDED spacing with circular arc billowing.
 
 Between each pair of unrefined (rib) sections, the trailing edge follows a circular arc
 that bulges in the direction perpendicular to the chord and span (simulating fabric
 billowing between ribs on a ram-air kite). The leading edge stays linearly interpolated.
 
 The arc half-angle is `wing.billowing_angle` (0 = straight line, π/2 = semicircle).
+
+Delegates to [`refine_mesh_by_splitting_provided_sections!`](@ref).
 """
-function refine_mesh_with_billowing!(wing, LE, TE, aero_model, aero_data;
-                                     reuse_aero_data::Bool=false)
-    n_sections = wing.n_panels + 1
-
-    # Step 1: Do standard LINEAR refinement first
-    refine_mesh_for_linear_cosine_distribution!(
-        wing, 1, LINEAR, n_sections, LE, TE, aero_model, aero_data;
-        reuse_aero_data
+function refine_mesh_with_billowing!(wing; reuse_aero_data::Bool=false)
+    refine_mesh_by_splitting_provided_sections!(
+        wing; reuse_aero_data,
+        billowing_angle=wing.billowing_angle
     )
-
-    angle = wing.billowing_angle
-    if angle ≈ 0.0
-        return nothing  # No billowing needed
-    end
-
-    n_unrefined = length(wing.unrefined_sections)
-
-    # Collect unrefined LE positions for rib detection
-    unrefined_LEs = [s.LE_point for s in wing.unrefined_sections]
-
-    # Iterate over each pair of adjacent unrefined sections (ribs)
-    for rib_idx in 1:(n_unrefined - 1)
-        LE_1 = wing.unrefined_sections[rib_idx].LE_point
-        TE_1 = wing.unrefined_sections[rib_idx].TE_point
-        LE_2 = wing.unrefined_sections[rib_idx + 1].LE_point
-        TE_2 = wing.unrefined_sections[rib_idx + 1].TE_point
-
-        # Build local coordinate frame
-        chord_1 = TE_1 - LE_1
-        chord_2 = TE_2 - LE_2
-        x_hat = (chord_1 + chord_2) / 2
-        x_hat = x_hat / max(norm(x_hat), 1e-12)
-
-        y_vec = LE_1 - LE_2  # spanwise: from section 2 toward section 1
-        y_hat = y_vec / max(norm(y_vec), 1e-12)
-
-        z_hat = cross(x_hat, y_hat)
-        z_hat = z_hat / max(norm(z_hat), 1e-12)
-
-        # Project unrefined TEs into the local yz plane
-        TE_mid = (TE_1 + TE_2) / 2
-        y1 = dot(TE_1 - TE_mid, y_hat)
-        y2 = dot(TE_2 - TE_mid, y_hat)
-        d = abs(y1 - y2)  # chord length of the arc in yz plane
-
-        if d < 1e-12
-            continue  # degenerate: both TEs at same spanwise position
-        end
-
-        # Circular arc parameters
-        R = (d / 2) / sin(angle)
-        h = (d / 2) / tan(angle)  # center offset from midpoint along z
-
-        # Spanwise extent of this rib pair (for checking membership)
-        span_len = dot(LE_1 - LE_2, y_hat)
-
-        # Rib chord lengths for interpolation
-        chord_len_1 = norm(chord_1)
-        chord_len_2 = norm(chord_2)
-
-        # Displace TE of refined sections that fall between this rib pair
-        for sec in wing.refined_sections
-            # Skip sections at any unrefined rib position
-            is_rib = any(norm(sec.LE_point - ule) < 0.01 for ule in unrefined_LEs)
-            if is_rib
-                continue
-            end
-
-            # Project refined section's LE onto the spanwise direction
-            frac_vec = sec.LE_point - LE_2
-            t = dot(frac_vec, y_hat) / span_len
-
-            # Skip sections outside this rib pair
-            if t < 0.01 || t > 0.99
-                continue
-            end
-
-            # Arc parametrization: t=1 -> TE_1, t=0 -> TE_2
-            # In local coords centered at TE midpoint:
-            #   y(t) = -R * sin(angle * (1 - 2t))
-            #   z(t) = -h + R * cos(angle * (1 - 2t))
-            arc_y = -R * sin(angle * (1 - 2t))
-            arc_z = -h + R * cos(angle * (1 - 2t))
-
-            # Transform arc position back to global coords
-            arc_TE = TE_mid + arc_y * y_hat + arc_z * z_hat
-
-            # Preserve chord length: use the arc TE to define the chord
-            # direction, but enforce the interpolated chord length
-            chord_dir = arc_TE - sec.LE_point
-            chord_dir_len = norm(chord_dir)
-            if chord_dir_len > 1e-12
-                target_chord = t * chord_len_1 + (1 - t) * chord_len_2
-                sec.TE_point .= sec.LE_point + (target_chord / chord_dir_len) * chord_dir
-            end
-        end
-    end
-
-    return nothing
 end
 
 """
