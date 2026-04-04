@@ -1,4 +1,4 @@
-## VortexStepMethod v3.1.0 2026-03-18
+## Unreleased
 
 ### Added
 - `BILLOWING` panel distribution with circular arc TE billowing between ribs
@@ -15,9 +15,11 @@
 - Domain error in elliptical gamma distribution when control points lie
   outside the nominal span envelope
 
-## VortexStepMethod v3.0.1 2025-03-17
+## VortexStepMethod v3.0.1 2025-04-04
+
 ### Changed
 - the file `CITATION.cff`
+- compat entry for RecursiveArrayTools
 ### Added
 - the file `.zenodo.json`
 
