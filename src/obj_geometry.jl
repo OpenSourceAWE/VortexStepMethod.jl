@@ -580,7 +580,7 @@ function ObjWing(
         cache = [PreallocationTools.LazyBufferCache()]
 
         wing = Wing(n_panels, Int16(n_unrefined_sections), spanwise_distribution, panel_props, MVec3(spanwise_direction),
-            sections, Section[], remove_nan, use_prior_polar, 0.0,  # billowing_angle
+            sections, Section[], remove_nan, use_prior_polar, 0.0,  # billowing_percentage
             Int16[],  # refined_panel_mapping empty
             Section[], zeros(n_panels), zeros(n_panels),  # non_deformed, theta, delta
             mass, gamma_tip, inertia_tensor, T_cad_body, R_cad_body, radius,

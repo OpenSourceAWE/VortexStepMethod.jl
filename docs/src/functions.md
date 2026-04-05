@@ -8,7 +8,6 @@ refine!
 calculate_span
 calculate_projected_area
 load_polar_data
-billowing_angle_from_percentage
 ```
 
 ## Setting the inflow conditions and solving

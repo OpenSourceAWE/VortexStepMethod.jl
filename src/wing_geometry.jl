@@ -232,7 +232,7 @@ mutable struct Wing <: AbstractWing
     refined_sections::Vector{Section}
     remove_nan::Bool
     use_prior_polar::Bool
-    billowing_angle::Float64  # Half-angle of circular arc [rad] (0=straight, π/2=semicircle)
+    billowing_percentage::Float64  # TE billow as percentage of arc length (0=flat)
 
     # Grouping
     refined_panel_mapping::Vector{Int16}  # Maps each refined panel index to unrefined section index (1 to n_unrefined_sections)
@@ -262,7 +262,7 @@ end
          spanwise_direction::PosVector=MVec3([0.0, 1.0, 0.0]),
          remove_nan::Bool=true,
          use_prior_polar::Bool=false,
-         billowing_angle::Float64=0.0)
+         billowing_percentage::Float64=0.0)
 
 Constructor for a [Wing](@ref) struct with default values that initializes the sections
 and refined sections as empty arrays. Creates a basic wing suitable for YAML-based construction.
@@ -274,7 +274,7 @@ and refined sections as empty arrays. Creates a basic wing suitable for YAML-bas
 - `spanwise_direction::MVec3` = MVec3([0.0, 1.0, 0.0]): Wing span direction vector
 - `remove_nan::Bool`: Whether to remove the NaNs from interpolations or not
 - `use_prior_polar::Bool`: Reuse prior refined/panel polar mapping during geometry-only updates
-- `billowing_angle::Float64`: Half-angle of billowing arc in radians (0=straight, π/2=semicircle)
+- `billowing_percentage::Float64`: TE billow as percentage of arc length (0=flat)
 """
 function Wing(n_panels::Int;
         n_unrefined_sections=nothing,
@@ -282,7 +282,7 @@ function Wing(n_panels::Int;
         spanwise_direction::PosVector=MVec3([0.0, 1.0, 0.0]),
         remove_nan=true,
         use_prior_polar=false,
-        billowing_angle=0.0)
+        billowing_percentage=0.0)
 
     # For YAML wings, n_unrefined_sections will be set when sections are added
     # Set to 0 as placeholder for now
@@ -293,7 +293,7 @@ function Wing(n_panels::Int;
     # Initialize with default/empty values for optional fields
     Wing(
         n_panels, n_unrefined_sections_value, spanwise_distribution, panel_props, spanwise_direction,
-        Section[], Section[], remove_nan, use_prior_polar, Float64(billowing_angle),
+        Section[], Section[], remove_nan, use_prior_polar, Float64(billowing_percentage),
         # Grouping
         Int16[],
         # Deformation fields
@@ -1115,17 +1115,18 @@ function refine_mesh_for_linear_cosine_distribution!(
 end
 
 """
-    refine_mesh_by_splitting_provided_sections!(wing; reuse_aero_data, billowing_angle)
+    refine_mesh_by_splitting_provided_sections!(wing; reuse_aero_data,
+        billowing_percentage)
 
 Refine mesh by splitting provided sections into desired number of panels.
 
-When `billowing_angle > 0`, applies circular arc TE displacement to intermediate
+When `billowing_percentage > 0`, applies catenary TE displacement to intermediate
 sections within each rib pair (simulating fabric billowing between ribs).
 """
 function refine_mesh_by_splitting_provided_sections!(
     wing::AbstractWing;
     reuse_aero_data::Bool=false,
-    billowing_angle::Float64=0.0
+    billowing_percentage::Float64=0.0
 )
     n_sections_provided = length(wing.unrefined_sections)
     n_panels_provided = n_sections_provided - 1
@@ -1212,8 +1213,8 @@ function refine_mesh_by_splitting_provided_sections!(
                 reuse_aero_data
             )
 
-            # Apply billowing arc to the just-created sections
-            if billowing_angle > 0 && idx > start_idx
+            # Apply catenary billowing to the just-created sections
+            if billowing_percentage > 0 && idx > start_idx
                 LE_1 = LE[left_section_index]
                 TE_1 = TE[left_section_index]
                 LE_2 = LE[left_section_index + 1]
@@ -1228,40 +1229,25 @@ function refine_mesh_by_splitting_provided_sections!(
                 if z_norm > 1e-10
                     z_hat = z_hat / z_norm
 
-                    TE_mid = (TE_1 + TE_2) / 2
                     d = abs(dot(TE_1 - TE_2, y_hat))
-                    span_len = norm(LE_1 - LE_2)
-                    chord_len_1 = norm(chord_1)
-                    chord_len_2 = norm(chord_2)
 
                     if d > 1e-12
-                        R = (d / 2) / sin(billowing_angle)
-                        h = (d / 2) / tan(billowing_angle)
+                        a = catenary_parameter(
+                            billowing_percentage, d)
+                        u = d / (2a)
+                        span_len = norm(LE_1 - LE_2)
+                        TE_mid = (TE_1 + TE_2) / 2
 
                         for si in start_idx:(idx - 1)
                             sec = wing.refined_sections[si]
                             t = dot(sec.LE_point - LE_2,
                                     y_hat) / span_len
-
-                            arc_y = -R * sin(
-                                billowing_angle * (1 - 2t))
-                            arc_z = -h + R * cos(
-                                billowing_angle * (1 - 2t))
-                            arc_TE = TE_mid +
-                                arc_y * y_hat + arc_z * z_hat
-
-                            chord_dir = arc_TE - sec.LE_point
-                            chord_dir_len = norm(chord_dir)
-                            if chord_dir_len > 1e-12
-                                target_chord = (
-                                    t * chord_len_1 +
-                                    (1 - t) * chord_len_2)
-                                sec.TE_point .= (
-                                    sec.LE_point +
-                                    (target_chord /
-                                     chord_dir_len) *
-                                    chord_dir)
-                            end
+                            x = d * (t - 0.5)
+                            sag = a * (cosh(x / a) -
+                                       cosh(u))
+                            arc_y = d * (t - 0.5)
+                            sec.TE_point .= TE_mid +
+                                arc_y * y_hat + sag * z_hat
                         end
                     end
                 end
@@ -1293,63 +1279,59 @@ end
 
 
 """
-    billowing_angle_from_percentage(percentage)
+    catenary_parameter(percentage, d)
 
-Compute the billowing half-angle θ (in radians) such that the chord between two
-circle intersections is `percentage`% shorter than the minor arc.
+Compute the catenary parameter `a` such that a catenary spanning distance `d`
+has an arc length that is `percentage`% longer than `d`.
 
-Solves `sin(θ) = θ * (1 - percentage / 100)` using Newton's method.
+Solves `u / sinh(u) = 1 - percentage / 100` where `u = d / (2a)`,
+using Newton's method.
 
 # Arguments
-- `percentage::Real`: How much shorter the chord is relative to the arc (0–100).
-    0 means chord equals arc (θ → 0), ~36.3 means a semicircle (θ = π/2).
+- `percentage::Real`: How much shorter the chord is relative to the arc
+    (0–100). 0 means no sag (flat), larger values mean deeper catenary.
+- `d::Real`: Span distance between the two endpoints.
 
 # Returns
-- `Float64`: The half-angle θ in radians (same convention as `Wing.billowing_angle`).
-
-# Example
-```julia
-julia> rad2deg(billowing_angle_from_percentage(10))
-43.66…
-```
+- `Float64`: The catenary parameter `a`.
 """
-function billowing_angle_from_percentage(percentage::Real)
-    percentage == 0 && return 0.0
+function catenary_parameter(percentage::Real, d::Real)
+    percentage == 0 && return Inf
     0 < percentage || throw(ArgumentError(
         "percentage must be ≥ 0, got $percentage"))
-    percentage < 100 * (1 - 2 / π) || throw(ArgumentError(
-        "percentage must be < $(100 * (1 - 2/π)) (semicircle limit), " *
-        "got $percentage"))
-    factor = 1 - percentage / 100
-    # Initial guess from Taylor expansion: sin(θ) ≈ θ - θ³/6
-    θ = sqrt(6 * percentage / 100)
+    percentage < 100 || throw(ArgumentError(
+        "percentage must be < 100, got $percentage"))
+    target = 1 - percentage / 100  # u / sinh(u) = target
+    # Initial guess from Taylor: u/sinh(u) ≈ 1 - u²/6
+    u = sqrt(6 * (1 - target))
     for _ in 1:100
-        f  = sin(θ) - θ * factor
-        df = cos(θ) - factor
+        f  = u / sinh(u) - target
+        # d/du [u/sinh(u)] = (sinh(u) - u*cosh(u)) / sinh(u)^2
+        sh = sinh(u)
+        df = (sh - u * cosh(u)) / sh^2
         δ  = f / df
-        θ -= δ
+        u -= δ
         abs(δ) < 1e-12 && break
     end
-    return θ
+    return d / (2u)
 end
 
 """
     refine_mesh_with_billowing!(wing; reuse_aero_data)
 
-Refine wing mesh using SPLIT_PROVIDED spacing with circular arc billowing.
+Refine wing mesh using SPLIT_PROVIDED spacing with catenary TE billowing.
 
-Between each pair of unrefined (rib) sections, the trailing edge follows a circular arc
-that bulges in the direction perpendicular to the chord and span (simulating fabric
-billowing between ribs on a ram-air kite). The leading edge stays linearly interpolated.
-
-The arc half-angle is `wing.billowing_angle` (0 = straight line, π/2 = semicircle).
+Between each pair of unrefined (rib) sections, the trailing edge follows a
+catenary curve that sags perpendicular to the chord and span (simulating fabric
+billowing between ribs on a ram-air kite). The leading edge stays linearly
+interpolated.
 
 Delegates to [`refine_mesh_by_splitting_provided_sections!`](@ref).
 """
 function refine_mesh_with_billowing!(wing; reuse_aero_data::Bool=false)
     refine_mesh_by_splitting_provided_sections!(
         wing; reuse_aero_data,
-        billowing_angle=wing.billowing_angle
+        billowing_percentage=wing.billowing_percentage
     )
 end
 

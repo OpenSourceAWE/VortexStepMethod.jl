@@ -1,9 +1,12 @@
 ## Unreleased
 
+### Breaking
+- `billowing_angle` replaced by `billowing_percentage` on `Wing` and
+  `WingSettings` (percentage of arc length, not radians)
+- `billowing_angle_from_percentage()` removed
+- `BILLOWING` distribution now uses catenary curve instead of circular arc
+
 ### Added
-- `BILLOWING` panel distribution with circular arc TE billowing between ribs
-- `billowing_angle` field on `Wing` and `WingSettings`
-- `billowing_angle_from_percentage()` utility function
 - `billowing.jl` example comparing flat vs billowed V3 kite
 - Coarse V3 kite geometry, settings, and combined CFD polar data
 - `cl_over_cd` keyword for `plot_polars` and `plot_combined_analysis`

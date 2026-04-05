@@ -28,17 +28,11 @@ solver_cfg = settings_data["solver_settings"]
 wing_cfg = settings_data["wings"][1]
 n_panels = wing_cfg["n_panels"]
 
-# Read billowing angle from settings (degrees → radians, or from percentage)
-if haskey(wing_cfg, "billowing_percentage")
-    BILLOWING_ANGLE = billowing_angle_from_percentage(
-        wing_cfg["billowing_percentage"])
-else
-    BILLOWING_ANGLE = deg2rad(get(wing_cfg, "billowing_angle", 0.0))
-end
+BILLOWING_PCT = get(wing_cfg, "billowing_percentage", 0.0)
 
 labels = [
     "VSM flat",
-    "VSM billowing $(round(Int, rad2deg(BILLOWING_ANGLE)))°",
+    "VSM billowing $(BILLOWING_PCT)%",
     "CFD Re=5e5",
     "CFD Re=10e5",
     "VSM Python Re=5e5",
@@ -51,10 +45,11 @@ geom_data = VortexStepMethod.YAML.load_file(
 section_headers = geom_data["wing_sections"]["headers"]
 section_rows = geom_data["wing_sections"]["data"]
 
-function build_wing(; distribution=SPLIT_PROVIDED, billowing_angle=0.0)
+function build_wing(; distribution=SPLIT_PROVIDED,
+                      billowing_percentage=0.0)
     wing = Wing(n_panels;
         spanwise_distribution=distribution,
-        billowing_angle=billowing_angle)
+        billowing_percentage=billowing_percentage)
     for row in section_rows
         d = Dict(zip(section_headers, row))
         le = [d["LE_x"], d["LE_y"], d["LE_z"]]
@@ -74,7 +69,7 @@ VortexStepMethod.reinit!(body_aero_flat)
 
 # --- Wing with billowing ---
 wing_bill = build_wing(distribution=BILLOWING,
-                       billowing_angle=BILLOWING_ANGLE)
+                       billowing_percentage=BILLOWING_PCT)
 body_aero_bill = BodyAerodynamics([wing_bill])
 VortexStepMethod.reinit!(body_aero_bill)
 
@@ -143,8 +138,7 @@ if PLOT
         angle_of_attack=angle_of_attack_deg,
         side_slip=sideslip_deg,
         v_a=wind_speed,
-        title="V3 Kite: flat vs billowing " *
-              "$(round(Int, rad2deg(BILLOWING_ANGLE)))°",
+        title="V3 Kite: flat vs billowing $(BILLOWING_PCT)%",
         is_show=false,
         use_tex=USE_TEX,
         angle_of_attack_for_spanwise_distribution=10.0,

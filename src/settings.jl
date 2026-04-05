@@ -34,13 +34,8 @@ Settings for a single wing, used within [`VSMSettings`](@ref).
     (default `true`)
 - `use_prior_polar`: Reuse prior refined/panel polar mapping on
     reinit/refine updates (default `false`)
-- `billowing_angle`: Half-angle of circular arc billowing in degrees
+- `billowing_percentage`: TE billow as percentage of arc length
     (default `0.0`; only used with `BILLOWING` distribution).
-    Converted to radians internally.
-    Mutually exclusive with `billowing_percentage`.
-- `billowing_percentage`: Percentage by which the chord is shorter than
-    the minor arc (default `nothing`; converted to `billowing_angle`).
-    Mutually exclusive with `billowing_angle`.
 """
 @with_kw mutable struct WingSettings
     name::String = "main_wing"
@@ -52,7 +47,7 @@ Settings for a single wing, used within [`VSMSettings`](@ref).
     spanwise_direction::MVec3 = [0.0, 1.0, 0.0]
     remove_nan = true
     use_prior_polar::Bool = false
-    billowing_angle::Float64 = 0.0     # half-angle of billowing arc [rad]
+    billowing_percentage::Float64 = 0.0 # TE billow as % of arc length
 end
 
 """
@@ -179,19 +174,9 @@ function VSMSettings(filename; data_prefix=true)
             wing.remove_nan = wing_data["remove_nan"]
             wing.use_prior_polar = get(wing_data, "use_prior_polar", false)
 
-            has_angle = haskey(wing_data, "billowing_angle")
-            has_pct   = haskey(wing_data, "billowing_percentage")
-            if has_angle && has_pct
-                throw(ArgumentError(
-                    "Wing '$(wing.name)': specify either " *
-                    "billowing_angle or billowing_percentage, " *
-                    "not both"))
-            elseif has_pct
-                wing.billowing_angle =
-                    billowing_angle_from_percentage(
-                        wing_data["billowing_percentage"])
-            elseif has_angle
-                wing.billowing_angle = deg2rad(wing_data["billowing_angle"])
+            if haskey(wing_data, "billowing_percentage")
+                wing.billowing_percentage =
+                    Float64(wing_data["billowing_percentage"])
             end
 
             push!(vsm_settings.wings, wing)
