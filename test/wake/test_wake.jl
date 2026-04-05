@@ -20,7 +20,8 @@ using VortexStepMethod
             
             try
                 # Create wing and body aerodynamics with known good geometry
-                wing = RamAirWing(body_path, foil_path; n_panels=56)  # Use default panels
+                # ObjWing is fully complete - no refine! needed
+                wing = ObjWing(body_path, foil_path; n_panels=56)  # Use default panels
                 body_aero = BodyAerodynamics([wing])
                 
                 # Test that frozen_wake! doesn't throw errors

@@ -4,7 +4,6 @@ Model:
 PanelDistribution:
     LINEAR:             Linear distribution
     COSINE:             Cosine distribution
-    COSINE_VAN_GARREL:  van Garrel cosine distribution
     SPLIT_PROVIDED:     Split provided sections
     UNCHANGED:          Keep original sections
 InitialGammaDistribution:
@@ -14,13 +13,11 @@ InitialGammaDistribution:
 wings:
     - name: main_wing
       n_panels: 40
-      n_groups: 40
       spanwise_panel_distribution: LINEAR
       spanwise_direction: [0.0, 1.0, 0.0]
       remove_nan: true
     - name: tail
       n_panels: 20
-      n_groups: 20
       spanwise_panel_distribution: COSINE
       spanwise_direction: [0.0, 1.1, 0.0]
       remove_nan: false
@@ -35,6 +32,7 @@ solver_settings:
     k2: 0.1                          # artificial damping parameter
     k4: 0.0                          # artificial damping parameter
     type_initial_gamma_distribution: ELLIPTIC
+    use_gamme_prev: false
     core_radius_fraction: 1e-20
     mu: 1.81e-5                      # dynamic viscosity [N·s/m²]
     calc_only_f_and_gamma: false     # whether to only output f and gamma

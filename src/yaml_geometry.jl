@@ -148,8 +148,9 @@ function load_polar_data(csv_file_path::String)
 end
 
 """
-    Wing(geometry_file::String; n_panels=20, n_groups=1, spanwise_distribution=LINEAR,
-         spanwise_direction=[0.0, 1.0, 0.0], remove_nan=true, prn=false)
+    Wing(geometry_file::String; n_panels=20, spanwise_distribution=LINEAR,
+         spanwise_direction=[0.0, 1.0, 0.0], remove_nan=true,
+         use_prior_polar=false, prn=false)
 
 Constructs a `Wing` object from a YAML geometry file.
 
@@ -158,10 +159,10 @@ Constructs a `Wing` object from a YAML geometry file.
 
 # Keyword Arguments
 - `n_panels::Int`: Number of spanwise panels (default: 20).
-- `n_groups::Int`: Number of grouped sections across the span (default: 1). Must divide `n_panels`.
 - `spanwise_distribution`: Spanwise panel distribution type (default: `LINEAR`).
 - `spanwise_direction::Vector{Float64}`: Direction of the spanwise axis (default: `[0.0, 1.0, 0.0]`). Must be the global Y axis.
 - `remove_nan::Bool`: Remove NaN values from the geometry (default: `true`).
+- `use_prior_polar::Bool`: Reuse prior refined/panel polar mapping on geometry updates (default: `false`).
 - `prn::Bool`: Print informational messages during construction (default: `false`).
 
 # Returns
@@ -171,28 +172,29 @@ Constructs a `Wing` object from a YAML geometry file.
 This function reads a YAML configuration file to define the geometry and airfoil data for a multi-section wing.
 Each section and corresponding airfoil is parsed from the YAML file, polar data is loaded, and each section is added
 to the wing. The geometry logic currently assumes the spanwise direction is `[0.0, 1.0, 0.0]` (aligned with the global Y axis).
+The number of unrefined sections is automatically inferred from the sections in the geometry file.
 
 # Errors
-- Throws an `ArgumentError` if `n_panels` is not divisible by `n_groups`.
 - Throws an `ArgumentError` if `spanwise_direction` is not `[0.0, 1.0, 0.0]`.
 
 # Example
 ```julia
-wing = Wing("wing_geometry.yaml"; n_panels=30, n_groups=2, prn=true)
+wing = Wing("wing_geometry.yaml"; n_panels=30, prn=true)
 ```
 """
 function Wing(
     geometry_file::String;
     n_panels=20,
-    n_groups=1,
     spanwise_distribution=LINEAR,
     spanwise_direction=[0.0, 1.0, 0.0],
     remove_nan=true,
-    prn=false
+    use_prior_polar=false,
+    prn=false,
+    sort_sections=true
 )
-    !(n_panels % n_groups == 0) && throw(ArgumentError("Number of panels should be divisible by number of groups"))
+
     !isapprox(spanwise_direction, [0.0, 1.0, 0.0]) && throw(ArgumentError("Spanwise direction has to be [0.0, 1.0, 0.0], not $spanwise_direction"))
-    
+
     prn && @info "Reading YAML wing configuration from $geometry_file"
     
     # Load YAML file following Uwe's suggestion
@@ -236,11 +238,12 @@ function Wing(
     end
     
     # Create Wing using the standard constructor
-    wing = Wing(n_panels; 
-        n_groups=n_groups, 
+    # n_unrefined_sections will be set automatically after sections are added
+    wing = Wing(n_panels;
         spanwise_distribution=spanwise_distribution,
-        spanwise_direction=MVec3(spanwise_direction), 
-        remove_nan=remove_nan
+        spanwise_direction=MVec3(spanwise_direction),
+        remove_nan=remove_nan,
+        use_prior_polar=use_prior_polar
     )
     
     # Parse sections and populate wing
@@ -248,7 +251,7 @@ function Wing(
         # Get coordinates directly from struct fields
         le_coord = [section.LE_x, section.LE_y, section.LE_z]
         te_coord = [section.TE_x, section.TE_y, section.TE_z]
-        
+
         # Load polar data and create section
         csv_file_path = get(airfoil_csv_map, section.airfoil_id, "")
         if !isempty(csv_file_path) && !isabspath(csv_file_path)
@@ -258,15 +261,13 @@ function Wing(
             csv_file_path = joinpath(dirname(geometry_file), csv_file_path)
         end
         aero_data, aero_model = load_polar_data(csv_file_path)
-        
+
         prn && println("Section airfoil_id $(section.airfoil_id): Using $aero_model model")
-        
+
         add_section!(wing, le_coord, te_coord, aero_model, aero_data)
     end
-    
-    # Initialize the wing after adding all sections
-    reinit!(wing)
-    
+
+    refine!(wing; sort_sections)
     return wing
 end
 
@@ -275,9 +276,13 @@ end
 
 Create a wing model from VSM settings configuration.
 
-This constructor is a convenience wrapper that extracts wing configuration 
-from VSMSettings and creates a Wing using the YAML geometry file path and 
-parameters specified in the settings.
+This constructor is a convenience wrapper that extracts wing configuration
+from VSMSettings and creates a Wing using either:
+- YAML geometry file (geometry_file field), or
+- OBJ + DAT files (obj_file and dat_file fields)
+
+The constructor automatically determines which path to use based on which
+fields are populated in the settings.
 
 # Arguments
 - `settings`: VSMSettings object containing wing configuration
@@ -287,15 +292,65 @@ A fully initialized `Wing` instance ready for aerodynamic simulation.
 
 # Example
 ```julia
-# Load settings and create wing in one step
+# Using YAML geometry
 settings = VSMSettings("path/to/vsm_settings.yaml")
 wing = Wing(settings)
+
+# Settings can specify either:
+# - geometry_file: "path/to/wing.yaml"  # YAML-based
+# - obj_file + dat_file                  # OBJ-based
 ```
 """
-function Wing(settings::VSMSettings)
-    Wing(settings.wings[1].geometry_file; 
-        n_panels=settings.wings[1].n_panels, 
-        n_groups=settings.wings[1].n_groups,
-        spanwise_distribution=settings.wings[1].spanwise_panel_distribution
-    )
+function Wing(settings::VSMSettings; sort_sections::Bool=true)
+    wing_settings = settings.wings[1]
+
+    # Check which geometry format to use
+    has_yaml = !isempty(wing_settings.geometry_file)
+    has_obj = !isempty(wing_settings.obj_file)
+    has_dat = !isempty(wing_settings.dat_file)
+
+    if has_yaml && (has_obj || has_dat)
+        throw(ArgumentError(
+            "Cannot specify both geometry_file and obj_file/dat_file"
+        ))
+    end
+
+    if has_obj && !has_dat
+        throw(ArgumentError(
+            "obj_file requires dat_file to be specified"
+        ))
+    end
+
+    if has_dat && !has_obj
+        throw(ArgumentError(
+            "dat_file requires obj_file to be specified"
+        ))
+    end
+
+    if has_yaml
+        # Use YAML geometry constructor
+        Wing(wing_settings.geometry_file;
+            n_panels=wing_settings.n_panels,
+            spanwise_distribution=wing_settings.spanwise_panel_distribution,
+            remove_nan=wing_settings.remove_nan,
+            use_prior_polar=wing_settings.use_prior_polar,
+            sort_sections
+        )
+    elseif has_obj && has_dat
+        # Use ObjWing constructor (ObjWing doesn't sort sections internally)
+        ObjWing(
+            wing_settings.obj_file,
+            wing_settings.dat_file;
+            n_panels=wing_settings.n_panels,
+            spanwise_distribution=wing_settings.spanwise_panel_distribution,
+            spanwise_direction=wing_settings.spanwise_direction,
+            remove_nan=wing_settings.remove_nan,
+            use_prior_polar=wing_settings.use_prior_polar
+        )
+    else
+        throw(ArgumentError(
+            "WingSettings must specify either geometry_file or " *
+            "both obj_file and dat_file"
+        ))
+    end
 end

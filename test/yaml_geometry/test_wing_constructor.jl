@@ -37,31 +37,30 @@ using Logging
         # Use the actual YAML file from the test data
         cp(test_data_path("yaml_geometry", "simple_wing.yaml"), test_yaml_path; force=true)
         
-        wing = Wing(test_yaml_path; n_panels=4, n_groups=2)
-        
+        wing = Wing(test_yaml_path; n_panels=4)
+
         @test wing isa Wing
         @test wing.n_panels == 4
-        @test wing.n_groups == 2
         @test wing.spanwise_distribution == LINEAR
         @test wing.spanwise_direction ≈ [0.0, 1.0, 0.0]
-        @test length(wing.sections) == 2  # simple_wing has 2 sections
+        @test length(wing.unrefined_sections) == 2  # simple_wing has 2 sections
         
         # Test section coordinates (sections are sorted by spanwise position)
         # simple_wing.yaml has: [1, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0] and [1, 0.0, -1.0, 0.0, 1.0, -1.0, 0.0]
         # Sorted by y-coordinate: y=1.0, y=-1.0
-        @test wing.sections[1].LE_point ≈ [0.0, 1.0, 0.0]
-        @test wing.sections[1].TE_point ≈ [1.0, 1.0, 0.0]
-        @test wing.sections[2].LE_point ≈ [0.0, -1.0, 0.0]
-        @test wing.sections[2].TE_point ≈ [1.0, -1.0, 0.0]
+        @test wing.unrefined_sections[1].LE_point ≈ [0.0, 1.0, 0.0]
+        @test wing.unrefined_sections[1].TE_point ≈ [1.0, 1.0, 0.0]
+        @test wing.unrefined_sections[2].LE_point ≈ [0.0, -1.0, 0.0]
+        @test wing.unrefined_sections[2].TE_point ≈ [1.0, -1.0, 0.0]
         
         # Test that sections have polar data
-        @test wing.sections[1].aero_model == POLAR_VECTORS
-        @test wing.sections[2].aero_model == POLAR_VECTORS
+        @test wing.unrefined_sections[1].aero_model == POLAR_VECTORS
+        @test wing.unrefined_sections[2].aero_model == POLAR_VECTORS
         
         # Test polar data is loaded
-        @test wing.sections[1].aero_data isa Tuple
-        @test length(wing.sections[1].aero_data) == 4
-        @test length(wing.sections[1].aero_data[1]) >= 3  # at least 3 alpha points
+        @test wing.unrefined_sections[1].aero_data isa Tuple
+        @test length(wing.unrefined_sections[1].aero_data) == 4
+        @test length(wing.unrefined_sections[1].aero_data[1]) >= 3  # at least 3 alpha points
     end
     
     @testset "Wing Constructor Parameters" begin
@@ -72,13 +71,11 @@ using Logging
         wing = Wing(
             test_yaml_path;
             n_panels=8,
-            n_groups=4,
             spanwise_distribution=COSINE,
             remove_nan=false
         )
-        
+
         @test wing.n_panels == 8
-        @test wing.n_groups == 4
         @test wing.spanwise_distribution == COSINE
         @test !wing.remove_nan
     end
@@ -104,8 +101,8 @@ wing_airfoils:
         wing = suppress_warnings(() -> Wing(test_yaml_path; n_panels=2))
         
         # Should fall back to INVISCID model
-        @test wing.sections[1].aero_model == INVISCID
-        @test wing.sections[1].aero_data === nothing
+        @test wing.unrefined_sections[1].aero_model == INVISCID
+        @test wing.unrefined_sections[1].aero_data === nothing
     end
     
     @testset "Sections Without Polar Files" begin
@@ -129,7 +126,7 @@ wing_airfoils:
         wing = suppress_warnings(() -> Wing(test_yaml_path; n_panels=2))
         
         # Should fall back to INVISCID model
-        @test wing.sections[1].aero_model == INVISCID
+        @test wing.unrefined_sections[1].aero_model == INVISCID
     end
     
     @testset "Invalid Parameters" begin
@@ -148,10 +145,11 @@ wing_airfoils:
     - [1, polars, {csv_file_path: "polars/1.csv"}]
 """
         write(test_yaml_path, yaml_content)
-        
-        # Test invalid n_panels/n_groups combination
-        @test_throws ArgumentError Wing(test_yaml_path; n_panels=5, n_groups=2)
-        
+
+        # Test # n_groups=0 (no grouping functionality) - backward compatibility
+        wing_no_groups = Wing(test_yaml_path; n_panels=4)
+        @test wing_no_groups.n_panels == 4
+
         # Test invalid spanwise direction
         @test_throws ArgumentError Wing(test_yaml_path; spanwise_direction=[1.0, 0.0, 0.0])
     end
@@ -172,10 +170,10 @@ wing_airfoils:
         wing = Wing(subdir_yaml_path; n_panels=2)
         
         # Should successfully load polar data with relative path
-        @test wing.sections[1].aero_model == POLAR_VECTORS
-        @test wing.sections[1].aero_data isa Tuple
-        @test wing.sections[2].aero_model == POLAR_VECTORS
-        @test wing.sections[2].aero_data isa Tuple
+        @test wing.unrefined_sections[1].aero_model == POLAR_VECTORS
+        @test wing.unrefined_sections[1].aero_data isa Tuple
+        @test wing.unrefined_sections[2].aero_model == POLAR_VECTORS
+        @test wing.unrefined_sections[2].aero_data isa Tuple
         
         # Cleanup
         rm(subdir; recursive=true)
@@ -184,21 +182,20 @@ wing_airfoils:
     @testset "Complex Wing Geometry" begin
         # Use the actual complex_wing.yaml file
         cp(test_data_path("yaml_geometry", "complex_wing.yaml"), test_yaml_path; force=true)
-        
-        wing = Wing(test_yaml_path; n_panels=12, n_groups=3)
-        
+
+        wing = Wing(test_yaml_path; n_panels=12)
+
         @test wing.n_panels == 12
-        @test wing.n_groups == 3
-        @test length(wing.sections) == 7
+        @test length(wing.unrefined_sections) == 7
         
         # Test that different airfoil_ids get different polar data
-        @test wing.sections[1].aero_model == POLAR_VECTORS
-        @test wing.sections[2].aero_model == POLAR_VECTORS
+        @test wing.unrefined_sections[1].aero_model == POLAR_VECTORS
+        @test wing.unrefined_sections[2].aero_model == POLAR_VECTORS
         
         # Verify geometric progression along wingspan
-        @test wing.sections[1].LE_point[2] == 5.0   # First section at y=5
-        @test wing.sections[4].LE_point[2] == 0.0   # Middle section at y=0
-        @test wing.sections[7].LE_point[2] == -5.0  # Last section at y=-5
+        @test wing.unrefined_sections[1].LE_point[2] == 5.0   # First section at y=5
+        @test wing.unrefined_sections[4].LE_point[2] == 0.0   # Middle section at y=0
+        @test wing.unrefined_sections[7].LE_point[2] == -5.0  # Last section at y=-5
     end
     
     @testset "VSMSettings Constructor" begin
@@ -211,55 +208,72 @@ wing_airfoils:
         settings.wings = [WingSettings(
             geometry_file=simple_wing_file,
             n_panels=6,
-            n_groups=3,
-            spanwise_panel_distribution=COSINE
+            spanwise_panel_distribution=COSINE,
+            use_prior_polar=true
         )]
-        
+
         # Test Wing constructor with VSMSettings
         wing = Wing(settings)
-        
+
         @test wing isa Wing
         @test wing.n_panels == 6
-        @test wing.n_groups == 3
         @test wing.spanwise_distribution == COSINE
-        @test length(wing.sections) == 2
-        @test wing.sections[1].aero_model == POLAR_VECTORS
-        @test wing.sections[2].aero_model == POLAR_VECTORS
+        @test wing.use_prior_polar
+        @test length(wing.unrefined_sections) == 2
+        @test wing.unrefined_sections[1].aero_model == POLAR_VECTORS
+        @test wing.unrefined_sections[2].aero_model == POLAR_VECTORS
     end
-    
+
+    @testset "VSMSettings YAML use_prior_polar parsing" begin
+        settings_file = create_temp_wing_settings(
+            "yaml_geometry",
+            "simple_wing.yaml";
+            n_panels=4,
+            use_prior_polar=true
+        )
+
+        try
+            settings = VSMSettings(settings_file)
+            @test settings.wings[1].use_prior_polar
+
+            wing = Wing(settings)
+            @test wing.use_prior_polar
+        finally
+            rm(settings_file; force=true)
+        end
+    end
+
     @testset "Shared Test Data Usage" begin
         # Demonstrate using module-specific test data files
         simple_wing_file = test_data_path("yaml_geometry", "simple_wing.yaml")
         @test isfile(simple_wing_file)
         
         # Test basic Wing construction with shared data
-        wing = Wing(simple_wing_file; n_panels=4, n_groups=2)
+        wing = Wing(simple_wing_file; n_panels=4)
         @test wing isa Wing
         @test wing.n_panels == 4
-        @test wing.n_groups == 2
-        @test length(wing.sections) == 2
-        
+        @test length(wing.unrefined_sections) == 2
+
         # Test complex wing construction
         complex_wing_file = test_data_path("yaml_geometry", "complex_wing.yaml")
         @test isfile(complex_wing_file)
-        
-        complex_wing = Wing(complex_wing_file; n_panels=12, n_groups=3)
+
+        complex_wing = Wing(complex_wing_file; n_panels=12)
         @test complex_wing isa Wing
         @test complex_wing.n_panels == 12
-        @test complex_wing.n_groups == 3
-        @test length(complex_wing.sections) == 7
+        @test length(complex_wing.unrefined_sections) == 7
         
         # Verify polar data is loaded from shared files
-        @test complex_wing.sections[1].aero_model == POLAR_VECTORS
-        @test complex_wing.sections[1].aero_data isa Tuple
+        @test complex_wing.unrefined_sections[1].aero_model == POLAR_VECTORS
+        @test complex_wing.unrefined_sections[1].aero_data isa Tuple
         
         # Test with module-specific convenience function - create a standard wing for this test
         standard_wing_file = simple_wing_file  # Use simple_wing as our "standard"
         @test isfile(standard_wing_file)
         
-        standard_wing = Wing(standard_wing_file; n_panels=2, n_groups=1)
+        standard_wing = Wing(standard_wing_file; n_panels=2)
         @test standard_wing isa Wing
-        @test length(standard_wing.sections) == 2
+        @test length(standard_wing.unrefined_sections) == 2
     end
     
     # Cleanup after all tests

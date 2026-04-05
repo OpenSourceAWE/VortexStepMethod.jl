@@ -1,11 +1,7 @@
-using ControlPlots
+using GLMakie
 using LinearAlgebra
 using VortexStepMethod
 
-using Pkg
-if ! ("CSV" ∈ keys(Pkg.project().dependencies))
-    using TestEnv; TestEnv.activate()
-end
 using CSV
 using DataFrames
 
@@ -14,7 +10,7 @@ USE_TEX = false
 
 # Find root directory
 root_dir = dirname(@__DIR__)
-save_folder = joinpath(root_dir, "results", "TUDELFT_V3_LEI_KITE")
+save_folder = joinpath(root_dir, "results", "TUDELFT_V3_KITE")
 mkpath(save_folder)
 
 # Defining discretisation
@@ -24,8 +20,8 @@ spanwise_distribution = SPLIT_PROVIDED
 # Load rib data from CSV
 csv_file_path = joinpath(
     root_dir,
-    "processed_data",
-    "TUDELFT_V3_LEI_KITE",
+    "data",
+    "TUDELFT_V3_KITE",
     "rib_list_from_CAD_LE_TE_and_surfplan_d_tube_camber_19ribs.csv"
 )
 
@@ -38,18 +34,20 @@ for row in eachrow(df)
 end
 
 # Create wing geometry
+# n_unrefined_sections will be automatically set to the number of ribs (18 sections)
 CAD_wing = Wing(n_panels; spanwise_distribution)
 for rib in rib_list
     add_section!(CAD_wing, rib[1], rib[2], rib[3], rib[4])
 end
+refine!(CAD_wing)
 body_aero = BodyAerodynamics([CAD_wing])
 
 # Create solvers
-vsm_solver = Solver(body_aero; 
+vsm_solver = Solver(body_aero;
     aerodynamic_model_type=VSM,
     is_with_artificial_damping=false
 )
-VSM_with_stall_correction = Solver(body_aero; 
+VSM_with_stall_correction = Solver(body_aero;
     aerodynamic_model_type=VSM,
     is_with_artificial_damping=true
 )
@@ -67,66 +65,36 @@ vel_app = [
 ] * v_a
 set_va!(body_aero, vel_app)
 
-# Plotting geometry
-PLOT && plot_geometry(
-    body_aero,
-    "";
-    data_type=".svg",
-    save_path="",
-    is_save=false,
-    is_show=true,
-    view_elevation=15,
-    view_azimuth=-120,
-    use_tex=USE_TEX
-)
-
-# Solving and plotting distributions
+# Solve both configurations
 results = solve(vsm_solver, body_aero)
 @time results_with_stall = solve(VSM_with_stall_correction, body_aero)
 @time results_with_stall = solve(VSM_with_stall_correction, body_aero)
 
-CAD_y_coordinates = [panel.aero_center[2] for panel in body_aero.panels]
-
-PLOT && plot_distribution(
-    [CAD_y_coordinates, CAD_y_coordinates],
-    [results, results_with_stall],
-    ["VSM", "VSM with stall correction"];
-    title="CAD_spanwise_distributions_alpha_$(round(aoa, digits=1))_delta_$(round(side_slip, digits=1))_yaw_$(round(yaw_rate, digits=1))_v_a_$(round(v_a, digits=1))",
-    data_type=".pdf",
-    save_path=joinpath(save_folder, "spanwise_distributions"),
-    is_save=false,
-    is_show=true,
-    use_tex=USE_TEX
-)
-
-# Plotting polar
-save_path = joinpath(root_dir, "results", "TUD_V3_LEI_KITE")
+# Setup literature data paths
 path_cfd_lebesque = joinpath(
     root_dir,
     "data",
-    "TUDELFT_V3_LEI_KITE",
+    "TUDELFT_V3_KITE",
     "literature_results",
     "V3_CL_CD_RANS_Lebesque_2024_Rey_300e4.csv"
 )
 
-PLOT && plot_polars(
+# Only include literature data if file exists
+literature_paths = isfile(path_cfd_lebesque) ? [path_cfd_lebesque] : String[]
+
+# Plot combined analysis
+PLOT && plot_combined_analysis(
     [vsm_solver, VSM_with_stall_correction],
     [body_aero, body_aero],
-    [
-        "VSM CAD 19ribs",
-        "VSM CAD 19ribs , with stall correction",
-        "CFD_Lebesque Rey 30e5"
-    ];
-    literature_path_list=[path_cfd_lebesque],
+    [results, results_with_stall];
+    solver_label=["VSM", "VSM (with stall)"],
+    literature_path_list=literature_paths,
     angle_range=range(0, 25, length=25),
     angle_type="angle_of_attack",
-    angle_of_attack=0,
-    side_slip=0,
-    v_a=10,
-    title="tutorial_testing_stall_model_n_panels_$(n_panels)_distribution_$(spanwise_distribution)",
-    data_type=".pdf",
-    save_path=joinpath(save_folder, "polars"),
-    is_save=true,
+    angle_of_attack=aoa,
+    side_slip=side_slip,
+    v_a=v_a,
+    title="Stall Model Comparison",
     is_show=true,
     use_tex=USE_TEX
 )
