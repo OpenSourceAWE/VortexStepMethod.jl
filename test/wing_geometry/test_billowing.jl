@@ -117,10 +117,10 @@ end
         for pair in 1:(n_ribs - 1)
             res = te_arc_length_between_ribs(
                 wing, pair, pair + 1)
-            # measured_pct = (arc - straight) / arc * 100
             measured = (res.arc - res.straight) / res.arc * 100
-            # With 8 panels per pair the discrete approximation
-            # won't be exact, but should be close.
+            diff = measured - pct
+            @info "Pair $pair: measured=$(round(measured; digits=3))%" *
+                  " target=$(pct)% diff=$(round(diff; digits=3))%"
             @test isapprox(measured, pct; rtol=0.05)
         end
     end
