@@ -1213,44 +1213,22 @@ function refine_mesh_by_splitting_provided_sections!(
                 reuse_aero_data
             )
 
-            # Apply catenary billowing to the just-created sections
+            # Apply billowing by rotating chords around LE
             if billowing_percentage > 0 && idx > start_idx
-                LE_1 = LE[left_section_index]
-                TE_1 = TE[left_section_index]
-                LE_2 = LE[left_section_index + 1]
-                TE_2 = TE[left_section_index + 1]
-
-                chord_1 = TE_1 - LE_1
-                chord_2 = TE_2 - LE_2
-                x_hat = normalize((chord_1 + chord_2) / 2)
-                y_hat = normalize(LE_1 - LE_2)
-                z_hat = cross(x_hat, y_hat)
-                z_norm = norm(z_hat)
-                if z_norm > 1e-10
-                    z_hat = z_hat / z_norm
-
-                    d = abs(dot(TE_1 - TE_2, y_hat))
-
-                    if d > 1e-12
-                        a = catenary_parameter(
-                            billowing_percentage, d)
-                        u = d / (2a)
-                        span_len = norm(LE_1 - LE_2)
-                        TE_mid = (TE_1 + TE_2) / 2
-
-                        for si in start_idx:(idx - 1)
-                            sec = wing.refined_sections[si]
-                            t = dot(sec.LE_point - LE_2,
-                                    y_hat) / span_len
-                            x = d * (t - 0.5)
-                            sag = a * (cosh(x / a) -
-                                       cosh(u))
-                            arc_y = d * (t - 0.5)
-                            sec.TE_point .= TE_mid +
-                                arc_y * y_hat + sag * z_hat
-                        end
-                    end
-                end
+                y_hat = normalize(
+                    LE[left_section_index] -
+                    LE[left_section_index + 1])
+                span_len = norm(
+                    LE[left_section_index] -
+                    LE[left_section_index + 1])
+                apply_billowing_to_pair!(
+                    wing.refined_sections,
+                    start_idx, idx - 1,
+                    y_hat, span_len,
+                    LE[left_section_index + 1],
+                    TE[left_section_index],
+                    TE[left_section_index + 1],
+                    billowing_percentage)
             end
         end
     end
@@ -1279,52 +1257,112 @@ end
 
 
 """
-    catenary_parameter(percentage, d)
+    billowing_arc_length(sections, start_si, end_si, y_hat,
+                         span_len, le_ref, te_left, te_right,
+                         angle_max)
 
-Compute the catenary parameter `a` such that a catenary spanning distance `d`
-has an arc length that is `percentage`% longer than `d`.
+Compute the TE arc length that would result from rotating each
+section's chord around `y_hat` by `angle_max * sin(π t)` radians,
+where `t` is the normalised spanwise position within the rib pair.
 
-Solves `u / sinh(u) = 1 - percentage / 100` where `u = d / (2a)`,
-using Newton's method.
-
-# Arguments
-- `percentage::Real`: How much shorter the chord is relative to the arc
-    (0–100). 0 means no sag (flat), larger values mean deeper catenary.
-- `d::Real`: Span distance between the two endpoints.
-
-# Returns
-- `Float64`: The catenary parameter `a`.
+Non-allocating: uses only stack-allocated MVec3 arithmetic.
 """
-function catenary_parameter(percentage::Real, d::Real)
-    percentage == 0 && return Inf
-    0 < percentage || throw(ArgumentError(
-        "percentage must be ≥ 0, got $percentage"))
-    percentage < 100 || throw(ArgumentError(
-        "percentage must be < 100, got $percentage"))
-    target = 1 - percentage / 100  # u / sinh(u) = target
-    # Initial guess from Taylor: u/sinh(u) ≈ 1 - u²/6
-    u = sqrt(6 * (1 - target))
-    for _ in 1:100
-        f  = u / sinh(u) - target
-        # d/du [u/sinh(u)] = (sinh(u) - u*cosh(u)) / sinh(u)^2
-        sh = sinh(u)
-        df = (sh - u * cosh(u)) / sh^2
-        δ  = f / df
-        u -= δ
-        abs(δ) < 1e-12 && break
+function billowing_arc_length(
+    sections, start_si, end_si,
+    y_hat, span_len, le_ref,
+    te_left, te_right, angle_max
+)
+    prev_te = MVec3(te_left)
+    arc = 0.0
+    for si in start_si:end_si
+        sec = sections[si]
+        t = dot(sec.LE_point - le_ref, y_hat) / span_len
+        θ = -angle_max * sin(π * t)
+        chord_vec = sec.TE_point - sec.LE_point
+        ct = cos(θ); st = sin(θ)
+        d_y = dot(chord_vec, y_hat)
+        rotated = ct * chord_vec +
+            st * cross(y_hat, chord_vec) +
+            (1 - ct) * d_y * y_hat
+        current_te = sec.LE_point + rotated
+        arc += norm(current_te - prev_te)
+        prev_te = current_te
     end
-    return d / (2u)
+    arc += norm(te_right - prev_te)
+    return arc
+end
+
+"""
+    apply_billowing_to_pair!(sections, start_si, end_si, y_hat,
+                             span_len, le_ref, te_left, te_right,
+                             percentage)
+
+Apply billowing to refined sections between two ribs by rotating
+each section's chord around `y_hat`.  Uses Newton iteration to
+find the rotation amplitude that matches the target TE arc-length
+`percentage`, then applies the rotations in-place.
+
+The angle profile is `angle_max * sin(π t)` (zero at ribs,
+maximum at centre).  All angles are in radians.
+
+Non-allocating: modifies `sections[start_si:end_si].TE_point`
+in-place using only stack-allocated MVec3 arithmetic.
+"""
+function apply_billowing_to_pair!(
+    sections, start_si, end_si,
+    y_hat, span_len, le_ref,
+    te_left, te_right, percentage
+)
+    percentage <= 0 && return nothing
+    straight = norm(te_right - te_left)
+    straight < 1e-12 && return nothing
+    target_arc = straight / (1 - percentage / 100)
+
+    # Newton iteration on angle_max (rad)
+    angle_max = sqrt(4 * percentage / (100 - percentage))
+    for _ in 1:50
+        arc = billowing_arc_length(
+            sections, start_si, end_si,
+            y_hat, span_len, le_ref,
+            te_left, te_right, angle_max)
+        f = arc - target_arc
+        abs(f) < 1e-12 * target_arc && break
+
+        δ = max(1e-8, abs(angle_max) * 1e-8)
+        arc_p = billowing_arc_length(
+            sections, start_si, end_si,
+            y_hat, span_len, le_ref,
+            te_left, te_right, angle_max + δ)
+        df = (arc_p - arc) / δ
+        abs(df) < 1e-30 && break
+        angle_max -= f / df
+    end
+
+    # Apply converged rotations in-place
+    for si in start_si:end_si
+        sec = sections[si]
+        t = dot(sec.LE_point - le_ref, y_hat) / span_len
+        θ = -angle_max * sin(π * t)
+        chord_vec = sec.TE_point - sec.LE_point
+        ct = cos(θ); st = sin(θ)
+        d_y = dot(chord_vec, y_hat)
+        rotated = ct * chord_vec +
+            st * cross(y_hat, chord_vec) +
+            (1 - ct) * d_y * y_hat
+        sec.TE_point .= sec.LE_point + rotated
+    end
+    return nothing
 end
 
 """
     refine_mesh_with_billowing!(wing; reuse_aero_data)
 
-Refine wing mesh using SPLIT_PROVIDED spacing with catenary TE billowing.
+Refine wing mesh using SPLIT_PROVIDED spacing with TE billowing.
 
-Between each pair of unrefined (rib) sections, the trailing edge follows a
-catenary curve that sags perpendicular to the chord and span (simulating fabric
-billowing between ribs on a ram-air kite). The leading edge stays linearly
-interpolated.
+Between each pair of unrefined (rib) sections, chord vectors are rotated
+around the leading edge to simulate fabric billowing.  The rotation
+amplitude is found iteratively so that the TE arc length matches the
+wing's `billowing_percentage`.
 
 Delegates to [`refine_mesh_by_splitting_provided_sections!`](@ref).
 """

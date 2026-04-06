@@ -1,8 +1,7 @@
 using Test
 using LinearAlgebra
 using VortexStepMethod
-using VortexStepMethod: Wing, Section, add_section!, refine!,
-    catenary_parameter
+using VortexStepMethod: Wing, Section, add_section!, refine!
 
 """
     build_flat_wing(n_panels, n_ribs; billowing_percentage=0.0)
@@ -75,7 +74,7 @@ function te_arc_length_between_ribs(wing, rib_left, rib_right)
     return (; arc, straight)
 end
 
-@testset "Billowing (catenary)" begin
+@testset "Billowing" begin
     n_ribs = 5   # 4 rib pairs
     n_panels = 4 * 8  # 8 panels per rib pair
 
@@ -110,6 +109,40 @@ end
         end
     end
 
+    @testset "Billowing sags outward" begin
+        wing = build_flat_wing(n_panels, n_ribs;
+            billowing_percentage=10.0)
+        # For this flat test wing the negative rotation around
+        # y_hat=[0,-1,0] produces -z sag in global coords.
+        # On a real kite this maps to +z in the local airfoil frame.
+        for pair in 1:(n_ribs - 1)
+            le_left = wing.unrefined_sections[pair].LE_point
+            le_right = wing.unrefined_sections[pair + 1].LE_point
+            mid_y = (le_left[2] + le_right[2]) / 2
+            best = nothing
+            best_dist = Inf
+            for sec in wing.refined_sections
+                dist = abs(sec.LE_point[2] - mid_y)
+                if dist < best_dist
+                    best_dist = dist
+                    best = sec
+                end
+            end
+            @test best.TE_point[3] < 0
+        end
+    end
+
+    @testset "Chord length preserved ($pct%)" for pct in
+            [5.0, 10.0, 15.0]
+        wing = build_flat_wing(n_panels, n_ribs;
+            billowing_percentage=pct)
+        for sec in wing.refined_sections
+            chord = norm(sec.TE_point - sec.LE_point)
+            # All ribs have chord=1.0, so interpolated chord=1.0
+            @test isapprox(chord, 1.0; atol=1e-10)
+        end
+    end
+
     @testset "TE arc length matches percentage ($pct%)" for pct in
             [1.0, 5.0, 10.0, 15.0]
         wing = build_flat_wing(n_panels, n_ribs;
@@ -121,28 +154,35 @@ end
             diff = measured - pct
             @info "Pair $pair: measured=$(round(measured; digits=3))%" *
                   " target=$(pct)% diff=$(round(diff; digits=3))%"
-            @test isapprox(measured, pct; rtol=0.05)
+            @test isapprox(measured, pct; rtol=0.01)
         end
     end
 
-    @testset "catenary_parameter edge cases" begin
-        # Zero percentage returns Inf (flat)
-        @test catenary_parameter(0.0, 1.0) == Inf
-        # Invalid inputs throw
-        @test_throws ArgumentError catenary_parameter(-1.0, 1.0)
-        @test_throws ArgumentError catenary_parameter(100.0, 1.0)
-    end
+    @testset "apply_billowing_to_pair! edge cases" begin
+        using VortexStepMethod: apply_billowing_to_pair!, MVec3
+        wing = build_flat_wing(n_panels, n_ribs;
+            billowing_percentage=0.0)
+        y_hat = MVec3(0.0, -1.0, 0.0)
+        le_ref = MVec3(0.0, 2.5, 0.0)
+        te_l = MVec3(-1.0, 0.0, 0.0)
+        te_r = MVec3(-1.0, 2.5, 0.0)
+        orig = [MVec3(s.TE_point)
+                for s in wing.refined_sections]
 
-    @testset "catenary_parameter arc length identity" begin
-        # Verify that catenary_parameter produces the correct
-        # arc length for a given percentage and distance.
-        for pct in [1.0, 5.0, 10.0, 20.0, 40.0]
-            d = 3.0
-            a = catenary_parameter(pct, d)
-            u = d / (2a)
-            arc = 2a * sinh(u)
-            expected_pct = (arc - d) / arc * 100
-            @test isapprox(expected_pct, pct; atol=1e-8)
+        # Zero percentage is a no-op
+        apply_billowing_to_pair!(
+            wing.refined_sections, 2, 8,
+            y_hat, 2.5, le_ref, te_l, te_r, 0.0)
+        for (i, sec) in enumerate(wing.refined_sections)
+            @test sec.TE_point == orig[i]
+        end
+
+        # Coincident ribs (straight ≈ 0) is a no-op
+        apply_billowing_to_pair!(
+            wing.refined_sections, 2, 8,
+            y_hat, 2.5, le_ref, te_l, te_l, 10.0)
+        for (i, sec) in enumerate(wing.refined_sections)
+            @test sec.TE_point == orig[i]
         end
     end
 end
