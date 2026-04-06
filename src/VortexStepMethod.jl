@@ -20,7 +20,6 @@ using PreallocationTools
 using PrecompileTools
 using Pkg
 using DifferentiationInterface
-import SciMLBase: successful_retcode
 import YAML
 using StructMapping
 using Xfoil
@@ -202,9 +201,11 @@ const AeroData = Union{
         Tuple{Vector{Float64}, Vector{Float64}, Matrix{Float64}, Matrix{Float64}, Matrix{Float64}}
     }
 
+const PACKAGE_ROOT = normpath(joinpath(@__DIR__, ".."))
+
 function menu()
    # Load the examples menu using a portable path
-   ex = joinpath(dirname(pathof(@__MODULE__)), "..", "examples", "menu.jl")
+    ex = joinpath(PACKAGE_ROOT, "examples", "menu.jl")
    Base.include(Main, normpath(ex))
 end
 
@@ -219,13 +220,13 @@ function copy_examples()
     if ! isdir(PATH)
         mkdir(PATH)
     end
-    src_path = joinpath(dirname(pathof(@__MODULE__)), "..", PATH)
+    src_path = joinpath(PACKAGE_ROOT, PATH)
     copy_files(PATH, readdir(src_path))
 end
 
 function install_examples(add_packages=true)
     copy_examples()
-    pkg_root = joinpath(dirname(pathof(@__MODULE__)), "..")
+    pkg_root = PACKAGE_ROOT
     src = joinpath(pkg_root, "data")
     isdir(src) && cp(src, "data"; force=true)
     if add_packages
@@ -241,7 +242,7 @@ function copy_files(relpath, files)
     if ! isdir(relpath) 
         mkdir(relpath)
     end
-    src_path = joinpath(dirname(pathof(@__MODULE__)), "..", relpath)
+    src_path = joinpath(PACKAGE_ROOT, relpath)
     for file in files
         cp(joinpath(src_path, file), joinpath(relpath, file), force=true)
         chmod(joinpath(relpath, file), 0o774)
@@ -254,7 +255,7 @@ function help(url)
         io = IOBuffer()
         run(pipeline(`xdg-open $url`, stderr = io))
         # ignore any error messages
-        out_data = String(take!(io)) 
+        String(take!(io)) 
     else
         DefaultApplication.open(url)
     end
