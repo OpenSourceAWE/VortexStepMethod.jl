@@ -575,7 +575,7 @@ function solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=n
 end
 
 @inline @inbounds function calc_norm_array!(va_norm_dist, va_array)
-    for i in 1:size(va_array, 1)
+    for i in axes(va_array, 1)
         va_norm_dist[i] = sqrt(
             va_array[i,1]^2 + va_array[i,2]^2 +
             va_array[i,3]^2)
@@ -584,6 +584,7 @@ end
 
 function solve_base!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=nothing; 
                log=false, reference_point=solver.reference_point)
+    reference_point
     
     # check arguments
     isnothing(body_aero.panels[1].va) && throw(ArgumentError("Inflow conditions are not set, use set_va!(body_aero, va)"))
@@ -759,17 +760,26 @@ function gamma_loop!(
     end
 
     if solver.solver_type == NONLIN
-        if isnothing(solver.prob)
+        prob = solver.prob
+        if isnothing(prob)
             function f_nonlin!(d_gamma, gamma, p)
                 calc_gamma_new!(solver.lr.gamma_new, gamma, p)
                 d_gamma .= solver.lr.gamma_new .- gamma
                 nothing
             end
-            solver.prob = NonlinearProblem(f_nonlin!, solver.lr.gamma_new, nothing)
-            solver.nonlin_cache = init(solver.prob, NewtonRaphson(autodiff=AutoFiniteDiff()); abstol=solver.atol, reltol=solver.rtol)
+            prob = NonlinearProblem(f_nonlin!, solver.lr.gamma_new, nothing)
+            solver.prob = prob
         end
+        prob = prob::NonlinearProblem
+
+        nonlin_cache = solver.nonlin_cache
+        if isnothing(nonlin_cache)
+            nonlin_cache = init(prob, NewtonRaphson(autodiff=AutoFiniteDiff()); abstol=solver.atol, reltol=solver.rtol)
+            solver.nonlin_cache = nonlin_cache
+        end
+        nonlin_cache = nonlin_cache::NonlinearSolveFirstOrder.GeneralizedFirstOrderAlgorithmCache
         
-        sol = NonlinearSolve.solve!(solver.nonlin_cache)
+        sol = NonlinearSolve.solve!(nonlin_cache)
         gamma .= sol.u
         solver.lr.gamma_new .= sol.u
         solver.lr.converged = SciMLBase.successful_retcode(sol)
@@ -792,13 +802,14 @@ function gamma_loop!(
                 damp .= 0.0
                 is_damping_applied = false
             end
-            nothing
+            return is_damping_applied
         end
         iters = 0
+        is_damping_applied = false
         for i in 1:solver.max_iterations
             iters += 1
 
-            f_loop!(solver.lr.gamma_new, gamma, damp)
+            is_damping_applied = f_loop!(solver.lr.gamma_new, gamma, damp)
 
             # Check convergence
             abs_gamma_new .= abs.(solver.lr.gamma_new)
@@ -808,7 +819,7 @@ function gamma_loop!(
             error = maximum(abs_gamma_new)
             normalized_error = error / reference_error
 
-            @debug "Iteration: $i, normalized_error: $normalized_error, is_damping_applied: $is_damping_applied"
+            @debug "Iteration: $i, normalized_error: $normalized_error"
 
             if normalized_error < solver.rtol
                 solver.lr.converged = true
