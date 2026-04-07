@@ -12,7 +12,6 @@ using LaTeXStrings
 using NonlinearSolve
 import NonlinearSolve: solve!, solve
 using Interpolations
-import Interpolations: Extrapolation
 using Parameters
 using Serialization
 using Timers
