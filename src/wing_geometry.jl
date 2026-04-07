@@ -248,9 +248,9 @@ mutable struct Wing <: AbstractWing
     T_cad_body::MVec3
     R_cad_body::MMat3
     radius::Float64
-    le_interp::Union{Nothing, NTuple{3, Extrapolation}}
-    te_interp::Union{Nothing, NTuple{3, Extrapolation}}
-    area_interp::Union{Nothing, Extrapolation}
+    le_interp::Union{Nothing, NTuple{3, Interpolations.Extrapolation}}
+    te_interp::Union{Nothing, NTuple{3, Interpolations.Extrapolation}}
+    area_interp::Union{Nothing, Interpolations.Extrapolation}
     cache::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}}
 end
 
