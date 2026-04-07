@@ -219,11 +219,11 @@ Represents a wing composed of multiple sections with aerodynamic properties.
 - `cache::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}}`: Preallocated buffers
 
 """
-mutable struct Wing <: AbstractWing
+mutable struct Wing{P} <: AbstractWing
     n_panels::Int16
     n_unrefined_sections::Int16
     spanwise_distribution::PanelDistribution
-    panel_props::PanelProperties
+    panel_props::PanelProperties{P}
     spanwise_direction::MVec3
     unrefined_sections::Vector{Section}
     refined_sections::Vector{Section}
@@ -271,28 +271,30 @@ and refined sections as empty arrays. Creates a basic wing suitable for YAML-bas
 - `use_prior_polar::Bool`: Reuse prior refined/panel polar mapping during geometry-only updates
 """
 function Wing(n_panels::Int;
-        n_unrefined_sections=nothing,
+    n_unrefined_sections::Union{Nothing, Int}=nothing,
         spanwise_distribution::PanelDistribution=LINEAR,
         spanwise_direction::PosVector=MVec3([0.0, 1.0, 0.0]),
-        remove_nan=true,
-        use_prior_polar=false)
+    remove_nan::Bool=true,
+    use_prior_polar::Bool=false)
 
     # For YAML wings, n_unrefined_sections will be set when sections are added
     # Set to 0 as placeholder for now
-    n_unrefined_sections_value = isnothing(n_unrefined_sections) ? Int16(0) : Int16(n_unrefined_sections)
+    n_unrefined_sections_value::Int16 =
+        isnothing(n_unrefined_sections) ? Int16(0) : Int16(n_unrefined_sections)
 
-    panel_props = PanelProperties{n_panels}()
+    panel_props::PanelProperties{n_panels} = PanelProperties{n_panels}()
+    spanwise_direction_m::MVec3 = MVec3(spanwise_direction)
 
     # Initialize with default/empty values for optional fields
-    Wing(
-        n_panels, n_unrefined_sections_value, spanwise_distribution, panel_props, spanwise_direction,
+    Wing{n_panels}(
+        Int16(n_panels), n_unrefined_sections_value, spanwise_distribution, panel_props, spanwise_direction_m,
         Section[], Section[], remove_nan, use_prior_polar,
         # Grouping
         Int16[],
         # Deformation fields
         Section[], zeros(max(0, n_panels)), zeros(max(0, n_panels)),
         # Physical properties (defaults for non-OBJ wings)
-        0.0, 0.0, zeros(0, 0), zeros(MVec3), Matrix{Float64}(I, 3, 3),
+        0.0, 0.0, zeros(0, 0), zeros(MVec3), MMat3(I),
         0.0, nothing, nothing, nothing,
         PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}[]
     )
