@@ -705,6 +705,7 @@ function gamma_loop!(
         prob = solver.prob
         if isnothing(prob)
             function f_nonlin!(d_gamma, gamma, p)
+                p
                 mul!(velocity_view_x, AIC_x, gamma)
                 mul!(velocity_view_y, AIC_y, gamma)
                 mul!(velocity_view_z, AIC_z, gamma)
@@ -765,7 +766,13 @@ function gamma_loop!(
 
         nonlin_cache = solver.nonlin_cache
         if isnothing(nonlin_cache)
-            nonlin_cache = init(prob, NewtonRaphson(autodiff=AutoFiniteDiff()); abstol=solver.atol, reltol=solver.rtol)
+            alg = NewtonRaphson(; autodiff=AutoFiniteDiff())
+            nonlin_cache = SciMLBase.init(
+                prob,
+                alg;
+                abstol = solver.atol,
+                reltol = solver.rtol,
+            )
             solver.nonlin_cache = nonlin_cache
         end
         nonlin_cache = nonlin_cache::NonlinearSolveFirstOrder.GeneralizedFirstOrderAlgorithmCache
@@ -836,20 +843,18 @@ function gamma_loop!(
             
             # Apply damping if needed
             if solver.is_with_artificial_damping
-                is_damping_applied = smooth_circulation!(damp, gamma, 0.1, 0.5)
+                smooth_circulation!(damp, gamma, 0.1, 0.5)
                 @debug "damp: $damp"
             else
                 damp .= 0.0
-                is_damping_applied = false
             end
-            return is_damping_applied
+            return nothing
         end
         iters = 0
-        is_damping_applied = false
         for i in 1:solver.max_iterations
             iters += 1
 
-            is_damping_applied = f_loop!(solver.lr.gamma_new, gamma, damp)
+            f_loop!(solver.lr.gamma_new, gamma, damp)
 
             # Check convergence
             abs_gamma_new .= abs.(solver.lr.gamma_new)
@@ -1016,19 +1021,23 @@ function linearize(solver::Solver, body_aero::BodyAerodynamics, y::Vector{T};
 
     init_va = body_aero.cache[1][body_aero.va]
     init_va .= body_aero.va
+    last_theta_ref = Ref{Vector{T}}(Vector{T}(undef, 0))
     if !isnothing(theta_idxs)
-        @views last_theta::Vector{T} = body_aero.cache[2][y[theta_idxs]]
-        last_theta .= NaN
+        @views last_theta_ref[] = body_aero.cache[2][y[theta_idxs]]
+        last_theta_ref[] .= NaN
     end
+    last_delta_ref = Ref{Vector{T}}(Vector{T}(undef, 0))
     if !isnothing(delta_idxs)
-        @views last_delta::Vector{T} = body_aero.cache[3][y[delta_idxs]]
-        last_delta .= NaN
+        @views last_delta_ref[] = body_aero.cache[3][y[delta_idxs]]
+        last_delta_ref[] .= NaN
     end
 
     # Function to compute forces for given control inputs
     function calc_results!(results, y)
         @views theta_angles = isnothing(theta_idxs) ? nothing : y[theta_idxs]
         @views delta_angles = isnothing(delta_idxs) ? nothing : y[delta_idxs]
+        last_theta = last_theta_ref[]
+        last_delta = last_delta_ref[]
 
         if !isnothing(theta_angles) && isnothing(delta_angles)
             if !all(theta_angles .== last_theta)
