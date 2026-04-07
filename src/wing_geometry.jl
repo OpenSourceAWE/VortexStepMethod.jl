@@ -56,16 +56,13 @@ function reinit!(section::Section, LE_point, TE_point, aero_model=nothing, aero_
 end
 
 function reinit!(refined_section::Section, section::Section)
-    refined_section.LE_point .= section.LE_point
-    refined_section.TE_point .= section.TE_point
-    refined_section.aero_model = section.aero_model
-    if isnothing(refined_section.aero_data)
-        refined_section.aero_data = section.aero_data
-    else
-        for i in eachindex(section.aero_data)
-            copyto!(refined_section.aero_data[i], section.aero_data[i])
-        end
-    end
+    reinit!(
+        refined_section,
+        section.LE_point,
+        section.TE_point,
+        section.aero_model,
+        section.aero_data,
+    )
 end
 
 """
@@ -548,7 +545,7 @@ end
 
 Remove the indices from aero_data where a NaN is found.
 """
-function remove_vector_nans(aero_data)
+function remove_vector_nans(aero_data::NTuple{4,AbstractVector})
     alpha_range, cl_vector, cd_vector, cm_vector = aero_data
     alpha_range = collect(alpha_range)
     nan_indices = Set{Int}()
@@ -572,6 +569,25 @@ function remove_vector_nans(aero_data)
     return (clean_alpha, clean_cl, clean_cd, clean_cm)
 end
 
+@inline remove_vector_nans(::Nothing) = nothing
+@inline remove_vector_nans(::Tuple{Float64, Float64}) =
+    throw(ArgumentError("POLAR_VECTORS requires aero_data = (alpha, cl, cd, cm) vectors."))
+@inline remove_vector_nans(::Tuple{AbstractVector, AbstractVector, AbstractMatrix, AbstractMatrix, AbstractMatrix}) =
+    throw(ArgumentError("POLAR_VECTORS requires aero_data = (alpha, cl, cd, cm) vectors."))
+
+function interpolate_polar_matrix_nans!(
+    aero_data::Tuple{AbstractVector, AbstractVector, AbstractMatrix, AbstractMatrix, AbstractMatrix}
+)
+    interpolate_matrix_nans!.(aero_data[3:5])
+    return nothing
+end
+
+@inline interpolate_polar_matrix_nans!(::Nothing) = nothing
+@inline interpolate_polar_matrix_nans!(::Tuple{Float64, Float64}) =
+    throw(ArgumentError("POLAR_MATRICES requires aero_data = (alpha, delta, cl, cd, cm)."))
+@inline interpolate_polar_matrix_nans!(::NTuple{4,AbstractVector}) =
+    throw(ArgumentError("POLAR_MATRICES requires aero_data = (alpha, delta, cl, cd, cm)."))
+
 """
     add_section!(wing::Wing, LE_point::PosVector, TE_point::PosVector, 
                  aero_model, aero_data::AeroData=nothing)
@@ -590,7 +606,7 @@ function add_section!(wing::Wing, LE_point,
     if aero_model == POLAR_VECTORS && wing.remove_nan
         aero_data = remove_vector_nans(aero_data)
     elseif aero_model == POLAR_MATRICES && wing.remove_nan
-        interpolate_matrix_nans!.(aero_data[3:5])
+        interpolate_polar_matrix_nans!(aero_data)
     end
     push!(wing.unrefined_sections, Section(LE_point, TE_point, aero_model, aero_data))
     wing.n_unrefined_sections = Int16(length(wing.unrefined_sections))
@@ -1219,7 +1235,7 @@ function refine_mesh_by_splitting_provided_sections!(wing::AbstractWing; reuse_a
     
     # Validate result
     if length(wing.refined_sections) != wing.n_panels + 1
-        @warn "Number of panels ($(length(new_sections)-1)) differs from desired ($(wing.n_panels))"
+        @warn "Number of panels ($(length(wing.refined_sections)-1)) differs from desired ($(wing.n_panels))"
     end
     
     return nothing
