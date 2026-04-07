@@ -1067,8 +1067,6 @@ function refine_mesh_for_linear_cosine_distribution!(
     new_quarter_chord = zeros(Float64, n_sections, 3)
     new_LE = zeros(Float64, n_sections, 3)
     new_TE = zeros(Float64, n_sections, 3)
-    new_sections = Section[]
-
     # 3. Calculate new points and interpolate
     for i in 1:n_sections
         target_length = target_lengths[i]
@@ -1233,7 +1231,6 @@ function refine_mesh_by_splitting_provided_sections!(wing::AbstractWing; reuse_a
     else
         reinit!(wing.refined_sections[idx], wing.unrefined_sections[end])
     end
-    idx += 1
     
     # Validate result
     if length(wing.refined_sections) != wing.n_panels + 1
