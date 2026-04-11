@@ -229,6 +229,7 @@ mutable struct Wing{P} <: AbstractWing
     refined_sections::Vector{Section}
     remove_nan::Bool
     use_prior_polar::Bool
+    billowing_percentage::Float64  # TE billow as percentage of arc length (0=flat)
 
     # Grouping
     refined_panel_mapping::Vector{Int16}  # Maps each refined panel index to unrefined section index (1 to n_unrefined_sections)
@@ -251,13 +252,79 @@ mutable struct Wing{P} <: AbstractWing
     cache::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}}
 end
 
+# Compatibility constructor for full positional initialization with integer panel counts.
+# This keeps call sites that pass Int values working after n_panels/n_unrefined_sections
+# were tightened to Int16 fields.
+function Wing(
+        n_panels::Integer,
+        n_unrefined_sections::Integer,
+        spanwise_distribution::PanelDistribution,
+        panel_props::PanelProperties{P},
+        spanwise_direction::MVec3,
+        unrefined_sections::Vector{Section},
+        refined_sections::Vector{Section},
+        remove_nan::Bool,
+        use_prior_polar::Bool,
+        billowing_percentage::Float64,
+        refined_panel_mapping::Vector{Int16},
+        non_deformed_sections::Vector{Section},
+        theta_dist::Vector{Float64},
+        delta_dist::Vector{Float64},
+        mass::Float64,
+        gamma_tip::Float64,
+        inertia_tensor::Matrix{Float64},
+        T_cad_body::MVec3,
+        R_cad_body::MMat3,
+        radius::Float64,
+        le_interp::Union{Nothing, NTuple{3, Interpolations.Extrapolation}},
+        te_interp::Union{Nothing, NTuple{3, Interpolations.Extrapolation}},
+        area_interp::Union{Nothing, Interpolations.Extrapolation},
+        cache::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}}
+    ) where {P}
+
+    n_panels_i16 = Int16(n_panels)
+    n_unrefined_sections_i16 = Int16(n_unrefined_sections)
+
+    Int(n_panels_i16) == P || throw(ArgumentError(
+        "n_panels ($n_panels) must match PanelProperties{$P}"
+    ))
+
+    return Wing{P}(
+        n_panels_i16,
+        n_unrefined_sections_i16,
+        spanwise_distribution,
+        panel_props,
+        spanwise_direction,
+        unrefined_sections,
+        refined_sections,
+        remove_nan,
+        use_prior_polar,
+        billowing_percentage,
+        refined_panel_mapping,
+        non_deformed_sections,
+        theta_dist,
+        delta_dist,
+        mass,
+        gamma_tip,
+        inertia_tensor,
+        T_cad_body,
+        R_cad_body,
+        radius,
+        le_interp,
+        te_interp,
+        area_interp,
+        cache
+    )
+end
+
 """
     Wing(n_panels::Int;
          n_unrefined_sections=nothing,
          spanwise_distribution::PanelDistribution=LINEAR,
          spanwise_direction::PosVector=MVec3([0.0, 1.0, 0.0]),
          remove_nan::Bool=true,
-         use_prior_polar::Bool=false)
+         use_prior_polar::Bool=false,
+         billowing_percentage::Float64=0.0)
 
 Constructor for a [Wing](@ref) struct with default values that initializes the sections
 and refined sections as empty arrays. Creates a basic wing suitable for YAML-based construction.
@@ -267,15 +334,17 @@ and refined sections as empty arrays. Creates a basic wing suitable for YAML-bas
 - `n_unrefined_sections::Int`: Number of unrefined sections (inferred from added sections for YAML wings)
 - `spanwise_distribution`::PanelDistribution = LINEAR: [PanelDistribution](@ref)
 - `spanwise_direction::MVec3` = MVec3([0.0, 1.0, 0.0]): Wing span direction vector
-- `remove_nan::Bool`: Wether to remove the NaNs from interpolations or not
+- `remove_nan::Bool`: Whether to remove the NaNs from interpolations or not
 - `use_prior_polar::Bool`: Reuse prior refined/panel polar mapping during geometry-only updates
+- `billowing_percentage::Float64`: TE billow as percentage of arc length (0=flat)
 """
 function Wing(n_panels::Int;
     n_unrefined_sections::Union{Nothing, Int}=nothing,
         spanwise_distribution::PanelDistribution=LINEAR,
         spanwise_direction::PosVector=MVec3([0.0, 1.0, 0.0]),
-    remove_nan::Bool=true,
-    use_prior_polar::Bool=false)
+        remove_nan::Bool=true,
+        use_prior_polar::Bool=false,
+        billowing_percentage=0.0)
 
     # For YAML wings, n_unrefined_sections will be set when sections are added
     # Set to 0 as placeholder for now
@@ -288,7 +357,7 @@ function Wing(n_panels::Int;
     # Initialize with default/empty values for optional fields
     Wing{n_panels}(
         Int16(n_panels), n_unrefined_sections_value, spanwise_distribution, panel_props, spanwise_direction_m,
-        Section[], Section[], remove_nan, use_prior_polar,
+        Section[], Section[], remove_nan, use_prior_polar, Float64(billowing_percentage),
         # Grouping
         Int16[],
         # Deformation fields
@@ -680,6 +749,40 @@ end
 end
 
 """
+    copy_sections_to_refined!(wing; reuse_aero_data=false)
+
+Copy unrefined sections to refined sections 1:1 (no interpolation).
+If `refined_sections` is empty, allocates via `copy`; otherwise
+reinitialises in-place.  Warns if billowing was requested but there
+are no intermediate sections to billow.
+"""
+function copy_sections_to_refined!(
+    wing::AbstractWing; reuse_aero_data::Bool=false
+)
+    if wing.spanwise_distribution == BILLOWING &&
+            wing.billowing_percentage > 0
+        @warn "Billowing requested but n_panels " *
+            "($(wing.n_panels)) == n_provided; no " *
+            "intermediate sections to billow. " *
+            "Increase n_panels."
+    end
+    if length(wing.refined_sections) == 0
+        wing.refined_sections = copy(wing.unrefined_sections)
+    else
+        for (refined, unrefined) in zip(
+                wing.refined_sections, wing.unrefined_sections)
+            if reuse_aero_data
+                reinit!(refined, unrefined.LE_point,
+                    unrefined.TE_point, unrefined.aero_model)
+            else
+                reinit!(refined, unrefined)
+            end
+        end
+    end
+    return nothing
+end
+
+"""
     refine!(wing::AbstractWing; recompute_mapping=true, sort_sections=true)
 
 Refine the wing aerodynamic mesh from unrefined sections to refined sections.
@@ -742,7 +845,7 @@ function refine!(wing::AbstractWing; recompute_mapping=true, sort_sections=true)
     if length(wing.refined_sections) == 0
         if wing.spanwise_distribution == UNCHANGED ||
                length(wing.unrefined_sections) == n_sections
-            wing.refined_sections = copy(wing.unrefined_sections)
+            copy_sections_to_refined!(wing; reuse_aero_data)
             recompute_mapping && compute_refined_panel_mapping!(wing)
             update_non_deformed_sections!(wing)
             return nothing
@@ -772,19 +875,7 @@ function refine!(wing::AbstractWing; recompute_mapping=true, sort_sections=true)
     
     # Handle special cases
     if wing.spanwise_distribution == UNCHANGED || length(wing.unrefined_sections) == n_sections
-        for i in eachindex(wing.unrefined_sections)
-            if reuse_aero_data
-                section = wing.unrefined_sections[i]
-                reinit!(
-                    wing.refined_sections[i],
-                    section.LE_point,
-                    section.TE_point,
-                    section.aero_model
-                )
-            else
-                reinit!(wing.refined_sections[i], wing.unrefined_sections[i])
-            end
-        end
+        copy_sections_to_refined!(wing; reuse_aero_data)
         recompute_mapping && compute_refined_panel_mapping!(wing)
         update_non_deformed_sections!(wing)
         return nothing
@@ -828,6 +919,8 @@ function refine!(wing::AbstractWing; recompute_mapping=true, sort_sections=true)
             aero_data;
             reuse_aero_data
         )
+    elseif wing.spanwise_distribution == BILLOWING
+        refine_mesh_with_billowing!(wing; reuse_aero_data)
     else
         throw(ArgumentError("Unsupported spanwise panel distribution: $(wing.spanwise_distribution)"))
     end
@@ -1125,14 +1218,19 @@ function refine_mesh_for_linear_cosine_distribution!(
 end
 
 """
-    refine_mesh_by_splitting_provided_sections!(wing::AbstractWing)
+    refine_mesh_by_splitting_provided_sections!(wing; reuse_aero_data,
+        billowing_percentage)
 
 Refine mesh by splitting provided sections into desired number of panels.
 
-Returns:
-    Vector{Section}: Refined sections
+When `billowing_percentage > 0`, rotates chord vectors around the leading
+edge with a sinusoidal profile to simulate fabric billowing between ribs.
 """
-function refine_mesh_by_splitting_provided_sections!(wing::AbstractWing; reuse_aero_data::Bool=false)
+function refine_mesh_by_splitting_provided_sections!(
+    wing::AbstractWing;
+    reuse_aero_data::Bool=false,
+    billowing_percentage::Float64=0.0
+)
     n_sections_provided = length(wing.unrefined_sections)
     n_panels_provided = n_sections_provided - 1
     n_panels_desired = wing.n_panels
@@ -1141,16 +1239,10 @@ function refine_mesh_by_splitting_provided_sections!(wing::AbstractWing; reuse_a
     
     # Check if refinement is needed
     if n_panels_provided == n_panels_desired
-        for (refined_section, section) in zip(wing.refined_sections, wing.unrefined_sections)
-            if reuse_aero_data
-                reinit!(refined_section, section.LE_point, section.TE_point, section.aero_model)
-            else
-                reinit!(refined_section, section)
-            end
-        end
+        copy_sections_to_refined!(wing; reuse_aero_data)
         return nothing
     end
-    
+
     # Validate panel count relationship
     if n_panels_desired % n_panels_provided != 0
         throw(ArgumentError(
@@ -1204,6 +1296,7 @@ function refine_mesh_by_splitting_provided_sections!(wing::AbstractWing; reuse_a
             ]
 
             # Generate sections for this pair
+            start_idx = idx
             idx = refine_mesh_for_linear_cosine_distribution!(
                 wing,
                 idx,
@@ -1216,6 +1309,24 @@ function refine_mesh_by_splitting_provided_sections!(wing::AbstractWing; reuse_a
                 endpoints=false,
                 reuse_aero_data
             )
+
+            # Apply billowing by rotating chords around LE
+            if billowing_percentage > 0 && idx > start_idx
+                y_hat = normalize(
+                    LE[left_section_index] -
+                    LE[left_section_index + 1])
+                span_len = norm(
+                    LE[left_section_index] -
+                    LE[left_section_index + 1])
+                apply_billowing_to_pair!(
+                    wing.refined_sections,
+                    start_idx, idx - 1,
+                    y_hat, span_len,
+                    LE[left_section_index + 1],
+                    TE[left_section_index],
+                    TE[left_section_index + 1],
+                    billowing_percentage)
+            end
         end
     end
     
@@ -1240,6 +1351,131 @@ function refine_mesh_by_splitting_provided_sections!(wing::AbstractWing; reuse_a
     return nothing
 end
 
+
+"""
+    rodrigues_rotate(vec, axis, θ)
+
+Rotate `vec` around unit `axis` by angle `θ` (radians) using the
+Rodrigues rotation formula. Non-allocating with MVec3 inputs.
+"""
+@inline function rodrigues_rotate(vec, axis, θ)
+    ct = cos(θ); st = sin(θ)
+    d = dot(vec, axis)
+    return ct * vec + st * cross(axis, vec) + (1 - ct) * d * axis
+end
+
+"""
+    billowing_arc_length(sections, start_si, end_si, y_hat,
+                         span_len, le_ref, te_left, te_right,
+                         angle_max)
+
+Compute the TE arc length that would result from rotating each
+section's chord around `y_hat` by `angle_max * sin(π t)` radians,
+where `t` is the normalised spanwise position within the rib pair.
+
+Non-allocating: uses only stack-allocated MVec3 arithmetic.
+"""
+function billowing_arc_length(
+    sections, start_si, end_si,
+    y_hat, span_len, le_ref,
+    te_left, te_right, angle_max
+)
+    prev_te = MVec3(te_left)
+    arc = 0.0
+    for si in start_si:end_si
+        sec = sections[si]
+        t = dot(sec.LE_point - le_ref, y_hat) / span_len
+        θ = -angle_max * sin(π * t)
+        chord_vec = sec.TE_point - sec.LE_point
+        rotated = rodrigues_rotate(chord_vec, y_hat, θ)
+        current_te = sec.LE_point + rotated
+        arc += norm(current_te - prev_te)
+        prev_te = current_te
+    end
+    arc += norm(te_right - prev_te)
+    return arc
+end
+
+"""
+    apply_billowing_to_pair!(sections, start_si, end_si, y_hat,
+                             span_len, le_ref, te_left, te_right,
+                             percentage)
+
+Apply billowing to refined sections between two ribs by rotating
+each section's chord around `y_hat`.  Uses Newton iteration to
+find the rotation amplitude that matches the target TE arc-length
+`percentage`, then applies the rotations in-place.
+
+The angle profile is `angle_max * sin(π t)` (zero at ribs,
+maximum at centre).  All angles are in radians.
+
+Non-allocating: modifies `sections[start_si:end_si].TE_point`
+in-place using only stack-allocated MVec3 arithmetic.
+"""
+function apply_billowing_to_pair!(
+    sections, start_si, end_si,
+    y_hat, span_len, le_ref,
+    te_left, te_right, percentage
+)
+    percentage <= 0 && return nothing
+    if percentage >= 100
+        throw(ArgumentError(
+            "billowing_percentage must be < 100, got $percentage"))
+    end
+    straight = norm(te_right - te_left)
+    straight < 1e-12 && return nothing
+    target_arc = straight / (1 - percentage / 100)
+
+    # Newton iteration on angle_max (rad)
+    angle_max = sqrt(4 * percentage / (100 - percentage))
+    for _ in 1:50
+        arc = billowing_arc_length(
+            sections, start_si, end_si,
+            y_hat, span_len, le_ref,
+            te_left, te_right, angle_max)
+        f = arc - target_arc
+        abs(f) < 1e-12 * target_arc && break
+
+        δ = max(1e-8, abs(angle_max) * 1e-8)
+        arc_p = billowing_arc_length(
+            sections, start_si, end_si,
+            y_hat, span_len, le_ref,
+            te_left, te_right, angle_max + δ)
+        df = (arc_p - arc) / δ
+        abs(df) < 1e-30 && break
+        angle_max = max(0.0, angle_max - f / df)
+    end
+
+    # Apply converged rotations in-place
+    for si in start_si:end_si
+        sec = sections[si]
+        t = dot(sec.LE_point - le_ref, y_hat) / span_len
+        θ = -angle_max * sin(π * t)
+        chord_vec = sec.TE_point - sec.LE_point
+        rotated = rodrigues_rotate(chord_vec, y_hat, θ)
+        sec.TE_point .= sec.LE_point + rotated
+    end
+    return nothing
+end
+
+"""
+    refine_mesh_with_billowing!(wing; reuse_aero_data)
+
+Refine wing mesh using SPLIT_PROVIDED spacing with TE billowing.
+
+Between each pair of unrefined (rib) sections, chord vectors are rotated
+around the leading edge to simulate fabric billowing.  The rotation
+amplitude is found iteratively so that the TE arc length matches the
+wing's `billowing_percentage`.
+
+Delegates to [`refine_mesh_by_splitting_provided_sections!`](@ref).
+"""
+function refine_mesh_with_billowing!(wing; reuse_aero_data::Bool=false)
+    refine_mesh_by_splitting_provided_sections!(
+        wing; reuse_aero_data,
+        billowing_percentage=wing.billowing_percentage
+    )
+end
 
 """
     calculate_span(wing::AbstractWing)

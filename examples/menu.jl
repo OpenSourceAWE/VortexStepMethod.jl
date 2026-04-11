@@ -9,6 +9,7 @@ url = "https://opensourceawe.github.io/VortexStepMethod.jl/dev"
 
 options = [
            "V3_kite = include(\"V3_kite.jl\")",
+           "billowing = include(\"billowing.jl\")",
            "pyramid_model = include(\"pyramid_model.jl\")",
            "rectangular_wing = include(\"rectangular_wing.jl\")",
            "ram_air_kite = include(\"ram_air_kite.jl\")",
