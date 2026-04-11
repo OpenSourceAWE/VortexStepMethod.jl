@@ -759,7 +759,7 @@ function gamma_loop!(
                 d_gamma .= solver.lr.gamma_new .- gamma
                 nothing
             end
-            prob = NonlinearProblem(f_nonlin!, solver.lr.gamma_new, nothing)
+            prob = NonlinearProblem(f_nonlin!, solver.lr.gamma_new, SciMLBase.NullParameters())
             solver.prob = prob
         end
         prob = prob::NonlinearProblem
