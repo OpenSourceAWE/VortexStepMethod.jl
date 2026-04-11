@@ -6,4 +6,4 @@ fi
 
 export JULIA_PKG_SERVER_REGISTRY_PREFERENCE=eager
 
-julia --project
+julia --project -i -e 'using VortexStepMethod; function menu(); include("examples/menu.jl"); end'
