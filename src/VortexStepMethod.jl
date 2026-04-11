@@ -254,7 +254,7 @@ function help(url)
         io = IOBuffer()
         run(pipeline(`xdg-open $url`, stderr = io))
         # ignore any error messages
-        String(take!(io)) 
+        _ = take!(io)
     else
         DefaultApplication.open(url)
     end
