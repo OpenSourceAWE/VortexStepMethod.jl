@@ -9,7 +9,7 @@ PLOT = true
 PRN = true
 USE_TEX = false
 DEFORM = true
-LINEARIZE = false
+const LINEARIZE = false
 
 # Create wing geometry
 wing = ObjWing(

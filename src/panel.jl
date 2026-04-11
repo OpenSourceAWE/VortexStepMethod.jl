@@ -50,7 +50,7 @@ Represents a panel in a vortex step method simulation. All points and vectors ar
     LE_point_2::MVec3 = zeros(MVec3)
     chord::Float64 = zero(Float64)
     va::MVec3 = zeros(MVec3)
-    corner_points::MMatrix{3, 4, Float64} = zeros(MMatrix{3, 4, Float64})
+    corner_points::MMatrix{3, 4, Float64, 12} = zeros(MMatrix{3, 4, Float64, 12})
     aero_model::AeroModel = INVISCID
     cl_coeffs::Vector{Float64} = zeros(Float64, 3)
     cd_coeffs::Vector{Float64} = zeros(Float64, 3)
