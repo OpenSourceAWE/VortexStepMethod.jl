@@ -1,3 +1,8 @@
+using Pkg
+if abspath(PROGRAM_FILE) == abspath(@__FILE__)
+    Pkg.activate(@__DIR__)
+end
+
 using BenchmarkTools
 using StaticArrays
 using VortexStepMethod
@@ -188,14 +193,12 @@ using LinearAlgebra
             $gamma,
             $reference_point,
             $density,
-            VSM,
             1e-20,
             0.0,
             $alpha_array,
             $v_a_array,
             $chord_array,
             $x_airf_array,
-            $y_airf_array,
             $z_airf_array,
             $va_array,
             $va_norm_array,

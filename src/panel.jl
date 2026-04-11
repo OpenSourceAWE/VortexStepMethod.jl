@@ -50,7 +50,7 @@ Represents a panel in a vortex step method simulation. All points and vectors ar
     LE_point_2::MVec3 = zeros(MVec3)
     chord::Float64 = zero(Float64)
     va::MVec3 = zeros(MVec3)
-    corner_points::MMatrix{3, 4, Float64} = zeros(MMatrix{3, 4, Float64})
+    corner_points::MMatrix{3, 4, Float64, 12} = zeros(MMatrix{3, 4, Float64, 12})
     aero_model::AeroModel = INVISCID
     cl_coeffs::Vector{Float64} = zeros(Float64, 3)
     cd_coeffs::Vector{Float64} = zeros(Float64, 3)
@@ -137,12 +137,6 @@ function init_aero!(
         panel.cl_coeffs, panel.cd_coeffs, panel.cm_coeffs = compute_lei_coeffs(section_1, section_2)
 
     elseif panel.aero_model in (POLAR_VECTORS, POLAR_MATRICES)
-        aero_1 = section_1.aero_data
-        aero_2 = section_2.aero_data
-        if !all(size.(aero_1) .== size.(aero_2))
-            throw(ArgumentError("Polar data must have same shape"))
-        end
-
         if remove_nan
             extrap_flat = Flat()
             extrap_line = Line()
@@ -152,17 +146,30 @@ function init_aero!(
         end
 
         if panel.aero_model == POLAR_VECTORS
-            alphas_1 = aero_1[1]
-            alphas_2 = aero_2[1]
+            aero_1 = section_1.aero_data
+            aero_2 = section_2.aero_data
+            aero_1 isa Tuple{Vector{Float64}, Vector{Float64}, Vector{Float64}, Vector{Float64}} ||
+                throw(ArgumentError("POLAR_VECTORS requires aero_data = (alpha, cl, cd, cm) vectors."))
+            aero_2 isa Tuple{Vector{Float64}, Vector{Float64}, Vector{Float64}, Vector{Float64}} ||
+                throw(ArgumentError("POLAR_VECTORS requires aero_data = (alpha, cl, cd, cm) vectors."))
+            aero_1_t = aero_1::Tuple{Vector{Float64}, Vector{Float64}, Vector{Float64}, Vector{Float64}}
+            aero_2_t = aero_2::Tuple{Vector{Float64}, Vector{Float64}, Vector{Float64}, Vector{Float64}}
+
+            if !all(size.(aero_1_t) .== size.(aero_2_t))
+                throw(ArgumentError("Polar data must have same shape"))
+            end
+
+            alphas_1 = aero_1_t[1]
+            alphas_2 = aero_2_t[1]
             (
                 length(alphas_1) == length(alphas_2) &&
                 all(isapprox.(diff(alphas_1), diff(alphas_2)))
             ) || throw(ArgumentError("Alpha steps must be identical."))
 
             polar_data = (
-                Vector{Float64}((aero_1[2] + aero_2[2]) / 2),
-                Vector{Float64}((aero_1[3] + aero_2[3]) / 2),
-                Vector{Float64}((aero_1[4] + aero_2[4]) / 2)
+                Vector{Float64}((aero_1_t[2] + aero_2_t[2]) / 2),
+                Vector{Float64}((aero_1_t[3] + aero_2_t[3]) / 2),
+                Vector{Float64}((aero_1_t[4] + aero_2_t[4]) / 2)
             )
             alphas = Vector{Float64}(alphas_1)
 
@@ -171,10 +178,23 @@ function init_aero!(
             panel.cm_interp = linear_interpolation(alphas, polar_data[3]; extrapolation_bc=extrap_flat)
 
         elseif panel.aero_model == POLAR_MATRICES
-            alphas_1 = aero_1[1]
-            alphas_2 = aero_2[1]
-            deltas_1 = aero_1[2]
-            deltas_2 = aero_2[2]
+            aero_1 = section_1.aero_data
+            aero_2 = section_2.aero_data
+            aero_1 isa Tuple{Vector{Float64}, Vector{Float64}, Matrix{Float64}, Matrix{Float64}, Matrix{Float64}} ||
+                throw(ArgumentError("POLAR_MATRICES requires aero_data = (alpha, delta, cl, cd, cm)."))
+            aero_2 isa Tuple{Vector{Float64}, Vector{Float64}, Matrix{Float64}, Matrix{Float64}, Matrix{Float64}} ||
+                throw(ArgumentError("POLAR_MATRICES requires aero_data = (alpha, delta, cl, cd, cm)."))
+            aero_1_t = aero_1::Tuple{Vector{Float64}, Vector{Float64}, Matrix{Float64}, Matrix{Float64}, Matrix{Float64}}
+            aero_2_t = aero_2::Tuple{Vector{Float64}, Vector{Float64}, Matrix{Float64}, Matrix{Float64}, Matrix{Float64}}
+
+            if !all(size.(aero_1_t) .== size.(aero_2_t))
+                throw(ArgumentError("Polar data must have same shape"))
+            end
+
+            alphas_1 = aero_1_t[1]
+            alphas_2 = aero_2_t[1]
+            deltas_1 = aero_1_t[2]
+            deltas_2 = aero_2_t[2]
             (
                 length(alphas_1) == length(alphas_2) &&
                 all(isapprox.(diff(alphas_1), diff(alphas_2)))
@@ -185,9 +205,9 @@ function init_aero!(
             ) || throw(ArgumentError("Delta steps must be identical."))
 
             polar_data = (
-                Matrix{Float64}((aero_1[3] + aero_2[3]) / 2),
-                Matrix{Float64}((aero_1[4] + aero_2[4]) / 2),
-                Matrix{Float64}((aero_1[5] + aero_2[5]) / 2)
+                Matrix{Float64}((aero_1_t[3] + aero_2_t[3]) / 2),
+                Matrix{Float64}((aero_1_t[4] + aero_2_t[4]) / 2),
+                Matrix{Float64}((aero_1_t[5] + aero_2_t[5]) / 2)
             )
             alphas = Vector{Float64}(alphas_1)
             deltas = Vector{Float64}(deltas_1)
@@ -196,7 +216,7 @@ function init_aero!(
             panel.cd_interp = linear_interpolation((alphas, deltas), polar_data[2]; extrapolation_bc=extrap_line)
             panel.cm_interp = linear_interpolation((alphas, deltas), polar_data[3]; extrapolation_bc=extrap_flat)
         else
-            throw(ArgumentError("Polar data in wrong format: $aero_1"))
+            throw(ArgumentError("Polar data in wrong format for model $(panel.aero_model)."))
         end
 
     elseif !(panel.aero_model == INVISCID)
@@ -261,9 +281,14 @@ end
 Compute lift, drag and moment coefficients for Lei airfoil using Breukels model.
 """
 function compute_lei_coeffs(section_1::Section, section_2::Section)
+    section_1.aero_data isa NTuple{2, Float64} ||
+        throw(ArgumentError("LEI_AIRFOIL_BREUKELS requires aero_data = (tube_diameter, camber)."))
+    section_2.aero_data isa NTuple{2, Float64} ||
+        throw(ArgumentError("LEI_AIRFOIL_BREUKELS requires aero_data = (tube_diameter, camber)."))
+
     # Average tube diameter and camber from both sections
-    t1, k1 = section_1.aero_data
-    t2, k2 = section_2.aero_data
+    t1, k1 = section_1.aero_data::NTuple{2, Float64}
+    t2, k2 = section_2.aero_data::NTuple{2, Float64}
     t = (t1 + t2) / 2
     k = (k1 + k2) / 2
 
@@ -347,22 +372,25 @@ Calculate lift coefficient for given angle of attack.
 """
 function calculate_cl(panel::Panel, alpha::Float64)::Float64
     isnan(alpha) && return NaN
-    cl = 0.0
     if panel.aero_model == LEI_AIRFOIL_BREUKELS
         cl = evalpoly(rad2deg(alpha), reverse(panel.cl_coeffs))
         if abs(alpha) > (π/9)
             cl = 2 * cos(alpha) * sin(alpha)^2
         end
+        return cl
     elseif panel.aero_model == INVISCID
-        cl = 2π * alpha
+        return 2π * alpha
     elseif panel.aero_model == POLAR_VECTORS
-        cl = panel.cl_interp(alpha)::Float64
+        interp = panel.cl_interp
+        interp isa Union{I1, I2} || throw(ArgumentError("cl_interp is not initialized for POLAR_VECTORS."))
+        return (interp::Union{I1, I2})(alpha)::Float64
     elseif panel.aero_model == POLAR_MATRICES
-        cl = panel.cl_interp(alpha, panel.delta)::Float64
+        interp = panel.cl_interp
+        interp isa Union{I3, I4} || throw(ArgumentError("cl_interp is not initialized for POLAR_MATRICES."))
+        return (interp::Union{I3, I4})(alpha, panel.delta)::Float64
     else
         throw(ArgumentError("Unsupported aero model: $(panel.aero_model)"))
     end
-    return cl
 end
 
 
@@ -373,23 +401,31 @@ Calculate drag and moment coefficients for given angle of attack.
 """
 function calculate_cd_cm(panel::Panel, alpha::Float64)
     isnan(alpha) && return NaN, NaN
-    cd, cm = 0.0, 0.0
     if panel.aero_model == LEI_AIRFOIL_BREUKELS
         cd = evalpoly(rad2deg(alpha), reverse(panel.cd_coeffs))
         cm = evalpoly(rad2deg(alpha), reverse(panel.cm_coeffs))
         if abs(alpha) > (π/9)  # Outside ±20 degrees
             cd = 2 * sin(alpha)^3
         end
+        return cd, cm
     elseif panel.aero_model == POLAR_VECTORS
-        cd = panel.cd_interp(alpha)::Float64
-        cm = panel.cm_interp(alpha)::Float64
+        cd_interp = panel.cd_interp
+        cm_interp = panel.cm_interp
+        cd_interp isa Union{I1, I2, I5} || throw(ArgumentError("cd_interp is not initialized for POLAR_VECTORS."))
+        cm_interp isa Union{I1, I2} || throw(ArgumentError("cm_interp is not initialized for POLAR_VECTORS."))
+        return (cd_interp::Union{I1, I2, I5})(alpha)::Float64,
+               (cm_interp::Union{I1, I2})(alpha)::Float64
     elseif panel.aero_model == POLAR_MATRICES
-        cd = panel.cd_interp(alpha, panel.delta)::Float64
-        cm = panel.cm_interp(alpha, panel.delta)::Float64
+        cd_interp = panel.cd_interp
+        cm_interp = panel.cm_interp
+        cd_interp isa Union{I3, I4, I6} || throw(ArgumentError("cd_interp is not initialized for POLAR_MATRICES."))
+        cm_interp isa Union{I3, I4} || throw(ArgumentError("cm_interp is not initialized for POLAR_MATRICES."))
+        return (cd_interp::Union{I3, I4, I6})(alpha, panel.delta)::Float64,
+               (cm_interp::Union{I3, I4})(alpha, panel.delta)::Float64
     elseif !(panel.aero_model == INVISCID)
         throw(ArgumentError("Unsupported aero model: $(panel.aero_model)"))
     end
-    return cd, cm
+    return 0.0, 0.0
 end
 
 """

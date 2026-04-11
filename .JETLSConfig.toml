@@ -5,3 +5,16 @@ auto_instantiate = false            # boolean, default: true
 
 [diagnostic]
 all_files = false                   # boolean, default: true
+
+[[diagnostic.patterns]]
+pattern = "no matching method found `copy!\\(::Random\\.TaskLocalRNG, ::Nothing\\)`"
+match_by = "message"
+match_type = "regex"
+severity = "off"
+
+[[diagnostic.patterns]]
+pattern = "IncorrectCallArgs"
+match_by = "code"
+match_type = "literal"
+severity = "off"
+path = "src/solver.jl"

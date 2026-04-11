@@ -76,11 +76,11 @@ function find_circle_center_and_radius(vertices)
         end
     end
 
-    function r_diff!(du, u, p)
-        z = u[1]
+    function r_diff!(du, u, _)
+        z_local = u[1]
         r .= Inf
-        r[1] = sqrt(v_min[2]^2 + (v_min[3] - z)^2)
-        r[2] = sqrt(v_tip[2]^2 + (v_tip[3] - z)^2)
+        r[1] = sqrt(v_min[2]^2 + (v_min[3] - z_local)^2)
+        r[2] = sqrt(v_tip[2]^2 + (v_tip[3] - z_local)^2)
         du[1] = r[1] - r[2]
         return nothing
     end
@@ -88,12 +88,12 @@ function find_circle_center_and_radius(vertices)
     prob = NonlinearProblem(r_diff!, [v_min[3]-0.1], nothing)
     result = NonlinearSolve.solve(prob, NewtonRaphson(; autodiff=AutoFiniteDiff(; relstep = 1e-3, absstep = 1e-3)); abstol = 1e-2)
     r_diff!(zeros(1), result, nothing)
-    z = result[1]
+    z_center = result[1]
 
-    gamma_tip = atan(-v_tip[2], (v_tip[3] - z))
+    gamma_tip = atan(-v_tip[2], (v_tip[3] - z_center))
     @assert gamma_tip > 0.0
 
-    return z, r[1], gamma_tip
+    return z_center, r[1], gamma_tip
 end
 
 """
@@ -528,9 +528,9 @@ function ObjWing(
     # Load or create polars
     (!endswith(dat_path, ".dat")) && (dat_path *= ".dat")
     (!isfile(dat_path)) && error("DAT file not found: $dat_path")
-    cl_polar_path = dat_path[1:end-4] * "_cl_polar.csv"
-    cd_polar_path = dat_path[1:end-4] * "_cd_polar.csv"
-    cm_polar_path = dat_path[1:end-4] * "_cm_polar.csv"
+    cl_polar_path = string(dat_path[1:end-4], "_cl_polar.csv")
+    cd_polar_path = string(dat_path[1:end-4], "_cd_polar.csv")
+    cm_polar_path = string(dat_path[1:end-4], "_cm_polar.csv")
 
     (!endswith(obj_path, ".obj")) && (obj_path *= ".obj")
     (!isfile(obj_path)) && error("OBJ file not found: $obj_path")
@@ -557,9 +557,9 @@ function ObjWing(
                 area, width, crease_frac, alpha_range, delta_range, remove_nan)
         end
 
-        cl_matrix, _, _ = read_aero_matrix(cl_polar_path)
-        cd_matrix, _, _ = read_aero_matrix(cd_polar_path)
-        cm_matrix, alpha_range, delta_range = read_aero_matrix(cm_polar_path)
+        cl_matrix, _, _ = read_aero_matrix(String(cl_polar_path))
+        cd_matrix, _, _ = read_aero_matrix(String(cd_polar_path))
+        cm_matrix, alpha_range, delta_range = read_aero_matrix(String(cm_polar_path))
 
         if remove_nan
             any(isnan.(cl_matrix)) && interpolate_matrix_nans!(cl_matrix; prn)
@@ -579,11 +579,11 @@ function ObjWing(
         panel_props = PanelProperties{n_panels}()
         cache = [PreallocationTools.LazyBufferCache()]
 
-        wing = Wing(n_panels, Int16(n_unrefined_sections), spanwise_distribution, panel_props, MVec3(spanwise_direction),
+        wing = Wing(Int16(n_panels), Int16(n_unrefined_sections), spanwise_distribution, panel_props, MVec3(spanwise_direction),
             sections, Section[], remove_nan, use_prior_polar,  # refined_sections empty
             Int16[],  # refined_panel_mapping empty
             Section[], zeros(n_panels), zeros(n_panels),  # non_deformed, theta, delta
-            mass, gamma_tip, inertia_tensor, T_cad_body, R_cad_body, radius,
+            mass, gamma_tip, inertia_tensor, MVec3(T_cad_body), MMat3(R_cad_body), radius,
             le_interp, te_interp, area_interp, cache)
 
         # Auto-refine for backward compatibility
