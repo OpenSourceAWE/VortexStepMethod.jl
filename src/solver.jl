@@ -701,8 +701,7 @@ function gamma_loop!(
     if solver.solver_type == NONLIN
         prob = solver.prob
         if isnothing(prob)
-            function f_nonlin!(d_gamma, gamma, p)
-                p
+            function f_nonlin!(d_gamma, gamma, _p)
                 mul!(velocity_view_x, AIC_x, gamma)
                 mul!(velocity_view_y, AIC_y, gamma)
                 mul!(velocity_view_z, AIC_z, gamma)
