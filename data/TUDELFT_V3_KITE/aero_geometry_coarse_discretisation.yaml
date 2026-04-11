@@ -120,7 +120,7 @@ wing_airfoils:
   # ---------------------------------------------------------------
   # headers:
   #   - airfoil_id: integer, unique identifier for the airfoil
-  #   - type: one of [neuralfoil, breukels_regression, masure_regression, polars]
+  #   - type: one of [neuralfoil, breukels_regression, measure_regression, polars]
   #   - info_dict: dictionary with parameters depending on 'type'
   #
   # info_dict fields by type:
@@ -141,8 +141,8 @@ wing_airfoils:
   #           Dirty wind tunnel:   4–8
   #   - polars:
   #       csv_file_path: Path to polar CSV file (columns: alpha [rad], cl, cd, cm)
-  #   - masure_regression:
-  #       t, eta, kappa, delta, lamba, phi: Regression parameters
+  #   - measure_regression:
+  #       t, eta, kappa, delta, lambda, phi: Regression parameters
   #   - inviscid:
   #       no further data is required
   # ---------------------------------------------------------------
