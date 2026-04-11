@@ -1045,15 +1045,16 @@ function set_va!(body_aero::BodyAerodynamics, va::AbstractVector, omega=zeros(MV
     if all(iszero, omega)
         va_distribution .= repeat(reshape(va, 1, 3), n_panels)
     else
+        idx = 1
         for wing in body_aero.wings
-            # Get spanwise positions
-            spanwise_positions = [panel.control_point for panel in body_aero.panels]
-            
-            # Calculate velocities for each panel
-            for i in 1:wing.n_panels
-                omega_va = -omega × spanwise_positions[i]
-                va_distribution[i, :] .= omega_va .+ va
+            panel_end = idx + wing.n_panels - 1
+
+            # Calculate velocities for each panel in this wing slice
+            for j in idx:panel_end
+                omega_va = -omega × body_aero.panels[j].control_point
+                va_distribution[j, :] .= omega_va .+ va
             end
+            idx = panel_end + 1
         end
     end
     
