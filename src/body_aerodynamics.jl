@@ -22,9 +22,9 @@ Main structure for calculating aerodynamic properties of bodies. Use the constru
 - `y::MVector{P, Float64}` = MVector{P,Float64}(zeros(P))
 - `cache::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}}` = [LazyBufferCache() for _ in 1:15]
 """
-@with_kw mutable struct BodyAerodynamics{P}
+@with_kw mutable struct BodyAerodynamics{P,W<:AbstractWing}
     panels::Vector{Panel}
-    wings::Vector{Wing}
+    wings::Vector{W}
     _va::MVec3 = zeros(MVec3)
     has_distributed_va::Bool = false
     omega::MVec3 = zeros(MVec3)
@@ -110,7 +110,7 @@ function BodyAerodynamics(
         end
     end
 
-    body_aero = BodyAerodynamics{length(panels)}(; panels, wings)
+    body_aero = BodyAerodynamics{length(panels),T}(; panels, wings)
     reinit!(body_aero; va, omega)
     return body_aero
 end
@@ -694,11 +694,11 @@ end
 
 """
     calculate_results(body_aero::BodyAerodynamics, gamma_new, 
-                     density, aerodynamic_model_type::Model,
+                     density,
                      core_radius_fraction, mu,
                      alpha_dist, v_a_dist,
                      chord_array, x_airf_array,
-                     y_airf_array, z_airf_array,
+                     z_airf_array,
                      va_array, va_norm_array,
                      va_unit_array, panels::Vector{Panel},
                      is_only_f_and_gamma_output::Bool)
@@ -713,14 +713,12 @@ function calculate_results(
     gamma_new,
     reference_point,
     density,
-    aerodynamic_model_type::Model,
     core_radius_fraction,
     mu,
     alpha_dist,
     v_a_dist,
     chord_array,
     x_airf_array,
-    y_airf_array,
     z_airf_array,
     va_array,
     va_norm_array,
@@ -1041,12 +1039,12 @@ Set velocity array and update wake filaments.
 - `omega::VelVector`: Turn rate vector around x y and z axis            [rad/s]
 """
 function set_va!(body_aero::BodyAerodynamics, va::AbstractVector, omega=zeros(MVec3))
-    # Calculate va_distribution based on input type
-    va_distribution = if all(omega .== 0.0)
-        repeat(reshape(va, 1, 3), length(body_aero.panels))
-    elseif !all(omega .== 0.0)
-        va_dist = zeros(length(body_aero.panels), 3)
-        
+    n_panels = length(body_aero.panels)
+    va_distribution = zeros(n_panels, 3)
+
+    if all(iszero, omega)
+        va_distribution .= repeat(reshape(va, 1, 3), n_panels)
+    else
         for wing in body_aero.wings
             # Get spanwise positions
             spanwise_positions = [panel.control_point for panel in body_aero.panels]
@@ -1054,10 +1052,9 @@ function set_va!(body_aero::BodyAerodynamics, va::AbstractVector, omega=zeros(MV
             # Calculate velocities for each panel
             for i in 1:wing.n_panels
                 omega_va = -omega × spanwise_positions[i]
-                va_dist[i, :] .= omega_va .+ va
+                va_distribution[i, :] .= omega_va .+ va
             end
         end
-        va_dist
     end
     
     # Update panel velocities
@@ -1072,7 +1069,7 @@ function set_va!(body_aero::BodyAerodynamics, va::AbstractVector, omega=zeros(MV
     return nothing
 end
 
-function set_va!(body_aero::BodyAerodynamics, va_distribution::AbstractMatrix, omega=zeros(MVec3))
+function set_va!(body_aero::BodyAerodynamics, va_distribution::AbstractMatrix)
     size(va_distribution, 1) != length(body_aero.panels) &&
         throw(ArgumentError("Number of rows in va distribution should be equal to number of panels."))
 

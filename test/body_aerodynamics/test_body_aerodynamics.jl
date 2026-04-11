@@ -5,6 +5,9 @@ using Test
 using Logging
 
 include("../utils.jl")
+if !@isdefined(create_temp_wing_settings)
+    include("../test_data_utils.jl")
+end
 
 @testset "Induction Matrix Creation" begin
     # Setup
