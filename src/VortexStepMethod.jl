@@ -10,7 +10,7 @@ using DefaultApplication
 using Measures
 using LaTeXStrings
 using NonlinearSolve
-import NonlinearSolve: solve!, solve
+import NonlinearSolve: solve, solve!
 using Interpolations
 using Parameters
 using Serialization

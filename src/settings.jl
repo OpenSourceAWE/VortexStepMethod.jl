@@ -43,7 +43,7 @@ Settings for a single wing, used within [`VSMSettings`](@ref).
     n_panels::Int64 = 40
     spanwise_panel_distribution::PanelDistribution = LINEAR
     spanwise_direction::MVec3 = [0.0, 1.0, 0.0]
-    remove_nan = true
+    remove_nan::Bool = true
     use_prior_polar::Bool = false
 end
 
