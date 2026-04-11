@@ -493,5 +493,6 @@ end
         expected_va = va .+ (-omega × panel.control_point)
         @test panel.va ≈ expected_va atol=1e-12
     end
-    @test !body_aero.has_distributed_va
+    @test body_aero.has_distributed_va
+    @test_throws ArgumentError body_aero.va
 end
