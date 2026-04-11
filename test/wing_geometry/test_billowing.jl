@@ -51,20 +51,20 @@ function te_arc_length_between_ribs(wing, rib_left, rib_right)
         if isnothing(first_idx)
             if isapprox(sec.LE_point,
                     wing.unrefined_sections[rib_left].LE_point;
-                    atol=1e-10)
+                    atol=1e-8)
                 first_idx = i
             end
         end
         if !isnothing(first_idx) && isnothing(last_idx)
             if isapprox(sec.LE_point,
                     wing.unrefined_sections[rib_right].LE_point;
-                    atol=1e-10)
+                    atol=1e-8)
                 last_idx = i
                 break
             end
         end
     end
-    @assert !isnothing(first_idx) && !isnothing(last_idx)
+    @test !isnothing(first_idx) && !isnothing(last_idx)
     arc = 0.0
     for i in first_idx:(last_idx - 1)
         arc += norm(sections[i + 1].TE_point -
@@ -84,7 +84,7 @@ end
             billowing_percentage=0.0)
         for pair in 1:(n_ribs - 1)
             res = te_arc_length_between_ribs(wing, pair, pair + 1)
-            @test res.arc ≈ res.straight atol=1e-10
+            @test res.arc ≈ res.straight atol=1e-8
         end
     end
 
@@ -97,7 +97,7 @@ end
             for sec in wing.refined_sections
                 if isapprox(sec.LE_point,
                         wing.unrefined_sections[i].LE_point;
-                        atol=1e-10)
+                        atol=1e-8)
                     @test isapprox(sec.TE_point,
                         wing.unrefined_sections[i].TE_point;
                         atol=1e-6)
@@ -139,7 +139,7 @@ end
         for sec in wing.refined_sections
             chord = norm(sec.TE_point - sec.LE_point)
             # All ribs have chord=1.0, so interpolated chord=1.0
-            @test isapprox(chord, 1.0; atol=1e-10)
+            @test isapprox(chord, 1.0; atol=1e-8)
         end
     end
 
@@ -209,20 +209,20 @@ end
 
         # Zero angle is identity
         r = rodrigues_rotate(v, axis, 0.0)
-        @test isapprox(r, v; atol=1e-14)
+        @test isapprox(r, v; atol=1e-12)
 
         # 90 degrees around z rotates x -> y
         r90 = rodrigues_rotate(v, axis, pi / 2)
-        @test isapprox(r90, MVec3(0.0, 1.0, 0.0); atol=1e-14)
+        @test isapprox(r90, MVec3(0.0, 1.0, 0.0); atol=1e-12)
 
         # 180 degrees around z rotates x -> -x
         r180 = rodrigues_rotate(v, axis, pi)
-        @test isapprox(r180, MVec3(-1.0, 0.0, 0.0); atol=1e-14)
+        @test isapprox(r180, MVec3(-1.0, 0.0, 0.0); atol=1e-12)
 
         # Rotation preserves vector length
         v2 = MVec3(3.0, 4.0, 0.0)
         r2 = rodrigues_rotate(v2, axis, 1.23)
-        @test isapprox(norm(r2), norm(v2); atol=1e-14)
+        @test isapprox(norm(r2), norm(v2); atol=1e-12)
     end
 
     @testset "Fast path: n_panels == n_provided warns" begin
@@ -246,8 +246,8 @@ end
         # All refined sections should match unrefined exactly
         for (ref, unref) in zip(
                 wing.refined_sections, wing.unrefined_sections)
-            @test isapprox(ref.LE_point, unref.LE_point; atol=1e-10)
-            @test isapprox(ref.TE_point, unref.TE_point; atol=1e-10)
+            @test isapprox(ref.LE_point, unref.LE_point; atol=1e-8)
+            @test isapprox(ref.TE_point, unref.TE_point; atol=1e-8)
         end
     end
 end

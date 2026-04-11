@@ -780,6 +780,7 @@ Plot polar data comparing different solvers using Makie.
 - `is_save`: Whether to save (default: true)
 - `is_show`: Whether to display (default: true)
 - `use_tex`: Ignored for Makie (default: false)
+- `cl_over_cd`: Plot CL/CD vs angle instead of CL vs CD (default: true)
 """
 function VortexStepMethod.plot_polars(
     solver_list,
@@ -1025,6 +1026,8 @@ Create combined multi-panel figure with geometry, polar data, distributions, and
 - `data_type`: File extension (default: ".png", also supports ".jpeg")
 - `save_path`: Directory path to save files (default: nothing)
 - `is_save`: Save plots to files (default: false)
+- `cl_over_cd`: Plot CL/CD vs angle instead of CL vs CD (default: true)
+- `angle_of_attack_for_spanwise_distribution`: AoA for spanwise plots (default: 5.0)
 """
 function VortexStepMethod.plot_combined_analysis(
     solver,

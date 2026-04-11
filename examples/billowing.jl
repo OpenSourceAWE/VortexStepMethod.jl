@@ -23,7 +23,7 @@ literature_paths = [
     joinpath(lit_dir, "windtunnel_alpha_sweep_beta_00_0_Poland_2025_Rey_5e5.csv"),
 ]
 
-# Load solver settings (coarse: 36 panels, matches 10-section geometry)
+# Load solver settings (coarse: 54 panels, matches 10-section geometry)
 settings_data = VortexStepMethod.YAML.load_file(
     joinpath(v3_dir, "vsm_settings_coarse.yaml"))
 condition_cfg = settings_data["condition"]

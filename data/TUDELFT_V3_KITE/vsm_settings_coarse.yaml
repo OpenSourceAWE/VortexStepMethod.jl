@@ -17,9 +17,9 @@
 # PANEL DISTRIBUTIONS:
 #   LINEAR:             Uniform panel spacing along wingspan
 #   COSINE:             Cosine clustering (more panels at tips)
-#   COSINE_VAN_GARREL:  Van Garrel's modified cosine distribution
 #   SPLIT_PROVIDED:     Use predefined section splits from geometry
 #   UNCHANGED:          Preserve original geometry discretization
+#   BILLOWING:          Split provided + sinusoidal TE billowing
 #
 # INITIAL CIRCULATION DISTRIBUTIONS:
 #   ELLIPTIC:           Elliptical distribution (optimal for efficiency)
@@ -44,7 +44,7 @@ condition:
 # Define wing geometry files and discretization parameters
 wings:
   - name: V3_Kite # Wing identifier for output labeling
-    geometry_file: data/v3/aero_geometry.yaml
+    geometry_file: data/TUDELFT_V3_KITE/aero_geometry.yaml
     n_panels: 54 # Total number of panels along wingspan
     spanwise_panel_distribution: SPLIT_PROVIDED # Panel spacing algorithm
     spanwise_direction: [0.0, 1.0, 0.0] # Unit vector defining wingspan direction
