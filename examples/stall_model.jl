@@ -1,3 +1,6 @@
+using Pkg
+Pkg.activate(@__DIR__)
+
 using GLMakie
 using LinearAlgebra
 using VortexStepMethod
