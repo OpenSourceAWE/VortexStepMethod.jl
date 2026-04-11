@@ -40,7 +40,7 @@ export FAILURE, FEASIBLE, INFEASIBLE, SolverStatus
 export LOOP, NONLIN, SolverType
 export load_polar_data
 
-export plot_combined_analysis, plot_circulation_distribution, plot_distribution, plot_geometry,
+export plot_circulation_distribution, plot_combined_analysis, plot_distribution, plot_geometry,
     plot_polar_data, plot_polars, save_plot, show_plot
 
 # the following functions are defined in ext/VortexStepMethodExt.jl
