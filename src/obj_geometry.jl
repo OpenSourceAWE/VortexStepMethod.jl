@@ -528,9 +528,9 @@ function ObjWing(
     # Load or create polars
     (!endswith(dat_path, ".dat")) && (dat_path *= ".dat")
     (!isfile(dat_path)) && error("DAT file not found: $dat_path")
-    cl_polar_path = dat_path[1:end-4] * "_cl_polar.csv"
-    cd_polar_path = dat_path[1:end-4] * "_cd_polar.csv"
-    cm_polar_path = dat_path[1:end-4] * "_cm_polar.csv"
+    cl_polar_path = string(dat_path[1:end-4], "_cl_polar.csv")
+    cd_polar_path = string(dat_path[1:end-4], "_cd_polar.csv")
+    cm_polar_path = string(dat_path[1:end-4], "_cm_polar.csv")
 
     (!endswith(obj_path, ".obj")) && (obj_path *= ".obj")
     (!isfile(obj_path)) && error("OBJ file not found: $obj_path")
@@ -557,9 +557,9 @@ function ObjWing(
                 area, width, crease_frac, alpha_range, delta_range, remove_nan)
         end
 
-        cl_matrix, _, _ = read_aero_matrix(cl_polar_path)
-        cd_matrix, _, _ = read_aero_matrix(cd_polar_path)
-        cm_matrix, alpha_range, delta_range = read_aero_matrix(cm_polar_path)
+        cl_matrix, _, _ = read_aero_matrix(String(cl_polar_path))
+        cd_matrix, _, _ = read_aero_matrix(String(cd_polar_path))
+        cm_matrix, alpha_range, delta_range = read_aero_matrix(String(cm_polar_path))
 
         if remove_nan
             any(isnan.(cl_matrix)) && interpolate_matrix_nans!(cl_matrix; prn)
