@@ -1,16 +1,44 @@
-#!/bin/bash
-if [[ $(basename $(pwd)) == "bin" ]]; then
+#!/bin/bash -eu
+
+_yes_to_all=false
+
+print_usage() {
+    echo "Usage:"
+    echo "./bin/install"
+    echo "./bin/install -y"
+    echo "./bin/install --yes"
+    echo "./bin/install -h"
+    echo "./bin/install --help"
+}
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -h|--help)
+            print_usage
+            exit 0
+            ;;
+        -y|--yes)
+            _yes_to_all=true
+            shift
+            ;;
+        *)
+            echo "Invalid parameter: $1"
+            print_usage
+            exit 1
+            ;;
+    esac
+done
+
+if [[ $(basename "$(pwd)") == "bin" ]]; then
     cd ..
 fi
 
-# check if juliaup is installed
 if ! command -v juliaup &> /dev/null; then
     echo "Please install the Julia installer 'juliaup'!"
     echo "See: https://github.com/JuliaLang/juliaup"
     exit 1
 fi
 
-# if Julia is not installed, install Julia 1.11
 if ! command -v julia &> /dev/null; then
     echo "The command 'julia' was not found."
     echo "Installing Julia 1.11!"
@@ -18,11 +46,190 @@ if ! command -v julia &> /dev/null; then
     juliaup default 1.11
 fi
 
+if juliaup status 2>/dev/null | grep '^\s*\*' | grep -q '1\.12'; then
+    _default_choice=2
+    _default_julia="1.12"
+else
+    _default_choice=1
+    _default_julia="1.11"
+fi
+
+if [[ $_yes_to_all == true ]]; then
+    _julia_choice=""
+    echo "Using Julia version: ${_default_julia}"
+else
+    echo "Which Julia version do you want to use?"
+    echo "  1) Julia 1.11"
+    echo "  2) Julia 1.12"
+    read -rp "Enter 1 or 2 [default: ${_default_choice}]: " _julia_choice
+fi
+
+case "${_julia_choice}" in
+    1)
+        _desired_julia="1.11"
+        ;;
+    2)
+        _desired_julia="1.12"
+        ;;
+    "")
+        _desired_julia="${_default_julia}"
+        ;;
+    *)
+        echo "Invalid choice: '${_julia_choice}'. Please enter 1 or 2."
+        exit 1
+        ;;
+esac
+
+echo "Installing and activating Julia ${_desired_julia}..."
+juliaup add "${_desired_julia}"
+juliaup default "${_desired_julia}"
+
+_julia_cmd="julia +${_desired_julia}"
+_julia_version=$($_julia_cmd --version | awk '{print $3}')
+_julia_major=${_julia_version:0:4}
+if [[ $_julia_major != "1.11" ]] && [[ $_julia_major != "1.12" ]]; then
+    echo "Error: Julia ${_julia_major} is not supported. Only 1.11 and 1.12 are supported."
+    exit 1
+fi
+
 export JULIA_PKG_SERVER_REGISTRY_PREFERENCE=eager
 
-julia -e 'using Pkg; Pkg.add("ControlPlots")'
+MAIN_MANIFEST="Manifest-v${_julia_major}.toml"
+MAIN_DEFAULT="Manifest-v${_julia_major}.toml.default"
 
-julia --project -e 'include("bin/install.jl")'
+FIRST_TRY_OK=()
+RETRIED_OK=()
+FAILED=()
 
-# TODO rename Manifest.toml to Manifest-v1.11.toml if required
+track_result() {
+    local _label="$1"
+    local _status="$2"
+    if [[ $_status == "first" ]]; then
+        FIRST_TRY_OK+=("$_label")
+    elif [[ $_status == "retry" ]]; then
+        RETRIED_OK+=("$_label")
+    else
+        FAILED+=("$_label")
+    fi
+}
+
+cleanup_manifest_files() {
+    local _dir="$1"
+    rm -f "${_dir}/Manifest.toml" "${_dir}/Manifest-v1.11.toml" "${_dir}/Manifest-v1.12.toml"
+}
+
+rename_manifest_if_needed() {
+    local _dir="$1"
+    if [[ -f "${_dir}/Manifest.toml" ]]; then
+        mv "${_dir}/Manifest.toml" "${_dir}/Manifest-v${_julia_major}.toml"
+    fi
+}
+
+instantiate_with_fallback() {
+    local _project="$1"
+    local _label="$2"
+
+    if $_julia_cmd --project="${_project}" -e 'using Pkg; Pkg.resolve(); Pkg.instantiate()'; then
+        rename_manifest_if_needed "${_project}"
+        track_result "${_label}" "first"
+        return 0
+    fi
+
+    echo "First instantiate attempt failed for ${_label}, retrying with clean manifest..."
+    cleanup_manifest_files "${_project}"
+
+    if $_julia_cmd --project="${_project}" -e 'using Pkg; Pkg.resolve(); Pkg.instantiate()'; then
+        rename_manifest_if_needed "${_project}"
+        track_result "${_label}" "retry"
+        return 0
+    fi
+
+    track_result "${_label}" "failed"
+    return 1
+}
+
+instantiate_main_with_fallback() {
+    local _project="$1"
+    local _label="$2"
+
+    if $_julia_cmd --project="${_project}" -e 'using Pkg; Pkg.instantiate()'; then
+        rename_manifest_if_needed "${_project}"
+        track_result "${_label}" "first"
+        return 0
+    fi
+
+    echo "First instantiate attempt failed for ${_label}, retrying with clean manifest..."
+    cleanup_manifest_files "${_project}"
+
+    if $_julia_cmd --project="${_project}" -e 'using Pkg; Pkg.resolve(); Pkg.instantiate()'; then
+        rename_manifest_if_needed "${_project}"
+        track_result "${_label}" "retry"
+        return 0
+    fi
+
+    track_result "${_label}" "failed"
+    return 1
+}
+
+echo
+echo "Preparing main manifest for Julia ${_julia_major}..."
+
+if [[ $_julia_major == "1.11" ]]; then
+    if [[ -f "${MAIN_DEFAULT}" ]]; then
+        cp "${MAIN_DEFAULT}" "${MAIN_MANIFEST}"
+        echo "Copied ${MAIN_DEFAULT} to ${MAIN_MANIFEST}"
+    else
+        echo "Error: ${MAIN_DEFAULT} not found"
+        exit 1
+    fi
+else
+    echo "Julia 1.12 selected: not copying default manifest by request."
+fi
+
+if ! instantiate_main_with_fallback "." "main"; then
+    echo "Error: could not instantiate main project."
+    exit 1
+fi
+
+SUBPROJECTS=("examples" "test" "docs" "scripts")
+
+echo
+echo "Instantiating sub-projects..."
+for _sub in "${SUBPROJECTS[@]}"; do
+    _sub_manifest="${_sub}/Manifest-v${_julia_major}.toml"
+
+    if [[ $_julia_major == "1.11" ]]; then
+        cp "${MAIN_MANIFEST}" "${_sub_manifest}"
+    fi
+
+    if ! instantiate_with_fallback "${_sub}" "${_sub}"; then
+        echo "Error: could not instantiate sub-project '${_sub}'."
+        exit 1
+    fi
+done
+
+echo
+if [[ ${#FAILED[@]} -eq 0 && ${#RETRIED_OK[@]} -eq 0 ]]; then
+    echo "Instantiate report: all projects worked on first try."
+elif [[ ${#FAILED[@]} -eq 0 ]]; then
+    echo "Instantiate report: all projects completed, but clean retry was required for:"
+    for _item in "${RETRIED_OK[@]}"; do
+        echo "  - ${_item}"
+    done
+    if [[ ${#FIRST_TRY_OK[@]} -gt 0 ]]; then
+        echo "Worked on first try for:"
+        for _item in "${FIRST_TRY_OK[@]}"; do
+            echo "  - ${_item}"
+        done
+    fi
+else
+    echo "Instantiate report: failed projects:"
+    for _item in "${FAILED[@]}"; do
+        echo "  - ${_item}"
+    done
+    exit 1
+fi
+
+echo
+echo "Installation complete."
 
