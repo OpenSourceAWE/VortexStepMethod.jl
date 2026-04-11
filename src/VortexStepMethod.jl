@@ -12,7 +12,7 @@ using LaTeXStrings
 using NonlinearSolve
 import NonlinearSolve: solve!, solve
 using Interpolations
-using Interpolations: Extrapolation
+import Interpolations: Extrapolation
 using Parameters
 using Serialization
 using Timers
@@ -22,11 +22,12 @@ using Pkg
 using DifferentiationInterface
 import SciMLBase: successful_retcode
 import YAML
+using StructMapping
 using Xfoil
 
 # Export public interface
-export VSMSettings, WingSettings, SolverSettings, vs
-export Wing, Section, RamAirWing, reinit!
+export VSMSettings, WingSettings, SolverSettings
+export Wing, Section, ObjWing, reinit!, refine!
 export BodyAerodynamics
 export Solver, solve, solve_base!, solve!, VSMSolution, linearize
 export calculate_results
@@ -35,22 +36,24 @@ export calculate_span, calculate_projected_area
 export MVec3
 export Model, VSM, LLT
 export AeroModel, LEI_AIRFOIL_BREUKELS, POLAR_VECTORS, POLAR_MATRICES, INVISCID
-export PanelDistribution, LINEAR, COSINE, COSINE_VAN_GARREL, SPLIT_PROVIDED, UNCHANGED
+export PanelDistribution, LINEAR, COSINE, SPLIT_PROVIDED, UNCHANGED
 export InitialGammaDistribution, ELLIPTIC, ZEROS
 export SolverStatus, FEASIBLE, INFEASIBLE, FAILURE
 export SolverType, LOOP, NONLIN
+export load_polar_data
 
-export plot_geometry, plot_distribution, plot_circulation_distribution, plot_geometry, plot_polars, save_plot, show_plot, plot_polar_data
+export plot_geometry, plot_distribution, plot_circulation_distribution, plot_polars,
+        save_plot, show_plot, plot_polar_data, plot_combined_analysis
 
 # the following functions are defined in ext/VortexStepMethodExt.jl
 function plot_geometry end
 function plot_distribution end
 function plot_circulation_distribution end
-function plot_geometry end
 function plot_polars end
 function save_plot end
 function show_plot end
 function plot_polar_data end
+function plot_combined_analysis end
 
 """
    const MVec3    = MVector{3, Float64}
@@ -118,23 +121,21 @@ where `alpha` is the angle of attack, `delta` is trailing edge angle.
 end
 
 """
-   PanelDistribution `LINEAR` `COSINE` `COSINE_VAN_GARREL` `SPLIT_PROVIDED` `UNCHANGED`
+   PanelDistribution `LINEAR` `COSINE` `SPLIT_PROVIDED` `UNCHANGED`
 
 Enumeration of the implemented panel distributions.
 
 # Elements
 - LINEAR               # Linear distribution
 - COSINE               # Cosine distribution
-- `COSINE_VAN_GARREL`  # van Garrel cosine distribution
 - `SPLIT_PROVIDED`     # Split provided sections
-- UNCHANGED            # Keep original sections
+- `UNCHANGED`          # 1:1 copy of unrefined to refined sections (no interpolation)
 """
 @enum PanelDistribution begin
    LINEAR             # Linear distribution
    COSINE             # Cosine distribution
-   COSINE_VAN_GARREL  # van Garrel cosine distribution
    SPLIT_PROVIDED     # Split provided sections
-   UNCHANGED          # Keep original sections
+   UNCHANGED          # 1:1 copy of unrefined to refined sections
 end
 
 """
@@ -202,7 +203,9 @@ const AeroData = Union{
     }
 
 function menu()
-   Main.include("examples/menu.jl")
+   # Load the examples menu using a portable path
+   ex = joinpath(dirname(pathof(@__MODULE__)), "..", "examples", "menu.jl")
+   Base.include(Main, normpath(ex))
 end
 
 """
@@ -213,30 +216,23 @@ Copy all example scripts to the folder "examples"
 """
 function copy_examples()
     PATH = "examples"
-    if ! isdir(PATH) 
+    if ! isdir(PATH)
         mkdir(PATH)
     end
     src_path = joinpath(dirname(pathof(@__MODULE__)), "..", PATH)
-    copy_files("examples", readdir(src_path))
+    copy_files(PATH, readdir(src_path))
 end
 
 function install_examples(add_packages=true)
     copy_examples()
+    pkg_root = joinpath(dirname(pathof(@__MODULE__)), "..")
+    src = joinpath(pkg_root, "data")
+    isdir(src) && cp(src, "data"; force=true)
     if add_packages
-        if ! ("ControlPlots" ∈ keys(Pkg.project().dependencies))
-            Pkg.add("ControlPlots")
-        end
-        if ! ("LaTeXStrings" ∈ keys(Pkg.project().dependencies))
-            Pkg.add("LaTeXStrings")
-        end
-        if ! ("Xfoil" ∈ keys(Pkg.project().dependencies))
-            Pkg.add("Xfoil")
-        end
-        if ! ("CSV" ∈ keys(Pkg.project().dependencies))
-            Pkg.add("CSV")
-        end
-        if ! ("DataFrames" ∈ keys(Pkg.project().dependencies))
-            Pkg.add("DataFrames")
+        for pkg in ("GLMakie", "LaTeXStrings", "Xfoil", "CSV", "DataFrames")
+            if !(pkg ∈ keys(Pkg.project().dependencies))
+                Pkg.add(pkg)
+            end
         end
     end
 end
@@ -269,7 +265,8 @@ end
 include("settings.jl")
 include("wing_geometry.jl")
 include("polars.jl")
-include("ram_geometry.jl")
+include("obj_geometry.jl")
+include("yaml_geometry.jl")
 include("filament.jl")
 include("panel.jl")
 include("body_aerodynamics.jl")

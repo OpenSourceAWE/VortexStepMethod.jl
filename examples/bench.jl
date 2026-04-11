@@ -1,13 +1,7 @@
 using LinearAlgebra
-using ControlPlots
+using GLMakie
 using VortexStepMethod
 
-using Pkg
-
-if !("CSV" ∈ keys(Pkg.project().dependencies))
-    using TestEnv
-    TestEnv.activate()
-end
 
 # Step 1: Define wing parameters
 n_panels = 20          # Number of panels
@@ -30,6 +24,9 @@ add_section!(wing,
     [0.0, -span/2, 0.0],   # Right tip LE
     [chord, -span/2, 0.0], # Right tip TE
     INVISCID)
+
+# Refine mesh
+refine!(wing)
 
 # Step 3: Initialize aerodynamics
 body_aero = BodyAerodynamics([wing])
@@ -56,7 +53,11 @@ println("Rectangular wing, solve:")
 @time solve(vsm_solver, body_aero, nothing)
 
 # Create wing geometry
-wing = RamAirWing("data/ram_air_kite_body.obj", "data/ram_air_kite_foil.dat"; prn=false)
+wing = ObjWing(
+    joinpath("data", "ram_air_kite", "ram_air_kite_body.obj"),
+    joinpath("data", "ram_air_kite", "ram_air_kite_foil.dat");
+    prn=false
+)
 body_aero = BodyAerodynamics([wing])
 
 # Create solvers

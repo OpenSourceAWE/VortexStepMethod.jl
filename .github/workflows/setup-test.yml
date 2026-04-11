@@ -1,0 +1,25 @@
+name: Setup Test
+on:
+  pull_request:
+    branches:
+      - main
+    types: [opened, synchronize, reopened, ready_for_review]
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  setup-test:
+    name: Test end-user and developer setup
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: '1'
+      - uses: julia-actions/cache@v2
+      - name: Install xvfb for headless GLMakie
+        run: sudo apt-get update && sudo apt-get install -y xvfb
+      - name: Run setup tests
+        run: bash test/test_setup.sh

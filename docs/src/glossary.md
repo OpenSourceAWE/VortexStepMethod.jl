@@ -1,14 +1,15 @@
 |Term   |Explanation   |
 |:----|:---|
 | VSM | Vortex Step Method, an enhanced lifting line method that improves upon the classic approach by solving the circulation system at the three-quarter chord position, among the most important details.|
-| LLM | Lifting Line Method|
+| LLT | Lifting Line Theory|
 | AIC | Aerodynamic Influence Coefficient (AIC). The AIC matrix represents the relationship between the induced velocities or pressures on aerodynamic surfaces and the circulation strength or modal deformations of the lifting surfaces.|
 | inviscid | A fluid flow in which viscosity is considered negligible or zero. This means that there is no internal friction between the fluid layers, and the effects of viscosity on the flow are assumed to be insignificant. |
 | Panel | Flat surface element in 3D that approximate the contour of the aerodynamic body being studied.|
+| Unrefined Section | An original geometry section before mesh refinement. Panel forces are automatically aggregated back to unrefined sections for structural coupling.|
 | Section |A wing section, also known as an airfoil or aerofoil, is the cross-sectional shape of an aircraft wing.|
 | Span | Distance from one wing tip to the other wing tip. |
 | Polar | The polar typically plots the coefficient of lift (CL) against the coefficient of drag (CD), with the angle of attack as a parameter along the curve. |
-| Distribution  |Vector of scalars. Length: number of panels.|
+| Distribution  |Vector of scalars. `_dist` = per panel (length: number of panels), `_unrefined_dist` = per unrefined section.|
 | mu $\mu$ | Dynamic viscosity [N·s/m²]  |
 | alpha $\alpha$| Angle of attack [rad]|
 | beta $\beta$ | Elevation angle of the kite [rad]|
