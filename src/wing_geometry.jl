@@ -1120,9 +1120,8 @@ end
 
 Refine mesh by splitting provided sections into desired number of panels.
 
-When `billowing_percentage > 0`, applies sinusoidal TE displacement to
-intermediate sections within each rib pair (simulating fabric billowing
-between ribs).
+When `billowing_percentage > 0`, rotates chord vectors around the leading
+edge with a sinusoidal profile to simulate fabric billowing between ribs.
 """
 function refine_mesh_by_splitting_provided_sections!(
     wing::AbstractWing;
@@ -1147,26 +1146,13 @@ function refine_mesh_by_splitting_provided_sections!(
             end
         end
         if billowing_percentage > 0
-            LE = [s.LE_point for s in wing.unrefined_sections]
-            TE = [s.TE_point for s in wing.unrefined_sections]
-            for i in 1:(n_panels_provided - 1)
-                y_hat = normalize(LE[i] - LE[i + 1])
-                span_len = norm(LE[i] - LE[i + 1])
-                start_si = i + 1
-                end_si = i + 1
-                if start_si <= end_si
-                    apply_billowing_to_pair!(
-                        wing.refined_sections,
-                        start_si, end_si,
-                        y_hat, span_len,
-                        LE[i + 1], TE[i], TE[i + 1],
-                        billowing_percentage)
-                end
-            end
+            @warn "Billowing requested but n_panels == n_provided " *
+                "($n_panels_desired); no intermediate sections to " *
+                "billow. Increase n_panels to add sections between ribs."
         end
         return nothing
     end
-    
+
     # Validate panel count relationship
     if n_panels_desired % n_panels_provided != 0
         throw(ArgumentError(

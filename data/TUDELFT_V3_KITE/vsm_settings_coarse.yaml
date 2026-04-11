@@ -27,7 +27,7 @@
 #
 # SOLVER TYPES:
 #   LOOP:               Iterative fixed-point solver
-#   NEWTON:             Newton-Raphson nonlinear solver
+#   NONLIN:             Nonlinear solver
 #
 # USAGE NOTES:
 # - n_panels should be divisible by n_groups for proper load balancing
@@ -56,7 +56,7 @@ wings:
 solver_settings:
   # --- Core Aerodynamic Model ---
   aerodynamic_model_type: VSM # VSM=3D vortex method, LLT=lifting line theory
-  solver_type: LOOP # LOOP=fixed-point iteration, NEWTON=Newton-Raphson
+  solver_type: LOOP # LOOP=fixed-point iteration, NONLIN=nonlinear solver
   #correct_aoa: false               # Defaults to false, meaning the computed AoA at 3/4c is used
 
   # --- Physical Properties ---

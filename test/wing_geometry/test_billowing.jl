@@ -91,7 +91,6 @@ end
         wing = build_flat_wing(n_panels, n_ribs;
             billowing_percentage=10.0)
         for i in 1:n_ribs
-            y_target = 10.0 * (i - 1) / (n_ribs - 1)
             # Find the refined section matching this rib
             found = false
             for sec in wing.refined_sections
@@ -183,6 +182,71 @@ end
             y_hat, 2.5, le_ref, te_l, te_l, 10.0)
         for (i, sec) in enumerate(wing.refined_sections)
             @test sec.TE_point == orig[i]
+        end
+    end
+
+    @testset "percentage >= 100 throws ArgumentError" begin
+        using VortexStepMethod: apply_billowing_to_pair!, MVec3
+        wing = build_flat_wing(n_panels, n_ribs;
+            billowing_percentage=0.0)
+        y_hat = MVec3(0.0, -1.0, 0.0)
+        le_ref = MVec3(0.0, 2.5, 0.0)
+        te_l = MVec3(-1.0, 0.0, 0.0)
+        te_r = MVec3(-1.0, 2.5, 0.0)
+        @test_throws ArgumentError apply_billowing_to_pair!(
+            wing.refined_sections, 2, 8,
+            y_hat, 2.5, le_ref, te_l, te_r, 100.0)
+        @test_throws ArgumentError apply_billowing_to_pair!(
+            wing.refined_sections, 2, 8,
+            y_hat, 2.5, le_ref, te_l, te_r, 150.0)
+    end
+
+    @testset "rodrigues_rotate" begin
+        using VortexStepMethod: rodrigues_rotate, MVec3
+        v = MVec3(1.0, 0.0, 0.0)
+        axis = MVec3(0.0, 0.0, 1.0)
+
+        # Zero angle is identity
+        r = rodrigues_rotate(v, axis, 0.0)
+        @test isapprox(r, v; atol=1e-14)
+
+        # 90 degrees around z rotates x -> y
+        r90 = rodrigues_rotate(v, axis, pi / 2)
+        @test isapprox(r90, MVec3(0.0, 1.0, 0.0); atol=1e-14)
+
+        # 180 degrees around z rotates x -> -x
+        r180 = rodrigues_rotate(v, axis, pi)
+        @test isapprox(r180, MVec3(-1.0, 0.0, 0.0); atol=1e-14)
+
+        # Rotation preserves vector length
+        v2 = MVec3(3.0, 4.0, 0.0)
+        r2 = rodrigues_rotate(v2, axis, 1.23)
+        @test isapprox(norm(r2), norm(v2); atol=1e-14)
+    end
+
+    @testset "Fast path: n_panels == n_provided warns" begin
+        # When n_panels equals n_provided panels, every refined section
+        # is a rib — no intermediate sections to billow. Should warn.
+        n_ribs_fast = 5
+        n_panels_fast = n_ribs_fast - 1
+        wing = Wing(n_panels_fast;
+            spanwise_distribution=BILLOWING,
+            billowing_percentage=10.0)
+        span = 10.0
+        for i in 1:n_ribs_fast
+            y = span * (i - 1) / (n_ribs_fast - 1)
+            add_section!(wing,
+                [0.0, y, 0.0],
+                [-1.0, y, 0.0],
+                INVISCID)
+        end
+        @test_logs (:warn, r"no intermediate sections") refine!(wing)
+
+        # All refined sections should match unrefined exactly
+        for (ref, unref) in zip(
+                wing.refined_sections, wing.unrefined_sections)
+            @test isapprox(ref.LE_point, unref.LE_point; atol=1e-10)
+            @test isapprox(ref.TE_point, unref.TE_point; atol=1e-10)
         end
     end
 end
