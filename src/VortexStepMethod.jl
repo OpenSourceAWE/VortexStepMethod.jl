@@ -10,9 +10,9 @@ using DefaultApplication
 using Measures
 using LaTeXStrings
 using NonlinearSolve
-import NonlinearSolve: solve!, solve
+using SciMLBase
+import NonlinearSolve: solve, solve!
 using Interpolations
-import Interpolations: Extrapolation
 using Parameters
 using Serialization
 using Timers
@@ -20,30 +20,30 @@ using PreallocationTools
 using PrecompileTools
 using Pkg
 using DifferentiationInterface
-import SciMLBase: successful_retcode
 import YAML
 using StructMapping
 using Xfoil
 
 # Export public interface
-export VSMSettings, WingSettings, SolverSettings
-export Wing, Section, ObjWing, reinit!, refine!
+export SolverSettings, VSMSettings, WingSettings
+export ObjWing, Section, Wing, refine!, reinit!
 export BodyAerodynamics
-export Solver, solve, solve_base!, solve!, VSMSolution, linearize
+export Solver, VSMSolution, linearize, solve, solve!, solve_base!
 export calculate_results
 export add_section!, set_va!
-export calculate_span, calculate_projected_area
+export calculate_projected_area, calculate_span
 export MVec3
-export Model, VSM, LLT
-export AeroModel, LEI_AIRFOIL_BREUKELS, POLAR_VECTORS, POLAR_MATRICES, INVISCID
-export PanelDistribution, LINEAR, COSINE, SPLIT_PROVIDED, UNCHANGED, BILLOWING
-export InitialGammaDistribution, ELLIPTIC, ZEROS
-export SolverStatus, FEASIBLE, INFEASIBLE, FAILURE
-export SolverType, LOOP, NONLIN
+
+export LLT, Model, VSM
+export AeroModel, INVISCID, LEI_AIRFOIL_BREUKELS, POLAR_MATRICES, POLAR_VECTORS
+export BILLOWING, COSINE, LINEAR, PanelDistribution, SPLIT_PROVIDED, UNCHANGED
+export ELLIPTIC, InitialGammaDistribution, ZEROS
+export FAILURE, FEASIBLE, INFEASIBLE, SolverStatus
+export LOOP, NONLIN, SolverType
 export load_polar_data
 
-export plot_geometry, plot_distribution, plot_circulation_distribution, plot_polars,
-        save_plot, show_plot, plot_polar_data, plot_combined_analysis
+export plot_circulation_distribution, plot_combined_analysis, plot_distribution, plot_geometry,
+    plot_polar_data, plot_polars, save_plot, show_plot
 
 # the following functions are defined in ext/VortexStepMethodExt.jl
 function plot_geometry end
@@ -61,7 +61,7 @@ function plot_combined_analysis end
 Basic 3-dimensional vector, stack allocated, mutable.
 """
 const MVec3    = MVector{3, Float64}
-const MMat3    = MMatrix{3, 3, Float64}
+const MMat3    = MMatrix{3, 3, Float64, 9}
 
 """
    const PosVector=Union{MVec3, Vector}
@@ -204,9 +204,11 @@ const AeroData = Union{
         Tuple{Vector{Float64}, Vector{Float64}, Matrix{Float64}, Matrix{Float64}, Matrix{Float64}}
     }
 
+const PACKAGE_ROOT = normpath(joinpath(@__DIR__, ".."))
+
 function menu()
    # Load the examples menu using a portable path
-   ex = joinpath(dirname(pathof(@__MODULE__)), "..", "examples", "menu.jl")
+    ex = joinpath(PACKAGE_ROOT, "examples", "menu.jl")
    Base.include(Main, normpath(ex))
 end
 
@@ -221,13 +223,13 @@ function copy_examples()
     if ! isdir(PATH)
         mkdir(PATH)
     end
-    src_path = joinpath(dirname(pathof(@__MODULE__)), "..", PATH)
+    src_path = joinpath(PACKAGE_ROOT, PATH)
     copy_files(PATH, readdir(src_path))
 end
 
 function install_examples(add_packages=true)
     copy_examples()
-    pkg_root = joinpath(dirname(pathof(@__MODULE__)), "..")
+    pkg_root = PACKAGE_ROOT
     src = joinpath(pkg_root, "data")
     isdir(src) && cp(src, "data"; force=true)
     if add_packages
@@ -243,7 +245,7 @@ function copy_files(relpath, files)
     if ! isdir(relpath) 
         mkdir(relpath)
     end
-    src_path = joinpath(dirname(pathof(@__MODULE__)), "..", relpath)
+    src_path = joinpath(PACKAGE_ROOT, relpath)
     for file in files
         cp(joinpath(src_path, file), joinpath(relpath, file), force=true)
         chmod(joinpath(relpath, file), 0o774)
@@ -256,7 +258,7 @@ function help(url)
         io = IOBuffer()
         run(pipeline(`xdg-open $url`, stderr = io))
         # ignore any error messages
-        out_data = String(take!(io)) 
+        _ = take!(io)
     else
         DefaultApplication.open(url)
     end

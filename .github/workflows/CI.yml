@@ -40,12 +40,12 @@ jobs:
             version: 1
             build_is_production_build: true
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: julia-actions/setup-julia@v2
         with:
           version: ${{ matrix.version }}
           arch: ${{ matrix.arch }}
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         env:
           cache-name: cache-artifacts
         with:
@@ -63,7 +63,7 @@ jobs:
           coverage: false
   test-with-code-coverage:
     name: Julia ${{ matrix.julia_version }} - ${{ matrix.os }} - ${{ matrix.julia_arch }} - with code coverage
-    timeout-minutes: 20
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -76,7 +76,7 @@ jobs:
           - ubuntu-latest
     runs-on: ${{ matrix.os }}
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - uses: julia-actions/setup-julia@v2
       with:
         arch: ${{ matrix.julia_arch }}
@@ -104,9 +104,9 @@ jobs:
   docs:
     name: Documentation
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: julia-actions/setup-julia@v2
       - uses: julia-actions/cache@v2
       - uses: julia-actions/julia-buildpkg@v1

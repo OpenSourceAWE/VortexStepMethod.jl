@@ -42,7 +42,8 @@ polar_file = test_data_path("yaml_geometry", "polars", "standard_airfoil.csv")
 body_aero_wing = test_data_path("body_aerodynamics", "wings", "test_wing.yaml")
 ```
 """
-test_data_path(module_name, relative_path...) = joinpath(@__DIR__, module_name, relative_path...)
+test_data_path(module_name, relative_path...) =
+    joinpath(@__DIR__, string(module_name), map(string, relative_path)...)
 
 """
     create_temp_wing_settings(module_name, wing_file; kwargs...)

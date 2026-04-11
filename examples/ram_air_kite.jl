@@ -1,3 +1,6 @@
+using Pkg
+Pkg.activate(@__DIR__)
+
 using GLMakie
 using VortexStepMethod
 using LinearAlgebra
@@ -6,7 +9,7 @@ PLOT = true
 PRN = true
 USE_TEX = false
 DEFORM = true
-LINEARIZE = false
+const LINEARIZE = false
 
 # Create wing geometry
 wing = ObjWing(
@@ -70,7 +73,7 @@ end
 # Solving
 println("Solve")
 results = VortexStepMethod.solve(solver, body_aero; log=true)
-@time results = solve(solver, body_aero; log=true)
+@time VortexStepMethod.solve(solver, body_aero; log=true)
 
 body_y_coordinates = [panel.aero_center[2] for panel in body_aero.panels]
 

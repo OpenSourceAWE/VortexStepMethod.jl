@@ -1,3 +1,6 @@
+using Pkg
+Pkg.activate(@__DIR__)
+
 using LinearAlgebra
 using VortexStepMethod
 using GLMakie
@@ -7,7 +10,7 @@ PLOT = true
 USE_TEX = false
 DEFORM = false
 
-project_dir = dirname(dirname(pathof(VortexStepMethod)))  # Go up one level from src to project root#
+project_dir = dirname(@__DIR__)
 literature_paths = [
     joinpath(project_dir, "data", "TUDELFT_V3_KITE", "literature_results", "CFD_RANS_Rey_5e5_Poland2025_alpha_sweep_beta_0_NoStruts.csv"),
     joinpath(project_dir, "data", "TUDELFT_V3_KITE", "literature_results", "CFD_RANS_Rey_10e5_Poland2025_alpha_sweep_beta_0.csv"),
@@ -117,8 +120,8 @@ isinteractive() && wait(scr1)
 
 # Polar sweep including force and moment coefficients, with selectable solve or solve! path
 function compute_polar_input(
-    solver,
-    body_aero,
+    solver::VortexStepMethod.Solver,
+    body_aero::VortexStepMethod.BodyAerodynamics,
     angle_range;
     angle_type::String="angle_of_attack",
     angle_of_attack::Float64=0.0,
@@ -160,14 +163,12 @@ function compute_polar_input(
                 solver.lr.gamma_new,
                 solver.reference_point,
                 solver.density,
-                solver.aerodynamic_model_type,
                 solver.core_radius_fraction,
                 solver.mu,
                 solver.lr.alpha_dist,
                 solver.lr.v_a_dist,
                 solver.sol._chord_dist,
                 solver.sol._x_airf_dist,
-                solver.sol._y_airf_dist,
                 solver.sol._z_airf_dist,
                 solver.sol._va_dist,
                 solver.br.va_norm_dist,
@@ -191,9 +192,9 @@ function compute_polar_input(
 end
 
 function plot_polars(
-    solver_list,
-    body_aero_list,
-    label_list;
+    solver_list::AbstractVector{<:VortexStepMethod.Solver},
+    body_aero_list::AbstractVector{<:VortexStepMethod.BodyAerodynamics},
+    label_list::AbstractVector{<:AbstractString};
     literature_path_list::Vector{String}=String[],
     angle_range=range(-10, 40, step=1),
     angle_type::String="angle_of_attack",
@@ -232,7 +233,8 @@ function plot_polars(
 
     # Literature cases
     for (path, lbl) in zip(literature_path_list, label_list[length(solver_list)+1:end])
-        data = readdlm(path, ',')
+        data_raw = readdlm(path, ',')
+        data = data_raw isa Tuple ? data_raw[1] : data_raw
         header_raw = string.(data[1, :])
         header = lowercase.(strip.(header_raw))
         angle_idx = if angle_type == "angle_of_attack"

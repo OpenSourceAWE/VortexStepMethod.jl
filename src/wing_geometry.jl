@@ -56,16 +56,13 @@ function reinit!(section::Section, LE_point, TE_point, aero_model=nothing, aero_
 end
 
 function reinit!(refined_section::Section, section::Section)
-    refined_section.LE_point .= section.LE_point
-    refined_section.TE_point .= section.TE_point
-    refined_section.aero_model = section.aero_model
-    if isnothing(refined_section.aero_data)
-        refined_section.aero_data = section.aero_data
-    else
-        for i in eachindex(section.aero_data)
-            copyto!(refined_section.aero_data[i], section.aero_data[i])
-        end
-    end
+    reinit!(
+        refined_section,
+        section.LE_point,
+        section.TE_point,
+        section.aero_model,
+        section.aero_data,
+    )
 end
 
 """
@@ -222,11 +219,11 @@ Represents a wing composed of multiple sections with aerodynamic properties.
 - `cache::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}}`: Preallocated buffers
 
 """
-mutable struct Wing <: AbstractWing
+mutable struct Wing{P} <: AbstractWing
     n_panels::Int16
     n_unrefined_sections::Int16
     spanwise_distribution::PanelDistribution
-    panel_props::PanelProperties
+    panel_props::PanelProperties{P}
     spanwise_direction::MVec3
     unrefined_sections::Vector{Section}
     refined_sections::Vector{Section}
@@ -249,10 +246,75 @@ mutable struct Wing <: AbstractWing
     T_cad_body::MVec3
     R_cad_body::MMat3
     radius::Float64
-    le_interp::Union{Nothing, NTuple{3, Extrapolation}}
-    te_interp::Union{Nothing, NTuple{3, Extrapolation}}
-    area_interp::Union{Nothing, Extrapolation}
+    le_interp::Union{Nothing, NTuple{3, Interpolations.Extrapolation}}
+    te_interp::Union{Nothing, NTuple{3, Interpolations.Extrapolation}}
+    area_interp::Union{Nothing, Interpolations.Extrapolation}
     cache::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}}
+end
+
+# Compatibility constructor for full positional initialization with integer panel counts.
+# This keeps call sites that pass Int values working after n_panels/n_unrefined_sections
+# were tightened to Int16 fields.
+function Wing(
+        n_panels::Integer,
+        n_unrefined_sections::Integer,
+        spanwise_distribution::PanelDistribution,
+        panel_props::PanelProperties{P},
+        spanwise_direction::MVec3,
+        unrefined_sections::Vector{Section},
+        refined_sections::Vector{Section},
+        remove_nan::Bool,
+        use_prior_polar::Bool,
+        billowing_percentage::Float64,
+        refined_panel_mapping::Vector{Int16},
+        non_deformed_sections::Vector{Section},
+        theta_dist::Vector{Float64},
+        delta_dist::Vector{Float64},
+        mass::Float64,
+        gamma_tip::Float64,
+        inertia_tensor::Matrix{Float64},
+        T_cad_body::MVec3,
+        R_cad_body::MMat3,
+        radius::Float64,
+        le_interp::Union{Nothing, NTuple{3, Interpolations.Extrapolation}},
+        te_interp::Union{Nothing, NTuple{3, Interpolations.Extrapolation}},
+        area_interp::Union{Nothing, Interpolations.Extrapolation},
+        cache::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}}
+    ) where {P}
+
+    n_panels_i16 = Int16(n_panels)
+    n_unrefined_sections_i16 = Int16(n_unrefined_sections)
+
+    Int(n_panels_i16) == P || throw(ArgumentError(
+        "n_panels ($n_panels) must match PanelProperties{$P}"
+    ))
+
+    return Wing{P}(
+        n_panels_i16,
+        n_unrefined_sections_i16,
+        spanwise_distribution,
+        panel_props,
+        spanwise_direction,
+        unrefined_sections,
+        refined_sections,
+        remove_nan,
+        use_prior_polar,
+        billowing_percentage,
+        refined_panel_mapping,
+        non_deformed_sections,
+        theta_dist,
+        delta_dist,
+        mass,
+        gamma_tip,
+        inertia_tensor,
+        T_cad_body,
+        R_cad_body,
+        radius,
+        le_interp,
+        te_interp,
+        area_interp,
+        cache
+    )
 end
 
 """
@@ -277,29 +339,31 @@ and refined sections as empty arrays. Creates a basic wing suitable for YAML-bas
 - `billowing_percentage::Float64`: TE billow as percentage of arc length (0=flat)
 """
 function Wing(n_panels::Int;
-        n_unrefined_sections=nothing,
+    n_unrefined_sections::Union{Nothing, Int}=nothing,
         spanwise_distribution::PanelDistribution=LINEAR,
         spanwise_direction::PosVector=MVec3([0.0, 1.0, 0.0]),
-        remove_nan=true,
-        use_prior_polar=false,
+        remove_nan::Bool=true,
+        use_prior_polar::Bool=false,
         billowing_percentage=0.0)
 
     # For YAML wings, n_unrefined_sections will be set when sections are added
     # Set to 0 as placeholder for now
-    n_unrefined_sections_value = isnothing(n_unrefined_sections) ? Int16(0) : Int16(n_unrefined_sections)
+    n_unrefined_sections_value::Int16 =
+        isnothing(n_unrefined_sections) ? Int16(0) : Int16(n_unrefined_sections)
 
-    panel_props = PanelProperties{n_panels}()
+    panel_props::PanelProperties{n_panels} = PanelProperties{n_panels}()
+    spanwise_direction_m::MVec3 = MVec3(spanwise_direction)
 
     # Initialize with default/empty values for optional fields
-    Wing(
-        n_panels, n_unrefined_sections_value, spanwise_distribution, panel_props, spanwise_direction,
+    Wing{n_panels}(
+        Int16(n_panels), n_unrefined_sections_value, spanwise_distribution, panel_props, spanwise_direction_m,
         Section[], Section[], remove_nan, use_prior_polar, Float64(billowing_percentage),
         # Grouping
         Int16[],
         # Deformation fields
         Section[], zeros(max(0, n_panels)), zeros(max(0, n_panels)),
         # Physical properties (defaults for non-OBJ wings)
-        0.0, 0.0, zeros(0, 0), zeros(MVec3), Matrix{Float64}(I, 3, 3),
+        0.0, 0.0, zeros(0, 0), zeros(MVec3), MMat3(I),
         0.0, nothing, nothing, nothing,
         PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}[]
     )
@@ -552,7 +616,7 @@ end
 
 Remove the indices from aero_data where a NaN is found.
 """
-function remove_vector_nans(aero_data)
+function remove_vector_nans(aero_data::NTuple{4,AbstractVector})
     alpha_range, cl_vector, cd_vector, cm_vector = aero_data
     alpha_range = collect(alpha_range)
     nan_indices = Set{Int}()
@@ -576,6 +640,25 @@ function remove_vector_nans(aero_data)
     return (clean_alpha, clean_cl, clean_cd, clean_cm)
 end
 
+@inline remove_vector_nans(::Nothing) = nothing
+@inline remove_vector_nans(::Tuple{Float64, Float64}) =
+    throw(ArgumentError("POLAR_VECTORS requires aero_data = (alpha, cl, cd, cm) vectors."))
+@inline remove_vector_nans(::Tuple{AbstractVector, AbstractVector, AbstractMatrix, AbstractMatrix, AbstractMatrix}) =
+    throw(ArgumentError("POLAR_VECTORS requires aero_data = (alpha, cl, cd, cm) vectors."))
+
+function interpolate_polar_matrix_nans!(
+    aero_data::Tuple{AbstractVector, AbstractVector, AbstractMatrix, AbstractMatrix, AbstractMatrix}
+)
+    interpolate_matrix_nans!.(aero_data[3:5])
+    return nothing
+end
+
+@inline interpolate_polar_matrix_nans!(::Nothing) = nothing
+@inline interpolate_polar_matrix_nans!(::Tuple{Float64, Float64}) =
+    throw(ArgumentError("POLAR_MATRICES requires aero_data = (alpha, delta, cl, cd, cm)."))
+@inline interpolate_polar_matrix_nans!(::NTuple{4,AbstractVector}) =
+    throw(ArgumentError("POLAR_MATRICES requires aero_data = (alpha, delta, cl, cd, cm)."))
+
 """
     add_section!(wing::Wing, LE_point::PosVector, TE_point::PosVector, 
                  aero_model, aero_data::AeroData=nothing)
@@ -594,7 +677,7 @@ function add_section!(wing::Wing, LE_point,
     if aero_model == POLAR_VECTORS && wing.remove_nan
         aero_data = remove_vector_nans(aero_data)
     elseif aero_model == POLAR_MATRICES && wing.remove_nan
-        interpolate_matrix_nans!.(aero_data[3:5])
+        interpolate_polar_matrix_nans!(aero_data)
     end
     push!(wing.unrefined_sections, Section(LE_point, TE_point, aero_model, aero_data))
     wing.n_unrefined_sections = Int16(length(wing.unrefined_sections))
@@ -1077,8 +1160,6 @@ function refine_mesh_for_linear_cosine_distribution!(
     new_quarter_chord = zeros(Float64, n_sections, 3)
     new_LE = zeros(Float64, n_sections, 3)
     new_TE = zeros(Float64, n_sections, 3)
-    new_sections = Section[]
-
     # 3. Calculate new points and interpolate
     for i in 1:n_sections
         target_length = target_lengths[i]
@@ -1261,7 +1342,6 @@ function refine_mesh_by_splitting_provided_sections!(
     else
         reinit!(wing.refined_sections[idx], wing.unrefined_sections[end])
     end
-    idx += 1
     
     # Validate result
     if length(wing.refined_sections) != wing.n_panels + 1

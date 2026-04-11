@@ -60,6 +60,14 @@ for f in menu.jl bench.jl rectangular_wing.jl V3_kite.jl \
     fi
 done
 
+# The copied examples activate their own project (@__DIR__), so ensure that
+# environment is fully resolved and linked to this checkout before execution.
+$JULIA --project=examples -e '
+    using Pkg
+    Pkg.develop(path="'"$REPO_ROOT"'")
+    Pkg.instantiate()
+' 2>&1 && pass "instantiated examples environment" || fail "instantiated examples environment"
+
 # Verify correct packages were added
 $JULIA --project=. -e '
     using Pkg
@@ -74,7 +82,7 @@ $JULIA --project=. -e '
 for f in rectangular_wing.jl pyramid_model.jl V3_kite.jl \
          stall_model.jl ram_air_kite.jl bench.jl; do
     echo "  Running $f..."
-    $JULIA --project=. -e '
+    $JULIA --project=examples -e '
         include("examples/'"$f"'")
     ' 2>&1 && pass "run $f" || fail "run $f"
 done
