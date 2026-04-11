@@ -579,11 +579,11 @@ function ObjWing(
         panel_props = PanelProperties{n_panels}()
         cache = [PreallocationTools.LazyBufferCache()]
 
-        wing = Wing(n_panels, Int16(n_unrefined_sections), spanwise_distribution, panel_props, MVec3(spanwise_direction),
+        wing = Wing(Int16(n_panels), Int16(n_unrefined_sections), spanwise_distribution, panel_props, MVec3(spanwise_direction),
             sections, Section[], remove_nan, use_prior_polar,  # refined_sections empty
             Int16[],  # refined_panel_mapping empty
             Section[], zeros(n_panels), zeros(n_panels),  # non_deformed, theta, delta
-            mass, gamma_tip, inertia_tensor, T_cad_body, R_cad_body, radius,
+            mass, gamma_tip, inertia_tensor, MVec3(T_cad_body), MMat3(R_cad_body), radius,
             le_interp, te_interp, area_interp, cache)
 
         # Auto-refine for backward compatibility
