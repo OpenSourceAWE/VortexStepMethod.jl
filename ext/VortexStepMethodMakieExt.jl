@@ -373,7 +373,7 @@ Create a 3D Makie plot of wing geometry including panels and filaments.
 function create_geometry_plot_makie(body_aero::BodyAerodynamics, title,
     view_elevation, view_azimuth; zoom=0.5)
     panels = body_aero.panels
-    va = isa(body_aero.va, Tuple) ? body_aero.va[1] : body_aero.va
+    va = getfield(body_aero, :_va)
 
     # Create figure
     fig = Figure(size=(1400, 1400))
@@ -1084,7 +1084,7 @@ function VortexStepMethod.plot_combined_analysis(
     # Use first body_aero for geometry and polar data display
     first_body = body_aeros[1]
     panels = first_body.panels
-    va = isa(first_body.va, Tuple) ? first_body.va[1] : first_body.va
+    va = getfield(first_body, :_va)
 
     # Compute spanwise results for each solver
     results_spanwise_list = copy(results_list)
@@ -1092,12 +1092,13 @@ function VortexStepMethod.plot_combined_analysis(
         α_span = deg2rad(angle_of_attack_for_spanwise_distribution)
         β_span = deg2rad(side_slip)
         for (i, (s, ba)) in enumerate(zip(solvers, body_aeros))
-            va_old = copy(ba.va)
+            va_old = copy(getfield(ba, :_va))
+            omega_old = copy(ba.omega)
             set_va!(ba, [cos(α_span) * cos(β_span), sin(β_span),
                 sin(α_span)] * v_a)
             results_spanwise_list[i] = solve(s, ba,
                 s.sol.gamma_distribution)
-            set_va!(ba, va_old)
+            set_va!(ba, va_old, omega_old)
         end
     end
 
