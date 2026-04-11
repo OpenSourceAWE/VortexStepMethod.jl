@@ -160,6 +160,67 @@ end
 end
 
 """
+    calculate_stall_angle_list(panels::Vector{Panel};
+                             begin_aoa=9.0,
+                             end_aoa=22.0,
+                             step_aoa=1.0,
+                             stall_angle_if_none_detected=50.0,
+                             cl_initial=-10.0)
+
+Calculate stall angles for each panel.
+
+Returns:
+    Vector{Float64}: Stall angles in radians
+"""
+function calculate_stall_angle_list(panels::Vector{Panel};
+                                  begin_aoa=9.0,
+                                  end_aoa=22.0,
+                                  step_aoa=1.0,
+                                  stall_angle_if_none_detected=50.0,
+                                  cl_initial=-10.0)
+    stall_angles = Vector{Float64}(undef, length(panels))
+    calculate_stall_angle_list!(stall_angles, panels;
+                                begin_aoa, end_aoa, step_aoa,
+                                stall_angle_if_none_detected, cl_initial)
+    return stall_angles
+end
+
+function calculate_stall_angle_list!(stall_angles::AbstractVector{Float64},
+                                     panels::Vector{Panel};
+                                     begin_aoa=9.0,
+                                     end_aoa=22.0,
+                                     step_aoa=1.0,
+                                     stall_angle_if_none_detected=50.0,
+                                     cl_initial=-10.0)
+
+    # Pre-compute range values to avoid allocation
+    n_steps = Int(floor((end_aoa - begin_aoa) / step_aoa)) + 1
+
+    for (idx, panel) in enumerate(panels)
+        # Default stall angle if none found
+        panel_stall = stall_angle_if_none_detected
+
+        # Start with minimum cl
+        cl_old = cl_initial
+
+        # Find stall angle
+        for i in 0:(n_steps-1)
+            aoa = deg2rad(begin_aoa + i * step_aoa)
+            cl = calculate_cl(panel, aoa)
+            if cl < cl_old
+                panel_stall = aoa
+                break
+            end
+            cl_old = cl
+        end
+
+        stall_angles[idx] = panel_stall
+    end
+
+    return nothing
+end
+
+"""
     reinit!(body_aero::BodyAerodynamics; init_aero, va, omega, refine_mesh, recompute_mapping, sort_sections)
 
 Initialize a BodyAerodynamics struct in-place by setting up panels and coefficients.
@@ -379,67 +440,6 @@ function calculate_circulation_distribution_elliptical_wing(gamma_i, body_aero::
     
     @debug "Calculated circulation distribution: $gamma_i"
     nothing
-end
-
-"""
-    calculate_stall_angle_list(panels::Vector{Panel};
-                             begin_aoa=9.0,
-                             end_aoa=22.0,
-                             step_aoa=1.0,
-                             stall_angle_if_none_detected=50.0,
-                             cl_initial=-10.0)
-
-Calculate stall angles for each panel.
-
-Returns:
-    Vector{Float64}: Stall angles in radians
-"""
-function calculate_stall_angle_list(panels::Vector{Panel};
-                                  begin_aoa=9.0,
-                                  end_aoa=22.0,
-                                  step_aoa=1.0,
-                                  stall_angle_if_none_detected=50.0,
-                                  cl_initial=-10.0)
-    stall_angles = Vector{Float64}(undef, length(panels))
-    calculate_stall_angle_list!(stall_angles, panels;
-                                begin_aoa, end_aoa, step_aoa,
-                                stall_angle_if_none_detected, cl_initial)
-    return stall_angles
-end
-
-function calculate_stall_angle_list!(stall_angles::AbstractVector{Float64},
-                                     panels::Vector{Panel};
-                                     begin_aoa=9.0,
-                                     end_aoa=22.0,
-                                     step_aoa=1.0,
-                                     stall_angle_if_none_detected=50.0,
-                                     cl_initial=-10.0)
-
-    # Pre-compute range values to avoid allocation
-    n_steps = Int(floor((end_aoa - begin_aoa) / step_aoa)) + 1
-
-    for (idx, panel) in enumerate(panels)
-        # Default stall angle if none found
-        panel_stall = stall_angle_if_none_detected
-
-        # Start with minimum cl
-        cl_old = cl_initial
-
-        # Find stall angle
-        for i in 0:(n_steps-1)
-            aoa = deg2rad(begin_aoa + i * step_aoa)
-            cl = calculate_cl(panel, aoa)
-            if cl < cl_old
-                panel_stall = aoa
-                break
-            end
-            cl_old = cl
-        end
-
-        stall_angles[idx] = panel_stall
-    end
-
-    return nothing
 end
 
 """

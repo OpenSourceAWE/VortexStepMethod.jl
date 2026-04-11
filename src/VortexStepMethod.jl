@@ -24,24 +24,24 @@ using StructMapping
 using Xfoil
 
 # Export public interface
-export VSMSettings, WingSettings, SolverSettings
-export Wing, Section, ObjWing, reinit!, refine!
+export SolverSettings, VSMSettings, WingSettings
+export ObjWing, Section, Wing, refine!, reinit!
 export BodyAerodynamics
-export Solver, solve, solve_base!, solve!, VSMSolution, linearize
+export Solver, VSMSolution, linearize, solve, solve!, solve_base!
 export calculate_results
 export add_section!, set_va!
-export calculate_span, calculate_projected_area
+export calculate_projected_area, calculate_span
 export MVec3
-export Model, VSM, LLT
-export AeroModel, LEI_AIRFOIL_BREUKELS, POLAR_VECTORS, POLAR_MATRICES, INVISCID
-export PanelDistribution, LINEAR, COSINE, SPLIT_PROVIDED, UNCHANGED
-export InitialGammaDistribution, ELLIPTIC, ZEROS
-export SolverStatus, FEASIBLE, INFEASIBLE, FAILURE
-export SolverType, LOOP, NONLIN
+export LLT, Model, VSM
+export AeroModel, INVISCID, LEI_AIRFOIL_BREUKELS, POLAR_MATRICES, POLAR_VECTORS
+export COSINE, LINEAR, PanelDistribution, SPLIT_PROVIDED, UNCHANGED
+export ELLIPTIC, InitialGammaDistribution, ZEROS
+export FAILURE, FEASIBLE, INFEASIBLE, SolverStatus
+export LOOP, NONLIN, SolverType
 export load_polar_data
 
-export plot_geometry, plot_distribution, plot_circulation_distribution, plot_polars,
-        save_plot, show_plot, plot_polar_data, plot_combined_analysis
+export plot_combined_analysis, plot_circulation_distribution, plot_distribution, plot_geometry,
+    plot_polar_data, plot_polars, save_plot, show_plot
 
 # the following functions are defined in ext/VortexStepMethodExt.jl
 function plot_geometry end
