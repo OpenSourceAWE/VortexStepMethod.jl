@@ -771,8 +771,6 @@ function gamma_loop!(
             )
             solver.nonlin_cache = nonlin_cache
         end
-        nonlin_cache = nonlin_cache::NonlinearSolveFirstOrder.GeneralizedFirstOrderAlgorithmCache
-        
         sol = NonlinearSolve.solve!(nonlin_cache)
         gamma .= sol.u
         solver.lr.gamma_new .= sol.u
