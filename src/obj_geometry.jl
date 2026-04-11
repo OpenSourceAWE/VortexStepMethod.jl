@@ -76,11 +76,11 @@ function find_circle_center_and_radius(vertices)
         end
     end
 
-    function r_diff!(du, u, p)
-        z = u[1]
+    function r_diff!(du, u, _)
+        z_local = u[1]
         r .= Inf
-        r[1] = sqrt(v_min[2]^2 + (v_min[3] - z)^2)
-        r[2] = sqrt(v_tip[2]^2 + (v_tip[3] - z)^2)
+        r[1] = sqrt(v_min[2]^2 + (v_min[3] - z_local)^2)
+        r[2] = sqrt(v_tip[2]^2 + (v_tip[3] - z_local)^2)
         du[1] = r[1] - r[2]
         return nothing
     end
@@ -88,12 +88,12 @@ function find_circle_center_and_radius(vertices)
     prob = NonlinearProblem(r_diff!, [v_min[3]-0.1], nothing)
     result = NonlinearSolve.solve(prob, NewtonRaphson(; autodiff=AutoFiniteDiff(; relstep = 1e-3, absstep = 1e-3)); abstol = 1e-2)
     r_diff!(zeros(1), result, nothing)
-    z = result[1]
+    z_center = result[1]
 
-    gamma_tip = atan(-v_tip[2], (v_tip[3] - z))
+    gamma_tip = atan(-v_tip[2], (v_tip[3] - z_center))
     @assert gamma_tip > 0.0
 
-    return z, r[1], gamma_tip
+    return z_center, r[1], gamma_tip
 end
 
 """

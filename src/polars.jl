@@ -186,19 +186,25 @@ function create_polars(; dat_path, cl_polar_path, cd_polar_path, cm_polar_path, 
     local reynolds_number = kite_speed * chord_length / KINEMATIC_VISCOSITY # https://en.wikipedia.org/wiki/Reynolds_number
 
     # Read airfoil coordinates from a file.
-    local x, y = open(dat_path, "r") do f
-        x = Float64[]
-        y = Float64[]
+    local x = Float64[]
+    local y = Float64[]
+    f = open(dat_path, "r")
+    try
         for line in eachline(f)
             entries = split(chomp(line))
             try
                 push!(x, parse(Float64, entries[1]))
                 push!(y, parse(Float64, entries[2]))
-            catch ArgumentError
-                println(entries)
+            catch err
+                if err isa ArgumentError
+                    println(entries)
+                else
+                    rethrow(err)
+                end
             end
         end
-        x, y
+    finally
+        close(f)
     end
     normalize_foil!(x, y)
     Xfoil.set_coordinates(x, y)
