@@ -666,6 +666,40 @@ end
 end
 
 """
+    copy_sections_to_refined!(wing; reuse_aero_data=false)
+
+Copy unrefined sections to refined sections 1:1 (no interpolation).
+If `refined_sections` is empty, allocates via `copy`; otherwise
+reinitialises in-place.  Warns if billowing was requested but there
+are no intermediate sections to billow.
+"""
+function copy_sections_to_refined!(
+    wing::AbstractWing; reuse_aero_data::Bool=false
+)
+    if wing.spanwise_distribution == BILLOWING &&
+            wing.billowing_percentage > 0
+        @warn "Billowing requested but n_panels " *
+            "($(wing.n_panels)) == n_provided; no " *
+            "intermediate sections to billow. " *
+            "Increase n_panels."
+    end
+    if length(wing.refined_sections) == 0
+        wing.refined_sections = copy(wing.unrefined_sections)
+    else
+        for (refined, unrefined) in zip(
+                wing.refined_sections, wing.unrefined_sections)
+            if reuse_aero_data
+                reinit!(refined, unrefined.LE_point,
+                    unrefined.TE_point, unrefined.aero_model)
+            else
+                reinit!(refined, unrefined)
+            end
+        end
+    end
+    return nothing
+end
+
+"""
     refine!(wing::AbstractWing; recompute_mapping=true, sort_sections=true)
 
 Refine the wing aerodynamic mesh from unrefined sections to refined sections.
@@ -728,14 +762,7 @@ function refine!(wing::AbstractWing; recompute_mapping=true, sort_sections=true)
     if length(wing.refined_sections) == 0
         if wing.spanwise_distribution == UNCHANGED ||
                length(wing.unrefined_sections) == n_sections
-            if wing.spanwise_distribution == BILLOWING &&
-                    wing.billowing_percentage > 0
-                @warn "Billowing requested but n_panels " *
-                    "($(wing.n_panels)) == n_provided; no " *
-                    "intermediate sections to billow. " *
-                    "Increase n_panels."
-            end
-            wing.refined_sections = copy(wing.unrefined_sections)
+            copy_sections_to_refined!(wing; reuse_aero_data)
             recompute_mapping && compute_refined_panel_mapping!(wing)
             update_non_deformed_sections!(wing)
             return nothing
@@ -765,22 +792,7 @@ function refine!(wing::AbstractWing; recompute_mapping=true, sort_sections=true)
     
     # Handle special cases
     if wing.spanwise_distribution == UNCHANGED || length(wing.unrefined_sections) == n_sections
-        for i in eachindex(wing.unrefined_sections)
-            if reuse_aero_data
-                section = wing.unrefined_sections[i]
-                reinit!(
-                    wing.refined_sections[i],
-                    section.LE_point,
-                    section.TE_point,
-                    section.aero_model
-                )
-            else
-                reinit!(wing.refined_sections[i], wing.unrefined_sections[i])
-            end
-        end
-        if wing.spanwise_distribution == BILLOWING && wing.billowing_percentage > 0
-            @warn "Billowing requested but n_panels ($(wing.n_panels)) == n_provided; no intermediate sections to billow. Increase n_panels."
-        end
+        copy_sections_to_refined!(wing; reuse_aero_data)
         recompute_mapping && compute_refined_panel_mapping!(wing)
         update_non_deformed_sections!(wing)
         return nothing
@@ -1146,15 +1158,7 @@ function refine_mesh_by_splitting_provided_sections!(
     
     # Check if refinement is needed
     if n_panels_provided == n_panels_desired
-        for (refined_section, section) in zip(
-                wing.refined_sections, wing.unrefined_sections)
-            if reuse_aero_data
-                reinit!(refined_section, section.LE_point,
-                    section.TE_point, section.aero_model)
-            else
-                reinit!(refined_section, section)
-            end
-        end
+        copy_sections_to_refined!(wing; reuse_aero_data)
         return nothing
     end
 
