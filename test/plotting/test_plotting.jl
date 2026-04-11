@@ -10,8 +10,8 @@ using VortexStepMethod
 using Test
 
 # Resolve repo data directory for ram air kite assets
-const _ram_data_dir = joinpath(dirname(dirname(@__DIR__)),
-                               "data", "ram_air_kite")
+_ram_data_dir = joinpath(dirname(dirname(@__DIR__)),
+                         "data", "ram_air_kite")
 
 # Helper to robustly delete files on platforms with occasional file locks
 safe_rm(path) = begin
