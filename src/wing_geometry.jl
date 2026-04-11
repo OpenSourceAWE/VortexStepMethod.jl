@@ -728,6 +728,13 @@ function refine!(wing::AbstractWing; recompute_mapping=true, sort_sections=true)
     if length(wing.refined_sections) == 0
         if wing.spanwise_distribution == UNCHANGED ||
                length(wing.unrefined_sections) == n_sections
+            if wing.spanwise_distribution == BILLOWING &&
+                    wing.billowing_percentage > 0
+                @warn "Billowing requested but n_panels " *
+                    "($(wing.n_panels)) == n_provided; no " *
+                    "intermediate sections to billow. " *
+                    "Increase n_panels."
+            end
             wing.refined_sections = copy(wing.unrefined_sections)
             recompute_mapping && compute_refined_panel_mapping!(wing)
             update_non_deformed_sections!(wing)
@@ -770,6 +777,9 @@ function refine!(wing::AbstractWing; recompute_mapping=true, sort_sections=true)
             else
                 reinit!(wing.refined_sections[i], wing.unrefined_sections[i])
             end
+        end
+        if wing.spanwise_distribution == BILLOWING && wing.billowing_percentage > 0
+            @warn "Billowing requested but n_panels ($(wing.n_panels)) == n_provided; no intermediate sections to billow. Increase n_panels."
         end
         recompute_mapping && compute_refined_panel_mapping!(wing)
         update_non_deformed_sections!(wing)
@@ -1144,11 +1154,6 @@ function refine_mesh_by_splitting_provided_sections!(
             else
                 reinit!(refined_section, section)
             end
-        end
-        if billowing_percentage > 0
-            @warn "Billowing requested but n_panels == n_provided " *
-                "($n_panels_desired); no intermediate sections to " *
-                "billow. Increase n_panels to add sections between ribs."
         end
         return nothing
     end

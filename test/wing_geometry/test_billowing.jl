@@ -1,4 +1,5 @@
 using Test
+using Logging
 using LinearAlgebra
 using VortexStepMethod
 using VortexStepMethod: Wing, Section, add_section!, refine!
@@ -240,7 +241,7 @@ end
                 [-1.0, y, 0.0],
                 INVISCID)
         end
-        @test_logs (:warn, r"no intermediate sections") refine!(wing)
+        @test_logs (:warn, r"no intermediate sections") min_level=Logging.Warn refine!(wing)
 
         # All refined sections should match unrefined exactly
         for (ref, unref) in zip(
