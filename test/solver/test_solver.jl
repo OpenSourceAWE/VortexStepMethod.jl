@@ -1,6 +1,9 @@
 using VortexStepMethod
 using LinearAlgebra
 using Test
+if !@isdefined(test_data_path)
+    include("../test_data_utils.jl")
+end
 
 @testset "Solver Constructor Tests" begin
     @testset "Solver Constructor with VSMSettings" begin

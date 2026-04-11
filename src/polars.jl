@@ -72,12 +72,9 @@ function solve_alpha!(cls, cds, cms, alpha_range, alpha_idxs, delta, re, x_, y_,
     y = deepcopy(y_)
     turn_trailing_edge!(delta, x, y, lower, upper, crease_frac)
     Xfoil.set_coordinates(x, y)
-    x, y = Xfoil.pane(npan=140)
+    Xfoil.pane(npan=140)
     reinit = true
     for (alpha, alpha_idx) in zip(alpha_range, alpha_idxs)
-        converged = false
-        cl = 0.0
-        cd = 0.0
         # Solve for the given angle of attack
         cl, cd, _, cm, converged = Xfoil.solve_alpha(rad2deg(alpha), re; iter=50, reinit=reinit, mach=kite_speed/speed_of_sound, xtrip=(0.05, 0.05))
         reinit = false
@@ -189,19 +186,25 @@ function create_polars(; dat_path, cl_polar_path, cd_polar_path, cm_polar_path, 
     local reynolds_number = kite_speed * chord_length / KINEMATIC_VISCOSITY # https://en.wikipedia.org/wiki/Reynolds_number
 
     # Read airfoil coordinates from a file.
-    local x, y = open(dat_path, "r") do f
-        x = Float64[]
-        y = Float64[]
+    local x = Float64[]
+    local y = Float64[]
+    f = open(dat_path, "r")
+    try
         for line in eachline(f)
             entries = split(chomp(line))
             try
                 push!(x, parse(Float64, entries[1]))
                 push!(y, parse(Float64, entries[2]))
-            catch ArgumentError
-                println(entries)
+            catch err
+                if err isa ArgumentError
+                    println(entries)
+                else
+                    rethrow(err)
+                end
             end
         end
-        x, y
+    finally
+        close(f)
     end
     normalize_foil!(x, y)
     Xfoil.set_coordinates(x, y)
@@ -308,23 +311,29 @@ The first row contains flap deflection angles, first column contains angles of a
 - `delta_range`: Vector of flap deflection angles in radians
 - `label`: Coefficient label for the header
 """
-function write_aero_matrix(filepath::String, matrix::Matrix{Float64}, 
+function write_aero_matrix(filepath::AbstractString, matrix::Matrix{Float64}, 
                          alpha_range::Vector{Float64}, delta_range::Vector{Float64},
-                         label::String)
-    open(filepath, "w") do io
+                         label::AbstractString)
+    open(String(filepath), "w") do io
         # Write header with delta values
-        println(io, "$label/delta," * join(["δ=$(round(rad2deg(δ), digits=1))°" for δ in delta_range], ","))
+        delta_labels = ["δ=$(round(rad2deg(δ), digits=1))°" for δ in delta_range]
+        deltas_str = join(delta_labels, ",")
+        deltas_str isa String || throw(ArgumentError("Failed to serialize delta header labels."))
+        header = string(label, "/delta,", deltas_str)
+        println(io, header)
         
         # Write data rows with alpha values and coefficients
         for i in eachindex(alpha_range)
-            row = "α=$(round(rad2deg(alpha_range[i]), digits=1))°," * join(matrix[i,:], ",")
+            coeffs_str = join(matrix[i,:], ",")
+            coeffs_str isa String || throw(ArgumentError("Failed to serialize coefficient row."))
+            row = string("α=$(round(rad2deg(alpha_range[i]), digits=1))°,", coeffs_str)
             println(io, row)
         end
     end
 end
 
 """
-    read_aero_matrix(filepath::String) -> (Matrix{Float64}, Vector{Float64}, Vector{Float64})
+    read_aero_matrix(filepath::AbstractString) -> (Matrix{Float64}, Vector{Float64}, Vector{Float64})
 
 Read an aerodynamic coefficient matrix from CSV with angle labels.
 Returns the coefficient matrix and corresponding angle ranges.
@@ -334,15 +343,18 @@ Returns the coefficient matrix and corresponding angle ranges.
 - `alpha_range`: Vector of angle of attack values in radians
 - `delta_range`: Vector of flap deflection angles in radians
 """
-function read_aero_matrix(filepath::String)
-    lines = readlines(filepath)
+function read_aero_matrix(filepath::AbstractString)
+    lines = readlines(String(filepath))
     
     # Parse header to get delta values
     header = split(lines[1], ',')
     delta_values = map(header[2:end]) do δ_str
         # Extract number between "δ=" and "°"
         m = match(r"δ=(-?\d+\.?\d*)°", δ_str)
-        deg2rad(parse(Float64, m.captures[1]))
+        m === nothing && throw(ArgumentError("Invalid delta header entry: $δ_str"))
+        δ_cap = m.captures[1]
+        (δ_cap isa AbstractString) || throw(ArgumentError("Missing delta value in header entry: $δ_str"))
+        deg2rad(parse(Float64, String(δ_cap)))
     end
     
     # Initialize matrix
@@ -356,7 +368,10 @@ function read_aero_matrix(filepath::String)
         entries = split(line, ',')
         # Extract alpha value
         m = match(r"α=(-?\d+\.?\d*)°", entries[1])
-        alpha_values[i] = deg2rad(parse(Float64, m.captures[1]))
+        m === nothing && throw(ArgumentError("Invalid alpha row entry: $(entries[1])"))
+        α_cap = m.captures[1]
+        (α_cap isa AbstractString) || throw(ArgumentError("Missing alpha value in row entry: $(entries[1])"))
+        alpha_values[i] = deg2rad(parse(Float64, String(α_cap)))
         # Parse coefficient values
         matrix[i,:] .= parse.(Float64, entries[2:end])
     end

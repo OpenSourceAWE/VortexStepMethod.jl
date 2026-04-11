@@ -225,7 +225,7 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
         log=false, reference_point=solver.reference_point, moment_frac=0.1)
 
     # calculate intermediate result
-    solve_base!(solver, body_aero, gamma_distribution; log, reference_point=reference_point)
+    solve_base!(solver, body_aero, gamma_distribution; log)
     gamma_new = solver.lr.gamma_new
     if !isnothing(solver.sol.gamma_distribution)
         solver.sol.gamma_distribution .= gamma_new
@@ -543,7 +543,7 @@ function solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=n
     log=false, reference_point=solver.reference_point)
     reference_point_checked = check_reference_point(reference_point)
     # calculate intermediate result
-    solve_base!(solver, body_aero, gamma_distribution; log, reference_point=reference_point_checked)
+    solve_base!(solver, body_aero, gamma_distribution; log)
 
     # Calculate final results as dictionary
     results = calculate_results(
@@ -551,14 +551,12 @@ function solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=n
         solver.lr.gamma_new,
         reference_point_checked,
         solver.density,
-        solver.aerodynamic_model_type,
         solver.core_radius_fraction,
         solver.mu,
         solver.lr.alpha_dist,
         solver.lr.v_a_dist,
         solver.sol._chord_dist,
         solver.sol._x_airf_dist,
-        solver.sol._y_airf_dist,
         solver.sol._z_airf_dist,
         solver.sol._va_dist,
         solver.br.va_norm_dist,
@@ -575,15 +573,15 @@ function solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=n
 end
 
 @inline @inbounds function calc_norm_array!(va_norm_dist, va_array)
-    for i in 1:size(va_array, 1)
+    for i in axes(va_array, 1)
         va_norm_dist[i] = sqrt(
             va_array[i,1]^2 + va_array[i,2]^2 +
             va_array[i,3]^2)
     end
 end
 
-function solve_base!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=nothing; 
-               log=false, reference_point=solver.reference_point)
+function solve_base!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=nothing;
+               log=false)
     
     # check arguments
     isnothing(body_aero.panels[1].va) && throw(ArgumentError("Inflow conditions are not set, use set_va!(body_aero, va)"))
@@ -656,6 +654,85 @@ function solve_base!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribu
     nothing
 end
 
+@inline function update_gamma_candidate!(
+    gamma_out,
+    gamma_in,
+    solver::Solver,
+    panels::Vector{Panel},
+    n_panels::Int,
+    AIC_x,
+    AIC_y,
+    AIC_z,
+    velocity_view_x,
+    velocity_view_y,
+    velocity_view_z,
+    va_array,
+    induced_velocity_all,
+    relative_velocity_array,
+    y_airf_array,
+    relative_velocity_crossz,
+    v_acrossz_array,
+    z_airf_array,
+    x_airf_array,
+    v_normal_array,
+    v_tangential_array,
+    va_magw_array,
+    cl_dist,
+    chord_array,
+)
+    mul!(velocity_view_x, AIC_x, gamma_in)
+    mul!(velocity_view_y, AIC_y, gamma_in)
+    mul!(velocity_view_z, AIC_z, gamma_in)
+
+    relative_velocity_array .= va_array .+ induced_velocity_all
+    @inbounds for i in 1:n_panels
+        ax = relative_velocity_array[i,1]
+        ay = relative_velocity_array[i,2]
+        az = relative_velocity_array[i,3]
+        bx = y_airf_array[i,1]
+        by = y_airf_array[i,2]
+        bz = y_airf_array[i,3]
+        relative_velocity_crossz[i,1] = ay*bz - az*by
+        relative_velocity_crossz[i,2] = az*bx - ax*bz
+        relative_velocity_crossz[i,3] = ax*by - ay*bx
+        ax = va_array[i,1]
+        ay = va_array[i,2]
+        az = va_array[i,3]
+        v_acrossz_array[i,1] = ay*bz - az*by
+        v_acrossz_array[i,2] = az*bx - ax*bz
+        v_acrossz_array[i,3] = ax*by - ay*bx
+    end
+
+    @inbounds for i in 1:n_panels
+        v_normal_array[i] =
+            z_airf_array[i,1]*relative_velocity_array[i,1] +
+            z_airf_array[i,2]*relative_velocity_array[i,2] +
+            z_airf_array[i,3]*relative_velocity_array[i,3]
+        v_tangential_array[i] =
+            x_airf_array[i,1]*relative_velocity_array[i,1] +
+            x_airf_array[i,2]*relative_velocity_array[i,2] +
+            x_airf_array[i,3]*relative_velocity_array[i,3]
+    end
+    solver.lr.alpha_dist .= atan.(v_normal_array, v_tangential_array)
+
+    @inbounds for i in 1:n_panels
+        solver.lr.v_a_dist[i] = sqrt(
+            relative_velocity_crossz[i,1]^2 +
+            relative_velocity_crossz[i,2]^2 +
+            relative_velocity_crossz[i,3]^2)
+        va_magw_array[i] = sqrt(
+            v_acrossz_array[i,1]^2 +
+            v_acrossz_array[i,2]^2 +
+            v_acrossz_array[i,3]^2)
+    end
+
+    for (i, (panel, alpha)) in enumerate(zip(panels, solver.lr.alpha_dist))
+        cl_dist[i] = calculate_cl(panel, alpha)
+    end
+    gamma_out .= 0.5 .* solver.lr.v_a_dist.^2 ./ va_magw_array .* cl_dist .* chord_array
+    return nothing
+end
+
 """
     gamma_loop!(solver::Solver, AIC_x::Matrix{Float64}, 
               AIC_y::Matrix{Float64}, AIC_z::Matrix{Float64},
@@ -700,76 +777,56 @@ function gamma_loop!(
     velocity_view_y = @view induced_velocity_all[:, 2]
     velocity_view_z = @view induced_velocity_all[:, 3]
 
-    function calc_gamma_new!(gamma_new, gamma, p)
-        # (AIC_x, AIC_y, AIC_z, va_array, induced_velocity_all, 
-        #     x_airf_array, y_airf_array, z_airf_array, panels, chord_array) = p
-        # Calculate induced velocities
-        mul!(velocity_view_x, AIC_x, gamma)
-        mul!(velocity_view_y, AIC_y, gamma)
-        mul!(velocity_view_z, AIC_z, gamma)
-        
-        relative_velocity_array .= va_array .+ induced_velocity_all
-        @inbounds for i in 1:n_panels
-            ax = relative_velocity_array[i,1]
-            ay = relative_velocity_array[i,2]
-            az = relative_velocity_array[i,3]
-            bx = y_airf_array[i,1]
-            by = y_airf_array[i,2]
-            bz = y_airf_array[i,3]
-            relative_velocity_crossz[i,1] = ay*bz - az*by
-            relative_velocity_crossz[i,2] = az*bx - ax*bz
-            relative_velocity_crossz[i,3] = ax*by - ay*bx
-            ax = va_array[i,1]
-            ay = va_array[i,2]
-            az = va_array[i,3]
-            v_acrossz_array[i,1] = ay*bz - az*by
-            v_acrossz_array[i,2] = az*bx - ax*bz
-            v_acrossz_array[i,3] = ax*by - ay*bx
-        end
-
-        @inbounds for i in 1:n_panels
-            v_normal_array[i] =
-                z_airf_array[i,1]*relative_velocity_array[i,1] +
-                z_airf_array[i,2]*relative_velocity_array[i,2] +
-                z_airf_array[i,3]*relative_velocity_array[i,3]
-            v_tangential_array[i] =
-                x_airf_array[i,1]*relative_velocity_array[i,1] +
-                x_airf_array[i,2]*relative_velocity_array[i,2] +
-                x_airf_array[i,3]*relative_velocity_array[i,3]
-        end
-        solver.lr.alpha_dist .= atan.(
-            v_normal_array, v_tangential_array)
-
-        @inbounds for i in 1:n_panels
-            solver.lr.v_a_dist[i] = sqrt(
-                relative_velocity_crossz[i,1]^2 +
-                relative_velocity_crossz[i,2]^2 +
-                relative_velocity_crossz[i,3]^2)
-            va_magw_array[i] = sqrt(
-                v_acrossz_array[i,1]^2 +
-                v_acrossz_array[i,2]^2 +
-                v_acrossz_array[i,3]^2)
-        end
-        
-        for (i, (panel, alpha)) in enumerate(zip(panels, solver.lr.alpha_dist))
-            cl_dist[i] = calculate_cl(panel, alpha)
-        end
-        gamma_new .= 0.5 .* solver.lr.v_a_dist.^2 ./ va_magw_array .* cl_dist .* chord_array
-        nothing
-    end
-
     if solver.solver_type == NONLIN
-        if isnothing(solver.prob)
-            function f_nonlin!(d_gamma, gamma, p)
-                calc_gamma_new!(solver.lr.gamma_new, gamma, p)
+        prob = solver.prob
+        if isnothing(prob)
+            function f_nonlin!(d_gamma, gamma, _p)
+                update_gamma_candidate!(
+                    solver.lr.gamma_new,
+                    gamma,
+                    solver,
+                    panels,
+                    n_panels,
+                    AIC_x,
+                    AIC_y,
+                    AIC_z,
+                    velocity_view_x,
+                    velocity_view_y,
+                    velocity_view_z,
+                    va_array,
+                    induced_velocity_all,
+                    relative_velocity_array,
+                    y_airf_array,
+                    relative_velocity_crossz,
+                    v_acrossz_array,
+                    z_airf_array,
+                    x_airf_array,
+                    v_normal_array,
+                    v_tangential_array,
+                    va_magw_array,
+                    cl_dist,
+                    chord_array,
+                )
                 d_gamma .= solver.lr.gamma_new .- gamma
                 nothing
             end
-            solver.prob = NonlinearProblem(f_nonlin!, solver.lr.gamma_new, nothing)
-            solver.nonlin_cache = init(solver.prob, NewtonRaphson(autodiff=AutoFiniteDiff()); abstol=solver.atol, reltol=solver.rtol)
+            prob = NonlinearProblem(f_nonlin!, solver.lr.gamma_new, SciMLBase.NullParameters())
+            solver.prob = prob
         end
-        
-        sol = NonlinearSolve.solve!(solver.nonlin_cache)
+        prob = prob::NonlinearProblem
+
+        nonlin_cache = solver.nonlin_cache
+        if isnothing(nonlin_cache)
+            alg = NewtonRaphson(; autodiff=AutoFiniteDiff())
+            nonlin_cache = SciMLBase.init(
+                prob,
+                alg;
+                abstol = solver.atol,
+                reltol = solver.rtol,
+            )
+            solver.nonlin_cache = nonlin_cache
+        end
+        sol = NonlinearSolve.solve!(nonlin_cache)
         gamma .= sol.u
         solver.lr.gamma_new .= sol.u
         solver.lr.converged = SciMLBase.successful_retcode(sol)
@@ -779,20 +836,44 @@ function gamma_loop!(
     if solver.solver_type == LOOP
         function f_loop!(gamma_new, gamma, damp)
             gamma .= gamma_new
-            calc_gamma_new!(gamma_new, gamma, nothing)
+            update_gamma_candidate!(
+                gamma_new,
+                gamma,
+                solver,
+                panels,
+                n_panels,
+                AIC_x,
+                AIC_y,
+                AIC_z,
+                velocity_view_x,
+                velocity_view_y,
+                velocity_view_z,
+                va_array,
+                induced_velocity_all,
+                relative_velocity_array,
+                y_airf_array,
+                relative_velocity_crossz,
+                v_acrossz_array,
+                z_airf_array,
+                x_airf_array,
+                v_normal_array,
+                v_tangential_array,
+                va_magw_array,
+                cl_dist,
+                chord_array,
+            )
             # Update gamma with relaxation and damping
             @. gamma_new = (1 - relaxation_factor) * gamma + 
                     relaxation_factor * gamma_new + damp
             
             # Apply damping if needed
             if solver.is_with_artificial_damping
-                is_damping_applied = smooth_circulation!(damp, gamma, 0.1, 0.5)
+                smooth_circulation!(damp, gamma, 0.1, 0.5)
                 @debug "damp: $damp"
             else
                 damp .= 0.0
-                is_damping_applied = false
             end
-            nothing
+            return nothing
         end
         iters = 0
         for i in 1:solver.max_iterations
@@ -808,7 +889,7 @@ function gamma_loop!(
             error = maximum(abs_gamma_new)
             normalized_error = error / reference_error
 
-            @debug "Iteration: $i, normalized_error: $normalized_error, is_damping_applied: $is_damping_applied"
+            @debug "Iteration: $i, normalized_error: $normalized_error"
 
             if normalized_error < solver.rtol
                 solver.lr.converged = true
@@ -965,19 +1046,23 @@ function linearize(solver::Solver, body_aero::BodyAerodynamics, y::Vector{T};
 
     init_va = body_aero.cache[1][body_aero.va]
     init_va .= body_aero.va
+    last_theta_ref = Ref{Vector{T}}(Vector{T}(undef, 0))
     if !isnothing(theta_idxs)
-        @views last_theta::Vector{T} = body_aero.cache[2][y[theta_idxs]]
-        last_theta .= NaN
+        @views last_theta_ref[] = body_aero.cache[2][y[theta_idxs]]
+        last_theta_ref[] .= NaN
     end
+    last_delta_ref = Ref{Vector{T}}(Vector{T}(undef, 0))
     if !isnothing(delta_idxs)
-        @views last_delta::Vector{T} = body_aero.cache[3][y[delta_idxs]]
-        last_delta .= NaN
+        @views last_delta_ref[] = body_aero.cache[3][y[delta_idxs]]
+        last_delta_ref[] .= NaN
     end
 
     # Function to compute forces for given control inputs
     function calc_results!(results, y)
         @views theta_angles = isnothing(theta_idxs) ? nothing : y[theta_idxs]
         @views delta_angles = isnothing(delta_idxs) ? nothing : y[delta_idxs]
+        last_theta = last_theta_ref[]
+        last_delta = last_delta_ref[]
 
         if !isnothing(theta_angles) && isnothing(delta_angles)
             if !all(theta_angles .== last_theta)
