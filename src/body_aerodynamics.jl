@@ -1046,7 +1046,7 @@ function set_va!(body_aero::BodyAerodynamics, va::AbstractVector, omega=zeros(MV
     body_aero.omega .= omega
 
     if all(iszero, omega)
-        va_distribution .= repeat(reshape(va, 1, 3), n_panels)
+        va_distribution .= reshape(va, 1, 3)
     else
         idx = 1
         for wing in body_aero.wings
