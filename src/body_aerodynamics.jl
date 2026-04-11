@@ -1,11 +1,11 @@
 """
-    @with_kw mutable struct BodyAerodynamics{P}
+    @with_kw mutable struct BodyAerodynamics{P,W<:AbstractWing}
 
 Main structure for calculating aerodynamic properties of bodies. Use the constructor to initialize.
 
 # Fields
 - panels::Vector{Panel}: Vector of refined [Panel](@ref) structs
-- wings::Vector{Wing}: A vector of wings; a body can have multiple wings
+- wings::Vector{W}: A vector of wings of type `W <: AbstractWing`; a body can have multiple wings
 - `va::MVec3` = zeros(MVec3):   A vector of the apparent wind speed, see: [MVec3](@ref)
 - `omega`::MVec3 = zeros(MVec3): A vector of the turn rates around the kite body axes
 - `gamma_distribution`=zeros(Float64, P): A vector of the circulation
