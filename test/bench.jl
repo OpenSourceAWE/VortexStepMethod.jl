@@ -1,3 +1,8 @@
+using Pkg
+if abspath(PROGRAM_FILE) == abspath(@__FILE__)
+    Pkg.activate(@__DIR__)
+end
+
 using BenchmarkTools
 using StaticArrays
 using VortexStepMethod

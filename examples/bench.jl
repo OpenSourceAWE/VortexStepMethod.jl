@@ -4,6 +4,7 @@ Pkg.activate(@__DIR__)
 using LinearAlgebra
 using GLMakie
 using VortexStepMethod
+using VortexStepMethod: solve_base!
 
 
 # Step 1: Define wing parameters

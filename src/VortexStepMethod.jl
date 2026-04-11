@@ -28,7 +28,7 @@ using Xfoil
 export SolverSettings, VSMSettings, WingSettings
 export ObjWing, Section, Wing, refine!, reinit!
 export BodyAerodynamics
-export Solver, VSMSolution, linearize, solve, solve!
+export Solver, VSMSolution, linearize, solve, solve!, solve_base!
 export calculate_results
 export add_section!, set_va!
 export calculate_projected_area, calculate_span
