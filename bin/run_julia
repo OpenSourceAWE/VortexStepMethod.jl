@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -eu
 
 if [[ $(basename $(pwd)) == "bin" ]]; then
     cd ..
@@ -6,4 +6,10 @@ fi
 
 export JULIA_PKG_SERVER_REGISTRY_PREFERENCE=eager
 
-julia --project -i -e 'using VortexStepMethod; function menu(); include("examples/menu.jl"); end'
+if [[ $# -gt 0 ]]; then
+    JULIA_ARGS=("$@")
+else
+    JULIA_ARGS=(-i -e 'using VortexStepMethod; function menu(); include("examples/menu.jl"); end')
+fi
+
+julia --project "${JULIA_ARGS[@]}"
