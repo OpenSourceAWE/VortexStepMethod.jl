@@ -1,7 +1,6 @@
 using LinearAlgebra
 using VortexStepMethod
 using GLMakie
-using DelimitedFiles
 
 PLOT = true
 USE_TEX = false

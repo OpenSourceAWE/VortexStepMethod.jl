@@ -4,7 +4,7 @@
 - `billowing_angle` replaced by `billowing_percentage` on `Wing` and
   `WingSettings` (percentage of arc length, not radians)
 - `billowing_angle_from_percentage()` removed
-- `BILLOWING` distribution now uses catenary curve instead of circular arc
+- `BILLOWING` distribution now uses sinusoidal rotation instead of circular arc
 
 ### Added
 - `billowing.jl` example comparing flat vs billowed V3 kite

@@ -1120,8 +1120,9 @@ end
 
 Refine mesh by splitting provided sections into desired number of panels.
 
-When `billowing_percentage > 0`, applies catenary TE displacement to intermediate
-sections within each rib pair (simulating fabric billowing between ribs).
+When `billowing_percentage > 0`, applies sinusoidal TE displacement to
+intermediate sections within each rib pair (simulating fabric billowing
+between ribs).
 """
 function refine_mesh_by_splitting_provided_sections!(
     wing::AbstractWing;
@@ -1136,11 +1137,31 @@ function refine_mesh_by_splitting_provided_sections!(
     
     # Check if refinement is needed
     if n_panels_provided == n_panels_desired
-        for (refined_section, section) in zip(wing.refined_sections, wing.unrefined_sections)
+        for (refined_section, section) in zip(
+                wing.refined_sections, wing.unrefined_sections)
             if reuse_aero_data
-                reinit!(refined_section, section.LE_point, section.TE_point, section.aero_model)
+                reinit!(refined_section, section.LE_point,
+                    section.TE_point, section.aero_model)
             else
                 reinit!(refined_section, section)
+            end
+        end
+        if billowing_percentage > 0
+            LE = [s.LE_point for s in wing.unrefined_sections]
+            TE = [s.TE_point for s in wing.unrefined_sections]
+            for i in 1:(n_panels_provided - 1)
+                y_hat = normalize(LE[i] - LE[i + 1])
+                span_len = norm(LE[i] - LE[i + 1])
+                start_si = i + 1
+                end_si = i + 1
+                if start_si <= end_si
+                    apply_billowing_to_pair!(
+                        wing.refined_sections,
+                        start_si, end_si,
+                        y_hat, span_len,
+                        LE[i + 1], TE[i], TE[i + 1],
+                        billowing_percentage)
+                end
             end
         end
         return nothing
@@ -1249,12 +1270,24 @@ function refine_mesh_by_splitting_provided_sections!(
     
     # Validate result
     if length(wing.refined_sections) != wing.n_panels + 1
-        @warn "Number of panels ($(length(new_sections)-1)) differs from desired ($(wing.n_panels))"
+        @warn "Number of panels ($(length(wing.refined_sections)-1)) differs from desired ($(wing.n_panels))"
     end
     
     return nothing
 end
 
+
+"""
+    rodrigues_rotate(vec, axis, θ)
+
+Rotate `vec` around unit `axis` by angle `θ` (radians) using the
+Rodrigues rotation formula. Non-allocating with MVec3 inputs.
+"""
+@inline function rodrigues_rotate(vec, axis, θ)
+    ct = cos(θ); st = sin(θ)
+    d = dot(vec, axis)
+    return ct * vec + st * cross(axis, vec) + (1 - ct) * d * axis
+end
 
 """
     billowing_arc_length(sections, start_si, end_si, y_hat,
@@ -1279,11 +1312,7 @@ function billowing_arc_length(
         t = dot(sec.LE_point - le_ref, y_hat) / span_len
         θ = -angle_max * sin(π * t)
         chord_vec = sec.TE_point - sec.LE_point
-        ct = cos(θ); st = sin(θ)
-        d_y = dot(chord_vec, y_hat)
-        rotated = ct * chord_vec +
-            st * cross(y_hat, chord_vec) +
-            (1 - ct) * d_y * y_hat
+        rotated = rodrigues_rotate(chord_vec, y_hat, θ)
         current_te = sec.LE_point + rotated
         arc += norm(current_te - prev_te)
         prev_te = current_te
@@ -1314,6 +1343,10 @@ function apply_billowing_to_pair!(
     te_left, te_right, percentage
 )
     percentage <= 0 && return nothing
+    if percentage >= 100
+        throw(ArgumentError(
+            "billowing_percentage must be < 100, got $percentage"))
+    end
     straight = norm(te_right - te_left)
     straight < 1e-12 && return nothing
     target_arc = straight / (1 - percentage / 100)
@@ -1335,7 +1368,7 @@ function apply_billowing_to_pair!(
             te_left, te_right, angle_max + δ)
         df = (arc_p - arc) / δ
         abs(df) < 1e-30 && break
-        angle_max -= f / df
+        angle_max = max(0.0, angle_max - f / df)
     end
 
     # Apply converged rotations in-place
@@ -1344,11 +1377,7 @@ function apply_billowing_to_pair!(
         t = dot(sec.LE_point - le_ref, y_hat) / span_len
         θ = -angle_max * sin(π * t)
         chord_vec = sec.TE_point - sec.LE_point
-        ct = cos(θ); st = sin(θ)
-        d_y = dot(chord_vec, y_hat)
-        rotated = ct * chord_vec +
-            st * cross(y_hat, chord_vec) +
-            (1 - ct) * d_y * y_hat
+        rotated = rodrigues_rotate(chord_vec, y_hat, θ)
         sec.TE_point .= sec.LE_point + rotated
     end
     return nothing

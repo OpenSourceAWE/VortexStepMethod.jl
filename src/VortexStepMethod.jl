@@ -130,14 +130,14 @@ Enumeration of the implemented panel distributions.
 - COSINE               # Cosine distribution
 - `SPLIT_PROVIDED`     # Split provided sections
 - `UNCHANGED`          # 1:1 copy of unrefined to refined sections (no interpolation)
-- `BILLOWING`          # Split provided + catenary TE billowing between ribs
+- `BILLOWING`          # Split provided + sinusoidal TE billowing between ribs
 """
 @enum PanelDistribution begin
    LINEAR             # Linear distribution
    COSINE             # Cosine distribution
    SPLIT_PROVIDED     # Split provided sections
    UNCHANGED          # 1:1 copy of unrefined to refined sections
-   BILLOWING          # Split provided + catenary TE billowing
+   BILLOWING          # Split provided + sinusoidal TE billowing
 end
 
 """
