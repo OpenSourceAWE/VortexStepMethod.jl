@@ -129,8 +129,10 @@ function Base.getproperty(obj::BodyAerodynamics, sym::Symbol)
 end
 
 function Base.setproperty!(obj::BodyAerodynamics, sym::Symbol, val)
-    if sym === :va || sym === :omega
+    if sym === :va
         set_va!(obj, val)
+    elseif sym === :omega
+        set_va!(obj, obj._va, val)
     else
         setfield!(obj, sym, val)
     end
@@ -1041,6 +1043,7 @@ Set velocity array and update wake filaments.
 function set_va!(body_aero::BodyAerodynamics, va::AbstractVector, omega=zeros(MVec3))
     n_panels = length(body_aero.panels)
     va_distribution = zeros(n_panels, 3)
+    body_aero.omega .= omega
 
     if all(iszero, omega)
         va_distribution .= repeat(reshape(va, 1, 3), n_panels)
