@@ -225,7 +225,7 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
         log=false, reference_point=solver.reference_point, moment_frac=0.1)
 
     # calculate intermediate result
-    solve_base!(solver, body_aero, gamma_distribution; log, reference_point=reference_point)
+    solve_base!(solver, body_aero, gamma_distribution; log)
     gamma_new = solver.lr.gamma_new
     if !isnothing(solver.sol.gamma_distribution)
         solver.sol.gamma_distribution .= gamma_new
@@ -543,7 +543,7 @@ function solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=n
     log=false, reference_point=solver.reference_point)
     reference_point_checked = check_reference_point(reference_point)
     # calculate intermediate result
-    solve_base!(solver, body_aero, gamma_distribution; log, reference_point=reference_point_checked)
+    solve_base!(solver, body_aero, gamma_distribution; log)
 
     # Calculate final results as dictionary
     results = calculate_results(
@@ -580,9 +580,8 @@ end
     end
 end
 
-function solve_base!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=nothing; 
-               log=false, reference_point=solver.reference_point)
-    reference_point
+function solve_base!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=nothing;
+               log=false)
     
     # check arguments
     isnothing(body_aero.panels[1].va) && throw(ArgumentError("Inflow conditions are not set, use set_va!(body_aero, va)"))
