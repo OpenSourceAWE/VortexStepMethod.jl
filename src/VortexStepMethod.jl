@@ -10,6 +10,7 @@ using DefaultApplication
 using Measures
 using LaTeXStrings
 using NonlinearSolve
+using SciMLBase
 import NonlinearSolve: solve, solve!
 using Interpolations
 using Parameters
