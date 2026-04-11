@@ -55,6 +55,7 @@ function include_selected_tests()
         should_run_test("VortexStepMethod/test_VortexStepMethod.jl") && include("VortexStepMethod/test_VortexStepMethod.jl")
         should_run_test("wake/test_wake.jl") && include("wake/test_wake.jl")
         should_run_test("wing_geometry/test_wing_geometry.jl") && include("wing_geometry/test_wing_geometry.jl")
+        should_run_test("wing_geometry/test_billowing.jl") && include("wing_geometry/test_billowing.jl")
         should_run_test("yaml_geometry/test_yaml_geometry.jl") && include("yaml_geometry/test_yaml_geometry.jl")
         should_run_test("Aqua.jl") && include("Aqua.jl")
     end

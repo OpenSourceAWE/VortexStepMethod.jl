@@ -150,6 +150,61 @@ end
     @test isfile(joinpath(save_dir, "Rectangular_Wing_Polars.png"))
     safe_rm(joinpath(save_dir, "Rectangular_Wing_Polars.png"))
 
+    # Plot polars with CL vs CD (cl_over_cd=false)
+    fig = plot_polars(
+        [llt_solver, vsm_solver],
+        [body_aero, body_aero],
+        ["VSM", "LLT"],
+        angle_range=angle_range,
+        angle_type="angle_of_attack",
+        v_a=v_a,
+        title="Polars CL vs CD",
+        is_save=false,
+        is_show=false,
+        cl_over_cd=false
+    )
+    if backend == "Makie"
+        @test fig isa Figure
+    else
+        @test fig !== nothing
+    end
+
+    # Plot combined analysis with cl_over_cd
+    fig = plot_combined_analysis(
+        vsm_solver, body_aero, results_vsm;
+        angle_range=angle_range,
+        angle_type="angle_of_attack",
+        angle_of_attack=30.0,
+        v_a=v_a,
+        title="Combined Analysis",
+        is_save=false,
+        is_show=false,
+        cl_over_cd=true
+    )
+    if backend == "Makie"
+        @test fig isa Figure
+    else
+        @test fig !== nothing
+    end
+
+    # Plot combined analysis with cl_over_cd=false
+    fig = plot_combined_analysis(
+        vsm_solver, body_aero, results_vsm;
+        angle_range=angle_range,
+        angle_type="angle_of_attack",
+        angle_of_attack=30.0,
+        v_a=v_a,
+        title="Combined CL vs CD",
+        is_save=false,
+        is_show=false,
+        cl_over_cd=false
+    )
+    if backend == "Makie"
+        @test fig isa Figure
+    else
+        @test fig !== nothing
+    end
+
     # Test polar data plotting
     body_aero = BodyAerodynamics([ram_wing])
     fig = plot_polar_data(body_aero; is_show=false)

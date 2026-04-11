@@ -555,7 +555,6 @@ function VortexStepMethod.plot_distribution(y_coordinates_list, results_list, la
         lines!(ax_cl, Vector(y_coords), Vector(results["cl_distribution"]),
             label="$label CL: $value")
     end
-    axislegend(ax_cl, position=:lt)
 
     # Plot CD
     for (y_coords, results, label) in zip(y_coordinates_list, results_list, label_list)
@@ -563,35 +562,30 @@ function VortexStepMethod.plot_distribution(y_coordinates_list, results_list, la
         lines!(ax_cd, Vector(y_coords), Vector(results["cd_distribution"]),
             label="$label CD: $value")
     end
-    axislegend(ax_cd, position=:lt)
 
     # Plot Gamma
     for (y_coords, results, label) in zip(y_coordinates_list, results_list, label_list)
         lines!(ax_gamma, Vector(y_coords), Vector(results["gamma_distribution"]),
             label=label)
     end
-    axislegend(ax_gamma, position=:lt)
 
     # Plot alpha geometric
     for (y_coords, results, label) in zip(y_coordinates_list, results_list, label_list)
         lines!(ax_alpha_geo, Vector(y_coords), Vector(results["alpha_geometric"]),
             label=label)
     end
-    axislegend(ax_alpha_geo, position=:lt)
 
     # Plot alpha at ac
     for (y_coords, results, label) in zip(y_coordinates_list, results_list, label_list)
         lines!(ax_alpha_ac, Vector(y_coords), Vector(results["alpha_at_ac"]),
             label=label)
     end
-    axislegend(ax_alpha_ac, position=:lt)
 
     # Plot alpha uncorrected
     for (y_coords, results, label) in zip(y_coordinates_list, results_list, label_list)
         lines!(ax_alpha_unc, Vector(y_coords), Vector(results["alpha_uncorrected"]),
             label=label)
     end
-    axislegend(ax_alpha_unc, position=:lt)
 
     # Plot force components
     force_axes = [ax_fx, ax_fy, ax_fz]
@@ -607,8 +601,11 @@ function VortexStepMethod.plot_distribution(y_coordinates_list, results_list, la
             lines!(ax, Vector(y_coords), Vector(forces),
                 label="$label ΣF$comp: $total_force N")
         end
-        axislegend(ax, position=:lt)
     end
+
+    # Shared legend at bottom of grid
+    Legend(fig[4, :], ax_gamma;
+        orientation=:horizontal, tellwidth=false, tellheight=true)
 
     # Save and show
     if is_save
@@ -783,6 +780,7 @@ Plot polar data comparing different solvers using Makie.
 - `is_save`: Whether to save (default: true)
 - `is_show`: Whether to display (default: true)
 - `use_tex`: Ignored for Makie (default: false)
+- `cl_over_cd`: Plot CL/CD vs angle instead of CL vs CD (default: true)
 """
 function VortexStepMethod.plot_polars(
     solver_list,
@@ -799,7 +797,8 @@ function VortexStepMethod.plot_polars(
     save_path=nothing,
     is_save=true,
     is_show=true,
-    use_tex=false
+    use_tex=false,
+    cl_over_cd=true,
 )
     # Validate inputs
     total_cases = length(body_aero_list) + length(literature_path_list)
@@ -848,8 +847,13 @@ function VortexStepMethod.plot_polars(
         xlabel="$angle_type [°]", ylabel="CD")
     ax_cs = Axis(fig[2, 1], title="CS vs $angle_type [°]",
         xlabel="$angle_type [°]", ylabel="CS")
-    ax_polar = Axis(fig[2, 2], title="CL vs CD",
-        xlabel="CD", ylabel="CL")
+    ax_fourth = if cl_over_cd
+        Axis(fig[2, 2], title="CL/CD vs $angle_type [°]",
+            xlabel="$angle_type [°]", ylabel="CL/CD")
+    else
+        Axis(fig[2, 2], title="CL vs CD",
+            xlabel="CD", ylabel="CL")
+    end
 
     # Number of computational results
     n_solvers = length(solver_list)
@@ -864,7 +868,6 @@ function VortexStepMethod.plot_polars(
             ylims!(ax_cl, -0.5, 2)
         end
     end
-    axislegend(ax_cl, position=:lt)
 
     # Plot CD vs angle
     for (i, (polar_data, label)) in enumerate(zip(polar_data_list, labels_with_re))
@@ -876,7 +879,6 @@ function VortexStepMethod.plot_polars(
             ylims!(ax_cd, -0.5, 2)
         end
     end
-    axislegend(ax_cd, position=:lt)
 
     # Plot CS vs angle
     for (i, (polar_data, label)) in enumerate(zip(polar_data_list, labels_with_re))
@@ -888,20 +890,28 @@ function VortexStepMethod.plot_polars(
             ylims!(ax_cs, -0.5, 2)
         end
     end
-    axislegend(ax_cs, position=:lt)
 
-    # Plot CL vs CD
+    # Plot fourth panel: CL/CD vs angle or CL vs CD
     for (i, (polar_data, label)) in enumerate(zip(polar_data_list, labels_with_re))
         marker = i <= n_solvers ? :star5 : :circle
         markersize = i <= n_solvers ? 12 : 8
-        scatterlines!(ax_polar, polar_data[3], polar_data[2];
-            label=label, marker=marker, markersize=markersize)
-        if maximum(polar_data[2]) > 10 || maximum(polar_data[3]) > 10
-            ylims!(ax_polar, -0.5, 2)
-            xlims!(ax_polar, -0.5, 2)
+        if cl_over_cd
+            cl_cd = polar_data[2] ./ polar_data[3]
+            scatterlines!(ax_fourth, polar_data[1], cl_cd;
+                label=label, marker=marker, markersize=markersize)
+        else
+            scatterlines!(ax_fourth, polar_data[3], polar_data[2];
+                label=label, marker=marker, markersize=markersize)
+            if maximum(polar_data[2]) > 10 || maximum(polar_data[3]) > 10
+                ylims!(ax_fourth, -0.5, 2)
+                xlims!(ax_fourth, -0.5, 2)
+            end
         end
     end
-    axislegend(ax_polar, position=:lt)
+
+    # Shared legend at bottom of grid
+    Legend(fig[3, :], ax_cl;
+        orientation=:horizontal, tellwidth=false, tellheight=true)
 
     # Save and show
     if is_save && !isnothing(save_path)
@@ -1016,6 +1026,8 @@ Create combined multi-panel figure with geometry, polar data, distributions, and
 - `data_type`: File extension (default: ".png", also supports ".jpeg")
 - `save_path`: Directory path to save files (default: nothing)
 - `is_save`: Save plots to files (default: false)
+- `cl_over_cd`: Plot CL/CD vs angle instead of CL vs CD (default: true)
+- `angle_of_attack_for_spanwise_distribution`: AoA for spanwise plots (default: 5.0)
 """
 function VortexStepMethod.plot_combined_analysis(
     solver,
@@ -1038,6 +1050,7 @@ function VortexStepMethod.plot_combined_analysis(
     save_path=nothing,
     is_save=false,
     angle_of_attack_for_spanwise_distribution=5.0,
+    cl_over_cd=true,
 )
     # Normalize inputs to arrays for consistent handling
     solvers = solver isa Vector ? solver : [solver]
@@ -1259,10 +1272,8 @@ function VortexStepMethod.plot_combined_analysis(
         end
     end
 
-    for ax in [ax_cl, ax_cd, ax_gamma, ax_alpha_geo, ax_alpha_ac,
-        ax_alpha_unc, ax_fx, ax_fy, ax_fz]
-        axislegend(ax, position=:lt)
-    end
+    Legend(fig[2, 1][4, :], ax_gamma;
+        orientation=:horizontal, tellwidth=false, tellheight=true)
 
     # force y-limits
     ylims!(ax_alpha_geo, -0.25 * aoa_span, 1.1 * aoa_span)
@@ -1324,8 +1335,13 @@ function VortexStepMethod.plot_combined_analysis(
         xlabel="$angle_type [°]", ylabel="CD")
     ax_cs_polar = Axis(fig[2, 2][2, 1], title="CS vs $angle_type [°]",
         xlabel="$angle_type [°]", ylabel="CS")
-    ax_polar = Axis(fig[2, 2][2, 2], title="CL vs CD",
-        xlabel="CD", ylabel="CL")
+    ax_fourth_polar = if cl_over_cd
+        Axis(fig[2, 2][2, 2], title="CL/CD vs $angle_type [°]",
+            xlabel="$angle_type [°]", ylabel="CL/CD")
+    else
+        Axis(fig[2, 2][2, 2], title="CL vs CD",
+            xlabel="CD", ylabel="CL")
+    end
 
     for (idx, (pd, lbl)) in enumerate(polar_series)
         color = colors[mod1(idx, length(colors))]
@@ -1335,12 +1351,18 @@ function VortexStepMethod.plot_combined_analysis(
         scatterlines!(ax_cl_polar, pd.angle, pd.cl; label=lbl, marker, markersize, color)
         scatterlines!(ax_cd_polar, pd.angle, pd.cd; label=lbl, marker, markersize, color)
         scatterlines!(ax_cs_polar, pd.angle, pd.cs; label=lbl, marker, markersize, color)
-        scatterlines!(ax_polar, pd.cd, pd.cl; label=lbl, marker, markersize, color)
+        if cl_over_cd
+            cl_cd = pd.cl ./ pd.cd
+            scatterlines!(ax_fourth_polar, pd.angle, cl_cd;
+                label=lbl, marker, markersize, color)
+        else
+            scatterlines!(ax_fourth_polar, pd.cd, pd.cl;
+                label=lbl, marker, markersize, color)
+        end
     end
-    # axislegend(ax_cl_polar, position=:lt)
-    # axislegend(ax_cd_polar, position=:lt)
-    axislegend(ax_cs_polar, position=:lb)
-    # axislegend(ax_polar, position=:lt)
+    Legend(fig[2, 2][3, :], ax_cl_polar;
+        orientation=:horizontal, nbanks=2,
+        tellwidth=false, tellheight=true)
 
     # Set column widths: left column wider for 3x3 grid
     colsize!(fig.layout, 1, Relative(0.6))
