@@ -72,13 +72,12 @@ end
 
 # Solving
 println("Solve")
-results = nothing
 results = VortexStepMethod.solve(solver, body_aero; log=true)
-@time results = VortexStepMethod.solve(solver, body_aero; log=true)
+@time VortexStepMethod.solve(solver, body_aero; log=true)
 
 body_y_coordinates = [panel.aero_center[2] for panel in body_aero.panels]
 
-if PLOT && !isnothing(results)
+if PLOT
     plot_combined_analysis(
         solver,
         body_aero,
