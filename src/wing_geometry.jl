@@ -252,6 +252,71 @@ mutable struct Wing{P} <: AbstractWing
     cache::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}}
 end
 
+# Compatibility constructor for full positional initialization with integer panel counts.
+# This keeps call sites that pass Int values working after n_panels/n_unrefined_sections
+# were tightened to Int16 fields.
+function Wing(
+        n_panels::Integer,
+        n_unrefined_sections::Integer,
+        spanwise_distribution::PanelDistribution,
+        panel_props::PanelProperties{P},
+        spanwise_direction::MVec3,
+        unrefined_sections::Vector{Section},
+        refined_sections::Vector{Section},
+        remove_nan::Bool,
+        use_prior_polar::Bool,
+        billowing_percentage::Float64,
+        refined_panel_mapping::Vector{Int16},
+        non_deformed_sections::Vector{Section},
+        theta_dist::Vector{Float64},
+        delta_dist::Vector{Float64},
+        mass::Float64,
+        gamma_tip::Float64,
+        inertia_tensor::Matrix{Float64},
+        T_cad_body::MVec3,
+        R_cad_body::MMat3,
+        radius::Float64,
+        le_interp::Union{Nothing, NTuple{3, Interpolations.Extrapolation}},
+        te_interp::Union{Nothing, NTuple{3, Interpolations.Extrapolation}},
+        area_interp::Union{Nothing, Interpolations.Extrapolation},
+        cache::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}}
+    ) where {P}
+
+    n_panels_i16 = Int16(n_panels)
+    n_unrefined_sections_i16 = Int16(n_unrefined_sections)
+
+    Int(n_panels_i16) == P || throw(ArgumentError(
+        "n_panels ($n_panels) must match PanelProperties{$P}"
+    ))
+
+    return Wing{P}(
+        n_panels_i16,
+        n_unrefined_sections_i16,
+        spanwise_distribution,
+        panel_props,
+        spanwise_direction,
+        unrefined_sections,
+        refined_sections,
+        remove_nan,
+        use_prior_polar,
+        billowing_percentage,
+        refined_panel_mapping,
+        non_deformed_sections,
+        theta_dist,
+        delta_dist,
+        mass,
+        gamma_tip,
+        inertia_tensor,
+        T_cad_body,
+        R_cad_body,
+        radius,
+        le_interp,
+        te_interp,
+        area_interp,
+        cache
+    )
+end
+
 """
     Wing(n_panels::Int;
          n_unrefined_sections=nothing,
