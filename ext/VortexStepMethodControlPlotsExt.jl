@@ -177,7 +177,7 @@ function create_geometry_plot(body_aero::BodyAerodynamics, title, view_elevation
     va = isa(body_aero.va, Tuple) ? body_aero.va[1] : body_aero.va
 
     # Extract geometric data
-    # corner_points = [panel.corner_points for panel in panels]
+    corner_points = [panel.corner_points for panel in panels]
     control_points = [panel.control_point for panel in panels]
     aero_centers = [panel.aero_center for panel in panels]
 
@@ -233,7 +233,7 @@ function create_geometry_plot(body_aero::BodyAerodynamics, title, view_elevation
     plot_line_segment!(ax, [va_vector_begin, va_vector_end], :lightblue, "va")
 
     # Add legends for the first occurrence of each label
-    # handles, labels = ax.get_legend_handles_labels()
+    handles, labels = ax.get_legend_handles_labels()
     # by_label = Dict(zip(labels, handles))
     # ax.legend(values(by_label), keys(by_label), bbox_to_anchor=(0, 0, 1.1, 1))
 
@@ -553,7 +553,7 @@ function generate_polar_data(
         )
 
         # Solve and store results
-        results = solve(solver, body_aero, gamma)
+        results = solve(solver, body_aero, gamma_distribution[i, :])
 
         cl[i] = results["cl"]
         cd[i] = results["cd"]
@@ -564,8 +564,8 @@ function generate_polar_data(
         cs_distribution[i, :] = results["cs_distribution"]
         reynolds_number[i] = results["Rey"]
 
-        # Store gamma for next iteration initialization
-        gamma = results["gamma_distribution"]
+        # Store gamma for next iteration
+        gamma = gamma_distribution[i, :]
     end
 
     polar_data = [
@@ -657,14 +657,13 @@ function VortexStepMethod.plot_polars(
     # Load literature data if provided
     if !isempty(literature_path_list)
         for path in literature_path_list
-            raw_data = readdlm(path, ',')
-            data = isa(raw_data, Tuple) ? raw_data[1] : raw_data
+            data = readdlm(path, ',')
             header = lowercase.(string.(data[1, :]))
             # Find column indices for alpha, CL, CD, CS (case-insensitive, allow common variants)
-            alpha_idx = findfirst(x -> occursin("alpha", lowercase(string(x))), header)
-            cl_idx    = findfirst(x -> occursin("cl", lowercase(string(x))), header)
-            cd_idx    = findfirst(x -> occursin("cd", lowercase(string(x))), header)
-            cs_idx    = findfirst(x -> occursin("cs", lowercase(string(x))), header)
+            alpha_idx = findfirst(x -> occursin("alpha", x), header)
+            cl_idx    = findfirst(x -> occursin("cl", x), header)
+            cd_idx    = findfirst(x -> occursin("cd", x), header)
+            cs_idx    = findfirst(x -> occursin("cs", x), header)
             # Fallback: if CS not found, fill with zeros
             cs_col = cs_idx === nothing ? zeros(size(data, 1)-1) : data[2:end, cs_idx]
             # Push as [alpha, CL, CD, CS]
