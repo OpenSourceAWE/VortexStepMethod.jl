@@ -230,6 +230,7 @@ else
     exit 1
 fi
 
+julia --project=. -e 'using Pkg; Pkg.precompile(); Pkg.activate("examples"); Pkg.precompile(); using LinearAlgebra, GLMakie, VortexStepMethod; @info "Precompilation complete."'
 echo
 echo "Installation complete."
 
