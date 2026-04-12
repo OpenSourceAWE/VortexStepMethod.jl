@@ -611,6 +611,7 @@ Plot polar data comparing different solvers and configurations.
 - `is_save`: Whether to save plots (default: true)
 - `is_show`: Whether to display plots (default: true)
 - `use_tex`: if the external `pdflatex` command shall be used (default: false)
+- `cl_over_cd`: Plot CL/CD vs angle instead of CL vs CD (default: true)
 """
 function VortexStepMethod.plot_polars(
     solver_list,
@@ -627,7 +628,8 @@ function VortexStepMethod.plot_polars(
     save_path=nothing,
     is_save=true,
     is_show=true,
-    use_tex=false
+    use_tex=false,
+    cl_over_cd=true,
 )
     # Validate inputs
     total_cases = length(body_aero_list) + length(literature_path_list)
@@ -821,23 +823,34 @@ function VortexStepMethod.plot_polars(
             label = replace(label, "VSM" => raw"\mathrm{VSM}")
             label = raw"$" * label * raw"$"
         end
-        axs[2, 2].plot(
-            polar_data[3],
-            polar_data[2],
-            label=label,
-            linestyle=linestyle,
-            marker=marker,
-            markersize=markersize,
-        )
-        # Limit y-range if CL > 10
-        if maximum(polar_data[2]) > 10 || maximum(polar_data[3]) > 10
-            axs[2, 2].set_ylim([-0.5, 2])
-            axs[2, 2].set_xlim([-0.5, 2])
+        if cl_over_cd
+            cl_cd = polar_data[2] ./ polar_data[3]
+            axs[2, 2].plot(
+                polar_data[1], cl_cd,
+                label=label, linestyle=linestyle,
+                marker=marker, markersize=markersize)
+            title = raw"$C_\mathrm{L}/C_\mathrm{D}$" *
+                " vs $angle_type [°]"
+            axs[2, 2].set_title(title)
+            axs[2, 2].set_xlabel("$angle_type [°]")
+            axs[2, 2].set_ylabel(
+                L"$C_\mathrm{L}/C_\mathrm{D}$")
+        else
+            axs[2, 2].plot(
+                polar_data[3], polar_data[2],
+                label=label, linestyle=linestyle,
+                marker=marker, markersize=markersize)
+            if maximum(polar_data[2]) > 10 ||
+                    maximum(polar_data[3]) > 10
+                axs[2, 2].set_ylim([-0.5, 2])
+                axs[2, 2].set_xlim([-0.5, 2])
+            end
+            title = raw"$C_\mathrm{L}$" * " vs " *
+                raw"$C_\mathrm{D}$"
+            axs[2, 2].set_title(title)
+            axs[2, 2].set_xlabel(L"$C_\mathrm{D}$")
+            axs[2, 2].set_ylabel(L"$C_\mathrm{L}$")
         end
-        title = raw"$C_\mathrm{L}" * raw"$" * " vs " * raw"$C_\mathrm{D}" * raw"$"
-        axs[2, 2].set_title(title)
-        axs[2, 2].set_xlabel(L"$C_\mathrm{D}$")
-        axs[2, 2].set_ylabel(L"$C_\mathrm{L}$")
         axs[2, 2].legend()
     end
 
@@ -957,7 +970,8 @@ function VortexStepMethod.plot_combined_analysis(
     view_elevation=15,
     view_azimuth=-120,
     use_tex=false,
-    literature_path_list=String[]
+    literature_path_list=String[],
+    cl_over_cd=true,
 )
     # Normalize inputs to arrays for consistent handling
     solvers = solver isa Vector ? solver : [solver]
@@ -1011,7 +1025,8 @@ function VortexStepMethod.plot_combined_analysis(
         save_path=save_path,
         is_save=is_save,
         is_show=is_show,
-        use_tex=use_tex
+        use_tex=use_tex,
+        cl_over_cd=cl_over_cd
     )
 end
 

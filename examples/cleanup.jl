@@ -1,6 +1,5 @@
-
-# delete the generated polars
-# it is useful if you want to benchmark the polar generation or if you have changed parameters
+# Delete the generated polars.
+# Useful if you want to benchmark the polar generation or if you have changed parameters.
 
 file1="data/ram_air_kite/ram_air_kite_foil_cl_polar.csv"
 file2="data/ram_air_kite/ram_air_kite_foil_cd_polar.csv"

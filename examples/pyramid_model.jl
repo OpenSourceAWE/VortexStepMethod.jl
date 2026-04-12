@@ -1,8 +1,9 @@
+using Pkg
+Pkg.activate(@__DIR__)
+
 using LinearAlgebra
 using VortexStepMethod
 using GLMakie
-
-project_dir = dirname(dirname(pathof(VortexStepMethod)))  # Go up one level from src to project root
 
 # Load VSM vsm_settings from YAML configuration file
 vsm_settings = VSMSettings("pyramid_model/vsm_settings.yaml")

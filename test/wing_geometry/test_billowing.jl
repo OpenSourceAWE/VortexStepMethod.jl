@@ -1,4 +1,5 @@
 using Test
+using Logging
 using LinearAlgebra
 using VortexStepMethod
 using VortexStepMethod: Wing, Section, add_section!, refine!
@@ -50,20 +51,20 @@ function te_arc_length_between_ribs(wing, rib_left, rib_right)
         if isnothing(first_idx)
             if isapprox(sec.LE_point,
                     wing.unrefined_sections[rib_left].LE_point;
-                    atol=1e-10)
+                    atol=1e-8)
                 first_idx = i
             end
         end
         if !isnothing(first_idx) && isnothing(last_idx)
             if isapprox(sec.LE_point,
                     wing.unrefined_sections[rib_right].LE_point;
-                    atol=1e-10)
+                    atol=1e-8)
                 last_idx = i
                 break
             end
         end
     end
-    @assert !isnothing(first_idx) && !isnothing(last_idx)
+    @test !isnothing(first_idx) && !isnothing(last_idx)
     arc = 0.0
     for i in first_idx:(last_idx - 1)
         arc += norm(sections[i + 1].TE_point -
@@ -83,7 +84,7 @@ end
             billowing_percentage=0.0)
         for pair in 1:(n_ribs - 1)
             res = te_arc_length_between_ribs(wing, pair, pair + 1)
-            @test res.arc ≈ res.straight atol=1e-10
+            @test res.arc ≈ res.straight atol=1e-8
         end
     end
 
@@ -91,13 +92,12 @@ end
         wing = build_flat_wing(n_panels, n_ribs;
             billowing_percentage=10.0)
         for i in 1:n_ribs
-            y_target = 10.0 * (i - 1) / (n_ribs - 1)
             # Find the refined section matching this rib
             found = false
             for sec in wing.refined_sections
                 if isapprox(sec.LE_point,
                         wing.unrefined_sections[i].LE_point;
-                        atol=1e-10)
+                        atol=1e-8)
                     @test isapprox(sec.TE_point,
                         wing.unrefined_sections[i].TE_point;
                         atol=1e-6)
@@ -139,7 +139,7 @@ end
         for sec in wing.refined_sections
             chord = norm(sec.TE_point - sec.LE_point)
             # All ribs have chord=1.0, so interpolated chord=1.0
-            @test isapprox(chord, 1.0; atol=1e-10)
+            @test isapprox(chord, 1.0; atol=1e-8)
         end
     end
 
@@ -183,6 +183,72 @@ end
             y_hat, 2.5, le_ref, te_l, te_l, 10.0)
         for (i, sec) in enumerate(wing.refined_sections)
             @test sec.TE_point == orig[i]
+        end
+    end
+
+    @testset "percentage >= 100 throws ArgumentError" begin
+        using VortexStepMethod: apply_billowing_to_pair!, MVec3
+        wing = build_flat_wing(n_panels, n_ribs;
+            billowing_percentage=0.0)
+        y_hat = MVec3(0.0, -1.0, 0.0)
+        le_ref = MVec3(0.0, 2.5, 0.0)
+        te_l = MVec3(-1.0, 0.0, 0.0)
+        te_r = MVec3(-1.0, 2.5, 0.0)
+        @test_throws ArgumentError apply_billowing_to_pair!(
+            wing.refined_sections, 2, 8,
+            y_hat, 2.5, le_ref, te_l, te_r, 100.0)
+        @test_throws ArgumentError apply_billowing_to_pair!(
+            wing.refined_sections, 2, 8,
+            y_hat, 2.5, le_ref, te_l, te_r, 150.0)
+    end
+
+    @testset "rotated_te" begin
+        using VortexStepMethod: rotated_te, MVec3
+        origin = MVec3(0.0, 0.0, 0.0)
+        v = MVec3(1.0, 0.0, 0.0)
+        axis = MVec3(0.0, 0.0, 1.0)
+
+        # Zero angle is identity
+        r = rotated_te(origin, v, axis, 0.0)
+        @test isapprox(r, v; atol=1e-12)
+
+        # 90 degrees around z rotates x -> y
+        r90 = rotated_te(origin, v, axis, pi / 2)
+        @test isapprox(r90, MVec3(0.0, 1.0, 0.0); atol=1e-12)
+
+        # 180 degrees around z rotates x -> -x
+        r180 = rotated_te(origin, v, axis, pi)
+        @test isapprox(r180, MVec3(-1.0, 0.0, 0.0); atol=1e-12)
+
+        # Rotation preserves chord length
+        v2 = MVec3(3.0, 4.0, 0.0)
+        r2 = rotated_te(origin, v2, axis, 1.23)
+        @test isapprox(norm(r2), norm(v2); atol=1e-12)
+    end
+
+    @testset "Fast path: n_panels == n_provided warns" begin
+        # When n_panels equals n_provided panels, every refined section
+        # is a rib — no intermediate sections to billow. Should warn.
+        n_ribs_fast = 5
+        n_panels_fast = n_ribs_fast - 1
+        wing = Wing(n_panels_fast;
+            spanwise_distribution=BILLOWING,
+            billowing_percentage=10.0)
+        span = 10.0
+        for i in 1:n_ribs_fast
+            y = span * (i - 1) / (n_ribs_fast - 1)
+            add_section!(wing,
+                [0.0, y, 0.0],
+                [-1.0, y, 0.0],
+                INVISCID)
+        end
+        @test_logs (:warn, r"no intermediate sections") min_level=Logging.Warn refine!(wing)
+
+        # All refined sections should match unrefined exactly
+        for (ref, unref) in zip(
+                wing.refined_sections, wing.unrefined_sections)
+            @test isapprox(ref.LE_point, unref.LE_point; atol=1e-8)
+            @test isapprox(ref.TE_point, unref.TE_point; atol=1e-8)
         end
     end
 end

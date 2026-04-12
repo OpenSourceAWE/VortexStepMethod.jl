@@ -1,13 +1,16 @@
+using Pkg
+Pkg.activate(@__DIR__)
+
 using LinearAlgebra
 using VortexStepMethod
 using GLMakie
-using DelimitedFiles
 
-PLOT = true
+const PLOT = true
 USE_TEX = false
 
 # Data paths (all within this repo)
-project_dir = dirname(dirname(pathof(VortexStepMethod)))
+vsm_src_path = something(pathof(VortexStepMethod), @__FILE__)
+project_dir = normpath(joinpath(dirname(vsm_src_path), ".."))
 v3_dir = joinpath(project_dir, "data", "TUDELFT_V3_KITE")
 polar_dir = joinpath(v3_dir, "polars_CFD_NF_combined")
 
@@ -20,7 +23,7 @@ literature_paths = [
     joinpath(lit_dir, "windtunnel_alpha_sweep_beta_00_0_Poland_2025_Rey_5e5.csv"),
 ]
 
-# Load solver settings (coarse: 36 panels, matches 10-section geometry)
+# Load solver settings (coarse: 54 panels, matches 10-section geometry)
 settings_data = VortexStepMethod.YAML.load_file(
     joinpath(v3_dir, "vsm_settings_coarse.yaml"))
 condition_cfg = settings_data["condition"]
@@ -125,8 +128,10 @@ println("\nFlat wing: CL=$(round(results_flat["cl"]; digits=4)), " *
 println("Billowed:  CL=$(round(results_bill["cl"]; digits=4)), " *
         "CD=$(round(results_bill["cd"]; digits=4))")
 
-if PLOT
-    fig1 = plot_combined_analysis(
+function show_plot(solver_flat, solver_bill, body_aero_flat, body_aero_bill,
+                   results_flat, results_bill, labels, literature_paths,
+                   angle_of_attack_deg, sideslip_deg, wind_speed)
+    scr = display(plot_combined_analysis(
         [solver_flat, solver_bill],
         [body_aero_flat, body_aero_bill],
         [results_flat, results_bill];
@@ -142,9 +147,27 @@ if PLOT
         is_show=false,
         use_tex=USE_TEX,
         angle_of_attack_for_spanwise_distribution=10.0,
+    ))
+    if isinteractive()
+        wait(scr)
+    end
+    return nothing
+end
+
+if PLOT
+    show_plot(
+        solver_flat,
+        solver_bill,
+        body_aero_flat,
+        body_aero_bill,
+        results_flat,
+        results_bill,
+        labels,
+        literature_paths,
+        angle_of_attack_deg,
+        sideslip_deg,
+        wind_speed,
     )
-    scr1 = display(fig1)
-    isinteractive() && wait(scr1)
 end
 
 nothing

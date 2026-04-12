@@ -10,8 +10,8 @@ using VortexStepMethod
 using Test
 
 # Resolve repo data directory for ram air kite assets
-const _ram_data_dir = joinpath(dirname(dirname(@__DIR__)),
-                               "data", "ram_air_kite")
+_ram_data_dir = joinpath(dirname(dirname(@__DIR__)),
+                         "data", "ram_air_kite")
 
 # Helper to robustly delete files on platforms with occasional file locks
 safe_rm(path) = begin
@@ -30,16 +30,16 @@ safe_rm(path) = begin
     nothing
 end
 
-if !@isdefined ram_wing
+let
     body_path = joinpath(tempdir(), "ram_air_kite_body.obj")
     foil_path = joinpath(tempdir(), "ram_air_kite_foil.dat")
     body_src = joinpath(_ram_data_dir, "ram_air_kite_body.obj")
     foil_src = joinpath(_ram_data_dir, "ram_air_kite_foil.dat")
     cp(body_src, body_path; force=true)
     cp(foil_src, foil_path; force=true)
-    ram_wing = ObjWing(body_path, foil_path;
-                       alpha_range=deg2rad.(-1:1),
-                       delta_range=deg2rad.(-1:1))
+    global ram_wing = ObjWing(body_path, foil_path;
+                              alpha_range=deg2rad.(-1:1),
+                              delta_range=deg2rad.(-1:1))
 end
 
 function create_body_aero()
@@ -149,6 +149,61 @@ end
     end
     @test isfile(joinpath(save_dir, "Rectangular_Wing_Polars.png"))
     safe_rm(joinpath(save_dir, "Rectangular_Wing_Polars.png"))
+
+    # Plot polars with CL vs CD (cl_over_cd=false)
+    fig = plot_polars(
+        [llt_solver, vsm_solver],
+        [body_aero, body_aero],
+        ["VSM", "LLT"],
+        angle_range=angle_range,
+        angle_type="angle_of_attack",
+        v_a=v_a,
+        title="Polars CL vs CD",
+        is_save=false,
+        is_show=false,
+        cl_over_cd=false
+    )
+    if backend == "Makie"
+        @test fig isa Figure
+    else
+        @test fig !== nothing
+    end
+
+    # Plot combined analysis with cl_over_cd
+    fig = plot_combined_analysis(
+        vsm_solver, body_aero, results_vsm;
+        angle_range=angle_range,
+        angle_type="angle_of_attack",
+        angle_of_attack=30.0,
+        v_a=v_a,
+        title="Combined Analysis",
+        is_save=false,
+        is_show=false,
+        cl_over_cd=true
+    )
+    if backend == "Makie"
+        @test fig isa Figure
+    else
+        @test fig !== nothing
+    end
+
+    # Plot combined analysis with cl_over_cd=false
+    fig = plot_combined_analysis(
+        vsm_solver, body_aero, results_vsm;
+        angle_range=angle_range,
+        angle_type="angle_of_attack",
+        angle_of_attack=30.0,
+        v_a=v_a,
+        title="Combined CL vs CD",
+        is_save=false,
+        is_show=false,
+        cl_over_cd=false
+    )
+    if backend == "Makie"
+        @test fig isa Figure
+    else
+        @test fig !== nothing
+    end
 
     # Test polar data plotting
     body_aero = BodyAerodynamics([ram_wing])

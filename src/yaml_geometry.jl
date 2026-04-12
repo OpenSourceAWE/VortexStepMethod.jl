@@ -107,7 +107,8 @@ function load_polar_data(csv_file_path::String)
             data_vectors[col] = Float64[]
         end
 
-        for line_num in 2:length(lines)
+        for line_num in eachindex(lines)
+            line_num == firstindex(lines) && continue
             line = strip(lines[line_num])
             isempty(line) && continue  # Skip empty lines
             
