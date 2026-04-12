@@ -202,27 +202,26 @@ end
             y_hat, 2.5, le_ref, te_l, te_r, 150.0)
     end
 
-    @testset "rodrigues_rotate" begin
-        using VortexStepMethod: rodrigues_rotate, MVec3
-        v = MVec3(1.0, 0.0, 0.0)
+    @testset "rotated_te" begin
+        using VortexStepMethod: rotated_te, MVec3
+        le = MVec3(0.0, 0.0, 0.0)
+        te = MVec3(1.0, 0.0, 0.0)
         axis = MVec3(0.0, 0.0, 1.0)
 
         # Zero angle is identity
-        r = rodrigues_rotate(v, axis, 0.0)
-        @test isapprox(r, v; atol=1e-12)
+        r = rotated_te(le, te, axis, 0.0)
+        @test isapprox(r[1], 1.0; atol=1e-12)
+        @test isapprox(r[2], 0.0; atol=1e-12)
+        @test isapprox(r[3], 0.0; atol=1e-12)
 
-        # 90 degrees around z rotates x -> y
-        r90 = rodrigues_rotate(v, axis, pi / 2)
-        @test isapprox(r90, MVec3(0.0, 1.0, 0.0); atol=1e-12)
+        # 90 degrees around z rotates chord x -> y
+        r90 = rotated_te(le, te, axis, pi / 2)
+        @test isapprox(r90[1], 0.0; atol=1e-12)
+        @test isapprox(r90[2], 1.0; atol=1e-12)
 
-        # 180 degrees around z rotates x -> -x
-        r180 = rodrigues_rotate(v, axis, pi)
-        @test isapprox(r180, MVec3(-1.0, 0.0, 0.0); atol=1e-12)
-
-        # Rotation preserves vector length
-        v2 = MVec3(3.0, 4.0, 0.0)
-        r2 = rodrigues_rotate(v2, axis, 1.23)
-        @test isapprox(norm(r2), norm(v2); atol=1e-12)
+        # Rotation preserves chord length
+        r_any = rotated_te(le, te, axis, 1.23)
+        @test isapprox(norm(r_any .- le), norm(te .- le); atol=1e-12)
     end
 
     @testset "Fast path: n_panels == n_provided warns" begin

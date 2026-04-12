@@ -505,4 +505,103 @@ end
         end
 
     end
+
+    @testset "UNCHANGED preserves sections exactly" begin
+        n_panels = 4
+        span = 10.0
+        wing = Wing(n_panels; spanwise_distribution=UNCHANGED)
+        ys = range(span/2, -span/2; length=n_panels+1)
+        for y in ys
+            add_section!(wing,
+                [0.0, y, 0.0], [-1.0, y, 0.0], INVISCID)
+        end
+        refine!(wing)
+        @test length(wing.refined_sections) == n_panels + 1
+        for (i, sec) in enumerate(wing.refined_sections)
+            @test isapprox(sec.LE_point,
+                wing.unrefined_sections[i].LE_point;
+                atol=1e-14)
+            @test isapprox(sec.TE_point,
+                wing.unrefined_sections[i].TE_point;
+                atol=1e-14)
+            chord = norm(sec.TE_point - sec.LE_point)
+            @test isapprox(chord, 1.0; atol=1e-14)
+        end
+        # Re-refine preserves same result
+        refine!(wing)
+        for (i, sec) in enumerate(wing.refined_sections)
+            @test isapprox(sec.LE_point,
+                wing.unrefined_sections[i].LE_point;
+                atol=1e-14)
+        end
+    end
+
+    @testset "COSINE concentrates panels at tips" begin
+        n_panels = 20
+        span = 10.0
+        wing = Wing(n_panels; spanwise_distribution=COSINE)
+        add_section!(wing,
+            [0.0, span/2, 0.0], [-1.0, span/2, 0.0],
+            INVISCID)
+        add_section!(wing,
+            [0.0, -span/2, 0.0], [-1.0, -span/2, 0.0],
+            INVISCID)
+        refine!(wing)
+        sections = wing.refined_sections
+        @test length(sections) == n_panels + 1
+        # Endpoints match
+        @test isapprox(sections[1].LE_point[2],
+            span/2; atol=1e-10)
+        @test isapprox(sections[end].LE_point[2],
+            -span/2; atol=1e-10)
+        # Tip spacing smaller than root spacing
+        tip_gap = abs(sections[1].LE_point[2] -
+            sections[2].LE_point[2])
+        mid = div(n_panels, 2) + 1
+        root_gap = abs(sections[mid].LE_point[2] -
+            sections[mid+1].LE_point[2])
+        @test tip_gap < root_gap
+        # All chords preserved
+        for sec in sections
+            @test isapprox(
+                norm(sec.TE_point - sec.LE_point),
+                1.0; atol=1e-10)
+        end
+    end
+
+    @testset "SPLIT_PROVIDED chord preservation" begin
+        n_panels = 12
+        n_ribs = 4
+        span = 9.0
+        wing = Wing(n_panels;
+            spanwise_distribution=SPLIT_PROVIDED)
+        for i in 1:n_ribs
+            y = span/2 - (i-1) * span / (n_ribs - 1)
+            add_section!(wing,
+                [0.0, y, 0.0], [-1.0, y, 0.0], INVISCID)
+        end
+        refine!(wing)
+        @test length(wing.refined_sections) == n_panels + 1
+        for sec in wing.refined_sections
+            @test isapprox(
+                norm(sec.TE_point - sec.LE_point),
+                1.0; atol=1e-10)
+        end
+        # Rib endpoints preserved
+        for i in 1:n_ribs
+            found = false
+            for sec in wing.refined_sections
+                if isapprox(sec.LE_point,
+                        wing.unrefined_sections[i].LE_point;
+                        atol=1e-10)
+                    @test isapprox(sec.TE_point,
+                        wing.unrefined_sections[i].TE_point;
+                        atol=1e-10)
+                    found = true
+                    break
+                end
+            end
+            @test found
+        end
+    end
 end
