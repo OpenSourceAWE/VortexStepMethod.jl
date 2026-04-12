@@ -5,7 +5,7 @@ using LinearAlgebra
 using VortexStepMethod
 using GLMakie
 
-const PLOT = true
+PLOT = true
 USE_TEX = false
 
 # Data paths (all within this repo)
