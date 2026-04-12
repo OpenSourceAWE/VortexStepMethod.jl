@@ -50,7 +50,7 @@ results_vsm_base = solve_base!(vsm_solver, body_aero, nothing)
 println("Rectangular wing, solve_base!:")
 @time results_vsm_base = solve_base!(vsm_solver, body_aero, nothing)
 # time Python: 32.0  ms Ryzen 7950x
-# time Julia:   0.42 ms Ryzen 7950x
+# time Julia:   0.34 ms Ryzen 7950x
 println("Rectangular wing, solve!:")
 @time sol = solve!(vsm_solver, body_aero, nothing)
 println("Rectangular wing, solve:")
