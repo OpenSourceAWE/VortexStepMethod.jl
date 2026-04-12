@@ -39,8 +39,6 @@ end
 
 Function to update a [Section](@ref) in place.
 """
-@inline _section_sort_key(s::Section) = s.LE_point[2]
-
 function reinit!(section::Section, LE_point, TE_point, aero_model=nothing, aero_data=nothing)
     section.LE_point .= LE_point
     section.TE_point .= TE_point
@@ -841,17 +839,16 @@ function refine!(wing::AbstractWing; recompute_mapping=true, sort_sections=true)
     # Only sort sections if requested (skip for REFINE wings with fixed structural order)
     #TODO: only works if can be sorted by global y position
     if sort_sections
-        # Check if already sorted (descending by LE y)
         sorted = true
         for i in 1:(length(wing.unrefined_sections) - 1)
-            if _section_sort_key(wing.unrefined_sections[i]) <
-               _section_sort_key(wing.unrefined_sections[i+1])
+            if wing.unrefined_sections[i].LE_point[2] <
+               wing.unrefined_sections[i+1].LE_point[2]
                 sorted = false
                 break
             end
         end
         sorted || sort!(wing.unrefined_sections;
-            by=_section_sort_key, rev=true)
+            by=s -> s.LE_point[2], rev=true)
     end
     n_sections = wing.n_panels + 1
     reuse_aero_data = _can_reuse_prior_refined_polar_data(wing, n_sections)
@@ -904,9 +901,7 @@ function refine!(wing::AbstractWing; recompute_mapping=true, sort_sections=true)
     elseif wing.spanwise_distribution == BILLOWING
         refine_mesh_with_billowing!(wing; reuse_aero_data)
     else
-        throw(ArgumentError(
-            "Unsupported spanwise panel distribution: " *
-            "$(wing.spanwise_distribution)"))
+        throw(ArgumentError("Unsupported spanwise panel distribution: $(wing.spanwise_distribution)"))
     end
 
     # Compute panel mapping by finding closest unrefined section for each refined panel
@@ -1003,7 +998,7 @@ end
 Interpolate aerodynamic input between two sections.
 """
 function calculate_new_aero_data(
-    sections::Vector{Section},
+    sections::AbstractVector{Section},
     section_index::Int,
     left_weight::Float64,
     right_weight::Float64
@@ -1109,12 +1104,12 @@ function refine_mesh_for_linear_cosine_distribution!(
     idx,
     spanwise_distribution::PanelDistribution,
     n_sections::Int,
-    sections::Vector{Section};
+    sections::AbstractVector{Section};
+    endpoints::Bool=true,
     reuse_aero_data::Bool=false)
 
     n_input = length(sections)
 
-    # Inline LE/TE accessor
     @inline _le(s, j) = @inbounds s.LE_point[j]
     @inline _te(s, j) = @inbounds s.TE_point[j]
 
@@ -1124,10 +1119,8 @@ function refine_mesh_for_linear_cosine_distribution!(
         d = 0.0
         s_i = sections[i]; s_ip = sections[i+1]
         for j in 1:3
-            qc_j = (_le(s_ip,j) + 0.25*(_te(s_ip,j) -
-                _le(s_ip,j))) -
-                (_le(s_i,j) + 0.25*(_te(s_i,j) -
-                _le(s_i,j)))
+            qc_j = (_le(s_ip,j) + 0.25*(_te(s_ip,j) - _le(s_ip,j))) -
+                    (_le(s_i,j) + 0.25*(_te(s_i,j) - _le(s_i,j)))
             d += qc_j * qc_j
         end
         qc_total += sqrt(d)
@@ -1144,17 +1137,15 @@ function refine_mesh_for_linear_cosine_distribution!(
             qc_total * (1-cos(π*(i-1)/(n_sections-1))) / 2
         end
 
-        # Linear scan to find segment (n_input is small)
+        # Linear scan to find segment
         cum = 0.0
         si = 1
         for k in 1:(n_input - 1)
             d = 0.0
             s_k = sections[k]; s_kp = sections[k+1]
             for j in 1:3
-                qc_j = (_le(s_kp,j) + 0.25*(_te(s_kp,j)-
-                    _le(s_kp,j))) -
-                    (_le(s_k,j) + 0.25*(_te(s_k,j)-
-                    _le(s_k,j)))
+                qc_j = (_le(s_kp,j) + 0.25*(_te(s_kp,j)-_le(s_kp,j))) -
+                        (_le(s_k,j) + 0.25*(_te(s_k,j)-_le(s_k,j)))
                 d += qc_j * qc_j
             end
             next_cum = cum + sqrt(d)
@@ -1166,18 +1157,15 @@ function refine_mesh_for_linear_cosine_distribution!(
         end
         s_l = sections[si]; s_r = sections[si + 1]
 
-        # Recompute segment length for this pair
+        # Segment length for interpolation weight
         seg_d = 0.0
         for j in 1:3
-            qc_j = (_le(s_r,j) + 0.25*(_te(s_r,j) -
-                _le(s_r,j))) -
-                (_le(s_l,j) + 0.25*(_te(s_l,j) -
-                _le(s_l,j)))
+            qc_j = (_le(s_r,j) + 0.25*(_te(s_r,j)-_le(s_r,j))) -
+                    (_le(s_l,j) + 0.25*(_te(s_l,j)-_le(s_l,j)))
             seg_d += qc_j * qc_j
         end
         seg_len = sqrt(seg_d)
-        t = seg_len > 1e-30 ?
-            (target - cum) / seg_len : 0.0
+        t = seg_len > 1e-30 ? (target - cum) / seg_len : 0.0
         wl = 1 - t; wr = t
 
         lc_len = 0.0; rc_len = 0.0
@@ -1188,34 +1176,29 @@ function refine_mesh_for_linear_cosine_distribution!(
         lc_len = sqrt(lc_len); rc_len = sqrt(rc_len)
 
         for j in 1:3
-            dir[j] = wl * (_te(s_l,j)-_le(s_l,j)) /
-                max(lc_len, 1e-12) +
-                wr * (_te(s_r,j)-_le(s_r,j)) /
-                max(rc_len, 1e-12)
+            dir[j] = wl * (_te(s_l,j)-_le(s_l,j)) / max(lc_len, 1e-12) +
+                     wr * (_te(s_r,j)-_le(s_r,j)) / max(rc_len, 1e-12)
         end
         dir_len = sqrt(dir[1]^2+dir[2]^2+dir[3]^2)
         avg_len = wl * lc_len + wr * rc_len
 
         for j in 1:3
-            qc_j = _le(s_l,j) +
-                0.25*(_te(s_l,j)-_le(s_l,j)) +
-                t * ((_le(s_r,j) +
-                0.25*(_te(s_r,j)-_le(s_r,j))) -
-                (_le(s_l,j) +
-                0.25*(_te(s_l,j)-_le(s_l,j))))
-            chord_j = dir[j] / max(dir_len, 1e-12) *
-                avg_len
+            qc_j = _le(s_l,j) + 0.25*(_te(s_l,j)-_le(s_l,j)) +
+                t * ((_le(s_r,j) + 0.25*(_te(s_r,j)-_le(s_r,j))) -
+                     (_le(s_l,j) + 0.25*(_te(s_l,j)-_le(s_l,j))))
+            chord_j = dir[j] / max(dir_len, 1e-12) * avg_len
             new_le[j] = qc_j - 0.25 * chord_j
             new_te[j] = qc_j + 0.75 * chord_j
         end
 
         new_data = reuse_aero_data ? nothing :
-            calculate_new_aero_data(
-                sections, si, wl, wr)
+            calculate_new_aero_data(sections, si, wl, wr)
 
-        reinit!(wing.refined_sections[idx],
-            new_le, new_te, s_l.aero_model, new_data)
-        idx += 1
+        if endpoints || (i != 1 && i != n_sections)
+            reinit!(wing.refined_sections[idx],
+                new_le, new_te, s_l.aero_model, new_data)
+            idx += 1
+        end
     end
 
     return idx
@@ -1262,94 +1245,78 @@ function refine_mesh_for_linear_cosine_distribution!(
     endpoints=true,
     reuse_aero_data::Bool=false)
 
-    n_input = size(LE, 1)
+    # 1. Compute quarter chord line
+    quarter_chord = LE .+ 0.25 .* (TE .- LE)
 
-    # 1. Compute quarter chord points and cumulative lengths
-    #    using scalar arithmetic to avoid matrix allocations
-    qc_cum = Vector{Float64}(undef, n_input)
-    qc_cum[1] = 0.0
-    for i in 1:(n_input - 1)
-        d = 0.0
-        for j in 1:3
-            qc_j = (LE[i+1,j] + 0.25*(TE[i+1,j]-LE[i+1,j])) -
-                    (LE[i,j]   + 0.25*(TE[i,j]  -LE[i,j]))
-            d += qc_j * qc_j
-        end
-        qc_cum[i+1] = qc_cum[i] + sqrt(d)
+    # Calculate segment lengths
+    qc_lengths = [norm(quarter_chord[i+1,:] - quarter_chord[i,:]) for i in 1:size(quarter_chord,1)-1]
+    qc_total_length = sum(qc_lengths)
+    qc_cum_length = vcat(0, cumsum(qc_lengths))
+
+    # 2. Define target lengths
+    target_lengths = if spanwise_distribution == LINEAR
+        range(0, qc_total_length, n_sections)
+    elseif spanwise_distribution == COSINE
+        theta = range(0, π, n_sections)
+        qc_total_length .* (1 .- cos.(theta)) ./ 2
+    else
+        throw(ArgumentError("Unsupported distribution: $spanwise_distribution"))
     end
-    qc_total = qc_cum[end]
 
-    # 2. Iterate over target positions
-    new_le = MVec3(0.0, 0.0, 0.0)
-    new_te = MVec3(0.0, 0.0, 0.0)
-
+    # Initialize arrays
+    new_quarter_chord = zeros(Float64, n_sections, 3)
+    new_LE = zeros(Float64, n_sections, 3)
+    new_TE = zeros(Float64, n_sections, 3)
+    # 3. Calculate new points and interpolate
     for i in 1:n_sections
-        # Target length along quarter-chord
-        target = if spanwise_distribution == LINEAR
-            qc_total * (i - 1) / (n_sections - 1)
-        else  # COSINE
-            qc_total * (1 - cos(π * (i-1) / (n_sections-1))) / 2
-        end
+        target_length = target_lengths[i]
 
-        # Find segment via binary search
-        si = searchsortedlast(qc_cum, target)
-        si = clamp(si, 1, n_input - 1)
+        # Find segment index
+        section_index = searchsortedlast(qc_cum_length, target_length)
+        section_index = clamp(section_index, 1, length(qc_cum_length)-1)
 
-        # Interpolation weight
-        seg_len = qc_cum[si+1] - qc_cum[si]
-        t = seg_len > 1e-30 ?
-            (target - qc_cum[si]) / seg_len : 0.0
-        wl = 1 - t; wr = t
+        # 4. Calculate weights
+        segment_start = qc_cum_length[section_index]
+        segment_end = qc_cum_length[section_index+1]
+        t = (target_length - segment_start) / (segment_end - segment_start)
+        left_weight = 1 - t
+        right_weight = t
 
-        # Interpolate chord direction and length
-        lc_len = 0.0; rc_len = 0.0
-        for j in 1:3
-            @inbounds new_le[j] = LE[si,j] + t*(LE[si+1,j]-LE[si,j])
-            @inbounds new_te[j] = TE[si,j] + t*(TE[si+1,j]-TE[si,j])
-        end
-        for j in 1:3
-            @inbounds lc_len += (TE[si,j]-LE[si,j])^2
-            @inbounds rc_len += (TE[si+1,j]-LE[si+1,j])^2
-        end
-        lc_len = sqrt(lc_len); rc_len = sqrt(rc_len)
+        # 5. Calculate quarter chord point
+        new_quarter_chord[i,:] = quarter_chord[section_index,:] +
+                                t .* (quarter_chord[section_index+1,:] - quarter_chord[section_index,:])
 
-        # Interpolated chord direction (normalised)
-        dir = MVec3(0.0, 0.0, 0.0)
-        for j in 1:3
-            @inbounds dir[j] = (
-                wl * (TE[si,j]-LE[si,j]) /
-                    max(lc_len, 1e-12) +
-                wr * (TE[si+1,j]-LE[si+1,j]) /
-                    max(rc_len, 1e-12))
-        end
-        dir_len = sqrt(dir[1]^2 + dir[2]^2 + dir[3]^2)
-        avg_len = wl * lc_len + wr * rc_len
+        # 6. Calculate chord vectors
+        left_chord = TE[section_index,:] - LE[section_index,:]
+        right_chord = TE[section_index+1,:] - LE[section_index+1,:]
 
-        # Quarter chord point
-        for j in 1:3
-            @inbounds begin
-                qc_j = LE[si,j] +
-                    0.25*(TE[si,j]-LE[si,j]) +
-                    t * ((LE[si+1,j] +
-                    0.25*(TE[si+1,j]-LE[si+1,j])) -
-                    (LE[si,j] +
-                    0.25*(TE[si,j]-LE[si,j])))
-                chord_j = dir[j] / max(dir_len, 1e-12) *
-                    avg_len
-                new_le[j] = qc_j - 0.25 * chord_j
-                new_te[j] = qc_j + 0.75 * chord_j
-            end
-        end
+        # Normalize chord vectors
+        left_chord_norm = left_chord ./ max(norm(left_chord), 1e-12)
+        right_chord_norm = right_chord ./ max(norm(right_chord), 1e-12)
 
-        # Interpolate aero properties
+        # Interpolate direction
+        avg_direction = left_weight .* left_chord_norm .+ right_weight .* right_chord_norm
+        avg_direction = avg_direction ./ max(norm(avg_direction), 1e-12)
+
+        # Interpolate length
+        left_length = norm(left_chord)
+        right_length = norm(right_chord)
+        avg_length = left_weight * left_length + right_weight * right_length
+
+        # Final chord vector
+        avg_chord = avg_direction .* avg_length
+
+        # Calculate LE and TE points
+        new_LE[i,:] = new_quarter_chord[i,:] .- 0.25 .* avg_chord
+        new_TE[i,:] = new_quarter_chord[i,:] .+ 0.75 .* avg_chord
+
+        # Interpolate aero properties unless reusing prior refined section aero.
         new_data = reuse_aero_data ? nothing :
-            calculate_new_aero_data(
-                aero_model, aero_data, si, wl, wr)
+            calculate_new_aero_data(aero_model, aero_data, section_index, left_weight, right_weight)
 
-        # Store section
+        # Create new section
         if endpoints || (i != 1 && i != n_sections)
-            reinit!(wing.refined_sections[idx],
-                new_le, new_te, aero_model[1], new_data)
+            @views reinit!(wing.refined_sections[idx], new_LE[i,:], new_TE[i,:], aero_model[1], new_data)
             idx += 1
         end
     end
@@ -1396,22 +1363,18 @@ function refine_mesh_by_splitting_provided_sections!(
     n_section_pairs = n_sections_provided - 1
     new_sections_per_pair, remaining = divrem(n_new_sections, n_section_pairs)
     
-    # Pre-allocate pair buffers to avoid per-pair allocations
-    LE_pair = zeros(Float64, 2, 3)
-    TE_pair = zeros(Float64, 2, 3)
+    # Process each section pair (no extraction — read sections directly)
     sections = wing.unrefined_sections
-
-    # Process each section pair
     idx = 1
     for li in 1:n_section_pairs
+        s_l = sections[li]; s_r = sections[li + 1]
+
         # Add left section of pair
         if reuse_aero_data
-            left = sections[li]
             reinit!(wing.refined_sections[idx],
-                left.LE_point, left.TE_point,
-                left.aero_model)
+                s_l.LE_point, s_l.TE_point, s_l.aero_model)
         else
-            reinit!(wing.refined_sections[idx], sections[li])
+            reinit!(wing.refined_sections[idx], s_l)
         end
         idx += 1
 
@@ -1420,26 +1383,12 @@ function refine_mesh_by_splitting_provided_sections!(
             (li <= remaining ? 1 : 0)
 
         if num_new > 0
-            s_l = sections[li]; s_r = sections[li + 1]
-            # Fill pair buffers in-place
-            for j in 1:3
-                LE_pair[1, j] = s_l.LE_point[j]
-                LE_pair[2, j] = s_r.LE_point[j]
-                TE_pair[1, j] = s_l.TE_point[j]
-                TE_pair[2, j] = s_r.TE_point[j]
-            end
-            aero_model_pair = (s_l.aero_model,
-                               s_r.aero_model)
-            aero_data_pair = (s_l.aero_data,
-                              s_r.aero_data)
-
-            # Generate sections for this pair
             start_idx = idx
+            pair_sections = @view sections[li:li+1]
             idx = refine_mesh_for_linear_cosine_distribution!(
                 wing, idx, LINEAR,
-                num_new + 2,  # +2 for endpoints
-                LE_pair, TE_pair,
-                aero_model_pair, aero_data_pair;
+                num_new + 2,
+                pair_sections;
                 endpoints=false, reuse_aero_data)
 
             # Apply billowing by rotating chords around LE
@@ -1490,7 +1439,6 @@ Returns an `SVector{3}` (stack-allocated, zero heap allocs).
 @inline function rotated_te(le, te, y_hat, θ)
     c1 = te[1] - le[1]; c2 = te[2] - le[2]; c3 = te[3] - le[3]
     ct = cos(θ); st = sin(θ)
-    # cross(y_hat, chord)
     cx1 = y_hat[2] * c3 - y_hat[3] * c2
     cx2 = y_hat[3] * c1 - y_hat[1] * c3
     cx3 = y_hat[1] * c2 - y_hat[2] * c1
