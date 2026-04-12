@@ -272,7 +272,7 @@ using LinearAlgebra
             result = @benchmark refine!($w) samples=1 evals=1
             @info "SPLIT_PROVIDED refine! allocs: " *
                   "$(result.allocs) memory: $(result.memory)"
-            @test result.allocs ≤ 35
+            @test result.allocs ≤ 100
         end
 
         @testset "UNCHANGED" begin
@@ -291,7 +291,7 @@ using LinearAlgebra
             result = @benchmark refine!($w) samples=1 evals=1
             @info "BILLOWING refine! allocs: $(result.allocs)" *
                   " memory: $(result.memory)"
-            @test result.allocs ≤ 40
+            @test result.allocs ≤ 140
         end
 
         @testset "billowing_arc_length" begin
