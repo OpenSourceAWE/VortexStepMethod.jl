@@ -15,7 +15,10 @@ using VortexStepMethod: calculate_AIC_matrices!, gamma_loop!, calculate_results,
                        velocity_3D_trailing_vortex!,
                        velocity_3D_trailing_vortex_semiinfinite!,
                        Panel,
-                       reinit!
+                       reinit!,
+                       Wing, add_section!, refine!,
+                       apply_billowing_to_pair!,
+                       billowing_arc_length, MVec3
 using Test
 using LinearAlgebra
 
@@ -223,5 +226,134 @@ using LinearAlgebra
         @test result.allocs <= 55
         result = @benchmark  sol = solve!($nonlin_solver, $body_aero, nothing) samples=1 evals=1
         @test result.allocs <= 110
+    end
+
+    @testset "Refinement Allocation Tests" begin
+        n = 20
+        s = 10.0
+        c = 1.0
+
+        function make_wing(dist, n_panels, n_ribs;
+                           billowing_pct=0.0)
+            w = Wing(n_panels;
+                spanwise_distribution=dist,
+                billowing_percentage=billowing_pct)
+            for i in 1:n_ribs
+                y = s * (i - 1) / (n_ribs - 1)
+                add_section!(w,
+                    [0.0, y, 0.0],
+                    [c, y, 0.0],
+                    INVISCID)
+            end
+            return w
+        end
+
+        @testset "LINEAR" begin
+            w = make_wing(LINEAR, n, 2)
+            refine!(w)
+            result = @benchmark refine!($w) samples=1 evals=1
+            @info "LINEAR refine! allocs: $(result.allocs)" *
+                  " memory: $(result.memory)"
+            @test result.allocs ≤ 70
+        end
+
+        @testset "COSINE" begin
+            w = make_wing(COSINE, n, 2)
+            refine!(w)
+            result = @benchmark refine!($w) samples=1 evals=1
+            @info "COSINE refine! allocs: $(result.allocs)" *
+                  " memory: $(result.memory)"
+            @test result.allocs ≤ 70
+        end
+
+        @testset "SPLIT_PROVIDED" begin
+            w = make_wing(SPLIT_PROVIDED, n, 5)
+            refine!(w)
+            result = @benchmark refine!($w) samples=1 evals=1
+            @info "SPLIT_PROVIDED refine! allocs: " *
+                  "$(result.allocs) memory: $(result.memory)"
+            @test result.allocs ≤ 100
+        end
+
+        @testset "UNCHANGED" begin
+            w = make_wing(UNCHANGED, 4, 5)
+            refine!(w)
+            result = @benchmark refine!($w) samples=1 evals=1
+            @info "UNCHANGED refine! allocs: $(result.allocs)" *
+                  " memory: $(result.memory)"
+            @test result.allocs ≤ 5
+        end
+
+        @testset "BILLOWING" begin
+            w = make_wing(BILLOWING, 4 * 8, 5;
+                          billowing_pct=10.0)
+            refine!(w)
+            result = @benchmark refine!($w) samples=1 evals=1
+            @info "BILLOWING refine! allocs: $(result.allocs)" *
+                  " memory: $(result.memory)"
+            @test result.allocs ≤ 140
+        end
+
+        @testset "billowing_arc_length" begin
+            w = make_wing(BILLOWING, 4 * 8, 5;
+                          billowing_pct=10.0)
+            refine!(w)
+            y_hat = MVec3(0.0, -1.0, 0.0)
+            le_ref = MVec3(w.unrefined_sections[2].LE_point)
+            te_l = MVec3(w.unrefined_sections[1].TE_point)
+            te_r = MVec3(w.unrefined_sections[2].TE_point)
+            span_len = norm(
+                w.unrefined_sections[1].LE_point -
+                w.unrefined_sections[2].LE_point)
+            # warmup
+            billowing_arc_length(
+                w.refined_sections, 2, 9,
+                y_hat, span_len, le_ref,
+                te_l, te_r, 0.3)
+            result = @benchmark billowing_arc_length(
+                $(w.refined_sections), $2, $9,
+                $y_hat, $span_len, $le_ref,
+                $te_l, $te_r, $0.3) samples=1 evals=1
+            @info "billowing_arc_length allocs: " *
+                  "$(result.allocs) memory: $(result.memory)"
+            @test result.allocs == 0
+        end
+
+        @testset "apply_billowing_to_pair!" begin
+            w = make_wing(BILLOWING, 4 * 8, 5;
+                          billowing_pct=10.0)
+            refine!(w)
+            # Reset TE to linear interpolation for re-application
+            w2 = make_wing(SPLIT_PROVIDED, 4 * 8, 5)
+            refine!(w2)
+            for (s1, s2) in zip(
+                    w.refined_sections, w2.refined_sections)
+                s1.TE_point .= s2.TE_point
+            end
+            y_hat = MVec3(0.0, -1.0, 0.0)
+            le_ref = MVec3(w.unrefined_sections[2].LE_point)
+            te_l = MVec3(w.unrefined_sections[1].TE_point)
+            te_r = MVec3(w.unrefined_sections[2].TE_point)
+            span_len = norm(
+                w.unrefined_sections[1].LE_point -
+                w.unrefined_sections[2].LE_point)
+            # warmup
+            apply_billowing_to_pair!(
+                w.refined_sections, 2, 9,
+                y_hat, span_len, le_ref,
+                te_l, te_r, 10.0)
+            # Reset again
+            for (s1, s2) in zip(
+                    w.refined_sections, w2.refined_sections)
+                s1.TE_point .= s2.TE_point
+            end
+            result = @benchmark apply_billowing_to_pair!(
+                $(w.refined_sections), $2, $9,
+                $y_hat, $span_len, $le_ref,
+                $te_l, $te_r, $10.0) samples=1 evals=1
+            @info "apply_billowing_to_pair! allocs: " *
+                  "$(result.allocs) memory: $(result.memory)"
+            @test result.allocs == 0
+        end
     end
 end

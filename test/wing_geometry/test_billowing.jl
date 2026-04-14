@@ -202,26 +202,27 @@ end
             y_hat, 2.5, le_ref, te_l, te_r, 150.0)
     end
 
-    @testset "rodrigues_rotate" begin
-        using VortexStepMethod: rodrigues_rotate, MVec3
+    @testset "rotated_te" begin
+        using VortexStepMethod: rotated_te, MVec3
+        origin = MVec3(0.0, 0.0, 0.0)
         v = MVec3(1.0, 0.0, 0.0)
         axis = MVec3(0.0, 0.0, 1.0)
 
         # Zero angle is identity
-        r = rodrigues_rotate(v, axis, 0.0)
+        r = rotated_te(origin, v, axis, 0.0)
         @test isapprox(r, v; atol=1e-12)
 
         # 90 degrees around z rotates x -> y
-        r90 = rodrigues_rotate(v, axis, pi / 2)
+        r90 = rotated_te(origin, v, axis, pi / 2)
         @test isapprox(r90, MVec3(0.0, 1.0, 0.0); atol=1e-12)
 
         # 180 degrees around z rotates x -> -x
-        r180 = rodrigues_rotate(v, axis, pi)
+        r180 = rotated_te(origin, v, axis, pi)
         @test isapprox(r180, MVec3(-1.0, 0.0, 0.0); atol=1e-12)
 
-        # Rotation preserves vector length
+        # Rotation preserves chord length
         v2 = MVec3(3.0, 4.0, 0.0)
-        r2 = rodrigues_rotate(v2, axis, 1.23)
+        r2 = rotated_te(origin, v2, axis, 1.23)
         @test isapprox(norm(r2), norm(v2); atol=1e-12)
     end
 
