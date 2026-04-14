@@ -1139,9 +1139,13 @@ function refine_mesh_for_linear_cosine_distribution!(
     for i in 1:n_sections
         target = if spanwise_distribution == LINEAR
             qc_total * (i - 1) / (n_sections - 1)
-        else
+        elseif spanwise_distribution == COSINE
             qc_total * (1 - cos(π * (i - 1) /
                 (n_sections - 1))) / 2
+        else
+            throw(ArgumentError(
+                "Unsupported distribution: " *
+                "$spanwise_distribution"))
         end
 
         cum = 0.0
@@ -1437,7 +1441,7 @@ function apply_billowing_to_pair!(
             te_left, te_right, angle_max + δ)
         df = (arc_p - arc) / δ
         abs(df) < 1e-30 && break
-        angle_max -= f / df
+        angle_max = max(0.0, angle_max - f / df)
     end
 
     # Apply converged rotations in-place
