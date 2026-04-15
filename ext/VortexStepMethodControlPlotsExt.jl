@@ -660,7 +660,7 @@ function VortexStepMethod.plot_polars(
             data = readdlm(path, ',')
             header = lowercase.(string.(data[1, :]))
             # Find column indices for alpha, CL, CD, CS (case-insensitive, allow common variants)
-            alpha_idx = findfirst(x -> occursin("alpha", x), header)
+            alpha_idx = findfirst(x -> occursin("alpha", x) || x == "aoa", header)
             cl_idx    = findfirst(x -> occursin("cl", x), header)
             cd_idx    = findfirst(x -> occursin("cd", x), header)
             cs_idx    = findfirst(x -> occursin("cs", x), header)
