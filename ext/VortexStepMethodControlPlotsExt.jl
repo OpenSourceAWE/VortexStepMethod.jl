@@ -79,7 +79,7 @@ function VortexStepMethod.save_plot(fig, save_path, title; data_type=".pdf")
 end
 
 """
-    show_plot(fig; dpi=130)
+    show_plot(fig::plt.Figure; dpi=130)
 
 Display a plot at specified DPI.
 
@@ -89,7 +89,8 @@ Display a plot at specified DPI.
 # Keyword arguments
 - `dpi`: Dots per inch for the figure (default: 130)
 """
-function VortexStepMethod.show_plot(fig; dpi=130)
+function VortexStepMethod.show_plot(fig::plt.Figure; dpi=130)
+    fig.set_dpi(dpi)
     plt.display(fig)
 end
 

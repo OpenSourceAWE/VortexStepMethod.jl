@@ -1,5 +1,6 @@
 backend = if "plot-controlplots" in ARGS
     using ControlPlots
+    import ControlPlots: plt
     "ControlPlots"
 else
     using CairoMakie
@@ -212,6 +213,20 @@ end
         @test fig isa Figure
     else
         @test fig !== nothing
+    end
+
+    if backend == "ControlPlots"
+        fig_dpi = plt.figure()
+        default_dpi = fig_dpi.get_dpi()
+        @test default_dpi != 173
+
+        show_plot(fig_dpi; dpi=173)
+        @test fig_dpi.get_dpi() == 173
+
+        # Also verify the default keyword value is applied.
+        show_plot(fig_dpi)
+        @test fig_dpi.get_dpi() == 130
+        plt.close(fig_dpi)
     end
 end
 nothing
