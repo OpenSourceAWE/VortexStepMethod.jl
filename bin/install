@@ -191,7 +191,7 @@ if ! instantiate_main_with_fallback "." "main"; then
     exit 1
 fi
 
-SUBPROJECTS=("examples" "test" "docs" "scripts")
+SUBPROJECTS=("examples" "examples_cp" "test" "docs" "scripts")
 
 echo
 echo "Instantiating sub-projects..."
@@ -230,7 +230,7 @@ else
     exit 1
 fi
 
-julia --project=. -e 'using Pkg; Pkg.precompile(); Pkg.activate("examples"); Pkg.precompile(); using LinearAlgebra, GLMakie, VortexStepMethod; @info "Precompilation complete."'
+$_julia_cmd --project=. -e 'using Pkg; Pkg.precompile(); Pkg.activate("examples"); Pkg.precompile(); Pkg.activate("examples_cp"); Pkg.precompile(); using LinearAlgebra, GLMakie, VortexStepMethod; @info "Precompilation complete."'
 echo
 echo "Installation complete."
 
