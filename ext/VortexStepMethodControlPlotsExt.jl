@@ -693,30 +693,6 @@ function VortexStepMethod.plot_polars(
     if !isempty(literature_path_list)
         for path in literature_path_list
             raw_data = readdlm(path, ',')
-            table, header = if raw_data isa Tuple
-                # readdlm(...; header=true) returns (data, header)
-                raw_table, raw_header = raw_data
-                raw_table, lowercase.(string.(vec(raw_header)))
-            else
-                # Header is in first row when a single matrix is returned
-                raw_data[2:end, :], lowercase.(string.(raw_data[1, :]))
-            end
-            # Find column indices for alpha, CL, CD, CS (case-insensitive, allow common variants)
-            alpha_idx = findfirst(x -> occursin("alpha", x) || x == "aoa", header)
-            cl_idx    = findfirst(x -> occursin("cl", x), header)
-            cd_idx    = findfirst(x -> occursin("cd", x), header)
-            cs_idx    = findfirst(x -> occursin("cs", x), header)
-            (isnothing(alpha_idx) || isnothing(cl_idx) || isnothing(cd_idx)) &&
-                throw(ArgumentError("Literature CSV must contain alpha/aoa, cl and cd columns: $path"))
-            # Fallback: if CS not found, fill with zeros
-            cs_col = cs_idx === nothing ? zeros(size(table, 1)) : table[:, cs_idx]
-            # Push as [alpha, CL, CD, CS]
-            push!(polar_data_list, [
-                table[:, alpha_idx],
-                table[:, cl_idx],
-                table[:, cd_idx],
-                cs_col
-            ])
             push!(polar_data_list, _extract_literature_polar_data(raw_data, path))
         end
     end
