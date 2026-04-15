@@ -174,7 +174,11 @@ function create_geometry_plot(body_aero::BodyAerodynamics, title, view_elevation
     set_plot_style(28; use_tex)
 
     panels = body_aero.panels
-    va = isa(body_aero.va, Tuple) ? body_aero.va[1] : body_aero.va
+    va = if body_aero.has_distributed_va
+        panels[1].va
+    else
+        isa(body_aero.va, Tuple) ? body_aero.va[1] : body_aero.va
+    end
 
     # Extract geometric data
     corner_points = [panel.corner_points for panel in panels]
