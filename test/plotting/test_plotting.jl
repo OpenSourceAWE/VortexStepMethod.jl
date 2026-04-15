@@ -84,6 +84,12 @@ end
     else
         @test fig !== nothing
     end
+
+    if backend == "Makie"
+        @test hasmethod(VortexStepMethod.show_plot, Tuple{Figure})
+        @test_throws MethodError VortexStepMethod.show_plot(nothing)
+    end
+
     @test isfile(joinpath(save_dir,
                           "Rectangular_wing_geometry_angled_view.png"))
     safe_rm(joinpath(save_dir,
