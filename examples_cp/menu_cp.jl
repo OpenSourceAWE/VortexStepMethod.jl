@@ -1,5 +1,9 @@
 using Pkg
+if !("VortexStepMethod" ∈ keys(Pkg.project().dependencies))
+    Pkg.activate(@__DIR__)
+end
 
+using VortexStepMethod
 using REPL.TerminalMenus
 
 url = "https://opensourceawe.github.io/VortexStepMethod.jl/dev"
