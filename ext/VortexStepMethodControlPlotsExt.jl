@@ -90,6 +90,7 @@ Display a plot at specified DPI.
 - `dpi`: Dots per inch for the figure (default: 130)
 """
 function VortexStepMethod.show_plot(fig; dpi=130)
+    fig.set_dpi(dpi)
     plt.display(fig)
 end
 
@@ -183,7 +184,6 @@ function create_geometry_plot(body_aero::BodyAerodynamics, title, view_elevation
     end
 
     # Extract geometric data
-    corner_points = [panel.corner_points for panel in panels]
     control_points = [panel.control_point for panel in panels]
     aero_centers = [panel.aero_center for panel in panels]
 
@@ -239,7 +239,6 @@ function create_geometry_plot(body_aero::BodyAerodynamics, title, view_elevation
     plot_line_segment!(ax, [va_vector_begin, va_vector_end], :lightblue, "va")
 
     # Add legends for the first occurrence of each label
-    handles, labels = ax.get_legend_handles_labels()
     # by_label = Dict(zip(labels, handles))
     # ax.legend(values(by_label), keys(by_label), bbox_to_anchor=(0, 0, 1.1, 1))
 
@@ -520,6 +519,8 @@ function generate_polar_data(
     v_a=10.0,
     use_latex=false
 )
+    _ = use_latex
+
     n_panels = length(body_aero.panels)
     n_angles = length(angle_range)
 
@@ -532,9 +533,6 @@ function generate_polar_data(
     cd_distribution = zeros(n_angles, n_panels)
     cs_distribution = zeros(n_angles, n_panels)
     reynolds_number = zeros(n_angles)
-
-    # Previous gamma for initialization
-    gamma = nothing
 
     for (i, angle_i) in enumerate(angle_range)
         # Set angle based on type
@@ -569,9 +567,6 @@ function generate_polar_data(
         cd_distribution[i, :] = results["cd_distribution"]
         cs_distribution[i, :] = results["cs_distribution"]
         reynolds_number[i] = results["Rey"]
-
-        # Store gamma for next iteration
-        gamma = gamma_distribution[i, :]
     end
 
     polar_data = [
@@ -896,7 +891,7 @@ function VortexStepMethod.plot_polar_data(body_aero::BodyAerodynamics;
         use_tex = false
         )
     if body_aero.panels[1].aero_model == POLAR_MATRICES
-        set_plot_style()
+    set_plot_style(; use_tex)
 
         # Create figure with subplots
         fig = plt.figure(figsize=(15, 6))
