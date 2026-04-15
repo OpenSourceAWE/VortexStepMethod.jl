@@ -174,8 +174,10 @@ function create_geometry_plot(body_aero::BodyAerodynamics, title, view_elevation
     set_plot_style(28; use_tex)
 
     panels = body_aero.panels
+    isempty(panels) && throw(ArgumentError("Cannot plot geometry: body_aero.panels is empty."))
+
     va = if body_aero.has_distributed_va
-        panels[1].va
+        body_aero._va
     else
         isa(body_aero.va, Tuple) ? body_aero.va[1] : body_aero.va
     end

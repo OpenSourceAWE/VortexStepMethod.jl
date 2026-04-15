@@ -215,6 +215,15 @@ end
     end
 
     if backend == "ControlPlots"
+        body_aero_empty = create_body_aero()
+        empty!(body_aero_empty.panels)
+        @test_throws ArgumentError plot_geometry(
+            body_aero_empty,
+            "Rectangular_wing_geometry_empty_panels";
+            is_save=false,
+            is_show=false,
+        )
+
         body_aero_distributed = create_body_aero()
         n_panels = length(body_aero_distributed.panels)
         va_distribution = repeat([12.0 0.0 1.0], n_panels, 1)
