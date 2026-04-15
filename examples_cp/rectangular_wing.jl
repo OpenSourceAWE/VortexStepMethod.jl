@@ -48,9 +48,9 @@ vsm_solver = Solver(body_aero; aerodynamic_model_type=VSM)
 
 # Step 5: Solve using both methods
 results_llt = solve(llt_solver, body_aero)
-@time results_llt = solve(llt_solver, body_aero)
 results_vsm = solve(vsm_solver, body_aero)
-@time results_vsm = solve(vsm_solver, body_aero)
+@time solve(llt_solver, body_aero)
+@time solve(vsm_solver, body_aero)
 
 # Print results comparison
 println("\nLifting Line Theory Results:")
