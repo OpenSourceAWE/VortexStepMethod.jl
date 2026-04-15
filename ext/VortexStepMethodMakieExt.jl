@@ -249,7 +249,7 @@ Save a Makie figure to a file.
 # Keyword arguments
 - `data_type`: File extension (default: ".png", also supports ".jpeg")
 """
-function VortexStepMethod.save_plot(fig, save_path, title; data_type=".png")
+function VortexStepMethod.save_plot(fig::Makie.Figure, save_path, title; data_type=".png")
     isnothing(save_path) && throw(ArgumentError("save_path should be provided"))
 
     !isdir(save_path) && mkpath(save_path)
@@ -286,7 +286,7 @@ Display a Makie figure.
 # Keyword arguments
 - `dpi`: Dots per inch for the figure (default: 130) - currently unused in Makie
 """
-function VortexStepMethod.show_plot(fig; dpi=130)
+function VortexStepMethod.show_plot(fig::Makie.Figure; dpi=130)
     display(fig)
 end
 
