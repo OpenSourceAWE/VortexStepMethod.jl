@@ -215,9 +215,23 @@ end
     end
 
     if backend == "ControlPlots"
+        body_aero_distributed = create_body_aero()
+        n_panels = length(body_aero_distributed.panels)
+        va_distribution = repeat([12.0 0.0 1.0], n_panels, 1)
+        set_va!(body_aero_distributed, va_distribution)
+
+        @test body_aero_distributed.has_distributed_va
+        fig = plot_geometry(
+            body_aero_distributed,
+            "Rectangular_wing_geometry_distributed_va";
+            is_save=false,
+            is_show=false,
+        )
+        @test fig !== nothing
+
         literature_csv = joinpath(tempdir(), "polar_literature_aoa.csv")
         open(literature_csv, "w") do io
-            write(io, "aoa,cl,cd,cs\n")
+            write(io, "AOA,cl,cd,cs\n")
             write(io, "0.0,0.1,0.01,0.0\n")
             write(io, "5.0,0.5,0.02,0.01\n")
             write(io, "10.0,0.9,0.04,0.02\n")
