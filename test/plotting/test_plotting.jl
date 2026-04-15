@@ -88,6 +88,11 @@ end
     if backend == "Makie"
         @test hasmethod(VortexStepMethod.show_plot, Tuple{Figure})
         @test_throws MethodError VortexStepMethod.show_plot(nothing)
+        @test_nowarn VortexStepMethod.show_plot(fig)
+    else
+        FigType = plt.Figure
+        @test hasmethod(VortexStepMethod.show_plot, Tuple{FigType})
+        @test_throws MethodError VortexStepMethod.show_plot(nothing)
     end
 
     @test isfile(joinpath(save_dir,
