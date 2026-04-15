@@ -119,7 +119,6 @@ PLOT && plot_polars(
 
 
 # Plotting geometry
-results = VortexStepMethod.solve(solver, body_aero; log=true)
 PLOT && plot_geometry(
     body_aero,
     "";
