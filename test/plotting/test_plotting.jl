@@ -213,5 +213,30 @@ end
     else
         @test fig !== nothing
     end
+
+    if backend == "ControlPlots"
+        literature_csv = joinpath(tempdir(), "polar_literature_aoa.csv")
+        open(literature_csv, "w") do io
+            write(io, "aoa,cl,cd,cs\n")
+            write(io, "0.0,0.1,0.01,0.0\n")
+            write(io, "5.0,0.5,0.02,0.01\n")
+            write(io, "10.0,0.9,0.04,0.02\n")
+        end
+
+        try
+            fig = plot_polars(
+                Solver[],
+                BodyAerodynamics[],
+                ["Literature"],
+                literature_path_list=[literature_csv],
+                title="Literature AOA Header",
+                is_save=false,
+                is_show=false,
+            )
+            @test fig !== nothing
+        finally
+            safe_rm(literature_csv)
+        end
+    end
 end
 nothing
