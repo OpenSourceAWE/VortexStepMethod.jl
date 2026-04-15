@@ -82,7 +82,7 @@ function VortexStepMethod.save_plot(fig, save_path, title; data_type=".pdf")
 end
 
 """
-    show_plot(fig; dpi=130)
+    show_plot(fig::plt.Figure; dpi=130)
 
 Display a plot at specified DPI.
 
@@ -587,6 +587,37 @@ function generate_polar_data(
     return polar_data, reynolds_number[1]
 end
 
+function _extract_literature_polar_data(raw_data, path)
+    table, header = if raw_data isa Tuple
+        # readdlm(...; header=true) returns (data, header)
+        raw_table, raw_header = raw_data
+        raw_table, lowercase.(strip.(string.(vec(raw_header))))
+    else
+        # Header is in first row when a single matrix is returned
+        raw_data[2:end, :], lowercase.(strip.(string.(raw_data[1, :])))
+    end
+
+    # Find column indices for alpha, CL, CD, CS (case-insensitive, allow common variants)
+    alpha_idx = findfirst(x -> occursin("alpha", x) || x == "aoa", header)
+    cl_idx = findfirst(x -> occursin("cl", x), header)
+    cd_idx = findfirst(x -> occursin("cd", x), header)
+    cs_idx = findfirst(x -> occursin("cs", x), header)
+
+    (isnothing(alpha_idx) || isnothing(cl_idx) || isnothing(cd_idx)) &&
+        throw(ArgumentError("Literature CSV must contain alpha/aoa, cl and cd columns: $path"))
+
+    # Fallback: if CS not found, fill with zeros
+    cs_col = cs_idx === nothing ? zeros(size(table, 1)) : table[:, cs_idx]
+
+    # Return as [alpha, CL, CD, CS]
+    return [
+        table[:, alpha_idx],
+        table[:, cl_idx],
+        table[:, cd_idx],
+        cs_col
+    ]
+end
+
 """
     plot_polars(solver_list, body_aero_list, label_list;
                 literature_path_list=String[],
@@ -686,6 +717,7 @@ function VortexStepMethod.plot_polars(
                 table[:, cd_idx],
                 cs_col
             ])
+            push!(polar_data_list, _extract_literature_polar_data(raw_data, path))
         end
     end
 

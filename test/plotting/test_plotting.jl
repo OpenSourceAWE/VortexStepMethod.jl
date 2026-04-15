@@ -1,5 +1,6 @@
 backend = if "plot-controlplots" in ARGS
     using ControlPlots
+    import ControlPlots: plt
     "ControlPlots"
 else
     using CairoMakie
@@ -271,6 +272,79 @@ end
         finally
             safe_rm(literature_csv)
         end
+        fig_dpi = plt.figure()
+        default_dpi = fig_dpi.get_dpi()
+        @test default_dpi != 173
+
+        show_plot(fig_dpi; dpi=173)
+        @test fig_dpi.get_dpi() == 173
+
+        # Also verify the default keyword value is applied.
+        show_plot(fig_dpi)
+        @test fig_dpi.get_dpi() == 130
+        plt.close(fig_dpi)
+
+        ext = Base.get_extension(VortexStepMethod, :VortexStepMethodControlPlotsExt)
+        @test ext !== nothing
+
+        # Unit-test tuple parsing branch (e.g. readdlm(...; header=true) shape).
+        tuple_table = [0.0 0.10 0.010; 5.0 0.20 0.020]
+        tuple_header = [" AoA " "CL" "CD"]
+        tuple_pd = ext._extract_literature_polar_data((tuple_table, tuple_header), "tuple.csv")
+        @test tuple_pd[1] == tuple_table[:, 1]
+        @test tuple_pd[2] == tuple_table[:, 2]
+        @test tuple_pd[3] == tuple_table[:, 3]
+        @test tuple_pd[4] == zeros(size(tuple_table, 1))
+
+        # Unit-test matrix parsing branch (header in first row + explicit CS column).
+        matrix_data = Any[
+            "alpha" "cl" "cd" "cs";
+            0.0 0.11 0.011 0.001;
+            4.0 0.21 0.021 0.002
+        ]
+        matrix_pd = ext._extract_literature_polar_data(matrix_data, "matrix.csv")
+        @test Float64.(matrix_pd[1]) == [0.0, 4.0]
+        @test Float64.(matrix_pd[2]) == [0.11, 0.21]
+        @test Float64.(matrix_pd[3]) == [0.011, 0.021]
+        @test Float64.(matrix_pd[4]) == [0.001, 0.002]
+
+        # Missing required columns should throw a clear ArgumentError.
+        bad_data = Any[
+            "aoa" "cl" "cs";
+            0.0 0.1 0.0
+        ]
+        @test_throws ArgumentError ext._extract_literature_polar_data(bad_data, "bad.csv")
+
+        # Integration: literature CSV with AoA alias and no CS should still plot.
+        lit_no_cs_path = tempname() * "_lit_no_cs.csv"
+        open(lit_no_cs_path, "w") do io_no_cs
+            write(io_no_cs, "aoa,cl,cd\n0.0,0.10,0.010\n5.0,0.20,0.020\n")
+        end
+        fig_lit_no_cs = plot_polars(
+            Any[],
+            Any[],
+            ["Literature no CS"];
+            literature_path_list=[lit_no_cs_path],
+            is_save=false,
+            is_show=false
+        )
+        @test fig_lit_no_cs !== nothing
+        safe_rm(lit_no_cs_path)
+
+        # Integration: missing CD column should fail.
+        lit_bad_path = tempname() * "_lit_bad.csv"
+        open(lit_bad_path, "w") do io_bad
+            write(io_bad, "alpha,cl\n0.0,0.10\n5.0,0.20\n")
+        end
+        @test_throws ArgumentError plot_polars(
+            Any[],
+            Any[],
+            ["Literature bad"];
+            literature_path_list=[lit_bad_path],
+            is_save=false,
+            is_show=false
+        )
+        safe_rm(lit_bad_path)
     end
 end
 nothing
