@@ -740,25 +740,27 @@ function VortexStepMethod.plot_polars(
     # Number of computational results (excluding literature)
     n_solvers = length(solver_list)
 
-    # Helper: format label for LaTeX rendering
+    # Helper: format label and line style
     function format_label(label, i, n_solvers)
         if i < n_solvers
             linestyle, marker, markersize = "-", "*", 7
         else
             linestyle, marker, markersize = "-", ".", 5
         end
-        if contains(label, "LLT")
-            label = replace(label, "e5" => raw"\cdot10^5")
-            label = replace(label, " " => raw"~")
-            label = replace(label,
-                "LLT" => raw"\mathrm{LLT}{~\,}")
-            label = raw"$" * label * raw"$"
-        else
-            label = replace(label, "e5" => raw"\cdot10^5")
-            label = replace(label, " " => "~")
-            label = replace(label,
-                "VSM" => raw"\mathrm{VSM}")
-            label = raw"$" * label * raw"$"
+        if use_tex
+            if contains(label, "LLT")
+                label = replace(label, "e5" => raw"\cdot10^5")
+                label = replace(label, " " => raw"~")
+                label = replace(label,
+                    "LLT" => raw"\mathrm{LLT}{~\,}")
+                label = raw"$" * label * raw"$"
+            else
+                label = replace(label, "e5" => raw"\cdot10^5")
+                label = replace(label, " " => "~")
+                label = replace(label,
+                    "VSM" => raw"\mathrm{VSM}")
+                label = raw"$" * label * raw"$"
+            end
         end
         return label, linestyle, marker, markersize
     end
