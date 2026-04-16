@@ -531,6 +531,9 @@ function generate_polar_data(
     cl = zeros(n_angles)
     cd = zeros(n_angles)
     cs = zeros(n_angles)
+    cmx = fill(NaN, n_angles)
+    cmy = fill(NaN, n_angles)
+    cmz = fill(NaN, n_angles)
     gamma_distribution = zeros(n_angles, n_panels)
     cl_distribution = zeros(n_angles, n_panels)
     cd_distribution = zeros(n_angles, n_panels)
@@ -546,7 +549,8 @@ function generate_polar_data(
             α = angle_of_attack
             β = deg2rad(angle_i)
         else
-            throw(ArgumentError("angle_type must be 'angle_of_attack' or 'side_slip'"))
+            throw(ArgumentError(
+                "angle_type must be 'angle_of_attack' or 'side_slip'"))
         end
 
         # Update inflow conditions
@@ -565,6 +569,9 @@ function generate_polar_data(
         cl[i] = results["cl"]
         cd[i] = results["cd"]
         cs[i] = results["cs"]
+        cmx[i] = get(results, "cmx", NaN)
+        cmy[i] = get(results, "cmy", NaN)
+        cmz[i] = get(results, "cmz", NaN)
         gamma_distribution[i, :] = results["gamma_distribution"]
         cl_distribution[i, :] = results["cl_distribution"]
         cd_distribution[i, :] = results["cd_distribution"]
@@ -584,7 +591,8 @@ function generate_polar_data(
         reynolds_number
     ]
 
-    return polar_data, reynolds_number[1]
+    return (polar_data=polar_data, cmx=cmx, cmy=cmy, cmz=cmz,
+            rey=reynolds_number[1])
 end
 
 function _extract_literature_polar_data(raw_data, path)
@@ -597,25 +605,42 @@ function _extract_literature_polar_data(raw_data, path)
         raw_data[2:end, :], lowercase.(strip.(string.(raw_data[1, :])))
     end
 
-    # Find column indices for alpha, CL, CD, CS (case-insensitive, allow common variants)
-    alpha_idx = findfirst(x -> occursin("alpha", x) || x == "aoa", header)
+    # Find column indices (case-insensitive, allow common variants)
+    alpha_idx = findfirst(
+        x -> occursin("alpha", x) || x == "aoa", header)
     cl_idx = findfirst(x -> occursin("cl", x), header)
     cd_idx = findfirst(x -> occursin("cd", x), header)
     cs_idx = findfirst(x -> occursin("cs", x), header)
+    cmx_idx = findfirst(x -> occursin("cmx", x), header)
+    cmy_idx = findfirst(x -> occursin("cmy", x), header)
+    cmz_idx = findfirst(x -> occursin("cmz", x), header)
 
     (isnothing(alpha_idx) || isnothing(cl_idx) || isnothing(cd_idx)) &&
-        throw(ArgumentError("Literature CSV must contain alpha/aoa, cl and cd columns: $path"))
+        throw(ArgumentError(
+            "Literature CSV must contain alpha/aoa, cl and cd " *
+            "columns: $path"))
 
-    # Fallback: if CS not found, fill with zeros
-    cs_col = cs_idx === nothing ? zeros(size(table, 1)) : table[:, cs_idx]
+    n_rows = size(table, 1)
+    cs_col = cs_idx === nothing ?
+        zeros(n_rows) : table[:, cs_idx]
+    cmx_col = cmx_idx === nothing ?
+        fill(NaN, n_rows) : table[:, cmx_idx]
+    cmy_col = cmy_idx === nothing ?
+        fill(NaN, n_rows) : table[:, cmy_idx]
+    cmz_col = cmz_idx === nothing ?
+        fill(NaN, n_rows) : table[:, cmz_idx]
 
-    # Return as [alpha, CL, CD, CS]
-    return [
-        table[:, alpha_idx],
-        table[:, cl_idx],
-        table[:, cd_idx],
-        cs_col
-    ]
+    return (
+        polar_data=[
+            table[:, alpha_idx],
+            table[:, cl_idx],
+            table[:, cd_idx],
+            cs_col
+        ],
+        cmx=cmx_col,
+        cmy=cmy_col,
+        cmz=cmz_col
+    )
 end
 
 """
@@ -665,6 +690,7 @@ function VortexStepMethod.plot_polars(
     is_show=true,
     use_tex=false,
     cl_over_cd=true,
+    show_moments=false,
 )
     # Validate inputs
     total_cases = length(body_aero_list) + length(literature_path_list)
@@ -677,202 +703,153 @@ function VortexStepMethod.plot_polars(
 
     # Generate polar data
     polar_data_list = []
+    cm_data_list = []
     for (i, (solver, body_aero)) in enumerate(zip(solver_list, body_aero_list))
-        polar_data, rey = generate_polar_data(
+        result = generate_polar_data(
             solver, body_aero, angle_range;
             angle_type,
             angle_of_attack,
             side_slip,
             v_a
         )
-        push!(polar_data_list, polar_data)
+        push!(polar_data_list, result.polar_data)
+        push!(cm_data_list, (cmx=result.cmx, cmy=result.cmy,
+                             cmz=result.cmz))
         # Update label with Reynolds number
-        label_list[i] = "$(label_list[i]) Re = $(round(Int64, rey*1e-5))e5"
+        label_list[i] = "$(label_list[i]) Re = $(round(Int64, result.rey*1e-5))e5"
     end
     # Load literature data if provided
     if !isempty(literature_path_list)
         for path in literature_path_list
             raw_data = readdlm(path, ',')
-            push!(polar_data_list, _extract_literature_polar_data(raw_data, path))
+            lit = _extract_literature_polar_data(raw_data, path)
+            push!(polar_data_list, lit.polar_data)
+            push!(cm_data_list, (cmx=lit.cmx, cmy=lit.cmy,
+                                 cmz=lit.cmz))
         end
     end
-
-    # Initializing plot
-    fig, axs = plt.subplots(2, 2, figsize=(14, 14))
 
     # Number of computational results (excluding literature)
     n_solvers = length(solver_list)
-    for (i, (polar_data, label)) in enumerate(zip(polar_data_list, label_list))
+
+    # Helper: format label for LaTeX rendering
+    function format_label(label, i, n_solvers)
         if i < n_solvers
-            linestyle = "-"
-            marker = "*"
-            markersize = 7
+            linestyle, marker, markersize = "-", "*", 7
         else
-            linestyle = "-"
-            marker = "."
-            markersize = 5
+            linestyle, marker, markersize = "-", ".", 5
         end
         if contains(label, "LLT")
             label = replace(label, "e5" => raw"\cdot10^5")
             label = replace(label, " " => raw"~")
-            label = replace(label, "LLT" => raw"\mathrm{LLT}{~\,}")
+            label = replace(label,
+                "LLT" => raw"\mathrm{LLT}{~\,}")
             label = raw"$" * label * raw"$"
         else
             label = replace(label, "e5" => raw"\cdot10^5")
             label = replace(label, " " => "~")
-            label = replace(label, "VSM" => raw"\mathrm{VSM}")
+            label = replace(label,
+                "VSM" => raw"\mathrm{VSM}")
             label = raw"$" * label * raw"$"
         end
-        axs[1, 1].plot(
-            polar_data[1],
-            polar_data[2],
-            label=label,
-            linestyle=linestyle,
-            marker=marker,
-            markersize=markersize,
-        )
-        # Limit y-range if CL > 10
-        if maximum(polar_data[2]) > 10
-            axs[1, 1].set_ylim([-0.5, 2])
-        end
-        title = raw"$C_\mathrm{L}" * raw"$" * " vs $angle_type [°]"
-        axs[1, 1].set_title(title)
-        axs[1, 1].set_xlabel("$angle_type [°]")
-        axs[1, 1].set_ylabel(L"$C_\mathrm{L}$")
-        axs[1, 1].legend()
+        return label, linestyle, marker, markersize
     end
 
-    for (i, (polar_data, label)) in enumerate(zip(polar_data_list, label_list))
-        if i < n_solvers
-            linestyle = "-"
-            marker = "*"
-            markersize = 7
-        else
-            linestyle = "-"
-            marker = "."
-            markersize = 5
+    if show_moments
+        # 2x3 layout: CL, CD, CS, CMx, CMy, CMz
+        fig, axs = plt.subplots(2, 3, figsize=(21, 14))
+        coeff_specs = [
+            (1, raw"$C_\mathrm{L}$", 2, nothing),
+            (2, raw"$C_\mathrm{D}$", 3, nothing),
+            (3, raw"$C_\mathrm{S}$", 4, nothing),
+            (4, raw"$C_\mathrm{Mx}$", nothing, :cmx),
+            (5, raw"$C_\mathrm{My}$", nothing, :cmy),
+            (6, raw"$C_\mathrm{Mz}$", nothing, :cmz),
+        ]
+        for (ax_idx, ylabel, pd_col, cm_field) in coeff_specs
+            row = (ax_idx - 1) ÷ 3 + 1
+            col = (ax_idx - 1) % 3 + 1
+            ax = axs[row, col]
+            for (i, (polar_data, cm, label)) in enumerate(
+                    zip(polar_data_list, cm_data_list,
+                        label_list))
+                label, ls, mk, ms = format_label(
+                    label, i, n_solvers)
+                if pd_col !== nothing
+                    y_data = polar_data[pd_col]
+                else
+                    y_data = Float64.(getfield(cm, cm_field))
+                    all(isnan, y_data) && continue
+                end
+                ax.plot(polar_data[1], y_data;
+                    label=label, linestyle=ls,
+                    marker=mk, markersize=ms)
+            end
+            ax.set_title(
+                ylabel * " vs $angle_type [°]")
+            ax.set_xlabel("$angle_type [°]")
+            ax.set_ylabel(ylabel)
+            ax.legend()
         end
-        if contains(label, "LLT")
-            label = replace(label, "e5" => raw"\cdot10^5")
-            label = replace(label, " " => raw"~")
-            label = replace(label, "LLT" => raw"\mathrm{LLT}{~\,}")
-            label = raw"$" * label * raw"$"
-        else
-            label = replace(label, "e5" => raw"\cdot10^5")
-            label = replace(label, " " => "~")
-            label = replace(label, "VSM" => raw"\mathrm{VSM}")
-            label = raw"$" * label * raw"$"
+    else
+        # 2x2 layout: CL, CD, CS, CL/CD or CL-vs-CD
+        fig, axs = plt.subplots(2, 2, figsize=(14, 14))
+        coeff_specs = [
+            ((1, 1), raw"$C_\mathrm{L}$", 2),
+            ((1, 2), raw"$C_\mathrm{D}$", 3),
+            ((2, 1), raw"$C_\mathrm{S}$", 4),
+        ]
+        for (pos, ylabel, pd_col) in coeff_specs
+            ax = axs[pos...]
+            for (i, (polar_data, label)) in enumerate(
+                    zip(polar_data_list, label_list))
+                label, ls, mk, ms = format_label(
+                    label, i, n_solvers)
+                ax.plot(polar_data[1], polar_data[pd_col];
+                    label=label, linestyle=ls,
+                    marker=mk, markersize=ms)
+                if maximum(polar_data[2]) > 10
+                    ax.set_ylim([-0.5, 2])
+                end
+            end
+            ax.set_title(
+                ylabel * " vs $angle_type [°]")
+            ax.set_xlabel("$angle_type [°]")
+            ax.set_ylabel(ylabel)
+            ax.legend()
         end
-        axs[1, 2].plot(
-            polar_data[1],
-            polar_data[3],
-            label=label,
-            linestyle=linestyle,
-            marker=marker,
-            markersize=markersize,
-        )
-        # Limit y-range if CL > 10
-        if maximum(polar_data[2]) > 10
-            axs[1, 2].set_ylim([-0.5, 2])
-        end
-        title = raw"$C_\mathrm{D}" * raw"$" * " vs $angle_type [°]"
-        axs[1, 2].set_title(title)
-        axs[1, 2].set_xlabel("$angle_type [°]")
-        axs[1, 2].set_ylabel(L"$C_\mathrm{D}$")
-        axs[1, 2].legend()
-    end
-
-
-    for (i, (polar_data, label)) in enumerate(zip(polar_data_list, label_list))
-        if i < n_solvers
-            linestyle = "-"
-            marker = "*"
-            markersize = 7
-        else
-            linestyle = "-"
-            marker = "."
-            markersize = 5
-        end
-        if contains(label, "LLT")
-            label = replace(label, "e5" => raw"\cdot10^5")
-            label = replace(label, " " => raw"~")
-            label = replace(label, "LLT" => raw"\mathrm{LLT}{~\,}")
-            label = raw"$" * label * raw"$"
-        else
-            label = replace(label, "e5" => raw"\cdot10^5")
-            label = replace(label, " " => "~")
-            label = replace(label, "VSM" => raw"\mathrm{VSM}")
-            label = raw"$" * label * raw"$"
-        end
-        axs[2, 1].plot(
-            polar_data[1],
-            polar_data[4],
-            label=label,
-            linestyle=linestyle,
-            marker=marker,
-            markersize=markersize,
-        )
-        # Limit y-range if CL > 10
-        if maximum(polar_data[2]) > 10
-            axs[2, 1].set_ylim([-0.5, 2])
-        end
-        title = raw"$C_\mathrm{S}" * raw"$" * " vs $angle_type [°]"
-        axs[2, 1].set_title(title)
-        axs[2, 1].set_xlabel("$angle_type [°]")
-        axs[2, 1].set_ylabel(L"$C_\mathrm{S}$")
-        axs[2, 1].legend()
-    end
-
-    for (i, (polar_data, label)) in enumerate(zip(polar_data_list, label_list))
-        if i < n_solvers
-            linestyle = "-"
-            marker = "*"
-            markersize = 7
-        else
-            linestyle = "-"
-            marker = "."
-            markersize = 5
-        end
-        if contains(label, "LLT")
-            label = replace(label, "e5" => raw"\cdot10^5")
-            label = replace(label, " " => raw"~")
-            label = replace(label, "LLT" => raw"\mathrm{LLT}{~\,}")
-            label = raw"$" * label * raw"$"
-        else
-            label = replace(label, "e5" => raw"\cdot10^5")
-            label = replace(label, " " => "~")
-            label = replace(label, "VSM" => raw"\mathrm{VSM}")
-            label = raw"$" * label * raw"$"
+        # Fourth panel: CL/CD or CL-vs-CD
+        ax4 = axs[2, 2]
+        for (i, (polar_data, label)) in enumerate(
+                zip(polar_data_list, label_list))
+            label, ls, mk, ms = format_label(
+                label, i, n_solvers)
+            if cl_over_cd
+                cl_cd = polar_data[2] ./ polar_data[3]
+                ax4.plot(polar_data[1], cl_cd;
+                    label=label, linestyle=ls,
+                    marker=mk, markersize=ms)
+            else
+                ax4.plot(polar_data[3], polar_data[2];
+                    label=label, linestyle=ls,
+                    marker=mk, markersize=ms)
+            end
         end
         if cl_over_cd
-            cl_cd = polar_data[2] ./ polar_data[3]
-            axs[2, 2].plot(
-                polar_data[1], cl_cd,
-                label=label, linestyle=linestyle,
-                marker=marker, markersize=markersize)
-            title = raw"$C_\mathrm{L}/C_\mathrm{D}$" *
-                " vs $angle_type [°]"
-            axs[2, 2].set_title(title)
-            axs[2, 2].set_xlabel("$angle_type [°]")
-            axs[2, 2].set_ylabel(
-                L"$C_\mathrm{L}/C_\mathrm{D}$")
+            ax4.set_title(
+                raw"$C_\mathrm{L}/C_\mathrm{D}$" *
+                " vs $angle_type [°]")
+            ax4.set_xlabel("$angle_type [°]")
+            ax4.set_ylabel(
+                raw"$C_\mathrm{L}/C_\mathrm{D}$")
         else
-            axs[2, 2].plot(
-                polar_data[3], polar_data[2],
-                label=label, linestyle=linestyle,
-                marker=marker, markersize=markersize)
-            if maximum(polar_data[2]) > 10 ||
-                    maximum(polar_data[3]) > 10
-                axs[2, 2].set_ylim([-0.5, 2])
-                axs[2, 2].set_xlim([-0.5, 2])
-            end
-            title = raw"$C_\mathrm{L}$" * " vs " *
-                raw"$C_\mathrm{D}$"
-            axs[2, 2].set_title(title)
-            axs[2, 2].set_xlabel(L"$C_\mathrm{D}$")
-            axs[2, 2].set_ylabel(L"$C_\mathrm{L}$")
+            ax4.set_title(
+                raw"$C_\mathrm{L}$" * " vs " *
+                raw"$C_\mathrm{D}$")
+            ax4.set_xlabel(raw"$C_\mathrm{D}$")
+            ax4.set_ylabel(raw"$C_\mathrm{L}$")
         end
-        axs[2, 2].legend()
+        ax4.legend()
     end
 
     fig.tight_layout(h_pad=3.5, rect=(0.01, 0.01, 0.99, 0.99))

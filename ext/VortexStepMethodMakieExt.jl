@@ -656,6 +656,9 @@ function generate_polar_data_makie(
     cl = zeros(n_angles)
     cd = zeros(n_angles)
     cs = zeros(n_angles)
+    cmx = fill(NaN, n_angles)
+    cmy = fill(NaN, n_angles)
+    cmz = fill(NaN, n_angles)
     gamma_distribution = zeros(n_angles, n_panels)
     reynolds_number = zeros(n_angles)
 
@@ -668,7 +671,8 @@ function generate_polar_data_makie(
             α = angle_of_attack
             β = deg2rad(angle_i)
         else
-            throw(ArgumentError("angle_type must be 'angle_of_attack' or 'side_slip'"))
+            throw(ArgumentError(
+                "angle_type must be 'angle_of_attack' or 'side_slip'"))
         end
 
         # Update inflow conditions
@@ -687,12 +691,16 @@ function generate_polar_data_makie(
         cl[i] = results["cl"]
         cd[i] = results["cd"]
         cs[i] = results["cs"]
+        cmx[i] = get(results, "cmx", NaN)
+        cmy[i] = get(results, "cmy", NaN)
+        cmz[i] = get(results, "cmz", NaN)
         gamma_distribution[i, :] = results["gamma_distribution"]
         reynolds_number[i] = results["Rey"]
     end
 
     polar_data = [angle_range, cl, cd, cs]
-    return polar_data, reynolds_number[1]
+    return (polar_data=polar_data, cmx=cmx, cmy=cmy, cmz=cmz,
+            rey=reynolds_number[1])
 end
 
 """
@@ -799,6 +807,7 @@ function VortexStepMethod.plot_polars(
     is_show=true,
     use_tex=false,
     cl_over_cd=true,
+    show_moments=false,
 )
     # Validate inputs
     total_cases = length(body_aero_list) + length(literature_path_list)
@@ -809,109 +818,176 @@ function VortexStepMethod.plot_polars(
 
     # Generate polar data
     polar_data_list = []
+    cm_data_list = []
     labels_with_re = copy(label_list)
     for (i, (solver, body_aero)) in enumerate(zip(solver_list, body_aero_list))
-        polar_data, rey = generate_polar_data_makie(
+        result = generate_polar_data_makie(
             solver, body_aero, angle_range;
             angle_type, angle_of_attack, side_slip, v_a
         )
-        push!(polar_data_list, polar_data)
-        labels_with_re[i] = "$(label_list[i]) Re = $(round(Int64, rey*1e-5))e5"
+        push!(polar_data_list, result.polar_data)
+        push!(cm_data_list, (cmx=result.cmx, cmy=result.cmy,
+                             cmz=result.cmz))
+        labels_with_re[i] = "$(label_list[i]) Re = $(round(Int64, result.rey*1e-5))e5"
     end
 
     # Load literature data if provided
     if !isempty(literature_path_list)
         for path in literature_path_list
             data = readdlm(path, ',')
-            header = lowercase.(string.(data[1, :]))
-            alpha_idx = findfirst(x -> occursin("alpha", x), header)
+            header = lowercase.(strip.(string.(data[1, :])))
+            alpha_idx = if angle_type == "side_slip"
+                findfirst(
+                    x -> occursin("beta", x) ||
+                         occursin("side_slip", x), header)
+            else
+                findfirst(
+                    x -> occursin("alpha", x) || x == "aoa",
+                    header)
+            end
             cl_idx = findfirst(x -> occursin("cl", x), header)
             cd_idx = findfirst(x -> occursin("cd", x), header)
             cs_idx = findfirst(x -> occursin("cs", x), header)
-            cs_col = cs_idx === nothing ? zeros(size(data, 1) - 1) : data[2:end, cs_idx]
+            cmx_idx = findfirst(x -> occursin("cmx", x), header)
+            cmy_idx = findfirst(x -> occursin("cmy", x), header)
+            cmz_idx = findfirst(x -> occursin("cmz", x), header)
+
+            (isnothing(alpha_idx) || isnothing(cl_idx) ||
+                isnothing(cd_idx)) &&
+                throw(ArgumentError(
+                    "Literature CSV must contain alpha/aoa, " *
+                    "cl and cd columns: $path"))
+
+            n_rows = size(data, 1) - 1
+            parse_col(col) = [v isa Real ? Float64(v) :
+                (y = tryparse(Float64, strip(string(v)));
+                 isnothing(y) ? NaN : y) for v in col]
+
+            cs_col = cs_idx === nothing ?
+                zeros(n_rows) : parse_col(data[2:end, cs_idx])
+            cmx_col = cmx_idx === nothing ?
+                fill(NaN, n_rows) :
+                parse_col(data[2:end, cmx_idx])
+            cmy_col = cmy_idx === nothing ?
+                fill(NaN, n_rows) :
+                parse_col(data[2:end, cmy_idx])
+            cmz_col = cmz_idx === nothing ?
+                fill(NaN, n_rows) :
+                parse_col(data[2:end, cmz_idx])
             push!(polar_data_list, [
-                data[2:end, alpha_idx],
-                data[2:end, cl_idx],
-                data[2:end, cd_idx],
+                parse_col(data[2:end, alpha_idx]),
+                parse_col(data[2:end, cl_idx]),
+                parse_col(data[2:end, cd_idx]),
                 cs_col
             ])
+            push!(cm_data_list, (cmx=cmx_col, cmy=cmy_col,
+                                 cmz=cmz_col))
         end
-    end
-
-    # Create figure with 2x2 grid
-    fig = Figure(size=(1400, 1400))
-
-    ax_cl = Axis(fig[1, 1], title="CL vs $angle_type [°]",
-        xlabel="$angle_type [°]", ylabel="CL")
-    ax_cd = Axis(fig[1, 2], title="CD vs $angle_type [°]",
-        xlabel="$angle_type [°]", ylabel="CD")
-    ax_cs = Axis(fig[2, 1], title="CS vs $angle_type [°]",
-        xlabel="$angle_type [°]", ylabel="CS")
-    ax_fourth = if cl_over_cd
-        Axis(fig[2, 2], title="CL/CD vs $angle_type [°]",
-            xlabel="$angle_type [°]", ylabel="CL/CD")
-    else
-        Axis(fig[2, 2], title="CL vs CD",
-            xlabel="CD", ylabel="CL")
     end
 
     # Number of computational results
     n_solvers = length(solver_list)
 
-    # Plot CL vs angle
-    for (i, (polar_data, label)) in enumerate(zip(polar_data_list, labels_with_re))
-        marker = i <= n_solvers ? :star5 : :circle
-        markersize = i <= n_solvers ? 12 : 8
-        scatterlines!(ax_cl, polar_data[1], polar_data[2];
-            label=label, marker=marker, markersize=markersize)
-        if maximum(polar_data[2]) > 10
-            ylims!(ax_cl, -0.5, 2)
-        end
-    end
+    if show_moments
+        # 2x3 layout: CL, CD, CS, CMx, CMy, CMz
+        fig = Figure(size=(1800, 1000))
+        ax_cl = Axis(fig[1, 1], title="CL vs $angle_type [°]",
+            xlabel="$angle_type [°]", ylabel="CL")
+        ax_cd = Axis(fig[1, 2], title="CD vs $angle_type [°]",
+            xlabel="$angle_type [°]", ylabel="CD")
+        ax_cs = Axis(fig[1, 3], title="CS vs $angle_type [°]",
+            xlabel="$angle_type [°]", ylabel="CS")
+        ax_cmx = Axis(fig[2, 1], title="CMx vs $angle_type [°]",
+            xlabel="$angle_type [°]", ylabel="CMx")
+        ax_cmy = Axis(fig[2, 2], title="CMy vs $angle_type [°]",
+            xlabel="$angle_type [°]", ylabel="CMy")
+        ax_cmz = Axis(fig[2, 3], title="CMz vs $angle_type [°]",
+            xlabel="$angle_type [°]", ylabel="CMz")
 
-    # Plot CD vs angle
-    for (i, (polar_data, label)) in enumerate(zip(polar_data_list, labels_with_re))
-        marker = i <= n_solvers ? :star5 : :circle
-        markersize = i <= n_solvers ? 12 : 8
-        scatterlines!(ax_cd, polar_data[1], polar_data[3];
-            label=label, marker=marker, markersize=markersize)
-        if maximum(polar_data[2]) > 10
-            ylims!(ax_cd, -0.5, 2)
+        for ax in (ax_cl, ax_cd, ax_cs, ax_cmx, ax_cmy, ax_cmz)
+            ax.yticklabelspace = 36.0
+            ax.xticklabelspace = 24.0
         end
-    end
 
-    # Plot CS vs angle
-    for (i, (polar_data, label)) in enumerate(zip(polar_data_list, labels_with_re))
-        marker = i <= n_solvers ? :star5 : :circle
-        markersize = i <= n_solvers ? 12 : 8
-        scatterlines!(ax_cs, polar_data[1], polar_data[4];
-            label=label, marker=marker, markersize=markersize)
-        if maximum(polar_data[2]) > 10
-            ylims!(ax_cs, -0.5, 2)
-        end
-    end
-
-    # Plot fourth panel: CL/CD vs angle or CL vs CD
-    for (i, (polar_data, label)) in enumerate(zip(polar_data_list, labels_with_re))
-        marker = i <= n_solvers ? :star5 : :circle
-        markersize = i <= n_solvers ? 12 : 8
-        if cl_over_cd
-            cl_cd = polar_data[2] ./ polar_data[3]
-            scatterlines!(ax_fourth, polar_data[1], cl_cd;
+        for (i, (polar_data, cm, label)) in enumerate(
+                zip(polar_data_list, cm_data_list, labels_with_re))
+            marker = i <= n_solvers ? :star5 : :circle
+            markersize = i <= n_solvers ? 12 : 8
+            angles = polar_data[1]
+            scatterlines!(ax_cl, angles, polar_data[2];
                 label=label, marker=marker, markersize=markersize)
-        else
-            scatterlines!(ax_fourth, polar_data[3], polar_data[2];
+            scatterlines!(ax_cd, angles, polar_data[3];
                 label=label, marker=marker, markersize=markersize)
-            if maximum(polar_data[2]) > 10 || maximum(polar_data[3]) > 10
-                ylims!(ax_fourth, -0.5, 2)
-                xlims!(ax_fourth, -0.5, 2)
+            scatterlines!(ax_cs, angles, polar_data[4];
+                label=label, marker=marker, markersize=markersize)
+            if !all(isnan, cm.cmx)
+                scatterlines!(ax_cmx, angles,
+                    Float64.(cm.cmx);
+                    label=label, marker=marker,
+                    markersize=markersize)
+            end
+            if !all(isnan, cm.cmy)
+                scatterlines!(ax_cmy, angles,
+                    Float64.(cm.cmy);
+                    label=label, marker=marker,
+                    markersize=markersize)
+            end
+            if !all(isnan, cm.cmz)
+                scatterlines!(ax_cmz, angles,
+                    Float64.(cm.cmz);
+                    label=label, marker=marker,
+                    markersize=markersize)
             end
         end
-    end
+        Legend(fig[3, 1:3], ax_cl;
+            orientation=:horizontal, tellwidth=false,
+            tellheight=true)
+    else
+        # 2x2 layout: CL, CD, CS, CL/CD or CL-vs-CD
+        fig = Figure(size=(1400, 1400))
+        ax_cl = Axis(fig[1, 1], title="CL vs $angle_type [°]",
+            xlabel="$angle_type [°]", ylabel="CL")
+        ax_cd = Axis(fig[1, 2], title="CD vs $angle_type [°]",
+            xlabel="$angle_type [°]", ylabel="CD")
+        ax_cs = Axis(fig[2, 1], title="CS vs $angle_type [°]",
+            xlabel="$angle_type [°]", ylabel="CS")
+        ax_fourth = if cl_over_cd
+            Axis(fig[2, 2], title="CL/CD vs $angle_type [°]",
+                xlabel="$angle_type [°]", ylabel="CL/CD")
+        else
+            Axis(fig[2, 2], title="CL vs CD",
+                xlabel="CD", ylabel="CL")
+        end
 
-    # Shared legend at bottom of grid
-    Legend(fig[3, :], ax_cl;
-        orientation=:horizontal, tellwidth=false, tellheight=true)
+        for (i, (polar_data, label)) in enumerate(
+                zip(polar_data_list, labels_with_re))
+            marker = i <= n_solvers ? :star5 : :circle
+            markersize = i <= n_solvers ? 12 : 8
+            scatterlines!(ax_cl, polar_data[1], polar_data[2];
+                label=label, marker=marker,
+                markersize=markersize)
+            scatterlines!(ax_cd, polar_data[1], polar_data[3];
+                label=label, marker=marker,
+                markersize=markersize)
+            scatterlines!(ax_cs, polar_data[1], polar_data[4];
+                label=label, marker=marker,
+                markersize=markersize)
+            if cl_over_cd
+                cl_cd = polar_data[2] ./ polar_data[3]
+                scatterlines!(ax_fourth, polar_data[1], cl_cd;
+                    label=label, marker=marker,
+                    markersize=markersize)
+            else
+                scatterlines!(ax_fourth, polar_data[3],
+                    polar_data[2];
+                    label=label, marker=marker,
+                    markersize=markersize)
+            end
+        end
+        Legend(fig[3, :], ax_cl;
+            orientation=:horizontal, tellwidth=false,
+            tellheight=true)
+    end
 
     # Save and show
     if is_save && !isnothing(save_path)

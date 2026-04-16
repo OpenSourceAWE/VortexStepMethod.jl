@@ -1,7 +1,3 @@
-using Pkg
-Pkg.activate(@__DIR__)
-
-using GLMakie
 using LinearAlgebra
 using VortexStepMethod
 
@@ -68,12 +64,40 @@ vel_app = [
 ] * v_a
 set_va!(body_aero, vel_app)
 
-# Solve both configurations
+# Plotting geometry
+PLOT && plot_geometry(
+    body_aero,
+    "";
+    data_type=".svg",
+    save_path="",
+    is_save=false,
+    is_show=true,
+    view_elevation=15,
+    view_azimuth=-120,
+    use_tex=USE_TEX
+)
+
+# Solving and plotting distributions
 results = solve(vsm_solver, body_aero)
 @time results_with_stall = solve(VSM_with_stall_correction, body_aero)
 @time results_with_stall = solve(VSM_with_stall_correction, body_aero)
 
-# Setup literature data paths
+CAD_y_coordinates = [panel.aero_center[2] for panel in body_aero.panels]
+
+PLOT && plot_distribution(
+    [CAD_y_coordinates, CAD_y_coordinates],
+    [results, results_with_stall],
+    ["VSM", "VSM with stall correction"];
+    title="CAD_spanwise_distributions_alpha_$(round(aoa, digits=1))_delta_$(round(side_slip, digits=1))_yaw_$(round(yaw_rate, digits=1))_v_a_$(round(v_a, digits=1))",
+    data_type=".pdf",
+    save_path=joinpath(save_folder, "spanwise_distributions"),
+    is_save=false,
+    is_show=true,
+    use_tex=USE_TEX
+)
+
+# Plotting polar
+save_path = joinpath(root_dir, "results", "TUDELFT_V3_KITE")
 path_cfd_lebesque = joinpath(
     root_dir,
     "data",
@@ -85,19 +109,28 @@ path_cfd_lebesque = joinpath(
 # Only include literature data if file exists
 literature_paths = isfile(path_cfd_lebesque) ? [path_cfd_lebesque] : String[]
 
-# Plot combined analysis
-PLOT && plot_combined_analysis(
+labels = [
+    "VSM CAD 19ribs",
+    "VSM CAD 19ribs , with stall correction"
+]
+if !isempty(literature_paths)
+    push!(labels, "CFD_Lebesque Rey 30e5")
+end
+
+PLOT && plot_polars(
     [vsm_solver, VSM_with_stall_correction],
     [body_aero, body_aero],
-    [results, results_with_stall];
-    solver_label=["VSM", "VSM (with stall)"],
+    labels;
     literature_path_list=literature_paths,
     angle_range=range(0, 25, length=25),
     angle_type="angle_of_attack",
     angle_of_attack=aoa,
     side_slip=side_slip,
     v_a=v_a,
-    title="Stall Model Comparison",
+    title="tutorial_testing_stall_model_n_panels_$(n_panels)_distribution_$(spanwise_distribution)",
+    data_type=".pdf",
+    save_path=joinpath(save_folder, "polars"),
+    is_save=true,
     is_show=true,
     use_tex=USE_TEX
 )

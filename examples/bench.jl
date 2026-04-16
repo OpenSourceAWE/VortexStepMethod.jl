@@ -1,8 +1,4 @@
-using Pkg
-Pkg.activate(@__DIR__)
-
 using LinearAlgebra
-using GLMakie
 using VortexStepMethod
 using VortexStepMethod: solve_base!
 
@@ -20,11 +16,11 @@ alpha = deg2rad(alpha_deg)
 wing = Wing(n_panels, spanwise_distribution=LINEAR)
 
 # Add wing sections - defining only tip sections with inviscid airfoil model
-add_section!(wing, 
-    [0.0, span/2, 0.0],    # Left tip LE 
+add_section!(wing,
+    [0.0, span/2, 0.0],    # Left tip LE
     [chord, span/2, 0.0],  # Left tip TE
     INVISCID)
-add_section!(wing, 
+add_section!(wing,
     [0.0, -span/2, 0.0],   # Right tip LE
     [chord, -span/2, 0.0], # Right tip TE
     INVISCID)
