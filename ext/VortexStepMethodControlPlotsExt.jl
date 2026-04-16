@@ -595,7 +595,8 @@ function generate_polar_data(
             rey=reynolds_number[1])
 end
 
-function _extract_literature_polar_data(raw_data, path)
+function _extract_literature_polar_data(raw_data, path;
+        angle_type="angle_of_attack")
     table, header = if raw_data isa Tuple
         # readdlm(...; header=true) returns (data, header)
         raw_table, raw_header = raw_data
@@ -605,9 +606,15 @@ function _extract_literature_polar_data(raw_data, path)
         raw_data[2:end, :], lowercase.(strip.(string.(raw_data[1, :])))
     end
 
-    # Find column indices (case-insensitive, allow common variants)
-    alpha_idx = findfirst(
-        x -> occursin("alpha", x) || x == "aoa", header)
+    # Find angle column based on angle_type
+    alpha_idx = if angle_type == "side_slip"
+        findfirst(
+            x -> occursin("beta", x) ||
+                 occursin("side_slip", x), header)
+    else
+        findfirst(
+            x -> occursin("alpha", x) || x == "aoa", header)
+    end
     cl_idx = findfirst(x -> occursin("cl", x), header)
     cd_idx = findfirst(x -> occursin("cd", x), header)
     cs_idx = findfirst(x -> occursin("cs", x), header)
@@ -722,7 +729,8 @@ function VortexStepMethod.plot_polars(
     if !isempty(literature_path_list)
         for path in literature_path_list
             raw_data = readdlm(path, ',')
-            lit = _extract_literature_polar_data(raw_data, path)
+            lit = _extract_literature_polar_data(
+                raw_data, path; angle_type)
             push!(polar_data_list, lit.polar_data)
             push!(cm_data_list, (cmx=lit.cmx, cmy=lit.cmy,
                                  cmz=lit.cmz))
