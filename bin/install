@@ -230,7 +230,9 @@ else
     exit 1
 fi
 
-$_julia_cmd --project=. -e 'using Pkg; Pkg.precompile(); Pkg.activate("examples"); Pkg.precompile(); Pkg.activate("examples_cp"); Pkg.precompile(); using LinearAlgebra, GLMakie, VortexStepMethod; @info "Precompilation complete."'
+$_julia_cmd --project=. -e 'using Pkg; Pkg.precompile(); Pkg.activate("examples"); Pkg.precompile(); Pkg.activate("examples_cp"); Pkg.precompile(); @info "Precompilation complete."'
+$_julia_cmd --project=examples -e 'using GLMakie, VortexStepMethod; @info "GLMakie extension ready."'
+$_julia_cmd --project=examples_cp -e 'using ControlPlots, VortexStepMethod; @info "ControlPlots extension ready."'
 echo
 echo "Installation complete."
 
