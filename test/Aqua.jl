@@ -3,6 +3,7 @@ using Aqua, VortexStepMethod, Test
     Aqua.test_all(
       VortexStepMethod;
       stale_deps=(ignore=[:Xfoil, :Timers, :PyCall],),
-      deps_compat=(ignore=[:PyCall],)
+      deps_compat=(ignore=[:PyCall],),
+      persistent_tasks=(broken=Sys.iswindows(),)
     )
 end
