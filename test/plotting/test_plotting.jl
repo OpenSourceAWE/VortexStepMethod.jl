@@ -290,11 +290,15 @@ end
         # Unit-test tuple parsing branch (e.g. readdlm(...; header=true) shape).
         tuple_table = [0.0 0.10 0.010; 5.0 0.20 0.020]
         tuple_header = [" AoA " "CL" "CD"]
-        tuple_pd = ext._extract_literature_polar_data((tuple_table, tuple_header), "tuple.csv")
-        @test tuple_pd[1] == tuple_table[:, 1]
-        @test tuple_pd[2] == tuple_table[:, 2]
-        @test tuple_pd[3] == tuple_table[:, 3]
-        @test tuple_pd[4] == zeros(size(tuple_table, 1))
+        tuple_result = ext._extract_literature_polar_data(
+            (tuple_table, tuple_header), "tuple.csv")
+        @test tuple_result.polar_data[1] == tuple_table[:, 1]
+        @test tuple_result.polar_data[2] == tuple_table[:, 2]
+        @test tuple_result.polar_data[3] == tuple_table[:, 3]
+        @test tuple_result.polar_data[4] == zeros(size(tuple_table, 1))
+        @test all(isnan, tuple_result.cmx)
+        @test all(isnan, tuple_result.cmy)
+        @test all(isnan, tuple_result.cmz)
 
         # Unit-test matrix parsing branch (header in first row + explicit CS column).
         matrix_data = Any[
@@ -302,18 +306,20 @@ end
             0.0 0.11 0.011 0.001;
             4.0 0.21 0.021 0.002
         ]
-        matrix_pd = ext._extract_literature_polar_data(matrix_data, "matrix.csv")
-        @test Float64.(matrix_pd[1]) == [0.0, 4.0]
-        @test Float64.(matrix_pd[2]) == [0.11, 0.21]
-        @test Float64.(matrix_pd[3]) == [0.011, 0.021]
-        @test Float64.(matrix_pd[4]) == [0.001, 0.002]
+        matrix_result = ext._extract_literature_polar_data(
+            matrix_data, "matrix.csv")
+        @test Float64.(matrix_result.polar_data[1]) == [0.0, 4.0]
+        @test Float64.(matrix_result.polar_data[2]) == [0.11, 0.21]
+        @test Float64.(matrix_result.polar_data[3]) == [0.011, 0.021]
+        @test Float64.(matrix_result.polar_data[4]) == [0.001, 0.002]
 
         # Missing required columns should throw a clear ArgumentError.
         bad_data = Any[
             "aoa" "cl" "cs";
             0.0 0.1 0.0
         ]
-        @test_throws ArgumentError ext._extract_literature_polar_data(bad_data, "bad.csv")
+        @test_throws ArgumentError ext._extract_literature_polar_data(
+            bad_data, "bad.csv")
 
         # Integration: literature CSV with AoA alias and no CS should still plot.
         lit_no_cs_path = tempname() * "_lit_no_cs.csv"

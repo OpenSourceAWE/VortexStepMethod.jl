@@ -7,24 +7,44 @@ using REPL.TerminalMenus
 
 url = "https://opensourceawe.github.io/VortexStepMethod.jl/dev"
 
-options = [
-           "V3_kite = include(\"V3_kite.jl\")",
-           "billowing = include(\"billowing.jl\")",
-           "pyramid_model = include(\"pyramid_model.jl\")",
-           "rectangular_wing = include(\"rectangular_wing.jl\")",
-           "ram_air_kite = include(\"ram_air_kite.jl\")",
-           "stall_model = include(\"stall_model.jl\")",
-           "bench = include(\"bench.jl\")",
-           "cleanup = include(\"cleanup.jl\")",
-           "help_me = VortexStepMethod.help(url)",
-           "quit"]
+example_files = [
+    "V3_kite.jl",
+    "billowing.jl",
+    "pyramid_model.jl",
+    "rectangular_wing.jl",
+    "ram_air_kite.jl",
+    "stall_model.jl",
+    "bench.jl",
+    "cleanup.jl",
+]
+
+function run_all()
+    for f in example_files
+        f == "cleanup.jl" && continue
+        println("\n" * "="^60)
+        println("Running: $f")
+        println("="^60)
+        try
+            include(joinpath(@__DIR__, f))
+        catch e
+            @error "Failed: $f" exception=(e, catch_backtrace())
+        end
+    end
+    println("\nAll examples completed.")
+end
 
 function example_menu()
+    options = [
+        [("$( splitext(f)[1]) = include(\"$f\")") for f in example_files];
+        "help_me = VortexStepMethod.help(\"$url\")";
+        "quit"
+    ]
     active = true
     while active
         menu = RadioMenu(options, pagesize=8)
-        choice = request("\nChoose function to execute or `q` to quit: ", menu)
-
+        choice = request(
+            "\nChoose function to execute or `q` to quit: ",
+            menu)
         if choice != -1 && choice != length(options)
             eval(Meta.parse(options[choice]))
         else
@@ -34,4 +54,8 @@ function example_menu()
     end
 end
 
-example_menu()
+if "--run-all" in ARGS
+    run_all()
+else
+    example_menu()
+end

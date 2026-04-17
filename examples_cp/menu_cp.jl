@@ -9,24 +9,47 @@ using REPL.TerminalMenus
 
 url = "https://opensourceawe.github.io/VortexStepMethod.jl/dev"
 
-options = [
-           "V3_kite = include(\"../examples/V3_kite.jl\")",
-           "billowing = include(\"../examples/billowing.jl\")",
-           "pyramid_model = include(\"../examples/pyramid_model.jl\")",
-           "rectangular_wing = include(\"../examples/rectangular_wing.jl\")",
-           "ram_air_kite = include(\"../examples/ram_air_kite.jl\")",
-           "stall_model = include(\"../examples/stall_model.jl\")",
-           "bench = include(\"../examples/bench.jl\")",
-           "cleanup = include(\"../examples/cleanup.jl\")",
-           "help_me = VortexStepMethod.help(url)",
-           "quit"]
+examples_dir = joinpath(@__DIR__, "..", "examples")
+
+example_files = [
+    "V3_kite.jl",
+    "billowing.jl",
+    "pyramid_model.jl",
+    "rectangular_wing.jl",
+    "ram_air_kite.jl",
+    "stall_model.jl",
+    "bench.jl",
+    "cleanup.jl",
+]
+
+function run_all()
+    for f in example_files
+        f == "cleanup.jl" && continue
+        println("\n" * "="^60)
+        println("Running: $f")
+        println("="^60)
+        try
+            include(joinpath(examples_dir, f))
+        catch e
+            @error "Failed: $f" exception=(e, catch_backtrace())
+        end
+    end
+    println("\nAll examples completed.")
+end
 
 function example_menu()
+    options = [
+        [("$(splitext(f)[1]) = include(\"../examples/$f\")")
+         for f in example_files];
+        "help_me = VortexStepMethod.help(\"$url\")";
+        "quit"
+    ]
     active = true
     while active
         menu = RadioMenu(options, pagesize=8)
-        choice = request("\nChoose function to execute or `q` to quit: ", menu)
-
+        choice = request(
+            "\nChoose function to execute or `q` to quit: ",
+            menu)
         if choice != -1 && choice != length(options)
             eval(Meta.parse(options[choice]))
         else
@@ -36,4 +59,8 @@ function example_menu()
     end
 end
 
-example_menu()
+if "--run-all" in ARGS
+    run_all()
+else
+    example_menu()
+end

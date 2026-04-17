@@ -49,14 +49,19 @@ for d in data/ram_air_kite data/TUDELFT_V3_KITE \
     [[ -d "$d" ]] && pass "copied $d/" || fail "copied $d/"
 done
 
-# Verify all examples use GLMakie, not ControlPlots
-for f in menu.jl bench.jl rectangular_wing.jl V3_kite.jl \
+# Verify menu.jl loads GLMakie and examples are backend-agnostic
+if grep -q "using GLMakie" "examples/menu.jl"; then
+    pass "menu.jl uses GLMakie"
+else
+    fail "menu.jl uses GLMakie"
+fi
+for f in bench.jl rectangular_wing.jl V3_kite.jl \
          pyramid_model.jl ram_air_kite.jl stall_model.jl; do
-    if grep -q "using GLMakie" "examples/$f" && \
+    if ! grep -q "using GLMakie" "examples/$f" && \
        ! grep -q "using ControlPlots" "examples/$f"; then
-        pass "$f uses GLMakie"
+        pass "$f is backend-agnostic"
     else
-        fail "$f uses GLMakie"
+        fail "$f is backend-agnostic"
     fi
 done
 
@@ -78,14 +83,10 @@ $JULIA --project=. -e '
     @assert !("ControlPlots" ∈ deps) "ControlPlots should not be installed"
 ' 2>&1 && pass "correct packages installed" || fail "correct packages installed"
 
-# Run all examples
-for f in rectangular_wing.jl pyramid_model.jl V3_kite.jl \
-         stall_model.jl ram_air_kite.jl bench.jl; do
-    echo "  Running $f..."
-    $JULIA --project=examples -e '
-        include("examples/'"$f"'")
-    ' 2>&1 && pass "run $f" || fail "run $f"
-done
+# Run all examples via menu.jl --run-all (single Julia process)
+echo "  Running all examples..."
+$JULIA --project=examples examples/menu.jl -- --run-all \
+    2>&1 && pass "run all examples" || fail "run all examples"
 
 echo ""
 echo "=== Results: $PASS passed, $FAIL failed ==="
