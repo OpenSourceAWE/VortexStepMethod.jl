@@ -13,56 +13,72 @@ The software presented here includes a couple of examples: a rectangular wing, a
 This package was translated from the Python code version 1.0.0 available at [https://github.com/ocayon/Vortex-Step-Method](https://github.com/ocayon/Vortex-Step-Method) with some extensions as documented in [News.md](https://github.com/OpenSourceAWE/VortexStepMethod.jl/blob/main/NEWS.md).
 
 ## Installation
-Install [Julia 1.10](https://ufechner7.github.io/2024/08/09/installing-julia-with-juliaup.html)
+Install [Julia 1.11](https://ufechner7.github.io/2024/08/09/installing-julia-with-juliaup.html)
 or later, if you haven't already.
 
 Before installing this software it is suggested to create a new project, for
 example like this:
+
 ```bash
 mkdir vsm
 cd vsm
 julia --project=.
 ```
+
 Then add VortexStepMethod from Julia's package manager, by typing `]` to enter
 the package manager (`pkg>` prompt), then:
-```
+
+```julia
 (vsm) pkg> add VortexStepMethod
 ```
+
 Press backspace to return to the `julia>` prompt. You can run the unit tests
 from the `pkg>` prompt with:
-```
+
+```julia
 (vsm) pkg> test VortexStepMethod
 ```
+
 You can also type `?` to enter help mode (`help?>` prompt) to look up
 documentation for any function.
 
 To run the examples, type at the `julia>` prompt:
+
 ```julia
 julia> using VortexStepMethod
 julia> VortexStepMethod.install_examples()
 julia> include("examples/menu.jl")
 ```
+
 This copies the example scripts to an `examples/` folder and installs the
 required packages ([GLMakie](https://docs.makie.org/stable/), CSV, etc.).
 
 ## Running the examples as developer
-Clone the repository and use the examples project environment:
+If you have git installed, check out this repo because it makes it easier to understand the code:
 ```bash
+mkdir repos
+cd repos
 git clone https://github.com/OpenSourceAWE/VortexStepMethod.jl
-cd VortexStepMethod.jl
-julia --project=examples
+cd VortexStepMethod.jl/bin
+./install
 ```
-In the Julia package manager (press `]` for the `pkg>` prompt), install all
-dependencies:
+You can launch Julia with:
+```bash
+jl
 ```
-(examples) pkg> dev .
-(examples) pkg> instantiate
+or with:
+```bash
+./bin/run_julia
 ```
-Press backspace to return to the `julia>` prompt, then run the interactive
-menu:
+Then you can display a menu with the available examples using the GLMakie library:
 ```julia
-julia> include("examples/menu.jl")
+menu()
 ```
+or using the ControlPlots library (faster time-to-first-plot):
+```julia
+menu_cp()
+```
+
 To browse the code, it is suggested to use
 [VSCode](https://code.visualstudio.com/) with the Julia plugin.
 
@@ -70,7 +86,7 @@ To browse the code, it is suggested to use
 Three kinds of input data is needed:
 
 - The wing geometry, defined by section:
-  - for the rectangualar wing two sections, two points in CAD reference frame + polars  
+  - for the rectangular wing two sections, two points in CAD reference frame + polars  
     (three different options to provide them) per section
   - kite wing: model of polars included, n sections to define
 
@@ -85,11 +101,13 @@ Wing geometry can also be loaded from YAML files or `.obj` files. See the exampl
 
 ### Example for defining the required input:
 ```julia
+
 # Step 1: Define wing parameters
 n_panels = 20          # Number of panels
 span = 20.0            # Wing span [m]
 chord = 1.0            # Chord length [m]
 v_a = 20.0             # Magnitude of inflow velocity [m/s]
+density = 1.225        # Air density [kg/m³]
 alpha_deg = 30.0       # Angle of attack [degrees]
 alpha = deg2rad(alpha_deg)
 
@@ -128,7 +146,7 @@ Surfplan files can be converted to an input for `VortexStepMethod.jl` using the 
 
 In addition, the spanwise distribution of these and additional values are available.
 
-See also the [documentation](https://opensourceawe.github.io/VortexStepMethod.jl/dev/).
+See also the [documentation](https://OpenSourceAWE.github.io/VortexStepMethod.jl/dev/).
 
 ## Citation
 If you use this project in your research, please consider citing it. 
