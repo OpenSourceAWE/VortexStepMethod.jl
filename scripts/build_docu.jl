@@ -3,4 +3,5 @@
 
 using Pkg
 Pkg.activate(joinpath(@__DIR__, "..", "docs"))
+Pkg.instantiate()
 using LiveServer; servedocs(launch_browser=true)
