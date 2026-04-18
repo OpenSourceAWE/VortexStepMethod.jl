@@ -33,20 +33,22 @@ function extract_literature_polar_data(raw_data, path;
     end
 
     # Find angle column based on angle_type
+    contains_token(token, value) = occursin(token, lowercase(strip(string(value))))
     angle_idx = if angle_type == "side_slip"
         findfirst(
-            x -> occursin("beta", x) ||
-                 occursin("side_slip", x), header)
+            x -> contains_token("beta", x) ||
+                 contains_token("side_slip", x), header)
     else
         findfirst(
-            x -> occursin("alpha", x) || x == "aoa", header)
+            x -> contains_token("alpha", x) ||
+                 lowercase(strip(string(x))) == "aoa", header)
     end
-    cl_idx = findfirst(x -> occursin("cl", x), header)
-    cd_idx = findfirst(x -> occursin("cd", x), header)
-    cs_idx = findfirst(x -> occursin("cs", x), header)
-    cmx_idx = findfirst(x -> occursin("cmx", x), header)
-    cmy_idx = findfirst(x -> occursin("cmy", x), header)
-    cmz_idx = findfirst(x -> occursin("cmz", x), header)
+    cl_idx = findfirst(x -> contains_token("cl", x), header)
+    cd_idx = findfirst(x -> contains_token("cd", x), header)
+    cs_idx = findfirst(x -> contains_token("cs", x), header)
+    cmx_idx = findfirst(x -> contains_token("cmx", x), header)
+    cmy_idx = findfirst(x -> contains_token("cmy", x), header)
+    cmz_idx = findfirst(x -> contains_token("cmz", x), header)
 
     (isnothing(angle_idx) || isnothing(cl_idx) ||
         isnothing(cd_idx)) &&
