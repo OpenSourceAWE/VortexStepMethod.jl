@@ -55,6 +55,7 @@ required packages ([GLMakie](https://docs.makie.org/stable/), CSV, etc.).
 
 ## Running the examples as developer
 If you have git installed, check out this repo because it makes it easier to understand the code:
+
 ```bash
 mkdir repos
 cd repos
@@ -62,19 +63,27 @@ git clone https://github.com/OpenSourceAWE/VortexStepMethod.jl
 cd VortexStepMethod.jl/bin
 ./install
 ```
+
 You can launch Julia with:
+
 ```bash
 jl
 ```
+
 or with:
+
 ```bash
 ./bin/run_julia
 ```
+
 Then you can display a menu with the available examples using the GLMakie library:
+
 ```julia
 menu()
 ```
+
 or using the ControlPlots library (faster time-to-first-plot):
+
 ```julia
 menu_cp()
 ```
@@ -100,6 +109,7 @@ Three kinds of input data is needed:
 Wing geometry can also be loaded from YAML files or `.obj` files. See the examples for details.
 
 ### Example for defining the required input:
+
 ```julia
 
 # Step 1: Define wing parameters
@@ -134,6 +144,7 @@ body_aero = BodyAerodynamics([wing])
 vel_app = [cos(alpha), 0.0, sin(alpha)] .* v_a
 set_va!(body_aero, vel_app)
 ```
+
 It is possible to import the wing geometry using an `.obj` file as shown in the example `ram_air_kite.jl`. During the import the polars are calculated automatically using XFoil. This approach is valid for rigid wings and ram-air kites, but not for leading edge inflatable kites.
 
 Surfplan files can be converted to an input for `VortexStepMethod.jl` using the [SurfplanAdapter](https://github.com/jellepoland/SurfplanAdapter).
