@@ -512,143 +512,6 @@ Generate polar data for aerodynamic analysis over a range of angles.
 # Returns
 - Tuple of polar data array and Reynolds number
 """
-function generate_polar_data(
-    solver,
-    body_aero::BodyAerodynamics,
-    angle_range;
-    angle_type="angle_of_attack",
-    angle_of_attack=0.0,
-    side_slip=0.0,
-    v_a=10.0,
-    use_latex=false
-)
-    _ = use_latex
-
-    n_panels = length(body_aero.panels)
-    n_angles = length(angle_range)
-
-    # Initialize arrays
-    cl = zeros(n_angles)
-    cd = zeros(n_angles)
-    cs = zeros(n_angles)
-    cmx = fill(NaN, n_angles)
-    cmy = fill(NaN, n_angles)
-    cmz = fill(NaN, n_angles)
-    gamma_distribution = zeros(n_angles, n_panels)
-    cl_distribution = zeros(n_angles, n_panels)
-    cd_distribution = zeros(n_angles, n_panels)
-    cs_distribution = zeros(n_angles, n_panels)
-    reynolds_number = zeros(n_angles)
-
-    for (i, angle_i) in enumerate(angle_range)
-        # Set angle based on type
-        if angle_type == "angle_of_attack"
-            α = deg2rad(angle_i)
-            β = side_slip
-        elseif angle_type == raw"side_slip"
-            α = angle_of_attack
-            β = deg2rad(angle_i)
-        else
-            throw(ArgumentError(
-                "angle_type must be 'angle_of_attack' or 'side_slip'"))
-        end
-
-        # Update inflow conditions
-        set_va!(
-            body_aero,
-            [
-                cos(α) * cos(β),
-                sin(β),
-                sin(α)
-            ] * v_a
-        )
-
-        # Solve and store results
-        results = solve(solver, body_aero, gamma_distribution[i, :])
-
-        cl[i] = results["cl"]
-        cd[i] = results["cd"]
-        cs[i] = results["cs"]
-        cmx[i] = get(results, "cmx", NaN)
-        cmy[i] = get(results, "cmy", NaN)
-        cmz[i] = get(results, "cmz", NaN)
-        gamma_distribution[i, :] = results["gamma_distribution"]
-        cl_distribution[i, :] = results["cl_distribution"]
-        cd_distribution[i, :] = results["cd_distribution"]
-        cs_distribution[i, :] = results["cs_distribution"]
-        reynolds_number[i] = results["Rey"]
-    end
-
-    polar_data = [
-        angle_range,
-        cl,
-        cd,
-        cs,
-        gamma_distribution,
-        cl_distribution,
-        cd_distribution,
-        cs_distribution,
-        reynolds_number
-    ]
-
-    return (polar_data=polar_data, cmx=cmx, cmy=cmy, cmz=cmz,
-            rey=reynolds_number[1])
-end
-
-function _extract_literature_polar_data(raw_data, path;
-        angle_type="angle_of_attack")
-    table, header = if raw_data isa Tuple
-        # readdlm(...; header=true) returns (data, header)
-        raw_table, raw_header = raw_data
-        raw_table, lowercase.(strip.(string.(vec(raw_header))))
-    else
-        # Header is in first row when a single matrix is returned
-        raw_data[2:end, :], lowercase.(strip.(string.(raw_data[1, :])))
-    end
-
-    # Find angle column based on angle_type
-    alpha_idx = if angle_type == "side_slip"
-        findfirst(
-            x -> occursin("beta", x) ||
-                 occursin("side_slip", x), header)
-    else
-        findfirst(
-            x -> occursin("alpha", x) || x == "aoa", header)
-    end
-    cl_idx = findfirst(x -> occursin("cl", x), header)
-    cd_idx = findfirst(x -> occursin("cd", x), header)
-    cs_idx = findfirst(x -> occursin("cs", x), header)
-    cmx_idx = findfirst(x -> occursin("cmx", x), header)
-    cmy_idx = findfirst(x -> occursin("cmy", x), header)
-    cmz_idx = findfirst(x -> occursin("cmz", x), header)
-
-    (isnothing(alpha_idx) || isnothing(cl_idx) || isnothing(cd_idx)) &&
-        throw(ArgumentError(
-            "Literature CSV must contain alpha/aoa, cl and cd " *
-            "columns: $path"))
-
-    n_rows = size(table, 1)
-    cs_col = cs_idx === nothing ?
-        zeros(n_rows) : table[:, cs_idx]
-    cmx_col = cmx_idx === nothing ?
-        fill(NaN, n_rows) : table[:, cmx_idx]
-    cmy_col = cmy_idx === nothing ?
-        fill(NaN, n_rows) : table[:, cmy_idx]
-    cmz_col = cmz_idx === nothing ?
-        fill(NaN, n_rows) : table[:, cmz_idx]
-
-    return (
-        polar_data=[
-            table[:, alpha_idx],
-            table[:, cl_idx],
-            table[:, cd_idx],
-            cs_col
-        ],
-        cmx=cmx_col,
-        cmy=cmy_col,
-        cmz=cmz_col
-    )
-end
 
 """
     plot_polars(solver_list, body_aero_list, label_list;
@@ -712,7 +575,7 @@ function VortexStepMethod.plot_polars(
     polar_data_list = []
     cm_data_list = []
     for (i, (solver, body_aero)) in enumerate(zip(solver_list, body_aero_list))
-        result = generate_polar_data(
+        result = VortexStepMethod.generate_polar_data(
             solver, body_aero, angle_range;
             angle_type,
             angle_of_attack,
@@ -729,7 +592,7 @@ function VortexStepMethod.plot_polars(
     if !isempty(literature_path_list)
         for path in literature_path_list
             raw_data = readdlm(path, ',')
-            lit = _extract_literature_polar_data(
+            lit = VortexStepMethod.extract_literature_polar_data(
                 raw_data, path; angle_type)
             push!(polar_data_list, lit.polar_data)
             push!(cm_data_list, (cmx=lit.cmx, cmy=lit.cmy,
@@ -965,6 +828,7 @@ function VortexStepMethod.plot_combined_analysis(
     body_aero,
     results;
     solver_label="VSM",
+    labels=nothing,
     angle_range=range(0, 20, length=20),
     angle_type="angle_of_attack",
     angle_of_attack=0.0,
@@ -980,61 +844,79 @@ function VortexStepMethod.plot_combined_analysis(
     use_tex=false,
     literature_path_list=String[],
     cl_over_cd=true,
+    angle_of_attack_for_spanwise_distribution=5.0,
 )
     # Normalize inputs to arrays for consistent handling
     solvers = solver isa Vector ? solver : [solver]
     body_aeros = body_aero isa Vector ? body_aero : [body_aero]
     results_list = results isa Vector ? results : [results]
-    labels = solver_label isa Vector ? solver_label : [solver_label]
+    n_solvers = length(solvers)
+    n_literature = length(literature_path_list)
 
-    # Extract y-coordinates for distribution plot (use first body_aero)
-    body_y_coordinates = [panel.aero_center[2] for panel in body_aeros[1].panels]
-    y_coords_list = [body_y_coordinates for _ in 1:length(solvers)]
+    # Label normalization (matches Makie version)
+    label_source = isnothing(labels) ? solver_label : labels
+    labels_in = label_source isa AbstractVector ?
+        string.(label_source) : [string(label_source)]
+    solver_labels = length(labels_in) == 1 ?
+        fill(labels_in[1], n_solvers) :
+        labels_in[1:n_solvers]
 
-    # Plot geometry (only use first body_aero)
+    # Compute spanwise results at specified AoA
+    results_spanwise = copy(results_list)
+    if !isnothing(angle_of_attack_for_spanwise_distribution)
+        α_span = deg2rad(
+            angle_of_attack_for_spanwise_distribution)
+        β_span = deg2rad(side_slip)
+        for (i, (s, ba)) in enumerate(
+                zip(solvers, body_aeros))
+            va_old = copy(getfield(ba, :_va))
+            omega_old = copy(ba.omega)
+            set_va!(ba, [cos(α_span) * cos(β_span),
+                sin(β_span), sin(α_span)] * v_a)
+            results_spanwise[i] = solve(s, ba,
+                s.sol.gamma_distribution)
+            set_va!(ba, va_old, omega_old)
+        end
+    end
+
+    # Extract y-coordinates for distribution plot
+    y_coords_list = [
+        [p.aero_center[2] for p in ba.panels]
+        for ba in body_aeros]
+
+    # Plot geometry (first body_aero only)
     plot_geometry(
         body_aeros[1],
         title;
-        data_type=data_type,
-        save_path=save_path,
-        is_save=is_save,
-        is_show=is_show,
-        view_elevation=view_elevation,
-        view_azimuth=view_azimuth,
-        use_tex=use_tex
+        data_type, save_path, is_save, is_show,
+        view_elevation, view_azimuth, use_tex
     )
 
     # Plot spanwise distributions
     plot_distribution(
         y_coords_list,
-        results_list,
-        labels;
+        results_spanwise,
+        solver_labels;
         title=title * " - Distributions",
-        data_type=data_type,
-        save_path=save_path,
-        is_save=is_save,
-        is_show=is_show,
-        use_tex=use_tex
+        data_type, save_path, is_save, is_show, use_tex
     )
 
-    # Plot polars
+    # Plot polars (include literature labels)
+    polar_labels = if n_literature > 0 &&
+            length(labels_in) == n_solvers + n_literature
+        labels_in
+    else
+        solver_labels
+    end
     plot_polars(
         solvers,
         body_aeros,
-        labels;
-        literature_path_list=literature_path_list,
-        angle_range=angle_range,
-        angle_type=angle_type,
-        angle_of_attack=angle_of_attack,
-        side_slip=side_slip,
-        v_a=v_a,
+        polar_labels;
+        literature_path_list, angle_range, angle_type,
+        angle_of_attack, side_slip, v_a,
         title=title * " - Polars",
-        data_type=data_type,
-        save_path=save_path,
-        is_save=is_save,
-        is_show=is_show,
-        use_tex=use_tex,
-        cl_over_cd=cl_over_cd
+        data_type, save_path, is_save, is_show,
+        use_tex, cl_over_cd
     )
 end
 

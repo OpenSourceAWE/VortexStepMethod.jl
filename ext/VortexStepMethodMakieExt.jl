@@ -640,125 +640,6 @@ Generate polar data for aerodynamic analysis over a range of angles.
 # Returns
 - Tuple of polar data array and Reynolds number
 """
-function generate_polar_data_makie(
-    solver,
-    body_aero::BodyAerodynamics,
-    angle_range;
-    angle_type="angle_of_attack",
-    angle_of_attack=0.0,
-    side_slip=0.0,
-    v_a=10.0
-)
-    n_panels = length(body_aero.panels)
-    n_angles = length(angle_range)
-
-    # Initialize arrays
-    cl = zeros(n_angles)
-    cd = zeros(n_angles)
-    cs = zeros(n_angles)
-    cmx = fill(NaN, n_angles)
-    cmy = fill(NaN, n_angles)
-    cmz = fill(NaN, n_angles)
-    gamma_distribution = zeros(n_angles, n_panels)
-    reynolds_number = zeros(n_angles)
-
-    for (i, angle_i) in enumerate(angle_range)
-        # Set angle based on type
-        if angle_type == "angle_of_attack"
-            α = deg2rad(angle_i)
-            β = side_slip
-        elseif angle_type == "side_slip"
-            α = angle_of_attack
-            β = deg2rad(angle_i)
-        else
-            throw(ArgumentError(
-                "angle_type must be 'angle_of_attack' or 'side_slip'"))
-        end
-
-        # Update inflow conditions
-        set_va!(
-            body_aero,
-            [
-                cos(α) * cos(β),
-                sin(β),
-                sin(α)
-            ] * v_a
-        )
-
-        # Solve and store results
-        results = solve(solver, body_aero, gamma_distribution[i, :])
-
-        cl[i] = results["cl"]
-        cd[i] = results["cd"]
-        cs[i] = results["cs"]
-        cmx[i] = get(results, "cmx", NaN)
-        cmy[i] = get(results, "cmy", NaN)
-        cmz[i] = get(results, "cmz", NaN)
-        gamma_distribution[i, :] = results["gamma_distribution"]
-        reynolds_number[i] = results["Rey"]
-    end
-
-    polar_data = [angle_range, cl, cd, cs]
-    return (polar_data=polar_data, cmx=cmx, cmy=cmy, cmz=cmz,
-            rey=reynolds_number[1])
-end
-
-"""
-    compute_polar_with_cmy(solver, body_aero, angle_range; angle_type=\"angle_of_attack\",
-                           angle_of_attack=0.0, side_slip=0.0, v_a=10.0)
-
-Compute CL/CD/CS polars and optional CMy for a sweep, reusing the previous gamma
-as initial guess for faster convergence. Returns a named tuple with angle,
-cl, cd, cs, cmy (NaN when unavailable) and per-sample Reynolds numbers.
-"""
-function compute_polar_with_cmy(
-    solver,
-    body_aero,
-    angle_range;
-    angle_type::String="angle_of_attack",
-    angle_of_attack::Float64=0.0,
-    side_slip::Float64=0.0,
-    v_a::Float64=10.0
-)
-    n_angles = length(angle_range)
-    cl = zeros(n_angles)
-    cd = zeros(n_angles)
-    cs = zeros(n_angles)
-    cmy = fill(NaN, n_angles)  # moment coefficient about body y (pitch)
-    reynolds_number = zeros(n_angles)
-
-    gamma_prev = nothing
-    for (i, angle_i) in enumerate(angle_range)
-        if angle_type == "angle_of_attack"
-            α = deg2rad(angle_i)
-            β = deg2rad(side_slip)
-        elseif angle_type == "side_slip"
-            α = deg2rad(angle_of_attack)
-            β = deg2rad(angle_i)
-        else
-            throw(ArgumentError("angle_type must be 'angle_of_attack' or 'side_slip'"))
-        end
-
-        set_va!(body_aero, [cos(α) * cos(β), sin(β), sin(α)] * v_a)
-        results = solve(solver, body_aero, gamma_prev)
-
-        cl[i] = results["cl"]
-        cd[i] = results["cd"]
-        cs[i] = results["cs"]
-        cmy[i] = get(results, "cmy", NaN)
-        reynolds_number[i] = results["Rey"]
-        gamma_prev = results["gamma_distribution"]
-    end
-
-    return (
-        angle=collect(angle_range),
-        cl=cl,
-        cd=cd,
-        cs=cs,
-        cmy=cmy,
-        rey=reynolds_number,
-    )
-end
 
 """
     plot_polars(solver_list, body_aero_list, label_list;
@@ -821,7 +702,7 @@ function VortexStepMethod.plot_polars(
     cm_data_list = []
     labels_with_re = copy(label_list)
     for (i, (solver, body_aero)) in enumerate(zip(solver_list, body_aero_list))
-        result = generate_polar_data_makie(
+        result = VortexStepMethod.generate_polar_data(
             solver, body_aero, angle_range;
             angle_type, angle_of_attack, side_slip, v_a
         )
@@ -834,54 +715,11 @@ function VortexStepMethod.plot_polars(
     # Load literature data if provided
     if !isempty(literature_path_list)
         for path in literature_path_list
-            data = readdlm(path, ',')
-            header = lowercase.(strip.(string.(data[1, :])))
-            alpha_idx = if angle_type == "side_slip"
-                findfirst(
-                    x -> occursin("beta", x) ||
-                         occursin("side_slip", x), header)
-            else
-                findfirst(
-                    x -> occursin("alpha", x) || x == "aoa",
-                    header)
-            end
-            cl_idx = findfirst(x -> occursin("cl", x), header)
-            cd_idx = findfirst(x -> occursin("cd", x), header)
-            cs_idx = findfirst(x -> occursin("cs", x), header)
-            cmx_idx = findfirst(x -> occursin("cmx", x), header)
-            cmy_idx = findfirst(x -> occursin("cmy", x), header)
-            cmz_idx = findfirst(x -> occursin("cmz", x), header)
-
-            (isnothing(alpha_idx) || isnothing(cl_idx) ||
-                isnothing(cd_idx)) &&
-                throw(ArgumentError(
-                    "Literature CSV must contain alpha/aoa, " *
-                    "cl and cd columns: $path"))
-
-            n_rows = size(data, 1) - 1
-            parse_col(col) = [v isa Real ? Float64(v) :
-                (y = tryparse(Float64, strip(string(v)));
-                 isnothing(y) ? NaN : y) for v in col]
-
-            cs_col = cs_idx === nothing ?
-                zeros(n_rows) : parse_col(data[2:end, cs_idx])
-            cmx_col = cmx_idx === nothing ?
-                fill(NaN, n_rows) :
-                parse_col(data[2:end, cmx_idx])
-            cmy_col = cmy_idx === nothing ?
-                fill(NaN, n_rows) :
-                parse_col(data[2:end, cmy_idx])
-            cmz_col = cmz_idx === nothing ?
-                fill(NaN, n_rows) :
-                parse_col(data[2:end, cmz_idx])
-            push!(polar_data_list, [
-                parse_col(data[2:end, alpha_idx]),
-                parse_col(data[2:end, cl_idx]),
-                parse_col(data[2:end, cd_idx]),
-                cs_col
-            ])
-            push!(cm_data_list, (cmx=cmx_col, cmy=cmy_col,
-                                 cmz=cmz_col))
+            lit = VortexStepMethod.extract_literature_polar_data(
+                readdlm(path, ','), path; angle_type)
+            push!(polar_data_list, lit.polar_data)
+            push!(cm_data_list, (cmx=lit.cmx, cmy=lit.cmy,
+                                 cmz=lit.cmz))
         end
     end
 
@@ -1356,52 +1194,33 @@ function VortexStepMethod.plot_combined_analysis(
 
     # [2,2] Polars (2×2 grid)
     polar_series = Tuple[]
-    for (si, (s, ba, lbl)) in enumerate(zip(solvers, body_aeros, solver_labels))
-        polar_solver = compute_polar_with_cmy(
+    for (si, (s, ba, lbl)) in enumerate(
+            zip(solvers, body_aeros, solver_labels))
+        result = VortexStepMethod.generate_polar_data(
             s, ba, angle_range;
-            angle_type=angle_type,
-            angle_of_attack=angle_of_attack,
-            side_slip=side_slip,
-            v_a=v_a
-        )
+            angle_type, angle_of_attack, side_slip, v_a)
+        pd = result.polar_data
         label_re = "$lbl Re = $(round(Int64,
-                     first(polar_solver.rey) * 1e-5))e5"
-        push!(polar_series, (polar_solver, label_re))
+                     result.rey * 1e-5))e5"
+        push!(polar_series, (
+            (angle=pd[1], cl=pd[2], cd=pd[3], cs=pd[4],
+             cmy=result.cmy,
+             rey=pd[9]),
+            label_re))
     end
 
     # Load literature data (if any)
     if !isempty(literature_path_list)
-        for (path, lit_label) in zip(literature_path_list, literature_labels)
-            data = readdlm(path, ',')
-            header_raw = string.(data[1, :])
-            header = lowercase.(strip.(header_raw))
-            alpha_idx = findfirst(x -> occursin("alpha", x) || occursin("aoa", x), header)
-            cl_idx = findfirst(x -> occursin("cl", x), header)
-            cd_idx = findfirst(x -> occursin("cd", x), header)
-            cs_idx = findfirst(x -> occursin("cs", x), header)
-            cmy_idx = findfirst(x -> occursin("cmy", x), header)
-
-            parse_col(col) = begin
-                vals = Float64[]
-                for v in col
-                    if v isa Real
-                        push!(vals, Float64(v))
-                    else
-                        s = strip(String(v))
-                        y = tryparse(Float64, s)
-                        push!(vals, isnothing(y) ? NaN : y)
-                    end
-                end
-                vals
-            end
-
-            angles = parse_col(data[2:end, alpha_idx])
-            cl_vals = parse_col(data[2:end, cl_idx])
-            cd_vals = parse_col(data[2:end, cd_idx])
-            cs_vals = cs_idx === nothing ? zeros(size(data, 1) - 1) : parse_col(data[2:end, cs_idx])
-            cmy_vals = cmy_idx === nothing ? fill(NaN, length(angles)) : parse_col(data[2:end, cmy_idx])
-
-            push!(polar_series, ((angle=angles, cl=cl_vals, cd=cd_vals, cs=cs_vals, cmy=cmy_vals, rey=fill(NaN, length(angles))), lit_label))
+        for (path, lit_label) in zip(
+                literature_path_list, literature_labels)
+            lit = VortexStepMethod.extract_literature_polar_data(
+                readdlm(path, ','), path; angle_type)
+            pd = lit.polar_data
+            push!(polar_series, (
+                (angle=pd[1], cl=pd[2], cd=pd[3], cs=pd[4],
+                 cmy=lit.cmy,
+                 rey=fill(NaN, length(pd[1]))),
+                lit_label))
         end
     end
 
