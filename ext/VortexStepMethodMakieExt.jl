@@ -254,6 +254,7 @@ function VortexStepMethod.save_plot(fig::Makie.Figure, save_path, title; data_ty
 
     !isdir(save_path) && mkpath(save_path)
     full_path = joinpath(save_path, title * data_type)
+    fallback_path = joinpath(save_path, title * ".png")
 
     @debug "Attempting to save figure to: $full_path"
     @debug "Current working directory: $(pwd())"
@@ -269,6 +270,14 @@ function VortexStepMethod.save_plot(fig::Makie.Figure, save_path, title; data_ty
             @info "File does not exist after save attempt: $full_path"
         end
     catch e
+        # GLMakie cannot export vector formats such as PDF/SVG directly.
+        # If that happens, save as PNG so batch example runs keep working.
+        if e isa MethodError && lowercase(data_type) in (".pdf", ".svg")
+            @warn "Vector export format $data_type is not supported by the active Makie backend; falling back to PNG" requested_path=full_path fallback_path=fallback_path
+            save(fallback_path, fig)
+            @debug "Figure saved as PNG fallback"
+            return nothing
+        end
         @error "Error saving figure: $e"
         @error "Error type: $(typeof(e))"
         rethrow(e)
