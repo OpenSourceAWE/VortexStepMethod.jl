@@ -50,6 +50,10 @@ using VortexStepMethod
 VortexStepMethod.install_examples()
 include("examples/menu.jl")
 ```
+or, for using the ControlPlots library (faster time-to-first-plot):
+```
+include("examples_cp/menu_cp.jl")
+```
 
 ## Running the examples as developer
 If you have git installed, check out this repo because it makes it easier to understand the code:
@@ -57,25 +61,27 @@ If you have git installed, check out this repo because it makes it easier to und
 mkdir repos
 cd repos
 git clone https://github.com/OpenSourceAWE/VortexStepMethod.jl
-cd VortexStepMethod.jl
+cd VortexStepMethod.jl/bin
+./install
 ```
 You can launch Julia with:
 ```bash
-julia --project
+jl
 ```
 or with:
 ```bash
 ./bin/run_julia
 ```
-In Julia, first update the packages:
+Then you can display a menu with the available examples using the GLMakie library:
 ```julia
-using Pkg
-Pkg.update()
+menu()
 ```
-and then you can display a menu with the available examples:
+or using the ControlPlots library (faster time-to-first-plot):
 ```julia
-include("examples/menu.jl")
+menu_cp()
 ```
+
+
 To browse the code, it is suggested to use [VSCode](https://code.visualstudio.com/) with the Julia plugin.
 
 ## Input
