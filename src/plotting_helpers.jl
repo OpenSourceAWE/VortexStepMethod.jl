@@ -108,9 +108,9 @@ function generate_polar_data(
     for (i, angle_i) in enumerate(angle_range)
         if angle_type == "angle_of_attack"
             α = deg2rad(angle_i)
-            β = side_slip
+            β = deg2rad(side_slip)
         elseif angle_type == "side_slip"
-            α = angle_of_attack
+            α = deg2rad(angle_of_attack)
             β = deg2rad(angle_i)
         else
             throw(ArgumentError(

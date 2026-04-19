@@ -633,8 +633,8 @@ Generate polar data for aerodynamic analysis over a range of angles.
 
 # Keyword arguments
 - `angle_type`: Type of angle variation ("angle_of_attack" or "side_slip")
-- `angle_of_attack`: Initial angle of attack [rad]
-- `side_slip`: Initial side slip angle [rad]
+- `angle_of_attack`: Initial angle of attack [°]
+- `side_slip`: Initial side slip angle [°]
 - `v_a`: norm of apparent wind speed [m/s]
 
 # Returns
@@ -660,8 +660,8 @@ Plot polar data comparing different solvers using Makie.
 - `literature_path_list`: Optional paths to literature data files
 - `angle_range`: Range of angles [°]
 - `angle_type`: "angle_of_attack" or "side_slip" (default: angle_of_attack)
-- `angle_of_attack`: AoA [rad] (default: 0.0)
-- `side_slip`: Side slip angle [rad] (default: 0.0)
+- `angle_of_attack`: AoA [°] (default: 0.0)
+- `side_slip`: Side slip angle [°] (default: 0.0)
 - `v_a`: Wind speed [m/s] (default: 10.0)
 - `title`: Plot title
 - `data_type`: File extension (default: ".png", also supports ".jpeg")

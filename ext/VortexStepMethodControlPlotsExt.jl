@@ -505,8 +505,8 @@ Generate polar data for aerodynamic analysis over a range of angles.
 
 # Keyword arguments
 - `angle_type`: Type of angle variation ("angle_of_attack" or "side_slip")
-- `angle_of_attack`: Initial angle of attack [rad]
-- `side_slip`: Initial side slip angle in [rad]
+- `angle_of_attack`: Initial angle of attack [°]
+- `side_slip`: Initial side slip angle [°]
 - `v_a`: norm of apparent wind speed [m/s]
 
 # Returns
@@ -532,8 +532,8 @@ Plot polar data comparing different solvers and configurations.
 - `literature_path_list`: Optional paths to literature data files
 - `angle_range`: Range of angles to analyze [°]
 - `angle_type`: "`angle_of_attack`" or "`side_slip`"; (default: `angle_of_attack`)
-- `angle_of_attack:` AoA to be used for plotting the polars (default: 0.0) [rad]
-- `side_slip`: side slip angle (default: 0.0) [rad]
+- `angle_of_attack:` AoA to be used for plotting the polars (default: 0.0) [°]
+- `side_slip`: side slip angle (default: 0.0) [°]
 - v_a: norm of apparent wind speed (default: 10.0) [m/s]
 - title: plot title
 - `data_type`: File extension for saving (default: ".pdf")
