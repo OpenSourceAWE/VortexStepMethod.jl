@@ -23,6 +23,7 @@ example_files = [
 ]
 
 function run_all()
+    failed_examples = String[]
     for f in example_files
         f == "cleanup.jl" && continue
         println("\n" * "="^60)
@@ -32,9 +33,15 @@ function run_all()
             include(joinpath(examples_dir, f))
         catch e
             @error "Failed: $f" exception=(e, catch_backtrace())
+            push!(failed_examples, f)
         end
     end
-    println("\nAll examples completed.")
+    if isempty(failed_examples)
+        println("\nAll examples completed.")
+    else
+        failed_list = join(failed_examples, ", ")
+        throw(ErrorException("run_all failed for $(length(failed_examples)) example(s): $failed_list"))
+    end
 end
 
 function example_menu()

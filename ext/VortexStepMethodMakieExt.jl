@@ -254,6 +254,7 @@ function VortexStepMethod.save_plot(fig::Makie.Figure, save_path, title; data_ty
 
     !isdir(save_path) && mkpath(save_path)
     full_path = joinpath(save_path, title * data_type)
+    fallback_path = joinpath(save_path, title * ".png")
 
     @debug "Attempting to save figure to: $full_path"
     @debug "Current working directory: $(pwd())"
@@ -269,6 +270,14 @@ function VortexStepMethod.save_plot(fig::Makie.Figure, save_path, title; data_ty
             @info "File does not exist after save attempt: $full_path"
         end
     catch e
+        # GLMakie cannot export vector formats such as PDF/SVG directly.
+        # If that happens, save as PNG so batch example runs keep working.
+        if e isa MethodError && lowercase(data_type) in (".pdf", ".svg")
+            @warn "Vector export format $data_type is not supported by the active Makie backend; falling back to PNG" requested_path=full_path fallback_path=fallback_path
+            save(fallback_path, fig)
+            @debug "Figure saved as PNG fallback"
+            return nothing
+        end
         @error "Error saving figure: $e"
         @error "Error type: $(typeof(e))"
         rethrow(e)
@@ -449,8 +458,8 @@ Plot wing geometry from different viewpoints using Makie.
 - `save_path`: Path for saving (default: nothing)
 - `is_save`: Whether to save (default: false)
 - `is_show`: Whether to display (default: false)
-- `view_elevation`: View elevation angle [°] (default: 15)
-- `view_azimuth`: View azimuth angle [°] (default: -120)
+- `view_elevation`: View elevation angle in degrees (default: 15)
+- `view_azimuth`: View azimuth angle in degrees (default: -120)
 - `use_tex`: Ignored for Makie (default: false)
 """
 function VortexStepMethod.plot_geometry(body_aero::BodyAerodynamics, title;
@@ -635,7 +644,7 @@ Generate polar data for aerodynamic analysis over a range of angles.
 - `angle_type`: Type of angle variation ("angle_of_attack" or "side_slip")
 - `angle_of_attack`: Initial angle of attack [°]
 - `side_slip`: Initial side slip angle [°]
-- `v_a`: norm of apparent wind speed [m/s]
+- `v_a`: Norm of apparent wind speed [m/s]
 
 # Returns
 - Tuple of polar data array and Reynolds number
@@ -658,7 +667,7 @@ Plot polar data comparing different solvers using Makie.
 
 # Keyword arguments
 - `literature_path_list`: Optional paths to literature data files
-- `angle_range`: Range of angles [°]
+- `angle_range`: Range of angles in degrees
 - `angle_type`: "angle_of_attack" or "side_slip" (default: angle_of_attack)
 - `angle_of_attack`: AoA [°] (default: 0.0)
 - `side_slip`: Side slip angle [°] (default: 0.0)
@@ -851,8 +860,8 @@ Plot polar data (Cl, Cd, Cm) as 3D surfaces using Makie.
 - `body_aero`: Wing aerodynamics struct
 
 # Keyword arguments
-- `alphas`: Range of AoA values [rad] (default: -5° to 25° in 0.3° steps)
-- `delta_tes`: Range of trailing edge angles [rad] (default: -5° to 25° in 0.3° steps)
+- `alphas`: Range of AoA values in radians (default: `deg2rad.(-5:0.3:25)`)
+- `delta_tes`: Range of trailing edge angles in radians (default: `deg2rad.(-5:0.3:25)`)
 - `is_show`: Whether to display (default: true)
 - `use_tex`: Ignored for Makie (default: false)
 """
@@ -932,8 +941,8 @@ Create combined multi-panel figure with geometry, polar data, distributions, and
 - `side_slip`: Side slip in degrees (default: 0.0)
 - `v_a`: Wind speed in m/s (default: 10.0)
 - `title`: Overall figure title (default: "Combined Analysis")
-- `view_elevation`: Geometry view elevation [°] (default: 15)
-- `view_azimuth`: Geometry view azimuth [°] (default: -120)
+- `view_elevation`: Geometry view elevation in degrees (default: 15)
+- `view_azimuth`: Geometry view azimuth in degrees (default: -120)
 - `is_show`: Display figure (default: true)
 - `use_tex`: Ignored for Makie (default: false)
 - `literature_path_list`: Paths to literature CSV files (default: String[])

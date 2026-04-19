@@ -29,26 +29,42 @@ Furthermore, the package `ControlPlots` must be installed globally:
 julia -e 'using Pkg; Pkg.add("ControlPlots")'
 ```
 
-Before installing this software it is suggested to create a new project, for example like this:
+Before installing this software it is suggested to create a new project, for
+example like this:
+
 ```bash
 mkdir vsm
 cd vsm
 julia --project=.
 ```
-Then add VortexStepMethod from  Julia's package manager, by typing:
+
+Then add VortexStepMethod from Julia's package manager, by typing `]` to enter
+the package manager (`pkg>` prompt), then:
+
 ```julia
-using Pkg
-pkg"add VortexStepMethod"
-``` 
-at the Julia prompt. You can run the unit tests with the command:
-```julia
-pkg"test VortexStepMethod"
+(vsm) pkg> add VortexStepMethod
 ```
-To run the examples, type:
+
+Press backspace to return to the `julia>` prompt. You can run the unit tests
+from the `pkg>` prompt with:
+
 ```julia
-using VortexStepMethod
-VortexStepMethod.install_examples()
-include("examples/menu.jl")
+(vsm) pkg> test VortexStepMethod
+```
+
+You can also type `?` to enter help mode (`help?>` prompt) to look up
+documentation for any function.
+
+To run the examples, type at the `julia>` prompt:
+
+```julia
+julia> using VortexStepMethod
+julia> VortexStepMethod.install_examples()
+julia> include("examples/menu.jl")
+```
+or, for using the ControlPlots library (faster time-to-first-plot):
+```
+include("examples_cp/menu_cp.jl")
 ```
 
 ## Running the examples as developer
@@ -57,25 +73,27 @@ If you have git installed, check out this repo because it makes it easier to und
 mkdir repos
 cd repos
 git clone https://github.com/OpenSourceAWE/VortexStepMethod.jl
-cd VortexStepMethod.jl
+cd VortexStepMethod.jl/bin
+./install
 ```
 You can launch Julia with:
 ```bash
-julia --project
+jl
 ```
 or with:
 ```bash
 ./bin/run_julia
 ```
-In Julia, first update the packages:
+Then you can display a menu with the available examples using the GLMakie library:
 ```julia
-using Pkg
-Pkg.update()
+menu()
 ```
-and then you can display a menu with the available examples:
+or using the ControlPlots library (faster time-to-first-plot):
 ```julia
-include("examples/menu.jl")
+menu_cp()
 ```
+
+
 To browse the code, it is suggested to use [VSCode](https://code.visualstudio.com/) with the Julia plugin.
 
 ## Input
@@ -93,7 +111,7 @@ Three kinds of input data is needed:
   - how many panels  
     --> two sections make a panel.
 
-Apart from the wing geometry there is no input file yet, the input has to be defined in the code.
+Wing geometry can also be loaded from YAML files or `.obj` files. See the examples for details.
 
 ### Example for defining the required input:
 ```julia
@@ -120,12 +138,15 @@ add_section!(wing,
     [chord, -span/2, 0.0], # Right tip TE
     INVISCID)
 
+# Refine the mesh
+refine!(wing)
+
 # Step 3: Initialize aerodynamics
 body_aero = BodyAerodynamics([wing])
 
 # Set inflow conditions
 vel_app = [cos(alpha), 0.0, sin(alpha)] .* v_a
-set_va!(wa, vel_app)
+set_va!(body_aero, vel_app)
 ```
 It is possible to import the wing geometry using an `.obj` file as shown in the example `ram_air_kite.jl`. During the import the polars are calculated automatically using XFoil. This approach is valid for rigid wings and ram-air kites, but not for leading edge inflatable kites.
 
@@ -158,4 +179,4 @@ Copyright (c) 2022 Oriol Cayon
 
 Copyright (c) 2024 Oriol Cayon, Jelle Poland, TU Delft
 
-Copyright (c) 2025 Oriol Cayon, Jelle Poland, Bart van de Lint, Uwe Fechner
+Copyright (c) 2025, 2026 Oriol Cayon, Jelle Poland, Bart van de Lint, Uwe Fechner

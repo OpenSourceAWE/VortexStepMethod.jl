@@ -2,6 +2,6 @@
 # run with: julia --project=docs scripts/build_docu.jl
 
 using Pkg
-Pkg.develop(path=dirname(@__DIR__))
+Pkg.activate(joinpath(@__DIR__, "..", "docs"))
 Pkg.instantiate()
 using LiveServer; servedocs(launch_browser=true)

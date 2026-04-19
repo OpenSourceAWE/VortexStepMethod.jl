@@ -278,8 +278,8 @@ Plot wing geometry from different viewpoints and optionally save/show plots.
 - `save_path`: path for saving the graphic (default: `nothing`)
 - `is_save`: boolean value, indicates if the graphic shall be saved (default: `false`)
 - `is_show`: boolean value, indicates if the graphic shall be displayed (default: `false`)
-- `view_elevation`: initial view elevation angle (default: 15) [°]
-- `view_azimuth`: initial view azimuth angle (default: -120) [°]
+- `view_elevation`: initial view elevation angle in degrees (default: 15)
+- `view_azimuth`: initial view azimuth angle in degrees (default: -120)
 - `use_tex`: if the external `pdflatex` command shall be used (default: false)
 
 """
@@ -507,7 +507,7 @@ Generate polar data for aerodynamic analysis over a range of angles.
 - `angle_type`: Type of angle variation ("angle_of_attack" or "side_slip")
 - `angle_of_attack`: Initial angle of attack [°]
 - `side_slip`: Initial side slip angle [°]
-- `v_a`: norm of apparent wind speed [m/s]
+- `v_a`: Norm of apparent wind speed [m/s]
 
 # Returns
 - Tuple of polar data array and Reynolds number
@@ -530,11 +530,11 @@ Plot polar data comparing different solvers and configurations.
 
 # Keyword arguments
 - `literature_path_list`: Optional paths to literature data files
-- `angle_range`: Range of angles to analyze [°]
+- `angle_range`: Range of angles to analyze in degrees
 - `angle_type`: "`angle_of_attack`" or "`side_slip`"; (default: `angle_of_attack`)
 - `angle_of_attack:` AoA to be used for plotting the polars (default: 0.0) [°]
 - `side_slip`: side slip angle (default: 0.0) [°]
-- v_a: norm of apparent wind speed (default: 10.0) [m/s]
+- `v_a`: norm of apparent wind speed (default: 10.0) [m/s]
 - title: plot title
 - `data_type`: File extension for saving (default: ".pdf")
 - `save_path`: Path to save plots (default: nothing)
@@ -749,8 +749,8 @@ relative to the 2d airfoil or panel chord line.
 - `body_aero`: Wing aerodynamics struct
 
 # Keyword arguments
-- `alphas`: Range of angle of attack values in radians (default: -5° to 25° in 0.3° steps)
-- `delta_tes`: Range of trailing edge angles in radians (default: -5° to 25° in 0.3° steps)
+- `alphas`: Range of angle of attack values in radians (default: `deg2rad.(-5:0.3:25)`)
+- `delta_tes`: Range of trailing edge angles in radians (default: `deg2rad.(-5:0.3:25)`)
 - `is_show`: Whether to display plots (default: true)
 - `use_tex`: if the external `pdflatex` command shall be used
 """

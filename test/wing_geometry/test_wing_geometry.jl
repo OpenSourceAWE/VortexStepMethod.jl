@@ -92,6 +92,56 @@ end
         @test all(diff(cleaned_data[2]) .> 0) # delta still monotonic
     end
 
+    @testset "Matrix polar interpolation" begin
+        alpha = [-0.2, 0.0, 0.2]
+        delta = [-0.1, 0.1]
+
+        cl_left = [1.0 2.0; 3.0 4.0; 5.0 6.0]
+        cd_left = [0.1 0.2; 0.3 0.4; 0.5 0.6]
+        cm_left = [-0.1 -0.2; -0.3 -0.4; -0.5 -0.6]
+
+        cl_right = cl_left .+ 6.0
+        cd_right = cd_left .+ 0.6
+        cm_right = cm_left .- 0.6
+
+        polar_left = (alpha, delta, cl_left, cd_left, cm_left)
+        polar_right = (copy(alpha), copy(delta), cl_right, cd_right, cm_right)
+
+        result = VortexStepMethod.calculate_new_aero_data(
+            (POLAR_MATRICES, POLAR_MATRICES),
+            (polar_left, polar_right),
+            1,
+            0.25,
+            0.75,
+        )
+
+        @test result[1] === alpha
+        @test result[2] === delta
+        @test result[3] ≈ cl_left .* 0.25 .+ cl_right .* 0.75
+        @test result[4] ≈ cd_left .* 0.25 .+ cd_right .* 0.75
+        @test result[5] ≈ cm_left .* 0.25 .+ cm_right .* 0.75
+
+        bad_alpha_right = [-0.2, 0.05, 0.2]
+        @test_throws ArgumentError("Alpha steps must be identical.") \
+            VortexStepMethod.calculate_new_aero_data(
+                (POLAR_MATRICES, POLAR_MATRICES),
+                (polar_left, (bad_alpha_right, delta, cl_right, cd_right, cm_right)),
+                1,
+                0.5,
+                0.5,
+            )
+
+        bad_delta_right = [-0.1, 0.15]
+        @test_throws ArgumentError("Delta steps must be identical.") \
+            VortexStepMethod.calculate_new_aero_data(
+                (POLAR_MATRICES, POLAR_MATRICES),
+                (polar_left, (copy(alpha), bad_delta_right, cl_right, cd_right, cm_right)),
+                1,
+                0.5,
+                0.5,
+            )
+    end
+
     @testset "Robustness left to right" begin
         example_wing = Wing(10)
         # Test correct order

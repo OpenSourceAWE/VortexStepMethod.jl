@@ -174,16 +174,12 @@ instantiate_main_with_fallback() {
 echo
 echo "Preparing main manifest for Julia ${_julia_major}..."
 
-if [[ $_julia_major == "1.11" ]]; then
-    if [[ -f "${MAIN_DEFAULT}" ]]; then
-        cp "${MAIN_DEFAULT}" "${MAIN_MANIFEST}"
-        echo "Copied ${MAIN_DEFAULT} to ${MAIN_MANIFEST}"
-    else
-        echo "Error: ${MAIN_DEFAULT} not found"
-        exit 1
-    fi
+if [[ -f "${MAIN_DEFAULT}" ]]; then
+    cp "${MAIN_DEFAULT}" "${MAIN_MANIFEST}"
+    echo "Copied ${MAIN_DEFAULT} to ${MAIN_MANIFEST}"
 else
-    echo "Julia 1.12 selected: not copying default manifest by request."
+    echo "Error: ${MAIN_DEFAULT} not found"
+    exit 1
 fi
 
 if ! instantiate_main_with_fallback "." "main"; then

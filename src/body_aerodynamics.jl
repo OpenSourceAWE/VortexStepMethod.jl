@@ -585,14 +585,17 @@ function find_center_of_pressure(
     body_aero::BodyAerodynamics,
     force_array,
     moment_array,
-    reference_point
+    reference_point;
+    force_tol::Float64 = 1e-12
 )
     F = force_array
     M0 = moment_array
     r0 = reference_point
     F_norm_sq = dot3(F, F)
-    F_norm_sq == 0 && throw(ArgumentError(
-        "Force vector must not be zero."))
+    # Treat near-zero forces as "CoP undefined"
+    if !(isfinite(F_norm_sq)) || F_norm_sq ≤ force_tol^2
+        return nothing
+    end
 
     wv = body_aero.work_vectors
     r0_moment = wv[1]
@@ -658,6 +661,12 @@ function compute_panel_center_of_pressures(
         chord_dir = panel.x_airf
         span_dir = panel.y_airf
         c = panel.chord
+
+        # Guard against non-finite forces and near-zero forces
+        if !all(isfinite, F) || dot3(F, F) ≤ 1e-24
+            panel_cp_locations[i] = MVec3(ac)
+            continue
+        end
 
         # cross(r, F) where r = ac - reference_point
         rx = ac[1]-reference_point[1]
