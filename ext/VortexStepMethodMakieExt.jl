@@ -247,12 +247,46 @@ Save a Makie figure to a file.
 - `title`: Title of the plot
 
 # Keyword arguments
-- `data_type`: File extension. Defaults to `".pdf"` when CairoMakie is active, `".png"` otherwise.
+- `data_type`: File extension. Defaults to `".pdf"` when the active Makie backend is CairoMakie, `".png"` otherwise.
 """
+function _active_backend_prefers_vector_output()
+    isdefined(Makie, :current_backend) || return false
+
+    backend = try
+        Makie.current_backend()
+    catch
+        return false
+    end
+
+    # Makie versions may return backend modules directly or backend callables.
+    if backend isa Module
+        return nameof(backend) == :CairoMakie
+    end
+    if backend isa DataType
+        return nameof(backend) == :CairoMakie
+    end
+
+    if Base.applicable(backend)
+        called_backend = try
+            backend()
+        catch
+            nothing
+        end
+        if called_backend isa Module
+            return nameof(called_backend) == :CairoMakie
+        end
+        if called_backend isa DataType
+            return nameof(called_backend) == :CairoMakie
+        end
+        !isnothing(called_backend) && return occursin("cairomakie", lowercase(string(called_backend)))
+    end
+
+    return occursin("cairomakie", lowercase(string(backend)))
+end
+
 function VortexStepMethod.save_plot(fig::Makie.Figure, save_path, title; data_type=nothing)
     if isnothing(data_type)
-        cairo_loaded = any(m -> nameof(m) == :CairoMakie, values(Base.loaded_modules))
-        data_type = cairo_loaded ? ".pdf" : ".png"
+        data_type = _active_backend_prefers_vector_output() ? ".pdf" : ".png"
     end
     isnothing(save_path) && throw(ArgumentError("save_path should be provided"))
 

@@ -448,8 +448,28 @@ end
 
         # Test 3: save_plot with data_type=nothing (backend-aware detection)
         VortexStepMethod.save_plot(fig, save_test_dir, "test_backend_aware", data_type=nothing)
-        cairo_loaded = any(m -> nameof(m) == :CairoMakie, values(Base.loaded_modules))
-        expected_ext = cairo_loaded ? ".pdf" : ".png"
+        backend_obj = Makie.current_backend()
+        backend_name = if backend_obj isa Module
+            nameof(backend_obj)
+        elseif backend_obj isa DataType
+            nameof(backend_obj)
+        elseif Base.applicable(backend_obj)
+            called_backend = try
+                backend_obj()
+            catch
+                nothing
+            end
+            if called_backend isa Module
+                nameof(called_backend)
+            elseif called_backend isa DataType
+                nameof(called_backend)
+            else
+                Symbol(string(something(called_backend, backend_obj)))
+            end
+        else
+            Symbol(string(backend_obj))
+        end
+        expected_ext = lowercase(String(backend_name)) == "cairomakie" ? ".pdf" : ".png"
         @test isfile(joinpath(save_test_dir, "test_backend_aware" * expected_ext))
         safe_rm(joinpath(save_test_dir, "test_backend_aware" * expected_ext))
 
