@@ -247,9 +247,13 @@ Save a Makie figure to a file.
 - `title`: Title of the plot
 
 # Keyword arguments
-- `data_type`: File extension (default: ".png", also supports ".jpeg")
+- `data_type`: File extension. Defaults to `".pdf"` when CairoMakie is active, `".png"` otherwise.
 """
-function VortexStepMethod.save_plot(fig::Makie.Figure, save_path, title; data_type=".png")
+function VortexStepMethod.save_plot(fig::Makie.Figure, save_path, title; data_type=nothing)
+    if isnothing(data_type)
+        cairo_loaded = any(m -> nameof(m) == :CairoMakie, values(Base.loaded_modules))
+        data_type = cairo_loaded ? ".pdf" : ".png"
+    end
     isnothing(save_path) && throw(ArgumentError("save_path should be provided"))
 
     !isdir(save_path) && mkpath(save_path)
