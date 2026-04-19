@@ -12,6 +12,7 @@
 - `cl_over_cd` keyword for `plot_polars` and `plot_combined_analysis`
 - the function `menu_cp()` can now be used to run the examples with the ControlPlots backend
 - the script `bin/install` can and should be used to instantiate the project and all sub-projects after git checkout
+- the files `Manifest-v1.11.toml.default` and `Manifest-v12.toml.default` for enhanced reproducibility
 - the scripts `bin/jetls` and `bin/jetls_examples` for running a static check of the source code
 - the script `test_bench.jl` for benchmarking the refinement method and measuring allocations
 
