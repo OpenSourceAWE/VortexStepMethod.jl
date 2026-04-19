@@ -68,7 +68,6 @@ set_va!(body_aero, vel_app)
 PLOT && plot_geometry(
     body_aero,
     "Stall model geometry";
-    data_type=".pdf",
     save_path=OUTPUT_DIR,
     is_save=false || SAVE_ALL,
     is_show=true,
