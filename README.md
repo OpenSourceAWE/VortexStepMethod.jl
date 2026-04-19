@@ -3,7 +3,7 @@
 [![Build Status](https://github.com/OpenSourceAWE/VortexStepMethod.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/OpenSourceAWE/VortexStepMethod.jl/actions/workflows/CI.yml?query=branch%3Amain) 
 [![codecov](https://codecov.io/gh/OpenSourceAWE/VortexStepMethod.jl/graph/badge.svg?token=NykTlxGOrZ)](https://codecov.io/gh/OpenSourceAWE/VortexStepMethod.jl)
 [![Aqua QA](https://raw.githubusercontent.com/JuliaTesting/Aqua.jl/master/badge.svg)](https://github.com/JuliaTesting/Aqua.jl)
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.18715571.svg)](https://doi.org/10.5281/zenodo.18715571)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.17287621.svg)](https://doi.org/10.5281/zenodo.17287621)
 
 
 # Aerodynamic models of 3D wings using the Vortex Step Method 
