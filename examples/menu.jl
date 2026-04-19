@@ -2,6 +2,7 @@ using Pkg
 Pkg.activate(@__DIR__)
 
 using GLMakie
+using CairoMakie
 using VortexStepMethod
 using REPL.TerminalMenus
 
@@ -43,6 +44,8 @@ end
 function example_menu()
     options = [
         [("$( splitext(f)[1]) = include(\"$f\")") for f in example_files];
+        "GLMakie.activate!()";
+        "CairoMakie.activate!()";
         "help_me = VortexStepMethod.help(\"$url\")";
         "quit"
     ]
