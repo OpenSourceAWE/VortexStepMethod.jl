@@ -122,7 +122,8 @@ end
         @test result[5] ≈ cm_left .* 0.25 .+ cm_right .* 0.75
 
         bad_alpha_right = [-0.2, 0.05, 0.2]
-        @test_throws ArgumentError("Alpha steps must be identical.") \
+        @test_throws(
+            ArgumentError("Alpha steps must be identical."),
             VortexStepMethod.calculate_new_aero_data(
                 (POLAR_MATRICES, POLAR_MATRICES),
                 (polar_left, (bad_alpha_right, delta, cl_right, cd_right, cm_right)),
@@ -130,9 +131,11 @@ end
                 0.5,
                 0.5,
             )
+        )
 
         bad_delta_right = [-0.1, 0.15]
-        @test_throws ArgumentError("Delta steps must be identical.") \
+        @test_throws(
+            ArgumentError("Delta steps must be identical."),
             VortexStepMethod.calculate_new_aero_data(
                 (POLAR_MATRICES, POLAR_MATRICES),
                 (polar_left, (copy(alpha), bad_delta_right, cl_right, cd_right, cm_right)),
@@ -140,6 +143,7 @@ end
                 0.5,
                 0.5,
             )
+        )
     end
 
     @testset "Robustness left to right" begin
