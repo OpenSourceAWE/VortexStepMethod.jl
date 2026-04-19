@@ -61,7 +61,6 @@ println("Projected area = $(round(results_vsm["projected_area"], digits=4)) m²"
 PLOT && plot_geometry(
       body_aero,
       "Rectangular wing geometry";
-      data_type=".pdf",
       save_path=OUTPUT_DIR,
       is_save=false || SAVE_ALL,
       is_show=true,
