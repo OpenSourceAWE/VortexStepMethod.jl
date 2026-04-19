@@ -131,7 +131,6 @@ PLOT && plot_polars(
 PLOT && plot_geometry(
     body_aero,
     "V3 kite geometry";
-    data_type=".pdf",
     save_path=OUTPUT_DIR,
     is_save=false || SAVE_ALL,
     is_show=true,

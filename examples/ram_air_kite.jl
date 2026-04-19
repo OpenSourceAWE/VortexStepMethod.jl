@@ -77,7 +77,6 @@ PLOT && plot_polar_data(body_aero)
 PLOT && plot_geometry(
     body_aero,
     "Ram air kite geometry";
-    data_type=".pdf",
     save_path=OUTPUT_DIR,
     is_save=false || SAVE_ALL,
     is_show=true,
