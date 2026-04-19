@@ -51,7 +51,7 @@ function example_menu()
     ]
     active = true
     while active
-        menu = RadioMenu(options, pagesize=8)
+        menu = RadioMenu(options, pagesize=11)
         choice = request(
             "\nChoose function to execute or `q` to quit: ",
             menu)

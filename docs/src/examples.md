@@ -155,3 +155,54 @@ Choose function to execute or `q` to quit:
 
 You can select one of the examples using the `<UP>` and `<DOWN>` keys.
 Press `<ENTER>` to run the selected example.
+
+## Plotting Backends
+
+The examples in this package support three plotting backends. Here is a comparison to help you choose:
+
+### GLMakie
+**Advantages:**
+- Interactive plots: zoom, pan, rotate 3D scenes in a native window.
+- Hardware-accelerated rendering via OpenGL — fast for large datasets.
+- Supports animations and live-updating plots.
+
+**Disadvantages:**
+- Requires a display server (does not work in headless/server environments without a virtual framebuffer).
+- Heavier dependency: needs OpenGL drivers and a GPU.
+- Longer initial load time compared to the other backends.
+
+### CairoMakie
+**Advantages:**
+- Fully software-rendered — works in headless environments (CI, servers, SSH sessions).
+- Produces high-quality vector output (SVG, PDF) suitable for publication.
+- Lighter dependency than GLMakie (no GPU required).
+
+**Disadvantages:**
+- Plots are static — no interactive zoom or pan.
+- Slower for very large or complex scenes because rendering is done in software.
+- 3D support is limited compared to GLMakie.
+
+### ControlPlots (based on PyPlot / Matplotlib)
+**Advantages:**
+- Simple API, easy to learn for students
+- In addition, the Matplotlib API for users coming from Python/Matplotlib is supported.
+- Works in headless environments; can save to PNG, SVG, PDF, etc.
+- Very lightweight Julia-side dependency (delegates work to Python).
+
+**Disadvantages:**
+- Requires a working Python installation with Matplotlib (via `PyCall`).
+- Can cause issues when multithreading is enabled.
+- No native Makie ecosystem integration (e.g. cannot use `Makie.Observable` for live updates).
+- Interactivity is limited and depends on the Matplotlib backend in use.
+- Extra setup complexity when Python or Matplotlib are not already installed.
+
+| Feature | GLMakie | CairoMakie | ControlPlots |
+|---|---|---|---|
+| Interactive (zoom/pan) | yes | no | yes |
+| Headless / server | no* | yes | yes |
+| Vector output (PDF/SVG) | no | yes | yes |
+| GPU required | yes | no | no |
+| 3D support | full | limited | limited |
+| Load time | slow | medium | fast |
+
+\* GLMakie can run headless with a virtual framebuffer (e.g. `Xvfb`), but this requires additional setup.
