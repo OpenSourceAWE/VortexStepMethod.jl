@@ -1,4 +1,4 @@
-## Unreleased
+## VortexStepMethod v3.1.0 2025-04-19
 
 ### Breaking
 - `billowing_angle` replaced by `billowing_percentage` on `Wing` and
@@ -10,11 +10,17 @@
 - `billowing.jl` example comparing flat vs billowed V3 kite
 - Coarse V3 kite geometry, settings, and combined CFD polar data
 - `cl_over_cd` keyword for `plot_polars` and `plot_combined_analysis`
+- the function `menu_cp()` can now be used to run the examples with the ControlPlots backend
+- the script `bin/install` can and should be used to instantiate the project and all sub-projects after git checkout
+- the scripts `bin/jetls` and `bin/jetls_examples` for running a static check of the source code
+- the script `test_bench.jl` for benchmarking the refinement method and measuring allocations
 
 ### Changed
 - Plot legends moved to shared horizontal legend at bottom of grid layouts
+- the script bin/run_julia now can be called with a script name as parameter
+- fixed all JETLS warnings in the source code for improved performance and stability
 
-### Fixed
+### Fixed errors
 - Domain error in elliptical gamma distribution when control points lie
   outside the nominal span envelope
 
