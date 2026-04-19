@@ -150,6 +150,9 @@ Choose function to execute or `q` to quit:
    stall_model = include("stall_model.jl")
    bench = include("bench.jl")
    cleanup = include("cleanup.jl")
+   GLMakie.activate!()
+   CairoMakie.activate!()
+   help_me = VortexStepMethod.help("https://opensourceawe.github.io/VortexStepMethod.jl/dev")
    quit
 ```
 
