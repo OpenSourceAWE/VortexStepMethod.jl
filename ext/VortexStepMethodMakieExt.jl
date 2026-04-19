@@ -236,19 +236,6 @@ function Makie.plot(body_aero::VortexStepMethod.BodyAerodynamics; size=(1200, 80
     return fig
 end
 
-"""
-    save_plot(fig, save_path, title; data_type=".png")
-
-Save a Makie figure to a file.
-
-# Arguments
-- `fig`: Makie Figure object
-- `save_path`: Path to save the plot
-- `title`: Title of the plot
-
-# Keyword arguments
-- `data_type`: File extension. Defaults to `".pdf"` when the active Makie backend is CairoMakie, `".png"` otherwise.
-"""
 function _active_backend_prefers_vector_output()
     isdefined(Makie, :current_backend) || return false
 
@@ -284,6 +271,20 @@ function _active_backend_prefers_vector_output()
     return occursin("cairomakie", lowercase(string(backend)))
 end
 
+"""
+    save_plot(fig, save_path, title; data_type=nothing)
+
+Save a Makie figure to a file.
+
+# Arguments
+- `fig`: Makie Figure object
+- `save_path`: Path to save the plot
+- `title`: Title of the plot
+
+# Keyword arguments
+- `data_type`: File extension. If `nothing`, defaults to `".pdf"` when the
+    active Makie backend is CairoMakie and `".png"` otherwise.
+"""
 function VortexStepMethod.save_plot(fig::Makie.Figure, save_path, title; data_type=nothing)
     if isnothing(data_type)
         data_type = _active_backend_prefers_vector_output() ? ".pdf" : ".png"
