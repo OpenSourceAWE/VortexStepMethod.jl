@@ -4,7 +4,7 @@ authors = ["1-Bart-1 <bart@vandelint.net>", "Oriol Cayon and contributors"]
 version = "3.0.1"
 
 [workspace]
-projects = ["examples", "docs", "test"]
+projects = ["examples", "examples_cp", "docs", "test"]
 
 [deps]
 Colors = "5ae59095-9a9b-59fe-a467-6f913c188581"
@@ -58,8 +58,8 @@ Parameters = "0.12"
 Pkg = "1"
 PreallocationTools = "1.1.2"
 PrecompileTools = "1.2.1"
-RecursiveArrayTools = "3.36.0, 4"
-SciMLBase = "2.77.0, 3"
+RecursiveArrayTools = "4"
+SciMLBase = "3"
 Serialization = "1"
 StaticArrays = "1"
 Statistics = "1"

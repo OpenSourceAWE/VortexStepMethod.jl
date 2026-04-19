@@ -276,6 +276,7 @@ include("panel.jl")
 include("body_aerodynamics.jl")
 include("wake.jl")
 include("solver.jl")
+include("plotting_helpers.jl")
 include("precompile.jl")
 
 

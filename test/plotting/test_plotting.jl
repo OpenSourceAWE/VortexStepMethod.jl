@@ -85,6 +85,17 @@ end
     else
         @test fig !== nothing
     end
+
+    if backend == "Makie"
+        @test hasmethod(VortexStepMethod.show_plot, Tuple{Figure})
+        @test_throws MethodError VortexStepMethod.show_plot(nothing)
+        @test_nowarn VortexStepMethod.show_plot(fig)
+    else
+        FigType = plt.Figure
+        @test hasmethod(VortexStepMethod.show_plot, Tuple{FigType})
+        @test_throws MethodError VortexStepMethod.show_plot(nothing)
+    end
+
     @test isfile(joinpath(save_dir,
                           "Rectangular_wing_geometry_angled_view.png"))
     safe_rm(joinpath(save_dir,
@@ -215,6 +226,54 @@ end
         @test fig !== nothing
     end
 
+    # Tests for both backends
+    body_aero_empty = create_body_aero()
+    empty!(body_aero_empty.panels)
+    @test_throws Exception plot_geometry(
+        body_aero_empty,
+        "Rectangular_wing_geometry_empty_panels";
+        is_save=false,
+        is_show=false,
+    )
+
+    body_aero_distributed = create_body_aero()
+    n_panels = length(body_aero_distributed.panels)
+    va_distribution = repeat([12.0 0.0 1.0], n_panels, 1)
+    set_va!(body_aero_distributed, va_distribution)
+
+    @test body_aero_distributed.has_distributed_va
+    fig = plot_geometry(
+        body_aero_distributed,
+        "Rectangular_wing_geometry_distributed_va";
+        is_save=false,
+        is_show=false,
+    )
+    @test fig !== nothing
+
+    literature_csv = joinpath(tempdir(), "polar_literature_aoa.csv")
+    open(literature_csv, "w") do io
+        write(io, "AOA,cl,cd,cs\n")
+        write(io, "0.0,0.1,0.01,0.0\n")
+        write(io, "5.0,0.5,0.02,0.01\n")
+        write(io, "10.0,0.9,0.04,0.02\n")
+    end
+
+    try
+        fig = plot_polars(
+            Solver[],
+            BodyAerodynamics[],
+            ["Literature"],
+            literature_path_list=[literature_csv],
+            title="Literature AOA Header",
+            is_save=false,
+            is_show=false,
+        )
+        @test fig !== nothing
+    finally
+        safe_rm(literature_csv)
+    end
+
+    # CP-specific tests (DPI, matplotlib internals)
     if backend == "ControlPlots"
         fig_dpi = plt.figure()
         default_dpi = fig_dpi.get_dpi()
@@ -223,72 +282,146 @@ end
         show_plot(fig_dpi; dpi=173)
         @test fig_dpi.get_dpi() == 173
 
-        # Also verify the default keyword value is applied.
         show_plot(fig_dpi)
         @test fig_dpi.get_dpi() == 130
         plt.close(fig_dpi)
-
-        ext = Base.get_extension(VortexStepMethod, :VortexStepMethodControlPlotsExt)
-        @test ext !== nothing
-
-        # Unit-test tuple parsing branch (e.g. readdlm(...; header=true) shape).
-        tuple_table = [0.0 0.10 0.010; 5.0 0.20 0.020]
-        tuple_header = [" AoA " "CL" "CD"]
-        tuple_pd = ext._extract_literature_polar_data((tuple_table, tuple_header), "tuple.csv")
-        @test tuple_pd[1] == tuple_table[:, 1]
-        @test tuple_pd[2] == tuple_table[:, 2]
-        @test tuple_pd[3] == tuple_table[:, 3]
-        @test tuple_pd[4] == zeros(size(tuple_table, 1))
-
-        # Unit-test matrix parsing branch (header in first row + explicit CS column).
-        matrix_data = Any[
-            "alpha" "cl" "cd" "cs";
-            0.0 0.11 0.011 0.001;
-            4.0 0.21 0.021 0.002
-        ]
-        matrix_pd = ext._extract_literature_polar_data(matrix_data, "matrix.csv")
-        @test Float64.(matrix_pd[1]) == [0.0, 4.0]
-        @test Float64.(matrix_pd[2]) == [0.11, 0.21]
-        @test Float64.(matrix_pd[3]) == [0.011, 0.021]
-        @test Float64.(matrix_pd[4]) == [0.001, 0.002]
-
-        # Missing required columns should throw a clear ArgumentError.
-        bad_data = Any[
-            "aoa" "cl" "cs";
-            0.0 0.1 0.0
-        ]
-        @test_throws ArgumentError ext._extract_literature_polar_data(bad_data, "bad.csv")
-
-        # Integration: literature CSV with AoA alias and no CS should still plot.
-        lit_no_cs_path = tempname() * "_lit_no_cs.csv"
-        open(lit_no_cs_path, "w") do io_no_cs
-            write(io_no_cs, "aoa,cl,cd\n0.0,0.10,0.010\n5.0,0.20,0.020\n")
-        end
-        fig_lit_no_cs = plot_polars(
-            Any[],
-            Any[],
-            ["Literature no CS"];
-            literature_path_list=[lit_no_cs_path],
-            is_save=false,
-            is_show=false
-        )
-        @test fig_lit_no_cs !== nothing
-        safe_rm(lit_no_cs_path)
-
-        # Integration: missing CD column should fail.
-        lit_bad_path = tempname() * "_lit_bad.csv"
-        open(lit_bad_path, "w") do io_bad
-            write(io_bad, "alpha,cl\n0.0,0.10\n5.0,0.20\n")
-        end
-        @test_throws ArgumentError plot_polars(
-            Any[],
-            Any[],
-            ["Literature bad"];
-            literature_path_list=[lit_bad_path],
-            is_save=false,
-            is_show=false
-        )
-        safe_rm(lit_bad_path)
     end
+
+    # Unit tests for shared extract_literature_polar_data (both backends)
+    using DelimitedFiles
+
+    # Tuple parsing branch (e.g. readdlm(...; header=true) shape)
+    tuple_table = [0.0 0.10 0.010; 5.0 0.20 0.020]
+    tuple_header = [" AoA " "CL" "CD"]
+    tuple_result = VortexStepMethod.extract_literature_polar_data(
+        (tuple_table, tuple_header), "tuple.csv")
+    @test tuple_result.polar_data[1] == tuple_table[:, 1]
+    @test tuple_result.polar_data[2] == tuple_table[:, 2]
+    @test tuple_result.polar_data[3] == tuple_table[:, 3]
+    @test tuple_result.polar_data[4] == zeros(size(tuple_table, 1))
+    @test all(isnan, tuple_result.cmx)
+    @test all(isnan, tuple_result.cmy)
+    @test all(isnan, tuple_result.cmz)
+
+    # Matrix parsing branch (header in first row + explicit CS column)
+    matrix_data = Any[
+        "alpha" "cl" "cd" "cs";
+        0.0 0.11 0.011 0.001;
+        4.0 0.21 0.021 0.002
+    ]
+    matrix_result = VortexStepMethod.extract_literature_polar_data(
+        matrix_data, "matrix.csv")
+    @test Float64.(matrix_result.polar_data[1]) == [0.0, 4.0]
+    @test Float64.(matrix_result.polar_data[2]) == [0.11, 0.21]
+    @test Float64.(matrix_result.polar_data[3]) == [0.011, 0.021]
+    @test Float64.(matrix_result.polar_data[4]) == [0.001, 0.002]
+
+    # Missing required columns should throw a clear ArgumentError
+    bad_data = Any[
+        "aoa" "cl" "cs";
+        0.0 0.1 0.0
+    ]
+    @test_throws ArgumentError VortexStepMethod.extract_literature_polar_data(
+        bad_data, "bad.csv")
+
+    # CM coefficient extraction from literature data
+    cm_csv = tempname() * "_lit_cm.csv"
+    open(cm_csv, "w") do io_cm
+        write(io_cm,
+            "alpha,cl,cd,cs,cmx,cmy,cmz\n" *
+            "0.0,0.1,0.01,0.0,0.001,0.002,0.003\n" *
+            "5.0,0.5,0.02,0.01,0.004,0.005,0.006\n")
+    end
+    cm_result = VortexStepMethod.extract_literature_polar_data(
+        readdlm(cm_csv, ','), cm_csv)
+    @test cm_result.polar_data[1] == [0.0, 5.0]
+    @test Float64.(cm_result.cmx) == [0.001, 0.004]
+    @test Float64.(cm_result.cmy) == [0.002, 0.005]
+    @test Float64.(cm_result.cmz) == [0.003, 0.006]
+    safe_rm(cm_csv)
+
+    # angle_type="side_slip" literature loading
+    beta_csv = tempname() * "_lit_beta.csv"
+    open(beta_csv, "w") do io_beta
+        write(io_beta,
+            "alpha,beta,cl,cd,cs\n" *
+            "7.4,0.0,0.7,0.06,0.0\n" *
+            "7.4,5.0,0.68,0.07,0.01\n")
+    end
+    beta_result = VortexStepMethod.extract_literature_polar_data(
+        readdlm(beta_csv, ','), beta_csv;
+        angle_type="side_slip")
+    @test beta_result.polar_data[1] == [0.0, 5.0]
+    safe_rm(beta_csv)
+
+    # Integration: literature CSV with AoA alias and no CS
+    lit_no_cs_path = tempname() * "_lit_no_cs.csv"
+    open(lit_no_cs_path, "w") do io_no_cs
+        write(io_no_cs, "aoa,cl,cd\n0.0,0.10,0.010\n5.0,0.20,0.020\n")
+    end
+    fig_lit_no_cs = plot_polars(
+        Any[],
+        Any[],
+        ["Literature no CS"];
+        literature_path_list=[lit_no_cs_path],
+        is_save=false,
+        is_show=false
+    )
+    @test fig_lit_no_cs !== nothing
+    safe_rm(lit_no_cs_path)
+
+    # Integration: missing CD column should fail
+    lit_bad_path = tempname() * "_lit_bad.csv"
+    open(lit_bad_path, "w") do io_bad
+        write(io_bad, "alpha,cl\n0.0,0.10\n5.0,0.20\n")
+    end
+    @test_throws ArgumentError plot_polars(
+        Any[],
+        Any[],
+        ["Literature bad"];
+        literature_path_list=[lit_bad_path],
+        is_save=false,
+        is_show=false
+    )
+    safe_rm(lit_bad_path)
+
+    # Test show_moments=true with literature data (both backends)
+    cm_lit_path = tempname() * "_lit_moments.csv"
+    open(cm_lit_path, "w") do io_cm_lit
+        write(io_cm_lit,
+            "alpha,cl,cd,cs,cmx,cmy,cmz\n" *
+            "0.0,0.1,0.01,0.0,0.001,0.002,0.003\n" *
+            "5.0,0.5,0.02,0.01,0.004,0.005,0.006\n")
+    end
+    fig_moments = plot_polars(
+        Any[],
+        Any[],
+        ["Literature with moments"];
+        literature_path_list=[cm_lit_path],
+        show_moments=true,
+        is_save=false,
+        is_show=false
+    )
+    @test fig_moments !== nothing
+    safe_rm(cm_lit_path)
+
+    # Test show_moments=false (default)
+    no_cm_path = tempname() * "_lit_no_cm.csv"
+    open(no_cm_path, "w") do io_no_cm
+        write(io_no_cm,
+            "alpha,cl,cd\n" *
+            "0.0,0.1,0.01\n5.0,0.5,0.02\n")
+    end
+    fig_no_moments = plot_polars(
+        Any[],
+        Any[],
+        ["Literature no moments"];
+        literature_path_list=[no_cm_path],
+        show_moments=false,
+        is_save=false,
+        is_show=false
+    )
+    @test fig_no_moments !== nothing
+    safe_rm(no_cm_path)
 end
 nothing

@@ -761,7 +761,7 @@ are no intermediate sections to billow.
 function copy_sections_to_refined!(
     wing::AbstractWing; reuse_aero_data::Bool=false
 )
-    if wing.spanwise_distribution == BILLOWING &&
+    if isequal(wing.spanwise_distribution, BILLOWING) &&
             wing.billowing_percentage > 0
         @warn "Billowing requested but n_panels " *
             "($(wing.n_panels)) == n_provided; no " *
@@ -856,7 +856,7 @@ function refine!(wing::AbstractWing; recompute_mapping=true, sort_sections=true)
     reuse_aero_data = _can_reuse_prior_refined_polar_data(wing, n_sections)
 
     if length(wing.refined_sections) == 0
-        if wing.spanwise_distribution == UNCHANGED ||
+        if isequal(wing.spanwise_distribution, UNCHANGED) ||
                length(wing.unrefined_sections) == n_sections
             copy_sections_to_refined!(wing; reuse_aero_data)
             recompute_mapping && compute_refined_panel_mapping!(wing)
@@ -868,7 +868,8 @@ function refine!(wing::AbstractWing; recompute_mapping=true, sort_sections=true)
     end
     
     # Handle special cases
-    if wing.spanwise_distribution == UNCHANGED || length(wing.unrefined_sections) == n_sections
+    if isequal(wing.spanwise_distribution, UNCHANGED) ||
+            length(wing.unrefined_sections) == n_sections
         copy_sections_to_refined!(wing; reuse_aero_data)
         recompute_mapping && compute_refined_panel_mapping!(wing)
         update_non_deformed_sections!(wing)
@@ -893,14 +894,15 @@ function refine!(wing::AbstractWing; recompute_mapping=true, sort_sections=true)
     end
 
     # Handle different distribution types
-    if wing.spanwise_distribution == SPLIT_PROVIDED
+    if isequal(wing.spanwise_distribution, SPLIT_PROVIDED)
         refine_mesh_by_splitting_provided_sections!(wing; reuse_aero_data)
-    elseif wing.spanwise_distribution in (LINEAR, COSINE)
+    elseif isequal(wing.spanwise_distribution, LINEAR) ||
+            isequal(wing.spanwise_distribution, COSINE)
         refine_mesh_for_linear_cosine_distribution!(
             wing, 1, wing.spanwise_distribution,
             n_sections, wing.unrefined_sections;
             reuse_aero_data)
-    elseif wing.spanwise_distribution == BILLOWING
+    elseif isequal(wing.spanwise_distribution, BILLOWING)
         refine_mesh_with_billowing!(wing; reuse_aero_data)
     else
         throw(ArgumentError("Unsupported spanwise panel distribution: $(wing.spanwise_distribution)"))
@@ -1023,68 +1025,80 @@ function calculate_new_aero_data(aero_model,
     
     model_type = aero_model[section_index]
     model_type_2 = aero_model[section_index+1]
-    if !(model_type == model_type_2)
+    if !(model_type isa AeroModel) || !(model_type_2 isa AeroModel)
+        throw(ArgumentError("Unsupported aero model type"))
+    end
+    if !isequal(model_type, model_type_2)
         throw(ArgumentError("Different aero models over the span are not supported"))
     end
     
-    if model_type == INVISCID
+    if isequal(model_type, INVISCID)
         return nothing
         
-    elseif model_type in (POLAR_VECTORS, POLAR_MATRICES)
+    elseif isequal(model_type, POLAR_VECTORS)
         polar_left = aero_data[section_index]
         polar_right = aero_data[section_index + 1]
+        (polar_left isa Tuple{Vector{Float64}, Vector{Float64}, Vector{Float64}, Vector{Float64}}) ||
+            throw(ArgumentError("Provide polar vector data in the correct format."))
+        (polar_right isa Tuple{Vector{Float64}, Vector{Float64}, Vector{Float64}, Vector{Float64}}) ||
+            throw(ArgumentError("Provide polar vector data in the correct format."))
         
-        # Unpack polar data
-        if model_type == POLAR_VECTORS
-            alpha_left, CL_left, CD_left, CM_left = polar_left
-            alpha_right, CL_right, CD_right, CM_right = polar_right
+        alpha_left, CL_left, CD_left, CM_left = polar_left
+        alpha_right, CL_right, CD_right, CM_right = polar_right
 
-            (
-                length(alpha_left) == length(alpha_right) &&
-                all(isapprox.(diff(alpha_left), diff(alpha_right)))
-            ) || throw(ArgumentError("Alpha steps must be identical."))
-            isa(CL_right, AbstractVector) || throw(ArgumentError(
-                "Provide polar data in the correct format."
-            ))
+        (
+            length(alpha_left) == length(alpha_right) &&
+            all(isapprox.(diff(alpha_left), diff(alpha_right)))
+        ) || throw(ArgumentError("Alpha steps must be identical."))
+        
+        # Weighted interpolation
+        CL_data = CL_left .* left_weight .+ CL_right .* right_weight
+        CD_data = CD_left .* left_weight .+ CD_right .* right_weight
+        CM_data = CM_left .* left_weight .+ CM_right .* right_weight
+        
+        return (alpha_left, CL_data, CD_data, CM_data)
             
-            # Weighted interpolation
-            CL_data = CL_left .* left_weight .+ CL_right .* right_weight
-            CD_data = CD_left .* left_weight .+ CD_right .* right_weight
-            CM_data = CM_left .* left_weight .+ CM_right .* right_weight
-            
-            return (alpha_left, CL_data, CD_data, CM_data)
-            
-        elseif model_type == POLAR_MATRICES
-            alpha_left, delta_left, CL_left, CD_left, CM_left = polar_left
-            alpha_right, delta_right, CL_right, CD_right, CM_right = polar_right
-            
-            (
-                length(alpha_left) == length(alpha_right) &&
-                all(isapprox.(diff(alpha_left), diff(alpha_right)))
-            ) || throw(ArgumentError("Alpha steps must be identical."))
-            (
-                length(delta_left) == length(delta_right) &&
-                all(isapprox.(diff(delta_left), diff(delta_right)))
-            ) || throw(ArgumentError("Delta steps must be identical."))
-            isa(CL_right, AbstractMatrix) || throw(ArgumentError(
-                "Provide polar data in the correct format."
-            ))
+    elseif isequal(model_type, POLAR_MATRICES)
+        polar_left = aero_data[section_index]
+        polar_right = aero_data[section_index + 1]
+        (polar_left isa Tuple{Vector{Float64}, Vector{Float64}, Matrix{Float64}, Matrix{Float64}, Matrix{Float64}}) ||
+            throw(ArgumentError("Provide polar matrix data in the correct format."))
+        (polar_right isa Tuple{Vector{Float64}, Vector{Float64}, Matrix{Float64}, Matrix{Float64}, Matrix{Float64}}) ||
+            throw(ArgumentError("Provide polar matrix data in the correct format."))
 
-            # Weighted interpolation
-            CL_data = CL_left .* left_weight .+ CL_right .* right_weight
-            CD_data = CD_left .* left_weight .+ CD_right .* right_weight
-            CM_data = CM_left .* left_weight .+ CM_right .* right_weight
-            
-            return (alpha_left, delta_left, CL_data, CD_data, CM_data)
-        end
+        alpha_left, delta_left, CL_left, CD_left, CM_left = polar_left
+        alpha_right, delta_right, CL_right, CD_right, CM_right = polar_right
+        
+        (
+            length(alpha_left) == length(alpha_right) &&
+            all(isapprox.(diff(alpha_left), diff(alpha_right)))
+        ) || throw(ArgumentError("Alpha steps must be identical."))
+        (
+            length(delta_left) == length(delta_right) &&
+            all(isapprox.(diff(delta_left), diff(delta_right)))
+        ) || throw(ArgumentError("Delta steps must be identical."))
 
-    elseif model_type == LEI_AIRFOIL_BREUKELS
-        tube_diameter_left = aero_data[section_index][1]
-        tube_diameter_right = aero_data[section_index + 1][1]
+        # Weighted interpolation
+        CL_data = CL_left .* left_weight .+ CL_right .* right_weight
+        CD_data = CD_left .* left_weight .+ CD_right .* right_weight
+        CM_data = CM_left .* left_weight .+ CM_right .* right_weight
+        
+        return (alpha_left, delta_left, CL_data, CD_data, CM_data)
+
+    elseif isequal(model_type, LEI_AIRFOIL_BREUKELS)
+        data_left = aero_data[section_index]
+        data_right = aero_data[section_index + 1]
+        (data_left isa NTuple{2, Float64}) ||
+            throw(ArgumentError("Provide LEI aero data as (tube_diameter, chamber_height)."))
+        (data_right isa NTuple{2, Float64}) ||
+            throw(ArgumentError("Provide LEI aero data as (tube_diameter, chamber_height)."))
+
+        tube_diameter_left = data_left[1]
+        tube_diameter_right = data_right[1]
         tube_diameter_i = tube_diameter_left * left_weight + tube_diameter_right * right_weight
         
-        chamber_height_left = aero_data[section_index][2]
-        chamber_height_right = aero_data[section_index + 1][2]
+        chamber_height_left = data_left[2]
+        chamber_height_right = data_right[2]
         chamber_height_i = chamber_height_left * left_weight + chamber_height_right * right_weight
         
         @debug "Interpolation weights" left_weight right_weight

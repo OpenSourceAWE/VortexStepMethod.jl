@@ -60,7 +60,7 @@ Solver configuration, used within [`VSMSettings`](@ref).
 - `aerodynamic_model_type`: [`VSM`](@ref Model) or
     [`LLT`](@ref Model) (default `VSM`)
 - `solver_type`: `"LOOP"` or `"NONLIN"` (default `"LOOP"`)
-- `density`: Air density [kg/m³] (default `1.225`)
+- `density`: Air density (kg/m^3) (default `1.225`)
 - `max_iterations`: Maximum solver iterations (default `1500`)
 - `rtol`: Relative tolerance (default `1e-5`)
 - `tol_reference_error`: Reference error tolerance
@@ -77,7 +77,7 @@ Solver configuration, used within [`VSMSettings`](@ref).
     available (default `true`)
 - `core_radius_fraction`: Vortex core radius fraction
     (default `1e-20`)
-- `mu`: Dynamic viscosity [N·s/m²] (default `1.81e-5`)
+- `mu`: Dynamic viscosity (N*s/m^2) (default `1.81e-5`)
 - `calc_only_f_and_gamma`: Only output forces and circulation
     (default `false`)
 - `correct_aoa`: Perform angle of attack correction
@@ -111,7 +111,7 @@ Can be constructed from keyword arguments or loaded from a YAML
 file with `VSMSettings(filename)`.
 
 # Fields
-- `condition`: [`ConditionSettings`] (wind speed, alpha, beta,
+- `condition`: `ConditionSettings` (wind speed, alpha, beta,
     yaw rate)
 - `wings`: Vector of [`WingSettings`](@ref)
 - `solver_settings`: [`SolverSettings`](@ref)

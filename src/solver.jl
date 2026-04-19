@@ -978,8 +978,8 @@ refinement), with each control angle affecting one unrefined section.
 # Keyword Arguments
 - `theta_idxs`: Indices in `y` for twist angles (one per unrefined section, default: 1:4)
 - `delta_idxs`: Indices in `y` for trailing edge deflections (one per unrefined section, default: nothing)
-- `va_idxs`: Indices in `y` for apparent wind velocity [vx, vy, vz] (default: nothing)
-- `omega_idxs`: Indices in `y` for angular velocity [ωx, ωy, ωz] (default: nothing)
+- `va_idxs`: Indices in `y` for apparent wind velocity components `(vx, vy, vz)` (default: nothing)
+- `omega_idxs`: Indices in `y` for angular velocity components `(ωx, ωy, ωz)` (default: nothing)
 - `aero_coeffs::Bool`: Return force/moment coefficients instead of dimensional values (default: false)
 - `kwargs...`: Additional arguments passed to `solve!`
 
@@ -994,8 +994,8 @@ Jacobian computation. When the same angles are encountered, geometry deformation
 # Returns
 - `jac::Matrix{Float64}`: Jacobian matrix (m×n) where m = 6 + n_unrefined_sections, n = length(y)
 - `results::Vector{Float64}`: Output vector at operating point
-  - If `aero_coeffs=false`: [Fx, Fy, Fz, Mx, My, Mz, moment_unrefined_dist...]
-  - If `aero_coeffs=true`: [CFx, CFy, CFz, CMx, CMy, CMz, cm_unrefined_dist...]
+    - If `aero_coeffs=false`: `(Fx, Fy, Fz, Mx, My, Mz, moment_unrefined_dist...)`
+    - If `aero_coeffs=true`: `(CFx, CFy, CFz, CMx, CMy, CMz, cm_unrefined_dist...)`
 
 # Example
 ```julia

@@ -1,11 +1,15 @@
 using Pkg
-Pkg.activate(@__DIR__)
+if !("ControlPlots" ∈ keys(Pkg.project().dependencies))
+    Pkg.activate(@__DIR__)
+end
 
-using GLMakie
+using ControlPlots
 using VortexStepMethod
 using REPL.TerminalMenus
 
 url = "https://opensourceawe.github.io/VortexStepMethod.jl/dev"
+
+examples_dir = joinpath(@__DIR__, "..", "examples")
 
 example_files = [
     "V3_kite.jl",
@@ -26,7 +30,7 @@ function run_all()
         println("Running: $f")
         println("="^60)
         try
-            include(joinpath(@__DIR__, f))
+            include(joinpath(examples_dir, f))
         catch e
             @error "Failed: $f" exception=(e, catch_backtrace())
             push!(failed_examples, f)
@@ -42,7 +46,8 @@ end
 
 function example_menu()
     options = [
-        [("$( splitext(f)[1]) = include(\"$f\")") for f in example_files];
+        [("$(splitext(f)[1]) = include(\"../examples/$f\")")
+         for f in example_files];
         "help_me = VortexStepMethod.help(\"$url\")";
         "quit"
     ]

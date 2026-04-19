@@ -62,7 +62,10 @@ function VortexStepMethod.save_plot(fig, save_path, title; data_type=".pdf")
     @debug "Current working directory: $(pwd())"
 
     try
-        fig.savefig(full_path)
+        hasproperty(fig, :savefig) || throw(ArgumentError(
+            "Figure object of type $(typeof(fig)) does not support savefig()."
+        ))
+        getproperty(fig, :savefig)(full_path)
         @debug "Figure saved as $data_type"
 
         if isfile(full_path)
@@ -175,10 +178,15 @@ function create_geometry_plot(body_aero::BodyAerodynamics, title, view_elevation
     set_plot_style(28; use_tex)
 
     panels = body_aero.panels
-    va = isa(body_aero.va, Tuple) ? body_aero.va[1] : body_aero.va
+    isempty(panels) && throw(ArgumentError("Cannot plot geometry: body_aero.panels is empty."))
+
+    va = if body_aero.has_distributed_va
+        body_aero._va
+    else
+        isa(body_aero.va, Tuple) ? body_aero.va[1] : body_aero.va
+    end
 
     # Extract geometric data
-    corner_points = [panel.corner_points for panel in panels]
     control_points = [panel.control_point for panel in panels]
     aero_centers = [panel.aero_center for panel in panels]
 
@@ -234,7 +242,6 @@ function create_geometry_plot(body_aero::BodyAerodynamics, title, view_elevation
     plot_line_segment!(ax, [va_vector_begin, va_vector_end], :lightblue, "va")
 
     # Add legends for the first occurrence of each label
-    handles, labels = ax.get_legend_handles_labels()
     # by_label = Dict(zip(labels, handles))
     # ax.legend(values(by_label), keys(by_label), bbox_to_anchor=(0, 0, 1.1, 1))
 
@@ -271,8 +278,8 @@ Plot wing geometry from different viewpoints and optionally save/show plots.
 - `save_path`: path for saving the graphic (default: `nothing`)
 - `is_save`: boolean value, indicates if the graphic shall be saved (default: `false`)
 - `is_show`: boolean value, indicates if the graphic shall be displayed (default: `false`)
-- `view_elevation`: initial view elevation angle (default: 15) [°]
-- `view_azimuth`: initial view azimuth angle (default: -120) [°]
+- `view_elevation`: initial view elevation angle in degrees (default: 15)
+- `view_azimuth`: initial view azimuth angle in degrees (default: -120)
 - `use_tex`: if the external `pdflatex` command shall be used (default: false)
 
 """
@@ -498,122 +505,13 @@ Generate polar data for aerodynamic analysis over a range of angles.
 
 # Keyword arguments
 - `angle_type`: Type of angle variation ("angle_of_attack" or "side_slip")
-- `angle_of_attack`: Initial angle of attack [rad]
-- `side_slip`: Initial side slip angle in [rad]
-- `v_a`: norm of apparent wind speed [m/s]
+- `angle_of_attack`: Initial angle of attack [°]
+- `side_slip`: Initial side slip angle [°]
+- `v_a`: Norm of apparent wind speed [m/s]
 
 # Returns
 - Tuple of polar data array and Reynolds number
 """
-function generate_polar_data(
-    solver,
-    body_aero::BodyAerodynamics,
-    angle_range;
-    angle_type="angle_of_attack",
-    angle_of_attack=0.0,
-    side_slip=0.0,
-    v_a=10.0,
-    use_latex=false
-)
-    n_panels = length(body_aero.panels)
-    n_angles = length(angle_range)
-
-    # Initialize arrays
-    cl = zeros(n_angles)
-    cd = zeros(n_angles)
-    cs = zeros(n_angles)
-    gamma_distribution = zeros(n_angles, n_panels)
-    cl_distribution = zeros(n_angles, n_panels)
-    cd_distribution = zeros(n_angles, n_panels)
-    cs_distribution = zeros(n_angles, n_panels)
-    reynolds_number = zeros(n_angles)
-
-    # Previous gamma for initialization
-    gamma = nothing
-
-    for (i, angle_i) in enumerate(angle_range)
-        # Set angle based on type
-        if angle_type == "angle_of_attack"
-            α = deg2rad(angle_i)
-            β = side_slip
-        elseif angle_type == raw"side_slip"
-            α = angle_of_attack
-            β = deg2rad(angle_i)
-        else
-            throw(ArgumentError("angle_type must be 'angle_of_attack' or 'side_slip'"))
-        end
-
-        # Update inflow conditions
-        set_va!(
-            body_aero,
-            [
-                cos(α) * cos(β),
-                sin(β),
-                sin(α)
-            ] * v_a
-        )
-
-        # Solve and store results
-        results = solve(solver, body_aero, gamma_distribution[i, :])
-
-        cl[i] = results["cl"]
-        cd[i] = results["cd"]
-        cs[i] = results["cs"]
-        gamma_distribution[i, :] = results["gamma_distribution"]
-        cl_distribution[i, :] = results["cl_distribution"]
-        cd_distribution[i, :] = results["cd_distribution"]
-        cs_distribution[i, :] = results["cs_distribution"]
-        reynolds_number[i] = results["Rey"]
-
-        # Store gamma for next iteration
-        gamma = gamma_distribution[i, :]
-    end
-
-    polar_data = [
-        angle_range,
-        cl,
-        cd,
-        cs,
-        gamma_distribution,
-        cl_distribution,
-        cd_distribution,
-        cs_distribution,
-        reynolds_number
-    ]
-
-    return polar_data, reynolds_number[1]
-end
-
-function _extract_literature_polar_data(raw_data, path)
-    table, header = if raw_data isa Tuple
-        # readdlm(...; header=true) returns (data, header)
-        raw_table, raw_header = raw_data
-        raw_table, lowercase.(strip.(string.(vec(raw_header))))
-    else
-        # Header is in first row when a single matrix is returned
-        raw_data[2:end, :], lowercase.(strip.(string.(raw_data[1, :])))
-    end
-
-    # Find column indices for alpha, CL, CD, CS (case-insensitive, allow common variants)
-    alpha_idx = findfirst(x -> occursin("alpha", x) || x == "aoa", header)
-    cl_idx = findfirst(x -> occursin("cl", x), header)
-    cd_idx = findfirst(x -> occursin("cd", x), header)
-    cs_idx = findfirst(x -> occursin("cs", x), header)
-
-    (isnothing(alpha_idx) || isnothing(cl_idx) || isnothing(cd_idx)) &&
-        throw(ArgumentError("Literature CSV must contain alpha/aoa, cl and cd columns: $path"))
-
-    # Fallback: if CS not found, fill with zeros
-    cs_col = cs_idx === nothing ? zeros(size(table, 1)) : table[:, cs_idx]
-
-    # Return as [alpha, CL, CD, CS]
-    return [
-        table[:, alpha_idx],
-        table[:, cl_idx],
-        table[:, cd_idx],
-        cs_col
-    ]
-end
 
 """
     plot_polars(solver_list, body_aero_list, label_list;
@@ -632,11 +530,11 @@ Plot polar data comparing different solvers and configurations.
 
 # Keyword arguments
 - `literature_path_list`: Optional paths to literature data files
-- `angle_range`: Range of angles to analyze [°]
+- `angle_range`: Range of angles to analyze in degrees
 - `angle_type`: "`angle_of_attack`" or "`side_slip`"; (default: `angle_of_attack`)
-- `angle_of_attack:` AoA to be used for plotting the polars (default: 0.0) [rad]
-- `side_slip`: side slip angle (default: 0.0) [rad]
-- v_a: norm of apparent wind speed (default: 10.0) [m/s]
+- `angle_of_attack:` AoA to be used for plotting the polars (default: 0.0) [°]
+- `side_slip`: side slip angle (default: 0.0) [°]
+- `v_a`: norm of apparent wind speed (default: 10.0) [m/s]
 - title: plot title
 - `data_type`: File extension for saving (default: ".pdf")
 - `save_path`: Path to save plots (default: nothing)
@@ -662,6 +560,7 @@ function VortexStepMethod.plot_polars(
     is_show=true,
     use_tex=false,
     cl_over_cd=true,
+    show_moments=false,
 )
     # Validate inputs
     total_cases = length(body_aero_list) + length(literature_path_list)
@@ -674,202 +573,156 @@ function VortexStepMethod.plot_polars(
 
     # Generate polar data
     polar_data_list = []
+    cm_data_list = []
     for (i, (solver, body_aero)) in enumerate(zip(solver_list, body_aero_list))
-        polar_data, rey = generate_polar_data(
+        result = VortexStepMethod.generate_polar_data(
             solver, body_aero, angle_range;
             angle_type,
             angle_of_attack,
             side_slip,
             v_a
         )
-        push!(polar_data_list, polar_data)
+        push!(polar_data_list, result.polar_data)
+        push!(cm_data_list, (cmx=result.cmx, cmy=result.cmy,
+                             cmz=result.cmz))
         # Update label with Reynolds number
-        label_list[i] = "$(label_list[i]) Re = $(round(Int64, rey*1e-5))e5"
+        label_list[i] = "$(label_list[i]) Re = $(round(Int64, result.rey*1e-5))e5"
     end
     # Load literature data if provided
     if !isempty(literature_path_list)
         for path in literature_path_list
             raw_data = readdlm(path, ',')
-            push!(polar_data_list, _extract_literature_polar_data(raw_data, path))
+            lit = VortexStepMethod.extract_literature_polar_data(
+                raw_data, path; angle_type)
+            push!(polar_data_list, lit.polar_data)
+            push!(cm_data_list, (cmx=lit.cmx, cmy=lit.cmy,
+                                 cmz=lit.cmz))
         end
     end
-
-    # Initializing plot
-    fig, axs = plt.subplots(2, 2, figsize=(14, 14))
 
     # Number of computational results (excluding literature)
     n_solvers = length(solver_list)
-    for (i, (polar_data, label)) in enumerate(zip(polar_data_list, label_list))
+
+    # Helper: format label and line style
+    function format_label(label, i, n_solvers)
         if i < n_solvers
-            linestyle = "-"
-            marker = "*"
-            markersize = 7
+            linestyle, marker, markersize = "-", "*", 7
         else
-            linestyle = "-"
-            marker = "."
-            markersize = 5
+            linestyle, marker, markersize = "-", ".", 5
         end
-        if contains(label, "LLT")
-            label = replace(label, "e5" => raw"\cdot10^5")
-            label = replace(label, " " => raw"~")
-            label = replace(label, "LLT" => raw"\mathrm{LLT}{~\,}")
-            label = raw"$" * label * raw"$"
-        else
-            label = replace(label, "e5" => raw"\cdot10^5")
-            label = replace(label, " " => "~")
-            label = replace(label, "VSM" => raw"\mathrm{VSM}")
-            label = raw"$" * label * raw"$"
+        if use_tex
+            if contains(label, "LLT")
+                label = replace(label, "e5" => raw"\cdot10^5")
+                label = replace(label, " " => raw"~")
+                label = replace(label,
+                    "LLT" => raw"\mathrm{LLT}{~\,}")
+                label = raw"$" * label * raw"$"
+            else
+                label = replace(label, "e5" => raw"\cdot10^5")
+                label = replace(label, " " => "~")
+                label = replace(label,
+                    "VSM" => raw"\mathrm{VSM}")
+                label = raw"$" * label * raw"$"
+            end
         end
-        axs[1, 1].plot(
-            polar_data[1],
-            polar_data[2],
-            label=label,
-            linestyle=linestyle,
-            marker=marker,
-            markersize=markersize,
-        )
-        # Limit y-range if CL > 10
-        if maximum(polar_data[2]) > 10
-            axs[1, 1].set_ylim([-0.5, 2])
-        end
-        title = raw"$C_\mathrm{L}" * raw"$" * " vs $angle_type [°]"
-        axs[1, 1].set_title(title)
-        axs[1, 1].set_xlabel("$angle_type [°]")
-        axs[1, 1].set_ylabel(L"$C_\mathrm{L}$")
-        axs[1, 1].legend()
+        return label, linestyle, marker, markersize
     end
 
-    for (i, (polar_data, label)) in enumerate(zip(polar_data_list, label_list))
-        if i < n_solvers
-            linestyle = "-"
-            marker = "*"
-            markersize = 7
-        else
-            linestyle = "-"
-            marker = "."
-            markersize = 5
+    if show_moments
+        # 2x3 layout: CL, CD, CS, CMx, CMy, CMz
+        fig, axs = plt.subplots(2, 3, figsize=(21, 14))
+        coeff_specs = [
+            (1, raw"$C_\mathrm{L}$", 2, nothing),
+            (2, raw"$C_\mathrm{D}$", 3, nothing),
+            (3, raw"$C_\mathrm{S}$", 4, nothing),
+            (4, raw"$C_\mathrm{Mx}$", nothing, :cmx),
+            (5, raw"$C_\mathrm{My}$", nothing, :cmy),
+            (6, raw"$C_\mathrm{Mz}$", nothing, :cmz),
+        ]
+        for (ax_idx, ylabel, pd_col, cm_field) in coeff_specs
+            row = (ax_idx - 1) ÷ 3 + 1
+            col = (ax_idx - 1) % 3 + 1
+            ax = axs[row, col]
+            for (i, (polar_data, cm, label)) in enumerate(
+                    zip(polar_data_list, cm_data_list,
+                        label_list))
+                label, ls, mk, ms = format_label(
+                    label, i, n_solvers)
+                if pd_col !== nothing
+                    y_data = polar_data[pd_col]
+                else
+                    y_data = Float64.(getfield(cm, cm_field))
+                    all(isnan, y_data) && continue
+                end
+                ax.plot(polar_data[1], y_data;
+                    label=label, linestyle=ls,
+                    marker=mk, markersize=ms)
+            end
+            ax.set_title(
+                ylabel * " vs $angle_type [°]")
+            ax.set_xlabel("$angle_type [°]")
+            ax.set_ylabel(ylabel)
+            ax.legend()
         end
-        if contains(label, "LLT")
-            label = replace(label, "e5" => raw"\cdot10^5")
-            label = replace(label, " " => raw"~")
-            label = replace(label, "LLT" => raw"\mathrm{LLT}{~\,}")
-            label = raw"$" * label * raw"$"
-        else
-            label = replace(label, "e5" => raw"\cdot10^5")
-            label = replace(label, " " => "~")
-            label = replace(label, "VSM" => raw"\mathrm{VSM}")
-            label = raw"$" * label * raw"$"
+    else
+        # 2x2 layout: CL, CD, CS, CL/CD or CL-vs-CD
+        fig, axs = plt.subplots(2, 2, figsize=(14, 14))
+        coeff_specs = [
+            ((1, 1), raw"$C_\mathrm{L}$", 2),
+            ((1, 2), raw"$C_\mathrm{D}$", 3),
+            ((2, 1), raw"$C_\mathrm{S}$", 4),
+        ]
+        for (pos, ylabel, pd_col) in coeff_specs
+            ax = axs[pos...]
+            for (i, (polar_data, label)) in enumerate(
+                    zip(polar_data_list, label_list))
+                label, ls, mk, ms = format_label(
+                    label, i, n_solvers)
+                ax.plot(polar_data[1], polar_data[pd_col];
+                    label=label, linestyle=ls,
+                    marker=mk, markersize=ms)
+                if maximum(polar_data[2]) > 10
+                    ax.set_ylim([-0.5, 2])
+                end
+            end
+            ax.set_title(
+                ylabel * " vs $angle_type [°]")
+            ax.set_xlabel("$angle_type [°]")
+            ax.set_ylabel(ylabel)
+            ax.legend()
         end
-        axs[1, 2].plot(
-            polar_data[1],
-            polar_data[3],
-            label=label,
-            linestyle=linestyle,
-            marker=marker,
-            markersize=markersize,
-        )
-        # Limit y-range if CL > 10
-        if maximum(polar_data[2]) > 10
-            axs[1, 2].set_ylim([-0.5, 2])
-        end
-        title = raw"$C_\mathrm{D}" * raw"$" * " vs $angle_type [°]"
-        axs[1, 2].set_title(title)
-        axs[1, 2].set_xlabel("$angle_type [°]")
-        axs[1, 2].set_ylabel(L"$C_\mathrm{D}$")
-        axs[1, 2].legend()
-    end
-
-
-    for (i, (polar_data, label)) in enumerate(zip(polar_data_list, label_list))
-        if i < n_solvers
-            linestyle = "-"
-            marker = "*"
-            markersize = 7
-        else
-            linestyle = "-"
-            marker = "."
-            markersize = 5
-        end
-        if contains(label, "LLT")
-            label = replace(label, "e5" => raw"\cdot10^5")
-            label = replace(label, " " => raw"~")
-            label = replace(label, "LLT" => raw"\mathrm{LLT}{~\,}")
-            label = raw"$" * label * raw"$"
-        else
-            label = replace(label, "e5" => raw"\cdot10^5")
-            label = replace(label, " " => "~")
-            label = replace(label, "VSM" => raw"\mathrm{VSM}")
-            label = raw"$" * label * raw"$"
-        end
-        axs[2, 1].plot(
-            polar_data[1],
-            polar_data[4],
-            label=label,
-            linestyle=linestyle,
-            marker=marker,
-            markersize=markersize,
-        )
-        # Limit y-range if CL > 10
-        if maximum(polar_data[2]) > 10
-            axs[2, 1].set_ylim([-0.5, 2])
-        end
-        title = raw"$C_\mathrm{S}" * raw"$" * " vs $angle_type [°]"
-        axs[2, 1].set_title(title)
-        axs[2, 1].set_xlabel("$angle_type [°]")
-        axs[2, 1].set_ylabel(L"$C_\mathrm{S}$")
-        axs[2, 1].legend()
-    end
-
-    for (i, (polar_data, label)) in enumerate(zip(polar_data_list, label_list))
-        if i < n_solvers
-            linestyle = "-"
-            marker = "*"
-            markersize = 7
-        else
-            linestyle = "-"
-            marker = "."
-            markersize = 5
-        end
-        if contains(label, "LLT")
-            label = replace(label, "e5" => raw"\cdot10^5")
-            label = replace(label, " " => raw"~")
-            label = replace(label, "LLT" => raw"\mathrm{LLT}{~\,}")
-            label = raw"$" * label * raw"$"
-        else
-            label = replace(label, "e5" => raw"\cdot10^5")
-            label = replace(label, " " => "~")
-            label = replace(label, "VSM" => raw"\mathrm{VSM}")
-            label = raw"$" * label * raw"$"
+        # Fourth panel: CL/CD or CL-vs-CD
+        ax4 = axs[2, 2]
+        for (i, (polar_data, label)) in enumerate(
+                zip(polar_data_list, label_list))
+            label, ls, mk, ms = format_label(
+                label, i, n_solvers)
+            if cl_over_cd
+                cl_cd = polar_data[2] ./ polar_data[3]
+                ax4.plot(polar_data[1], cl_cd;
+                    label=label, linestyle=ls,
+                    marker=mk, markersize=ms)
+            else
+                ax4.plot(polar_data[3], polar_data[2];
+                    label=label, linestyle=ls,
+                    marker=mk, markersize=ms)
+            end
         end
         if cl_over_cd
-            cl_cd = polar_data[2] ./ polar_data[3]
-            axs[2, 2].plot(
-                polar_data[1], cl_cd,
-                label=label, linestyle=linestyle,
-                marker=marker, markersize=markersize)
-            title = raw"$C_\mathrm{L}/C_\mathrm{D}$" *
-                " vs $angle_type [°]"
-            axs[2, 2].set_title(title)
-            axs[2, 2].set_xlabel("$angle_type [°]")
-            axs[2, 2].set_ylabel(
-                L"$C_\mathrm{L}/C_\mathrm{D}$")
+            ax4.set_title(
+                raw"$C_\mathrm{L}/C_\mathrm{D}$" *
+                " vs $angle_type [°]")
+            ax4.set_xlabel("$angle_type [°]")
+            ax4.set_ylabel(
+                raw"$C_\mathrm{L}/C_\mathrm{D}$")
         else
-            axs[2, 2].plot(
-                polar_data[3], polar_data[2],
-                label=label, linestyle=linestyle,
-                marker=marker, markersize=markersize)
-            if maximum(polar_data[2]) > 10 ||
-                    maximum(polar_data[3]) > 10
-                axs[2, 2].set_ylim([-0.5, 2])
-                axs[2, 2].set_xlim([-0.5, 2])
-            end
-            title = raw"$C_\mathrm{L}$" * " vs " *
-                raw"$C_\mathrm{D}$"
-            axs[2, 2].set_title(title)
-            axs[2, 2].set_xlabel(L"$C_\mathrm{D}$")
-            axs[2, 2].set_ylabel(L"$C_\mathrm{L}$")
+            ax4.set_title(
+                raw"$C_\mathrm{L}$" * " vs " *
+                raw"$C_\mathrm{D}$")
+            ax4.set_xlabel(raw"$C_\mathrm{D}$")
+            ax4.set_ylabel(raw"$C_\mathrm{L}$")
         end
-        axs[2, 2].legend()
+        ax4.legend()
     end
 
     fig.tight_layout(h_pad=3.5, rect=(0.01, 0.01, 0.99, 0.99))
@@ -896,8 +749,8 @@ relative to the 2d airfoil or panel chord line.
 - `body_aero`: Wing aerodynamics struct
 
 # Keyword arguments
-- `alphas`: Range of angle of attack values in radians (default: -5° to 25° in 0.3° steps)
-- `delta_tes`: Range of trailing edge angles in radians (default: -5° to 25° in 0.3° steps)
+- `alphas`: Range of angle of attack values in radians (default: `deg2rad.(-5:0.3:25)`)
+- `delta_tes`: Range of trailing edge angles in radians (default: `deg2rad.(-5:0.3:25)`)
 - `is_show`: Whether to display plots (default: true)
 - `use_tex`: if the external `pdflatex` command shall be used
 """
@@ -908,7 +761,7 @@ function VortexStepMethod.plot_polar_data(body_aero::BodyAerodynamics;
         use_tex = false
         )
     if body_aero.panels[1].aero_model == POLAR_MATRICES
-        set_plot_style()
+    set_plot_style(; use_tex)
 
         # Create figure with subplots
         fig = plt.figure(figsize=(15, 6))
@@ -975,6 +828,7 @@ function VortexStepMethod.plot_combined_analysis(
     body_aero,
     results;
     solver_label="VSM",
+    labels=nothing,
     angle_range=range(0, 20, length=20),
     angle_type="angle_of_attack",
     angle_of_attack=0.0,
@@ -990,61 +844,79 @@ function VortexStepMethod.plot_combined_analysis(
     use_tex=false,
     literature_path_list=String[],
     cl_over_cd=true,
+    angle_of_attack_for_spanwise_distribution=5.0,
 )
     # Normalize inputs to arrays for consistent handling
     solvers = solver isa Vector ? solver : [solver]
     body_aeros = body_aero isa Vector ? body_aero : [body_aero]
     results_list = results isa Vector ? results : [results]
-    labels = solver_label isa Vector ? solver_label : [solver_label]
+    n_solvers = length(solvers)
+    n_literature = length(literature_path_list)
 
-    # Extract y-coordinates for distribution plot (use first body_aero)
-    body_y_coordinates = [panel.aero_center[2] for panel in body_aeros[1].panels]
-    y_coords_list = [body_y_coordinates for _ in 1:length(solvers)]
+    # Label normalization (matches Makie version)
+    label_source = isnothing(labels) ? solver_label : labels
+    labels_in = label_source isa AbstractVector ?
+        string.(label_source) : [string(label_source)]
+    solver_labels = length(labels_in) == 1 ?
+        fill(labels_in[1], n_solvers) :
+        labels_in[1:n_solvers]
 
-    # Plot geometry (only use first body_aero)
+    # Compute spanwise results at specified AoA
+    results_spanwise = copy(results_list)
+    if !isnothing(angle_of_attack_for_spanwise_distribution)
+        α_span = deg2rad(
+            angle_of_attack_for_spanwise_distribution)
+        β_span = deg2rad(side_slip)
+        for (i, (s, ba)) in enumerate(
+                zip(solvers, body_aeros))
+            va_old = copy(getfield(ba, :_va))
+            omega_old = copy(ba.omega)
+            set_va!(ba, [cos(α_span) * cos(β_span),
+                sin(β_span), sin(α_span)] * v_a)
+            results_spanwise[i] = solve(s, ba,
+                s.sol.gamma_distribution)
+            set_va!(ba, va_old, omega_old)
+        end
+    end
+
+    # Extract y-coordinates for distribution plot
+    y_coords_list = [
+        [p.aero_center[2] for p in ba.panels]
+        for ba in body_aeros]
+
+    # Plot geometry (first body_aero only)
     plot_geometry(
         body_aeros[1],
         title;
-        data_type=data_type,
-        save_path=save_path,
-        is_save=is_save,
-        is_show=is_show,
-        view_elevation=view_elevation,
-        view_azimuth=view_azimuth,
-        use_tex=use_tex
+        data_type, save_path, is_save, is_show,
+        view_elevation, view_azimuth, use_tex
     )
 
     # Plot spanwise distributions
     plot_distribution(
         y_coords_list,
-        results_list,
-        labels;
+        results_spanwise,
+        solver_labels;
         title=title * " - Distributions",
-        data_type=data_type,
-        save_path=save_path,
-        is_save=is_save,
-        is_show=is_show,
-        use_tex=use_tex
+        data_type, save_path, is_save, is_show, use_tex
     )
 
-    # Plot polars
+    # Plot polars (include literature labels)
+    polar_labels = if n_literature > 0 &&
+            length(labels_in) == n_solvers + n_literature
+        labels_in
+    else
+        solver_labels
+    end
     plot_polars(
         solvers,
         body_aeros,
-        labels;
-        literature_path_list=literature_path_list,
-        angle_range=angle_range,
-        angle_type=angle_type,
-        angle_of_attack=angle_of_attack,
-        side_slip=side_slip,
-        v_a=v_a,
+        polar_labels;
+        literature_path_list, angle_range, angle_type,
+        angle_of_attack, side_slip, v_a,
         title=title * " - Polars",
-        data_type=data_type,
-        save_path=save_path,
-        is_save=is_save,
-        is_show=is_show,
-        use_tex=use_tex,
-        cl_over_cd=cl_over_cd
+        data_type, save_path, is_save, is_show,
+        use_tex, cl_over_cd
     )
 end
 

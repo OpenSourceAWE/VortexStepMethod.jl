@@ -1,8 +1,4 @@
-using Pkg
-Pkg.activate(@__DIR__)
-
 using LinearAlgebra
-using GLMakie
 using VortexStepMethod
 using VortexStepMethod: solve_base!
 
@@ -20,11 +16,11 @@ alpha = deg2rad(alpha_deg)
 wing = Wing(n_panels, spanwise_distribution=LINEAR)
 
 # Add wing sections - defining only tip sections with inviscid airfoil model
-add_section!(wing, 
-    [0.0, span/2, 0.0],    # Left tip LE 
+add_section!(wing,
+    [0.0, span/2, 0.0],    # Left tip LE
     [chord, span/2, 0.0],  # Left tip TE
     INVISCID)
-add_section!(wing, 
+add_section!(wing,
     [0.0, -span/2, 0.0],   # Right tip LE
     [chord, -span/2, 0.0], # Right tip TE
     INVISCID)
@@ -50,7 +46,7 @@ results_vsm_base = solve_base!(vsm_solver, body_aero, nothing)
 println("Rectangular wing, solve_base!:")
 @time results_vsm_base = solve_base!(vsm_solver, body_aero, nothing)
 # time Python: 32.0  ms Ryzen 7950x
-# time Julia:   0.42 ms Ryzen 7950x
+# time Julia:   0.35 ms Ryzen 7950x
 println("Rectangular wing, solve!:")
 @time sol = solve!(vsm_solver, body_aero, nothing)
 println("Rectangular wing, solve:")
