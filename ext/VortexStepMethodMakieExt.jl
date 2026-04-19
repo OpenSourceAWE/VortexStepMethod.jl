@@ -236,11 +236,11 @@ function Makie.plot(body_aero::VortexStepMethod.BodyAerodynamics; size=(1200, 80
     return fig
 end
 
-function _active_backend_prefers_vector_output()
-    isdefined(Makie, :current_backend) || return false
+function _active_backend_prefers_vector_output(makie=Makie)
+    isdefined(makie, :current_backend) || return false
 
     backend = try
-        Makie.current_backend()
+        makie.current_backend()
     catch
         return false
     end
