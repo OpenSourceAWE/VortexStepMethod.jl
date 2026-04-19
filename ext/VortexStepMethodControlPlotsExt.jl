@@ -56,7 +56,7 @@ function VortexStepMethod.save_plot(fig, save_path, title; data_type=".pdf")
     isnothing(save_path) && throw(ArgumentError("save_path should be provided"))
 
     !isdir(save_path) && mkpath(save_path)
-    sanitized_title = replace(String(title), ' ' => '_')
+    sanitized_title = replace(replace(String(title), ' ' => '_'), '%' => "pct")
     full_path = joinpath(save_path, sanitized_title * data_type)
 
     @debug "Attempting to save figure to: $full_path"

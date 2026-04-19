@@ -257,7 +257,7 @@ function VortexStepMethod.save_plot(fig::Makie.Figure, save_path, title; data_ty
     isnothing(save_path) && throw(ArgumentError("save_path should be provided"))
 
     !isdir(save_path) && mkpath(save_path)
-    sanitized_title = replace(String(title), ' ' => '_')
+    sanitized_title = replace(replace(String(title), ' ' => '_'), '%' => "pct")
     full_path = joinpath(save_path, sanitized_title * data_type)
     fallback_path = joinpath(save_path, sanitized_title * ".png")
 
@@ -448,7 +448,7 @@ end
 
 """
     plot_geometry(body_aero::BodyAerodynamics, title;
-                  data_type=".png", save_path=nothing,
+                  data_type=nothing, save_path=nothing,
                   is_save=false, is_show=false,
                   view_elevation=15, view_azimuth=-120, use_tex=false)
 
@@ -459,7 +459,7 @@ Plot wing geometry from different viewpoints using Makie.
 - `title`: plot title
 
 # Keyword arguments:
-- `data_type`: File extension (default: ".png", also supports ".jpeg")
+- `data_type`: File extension (default: `nothing`; delegated to `save_plot` backend-aware default)
 - `save_path`: Path for saving (default: nothing)
 - `is_save`: Whether to save (default: false)
 - `is_show`: Whether to display (default: false)
@@ -468,7 +468,7 @@ Plot wing geometry from different viewpoints using Makie.
 - `use_tex`: Ignored for Makie (default: false)
 """
 function VortexStepMethod.plot_geometry(body_aero::BodyAerodynamics, title;
-    data_type=".png",
+    data_type=nothing,
     save_path=nothing,
     is_save=false,
     is_show=false,
