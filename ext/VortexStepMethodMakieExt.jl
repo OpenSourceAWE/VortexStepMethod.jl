@@ -257,8 +257,9 @@ function VortexStepMethod.save_plot(fig::Makie.Figure, save_path, title; data_ty
     isnothing(save_path) && throw(ArgumentError("save_path should be provided"))
 
     !isdir(save_path) && mkpath(save_path)
-    full_path = joinpath(save_path, title * data_type)
-    fallback_path = joinpath(save_path, title * ".png")
+    sanitized_title = replace(String(title), ' ' => '_')
+    full_path = joinpath(save_path, sanitized_title * data_type)
+    fallback_path = joinpath(save_path, sanitized_title * ".png")
 
     @debug "Attempting to save figure to: $full_path"
     @debug "Current working directory: $(pwd())"
@@ -504,7 +505,7 @@ end
 
 """
     plot_distribution(y_coordinates_list, results_list, label_list;
-                      title="spanwise_distribution", data_type=".png",
+                      title="spanwise_distribution", data_type=nothing,
                       save_path=nothing, is_save=false, is_show=true, use_tex=false)
 
 Plot spanwise distributions of aerodynamic properties using Makie.
@@ -516,7 +517,7 @@ Plot spanwise distributions of aerodynamic properties using Makie.
 
 # Keyword arguments
 - `title`: Plot title (default: "spanwise_distribution")
-- `data_type`: File extension (default: ".png", also supports ".jpeg")
+- `data_type`: File extension (default: `nothing`; delegated to `save_plot` backend-aware default)
 - `save_path`: Path to save plots (default: nothing)
 - `is_save`: Whether to save (default: false)
 - `is_show`: Whether to display (default: true)
@@ -524,7 +525,7 @@ Plot spanwise distributions of aerodynamic properties using Makie.
 """
 function VortexStepMethod.plot_distribution(y_coordinates_list, results_list, label_list;
     title="spanwise_distribution",
-    data_type=".png",
+    data_type=nothing,
     save_path=nothing,
     is_save=false,
     is_show=true,
@@ -659,7 +660,7 @@ Generate polar data for aerodynamic analysis over a range of angles.
                 literature_path_list=String[],
                 angle_range=range(0, 20, 2), angle_type="angle_of_attack",
                 angle_of_attack=0.0, side_slip=0.0, v_a=10.0,
-                title="polar", data_type=".png", save_path=nothing,
+                title="polar", data_type=nothing, save_path=nothing,
                 is_save=true, is_show=true, use_tex=false)
 
 Plot polar data comparing different solvers using Makie.
@@ -677,7 +678,7 @@ Plot polar data comparing different solvers using Makie.
 - `side_slip`: Side slip angle [°] (default: 0.0)
 - `v_a`: Wind speed [m/s] (default: 10.0)
 - `title`: Plot title
-- `data_type`: File extension (default: ".png", also supports ".jpeg")
+- `data_type`: File extension (default: `nothing`; delegated to `save_plot` backend-aware default)
 - `save_path`: Path to save (default: nothing)
 - `is_save`: Whether to save (default: true)
 - `is_show`: Whether to display (default: true)
@@ -695,7 +696,7 @@ function VortexStepMethod.plot_polars(
     side_slip=0.0,
     v_a=10.0,
     title="polar",
-    data_type=".png",
+    data_type=nothing,
     save_path=nothing,
     is_save=true,
     is_show=true,

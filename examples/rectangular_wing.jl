@@ -2,7 +2,9 @@ using LinearAlgebra
 using VortexStepMethod
 
 PLOT = true
+SAVE_ALL = false
 USE_TEX = false
+OUTPUT_DIR = joinpath(dirname(@__DIR__), "output")
 
 # Step 1: Define wing parameters
 n_panels = 20          # Number of panels
@@ -60,8 +62,8 @@ PLOT && plot_geometry(
       body_aero,
       "Rectangular_wing_geometry";
       data_type=".pdf",
-      save_path=".",
-      is_save=false,
+      save_path=OUTPUT_DIR,
+      is_save=false || SAVE_ALL,
       is_show=true,
       use_tex=USE_TEX
 )
@@ -74,6 +76,8 @@ PLOT && plot_distribution(
     [results_vsm, results_llt],
     ["VSM", "LLT"],
     title="Spanwise Distributions",
+    save_path=OUTPUT_DIR,
+    is_save=false || SAVE_ALL,
     use_tex=USE_TEX
 )
 
@@ -87,6 +91,8 @@ PLOT && plot_polars(
     angle_type="angle_of_attack",
     v_a,
     title="Rectangular Wing Polars",
+    save_path=OUTPUT_DIR,
+    is_save=false || SAVE_ALL,
     use_tex=USE_TEX
 )
 nothing
