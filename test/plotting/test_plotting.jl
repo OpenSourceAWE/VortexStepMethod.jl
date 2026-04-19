@@ -423,5 +423,62 @@ end
     )
     @test fig_no_moments !== nothing
     safe_rm(no_cm_path)
+
+    # Tests for save_plot function
+    if backend == "Makie"
+        body_aero = create_body_aero()
+        fig = plot_geometry(
+            body_aero,
+            "save_plot_test";
+            is_save=false,
+            is_show=false)
+        @test fig isa Figure
+
+        save_test_dir = tempdir()
+        
+        # Test 1: save_plot with explicit data_type (".png")
+        VortexStepMethod.save_plot(fig, save_test_dir, "test_explicit_png", data_type=".png")
+        @test isfile(joinpath(save_test_dir, "test_explicit_png.png"))
+        safe_rm(joinpath(save_test_dir, "test_explicit_png.png"))
+
+        # Test 2: save_plot with explicit data_type (".pdf")
+        VortexStepMethod.save_plot(fig, save_test_dir, "test_explicit_pdf", data_type=".pdf")
+        @test isfile(joinpath(save_test_dir, "test_explicit_pdf.pdf"))
+        safe_rm(joinpath(save_test_dir, "test_explicit_pdf.pdf"))
+
+        # Test 3: save_plot with data_type=nothing (backend-aware detection)
+        VortexStepMethod.save_plot(fig, save_test_dir, "test_backend_aware", data_type=nothing)
+        cairo_loaded = any(m -> nameof(m) == :CairoMakie, values(Base.loaded_modules))
+        expected_ext = cairo_loaded ? ".pdf" : ".png"
+        @test isfile(joinpath(save_test_dir, "test_backend_aware" * expected_ext))
+        safe_rm(joinpath(save_test_dir, "test_backend_aware" * expected_ext))
+
+        # Test 4: save_plot with title containing spaces (should be sanitized to underscores)
+        VortexStepMethod.save_plot(fig, save_test_dir, "test with spaces", data_type=".png")
+        @test isfile(joinpath(save_test_dir, "test_with_spaces.png"))
+        safe_rm(joinpath(save_test_dir, "test_with_spaces.png"))
+
+        # Test 5: save_plot with title containing percent signs (should be sanitized to "pct")
+        VortexStepMethod.save_plot(fig, save_test_dir, "test%efficiency", data_type=".png")
+        @test isfile(joinpath(save_test_dir, "testpctefficiency.png"))
+        safe_rm(joinpath(save_test_dir, "testpctefficiency.png"))
+
+        # Test 6: save_plot with title containing both spaces and percent signs
+        VortexStepMethod.save_plot(fig, save_test_dir, "test %efficiency metric", data_type=".png")
+        @test isfile(joinpath(save_test_dir, "test_pctefficiency_metric.png"))
+        safe_rm(joinpath(save_test_dir, "test_pctefficiency_metric.png"))
+
+        # Test 7: save_plot creates directory if it doesn't exist
+        nested_dir = joinpath(save_test_dir, "nested_save_plot_dir")
+        !isdir(nested_dir) && @test !isdir(nested_dir)
+        VortexStepMethod.save_plot(fig, nested_dir, "test_nested_dir", data_type=".png")
+        @test isdir(nested_dir)
+        @test isfile(joinpath(nested_dir, "test_nested_dir.png"))
+        safe_rm(joinpath(nested_dir, "test_nested_dir.png"))
+        rm(nested_dir; force=true)
+
+        # Test 8: save_plot raises error when save_path is nothing
+        @test_throws ArgumentError VortexStepMethod.save_plot(fig, nothing, "test_title", data_type=".png")
+    end
 end
 nothing
