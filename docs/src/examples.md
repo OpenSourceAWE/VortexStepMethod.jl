@@ -177,7 +177,7 @@ The examples in this package support three plotting backends. Here is a comparis
 ### CairoMakie
 **Advantages:**
 - Fully software-rendered — works in headless environments (CI, servers, SSH sessions).
-- Produces high-quality vector output (SVG, PDF) suitable for publication.
+- Produces high-quality vector output (SVG, PDF) suitable for publication for 2D plots. The quality of 3D plots is not yet suitable for publications.
 - Lighter dependency than GLMakie (no GPU required).
 
 **Disadvantages:**
@@ -194,7 +194,7 @@ The examples in this package support three plotting backends. Here is a comparis
 
 **Disadvantages:**
 - Requires a working Python installation with Matplotlib (via `PyCall`).
-- Can cause issues when multithreading is enabled.
+- Might crash when multithreading is enabled. Start Julia with `-t 1,0` to avoid problems.
 - No native Makie ecosystem integration (e.g. cannot use `Makie.Observable` for live updates).
 - Interactivity is limited and depends on the Matplotlib backend in use.
 - Extra setup complexity when Python or Matplotlib are not already installed.
