@@ -1,3 +1,7 @@
+## VortexStepMethod v3.1.2 2025-04-20
+### Added
+- add back compat entry v2 for SciMLBase
+
 ## VortexStepMethod v3.1.1 2025-04-20
 ### Added
 - add back compat entry v3 for RecursiveArrayTools
