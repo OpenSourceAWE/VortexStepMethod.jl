@@ -1,3 +1,7 @@
+## VortexStepMethod v3.1.1 2025-04-20
+### Added
+- add back compat entry v3 for RecursiveArrayTools
+
 ## VortexStepMethod v3.1.0 2025-04-19
 
 ### Breaking
