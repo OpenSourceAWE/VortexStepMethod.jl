@@ -177,8 +177,7 @@ The examples in this package support three plotting backends. Here is a comparis
 ### CairoMakie
 **Advantages:**
 - Fully software-rendered — works in headless environments (CI, servers, SSH sessions).
-- Produces high-quality vector output (SVG, PDF) suitable for publication for 2D plots. The quality of 3D plots is not yet suitable for publications.
-- Lighter dependency than GLMakie (no GPU required).
+- Produces high-quality vector output (SVG, PDF) suitable for publication for 2D plots. The quality of 3D plots is not yet suitable for publications, though.
 
 **Disadvantages:**
 - Plots are static — no interactive zoom or pan.
