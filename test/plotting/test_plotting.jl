@@ -558,6 +558,9 @@ end
             is_show=false)
         @test fig isa Figure
 
+        active_backend_prefers_vector_output =
+            getfield(makie_ext, :_active_backend_prefers_vector_output)
+
         save_test_dir = tempdir()
         
         # Test 1: save_plot with explicit data_type (".png")
@@ -571,31 +574,20 @@ end
         safe_rm(joinpath(save_test_dir, "test_explicit_pdf.pdf"))
 
         # Test 3: save_plot with data_type=nothing (backend-aware detection)
-        VortexStepMethod.save_plot(fig, save_test_dir, "test_backend_aware", data_type=nothing)
-        backend_obj = Makie.current_backend()
-        backend_name = if backend_obj isa Module
-            nameof(backend_obj)
-        elseif backend_obj isa DataType
-            nameof(backend_obj)
-        elseif Base.applicable(backend_obj)
-            called_backend = try
-                backend_obj()
-            catch
-                nothing
-            end
-            if called_backend isa Module
-                nameof(called_backend)
-            elseif called_backend isa DataType
-                nameof(called_backend)
-            else
-                Symbol(string(something(called_backend, backend_obj)))
-            end
-        else
-            Symbol(string(backend_obj))
+        backend_aware_dir = mktempdir()
+        try
+            VortexStepMethod.save_plot(fig, backend_aware_dir, "test_backend_aware", data_type=nothing)
+            pdf_path = joinpath(backend_aware_dir, "test_backend_aware.pdf")
+            png_path = joinpath(backend_aware_dir, "test_backend_aware.png")
+            expected_ext = active_backend_prefers_vector_output(Makie) ? ".pdf" : ".png"
+
+            @test xor(isfile(pdf_path), isfile(png_path))
+            @test isfile(joinpath(backend_aware_dir, "test_backend_aware" * expected_ext))
+        finally
+            safe_rm(joinpath(backend_aware_dir, "test_backend_aware.pdf"))
+            safe_rm(joinpath(backend_aware_dir, "test_backend_aware.png"))
+            rm(backend_aware_dir; force=true, recursive=true)
         end
-        expected_ext = lowercase(String(backend_name)) == "cairomakie" ? ".pdf" : ".png"
-        @test isfile(joinpath(save_test_dir, "test_backend_aware" * expected_ext))
-        safe_rm(joinpath(save_test_dir, "test_backend_aware" * expected_ext))
 
         # Test 4: save_plot with title containing spaces (should be sanitized to underscores)
         VortexStepMethod.save_plot(fig, save_test_dir, "test with spaces", data_type=".png")
