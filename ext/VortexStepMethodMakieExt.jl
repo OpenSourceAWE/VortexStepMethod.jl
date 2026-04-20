@@ -336,7 +336,7 @@ Display a Makie figure.
 - `dpi`: Dots per inch for the figure (default: 130) - currently unused in Makie
 """
 function VortexStepMethod.show_plot(fig::Makie.Figure; dpi=130)
-    display(fig)
+    isinteractive() && display(fig)
 end
 
 """
@@ -531,7 +531,7 @@ function VortexStepMethod.plot_geometry(body_aero::BodyAerodynamics, title;
 
     fig = create_geometry_plot_makie(body_aero, title, view_elevation, view_azimuth)
 
-    if is_show
+    if is_show && isinteractive()
         display(fig)
     end
 
@@ -661,7 +661,7 @@ function VortexStepMethod.plot_distribution(y_coordinates_list, results_list, la
         save_plot(fig, save_path, title, data_type=data_type)
     end
 
-    if is_show
+    if is_show && isinteractive()
         display(fig)
     end
 
@@ -881,7 +881,7 @@ function VortexStepMethod.plot_polars(
         save_plot(fig, save_path, main_title; data_type)
     end
 
-    if is_show
+    if is_show && isinteractive()
         display(fig)
     end
 
@@ -940,7 +940,7 @@ function VortexStepMethod.plot_polar_data(body_aero::BodyAerodynamics;
                 color=:blue, linewidth=0.5, transparency=true)
         end
 
-        if is_show
+        if is_show && isinteractive()
             display(fig)
         end
         return fig
@@ -1312,7 +1312,7 @@ function VortexStepMethod.plot_combined_analysis(
     colsize!(fig.layout, 1, Relative(0.6))
     colsize!(fig.layout, 2, Relative(0.4))
 
-    if is_show
+    if is_show && isinteractive()
         display(fig)
     end
 
