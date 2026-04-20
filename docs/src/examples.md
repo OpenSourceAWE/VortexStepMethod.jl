@@ -172,7 +172,7 @@ The examples in this package support three plotting backends. Here is a comparis
 **Disadvantages:**
 - Requires a display server (does not work in headless/server environments without a virtual framebuffer).
 - Heavier dependency: needs OpenGL drivers and a GPU.
-- Longer initial load time compared to the other backends.
+- Longer initial load time compared to ControlPlots
 
 ### CairoMakie
 **Advantages:**
@@ -183,6 +183,7 @@ The examples in this package support three plotting backends. Here is a comparis
 - Plots are static — no interactive zoom or pan.
 - Slower for very large or complex scenes because rendering is done in software.
 - 3D support is limited compared to GLMakie.
+- Longer initial load time compared to ControlPlots
 
 ### ControlPlots (based on PyPlot / Matplotlib)
 **Advantages:**
