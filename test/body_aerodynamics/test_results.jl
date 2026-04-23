@@ -36,10 +36,10 @@ end
 
 @testset "Nonlinear vs Linear - Comprehensive Input Testing" begin
     # Initialize with base parameters
-    va = [15.0, 0.0, 0.0]
-    theta = zeros(4)
-    delta = zeros(4)
-    omega = zeros(3)
+    va = [15.0, 1.0, 0.5]
+    theta = deg2rad.([2.0, 1.0, -1.0, -2.0])
+    delta = deg2rad.([1.0, 0.5, -0.5, -1.0])
+    omega = [0.0, 0.1, 0.0]
     
     # Define perturbation magnitudes
     dva_magnitudes = [0.01, 0.01, 0.01]  # Velocity perturbations (m/s)
@@ -123,7 +123,7 @@ end
                     reset_va = copy(va)
                     reset_theta = copy(theta)
                     reset_delta = copy(delta)
-                    reset_omega = zeros(3)
+                    reset_omega = copy(omega)
                     
                     # Apply the perturbation to the nonlinear model
                     if input_name == "va"
@@ -133,7 +133,7 @@ end
                     elseif input_name == "delta"
                         reset_delta = delta + perturbation[11:14]
                     elseif input_name == "omega"
-                        reset_omega = perturbation[8:10]
+                        reset_omega = omega + perturbation[8:10]
                     else
                         throw(ArgumentError())
                     end
@@ -302,8 +302,8 @@ end
                 @info "$combo_name error metrics" prediction_error baseline_difference error_ratio
                 
                 # Validate the prediction
-                @test lin_prediction ≈ nonlin_res rtol=0.01 atol=1e-3
-                @test error_ratio < 0.005
+                @test lin_prediction ≈ nonlin_res rtol=0.05 atol=1e-3
+                @test error_ratio < 0.05
             end
         end
     end

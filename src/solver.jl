@@ -1044,8 +1044,9 @@ function linearize(solver::Solver, body_aero::BodyAerodynamics, y::Vector{T};
         throw(ArgumentError("Cannot use theta_idxs or delta_idxs when wing has no unrefined sections"))
     end
 
-    init_va = body_aero.cache[1][body_aero.va]
-    init_va .= body_aero.va
+    init_va = body_aero.cache[1][body_aero._va]
+    init_va .= body_aero._va
+    init_omega = copy(body_aero.omega)
     last_theta_ref = Ref{Vector{T}}(Vector{T}(undef, 0))
     if !isnothing(theta_idxs)
         @views last_theta_ref[] = body_aero.cache[2][y[theta_idxs]]
@@ -1085,15 +1086,10 @@ function linearize(solver::Solver, body_aero::BodyAerodynamics, y::Vector{T};
             end
         end
 
-        if !isnothing(va_idxs) && isnothing(omega_idxs)
-            set_va!(body_aero, y[va_idxs])
-        elseif !isnothing(va_idxs) && !isnothing(omega_idxs)
-            set_va!(body_aero, y[va_idxs], y[omega_idxs])
-        elseif isnothing(va_idxs) && !isnothing(omega_idxs)
-            set_va!(body_aero, init_va, y[omega_idxs])
-        else
-            set_va!(body_aero, init_va)
-        end
+        va = isnothing(va_idxs) ? init_va : y[va_idxs]
+        om = isnothing(omega_idxs) ? init_omega :
+            y[omega_idxs]
+        set_va!(body_aero, va, om)
 
         solve!(solver, body_aero; kwargs...)
         if !aero_coeffs
