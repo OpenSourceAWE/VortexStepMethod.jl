@@ -1078,14 +1078,8 @@ function set_va!(body_aero::BodyAerodynamics, va::AbstractVector, omega=zeros(MV
     
     # Update wake elements
     frozen_wake!(body_aero, va_distribution)
-    if all(iszero, omega)
-        body_aero._va .= va
-        body_aero.has_distributed_va = false
-    else
-        body_aero._va .= _compute_reference_velocity_from_distribution(
-            va_distribution, n_panels)
-        body_aero.has_distributed_va = true
-    end
+    body_aero._va .= va
+    body_aero.has_distributed_va = false
     return nothing
 end
 

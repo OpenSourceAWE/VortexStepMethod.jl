@@ -494,15 +494,15 @@ end
         @test panel.va ≈ expected_va atol=1e-12
     end
     @test body_aero.omega ≈ omega
-    @test body_aero.has_distributed_va
-    @test_throws ArgumentError body_aero.va
+    @test !body_aero.has_distributed_va
+    @test body_aero.va ≈ va
 
     new_omega = [0.0, 0.0, 2.0]
-    reference_va = copy(body_aero._va)
+    @test body_aero._va ≈ va
     body_aero.omega = new_omega
 
     for panel in body_aero.panels
-        expected_va = reference_va .+ (-new_omega × panel.control_point)
+        expected_va = va .+ (-new_omega × panel.control_point)
         @test panel.va ≈ expected_va atol=1e-12
     end
     @test body_aero.omega ≈ new_omega
