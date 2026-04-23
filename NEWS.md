@@ -1,3 +1,13 @@
+## VortexStepMethod v3.1.3 2026-04-23
+
+### Fixed
+- bug in `linearize` where `body_aero.va` was used instead of `body_aero._va`,
+  causing incorrect initial velocity storage (#227)
+- `set_va!` no longer overwrites `_va` with a computed reference velocity when
+  omega is nonzero; this simplifies the function and fixes linearization with
+  turn rates
+- linearize now correctly preserves and restores `omega` across perturbations
+
 ## VortexStepMethod v3.1.2 2025-04-20
 ### Added
 - add back compat entry v2 for SciMLBase
