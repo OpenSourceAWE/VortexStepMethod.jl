@@ -13,80 +13,6 @@ module FakeMakieReturnsOtherModule
     import Base
     current_backend() = Base
 end
-
-module FakeMakieReturnsCairoType
-    struct CairoMakie end
-    current_backend() = CairoMakie
-end
-
-module FakeMakieReturnsOtherType
-    struct OtherBackend end
-    current_backend() = OtherBackend
-end
-
-module FakeMakieReturnsCallableModuleCairo
-    import CairoMakie
-    struct BackendCallable end
-    current_backend() = BackendCallable()
-    (::BackendCallable)() = CairoMakie
-end
-
-module FakeMakieReturnsCallableModuleOther
-    import Base
-    struct BackendCallable end
-    current_backend() = BackendCallable()
-    (::BackendCallable)() = Base
-end
-
-module FakeMakieReturnsCallableTypeCairo
-    struct CairoMakie end
-    struct BackendCallable end
-    current_backend() = BackendCallable()
-    (::BackendCallable)() = CairoMakie
-end
-
-module FakeMakieReturnsCallableTypeOther
-    struct OtherBackend end
-    struct BackendCallable end
-    current_backend() = BackendCallable()
-    (::BackendCallable)() = OtherBackend
-end
-
-module FakeMakieReturnsCallableStringCairo
-    struct BackendCallable end
-    current_backend() = BackendCallable()
-    (::BackendCallable)() = "CairoMakie backend"
-end
-
-module FakeMakieReturnsCallableStringOther
-    struct BackendCallable end
-    current_backend() = BackendCallable()
-    (::BackendCallable)() = "Raster backend"
-end
-
-module FakeMakieReturnsThrowingCallableCairo
-    import Base: show
-    struct CairoMakieCallable end
-    current_backend() = CairoMakieCallable()
-    (::CairoMakieCallable)() = error("boom")
-    show(io::IO, ::CairoMakieCallable) = print(io, "CairoMakieCallable")
-end
-
-module FakeMakieReturnsThrowingCallableOther
-    import Base: show
-    struct OtherCallable end
-    current_backend() = OtherCallable()
-    (::OtherCallable)() = error("boom")
-    show(io::IO, ::OtherCallable) = print(io, "OtherCallable")
-end
-
-module FakeMakieReturnsStringCairo
-    current_backend() = "CairoMakie backend"
-end
-
-module FakeMakieReturnsStringOther
-    current_backend() = "Raster backend"
-end
 backend = if "plot-controlplots" in ARGS
     using ControlPlots
     import ControlPlots: plt
@@ -530,24 +456,6 @@ end
 
             @test active_backend_prefers_vector_output(FakeMakieReturnsCairoModule) == true
             @test active_backend_prefers_vector_output(FakeMakieReturnsOtherModule) == false
-
-            @test active_backend_prefers_vector_output(FakeMakieReturnsCairoType) == true
-            @test active_backend_prefers_vector_output(FakeMakieReturnsOtherType) == false
-
-            @test active_backend_prefers_vector_output(FakeMakieReturnsCallableModuleCairo) == true
-            @test active_backend_prefers_vector_output(FakeMakieReturnsCallableModuleOther) == false
-
-            @test active_backend_prefers_vector_output(FakeMakieReturnsCallableTypeCairo) == true
-            @test active_backend_prefers_vector_output(FakeMakieReturnsCallableTypeOther) == false
-
-            @test active_backend_prefers_vector_output(FakeMakieReturnsCallableStringCairo) == true
-            @test active_backend_prefers_vector_output(FakeMakieReturnsCallableStringOther) == false
-
-            @test active_backend_prefers_vector_output(FakeMakieReturnsThrowingCallableCairo) == true
-            @test active_backend_prefers_vector_output(FakeMakieReturnsThrowingCallableOther) == false
-
-            @test active_backend_prefers_vector_output(FakeMakieReturnsStringCairo) == true
-            @test active_backend_prefers_vector_output(FakeMakieReturnsStringOther) == false
         end
 
         body_aero = create_body_aero()

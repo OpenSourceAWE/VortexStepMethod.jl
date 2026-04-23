@@ -245,30 +245,7 @@ function _active_backend_prefers_vector_output(makie=Makie)
         return false
     end
 
-    # Makie versions may return backend modules directly or backend callables.
-    if backend isa Module
-        return nameof(backend) == :CairoMakie
-    end
-    if backend isa DataType
-        return nameof(backend) == :CairoMakie
-    end
-
-    if Base.applicable(backend)
-        called_backend = try
-            backend()
-        catch
-            nothing
-        end
-        if called_backend isa Module
-            return nameof(called_backend) == :CairoMakie
-        end
-        if called_backend isa DataType
-            return nameof(called_backend) == :CairoMakie
-        end
-        !isnothing(called_backend) && return occursin("cairomakie", lowercase(string(called_backend)))
-    end
-
-    return occursin("cairomakie", lowercase(string(backend)))
+    return nameof(backend) == :CairoMakie
 end
 
 """
