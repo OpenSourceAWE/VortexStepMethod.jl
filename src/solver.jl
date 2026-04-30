@@ -834,29 +834,22 @@ function gamma_loop!(
         relstep = sqrt(eps(Float64))
         abstep = sqrt(eps(Float64))
 
+        update_gamma_candidate!(
+            residual, gamma_iter, solver, panels, n_panels,
+            AIC_x, AIC_y, AIC_z,
+            velocity_view_x, velocity_view_y, velocity_view_z,
+            va_array, induced_velocity_all, relative_velocity_array,
+            y_airf_array, relative_velocity_crossz, v_acrossz_array,
+            z_airf_array, x_airf_array,
+            v_normal_array, v_tangential_array,
+            va_magw_array, cl_dist, chord_array,
+        )
+        @inbounds for i in 1:n_panels
+            residual[i] -= gamma_iter[i]
+        end
+
         solver.lr.converged = false
         for iter in 1:solver.max_iterations
-            update_gamma_candidate!(
-                residual, gamma_iter, solver, panels, n_panels,
-                AIC_x, AIC_y, AIC_z,
-                velocity_view_x, velocity_view_y, velocity_view_z,
-                va_array, induced_velocity_all, relative_velocity_array,
-                y_airf_array, relative_velocity_crossz, v_acrossz_array,
-                z_airf_array, x_airf_array,
-                v_normal_array, v_tangential_array,
-                va_magw_array, cl_dist, chord_array,
-            )
-            max_residual = 0.0
-            @inbounds for i in 1:n_panels
-                residual[i] -= gamma_iter[i]
-                a = abs(residual[i])
-                a > max_residual && (max_residual = a)
-            end
-            if max_residual < solver.atol
-                solver.lr.converged = true
-                break
-            end
-
             @inbounds for j in 1:n_panels
                 for i in 1:n_panels
                     gamma_perturbed[i] = gamma_iter[i]
@@ -885,21 +878,28 @@ function gamma_loop!(
             @inbounds for i in 1:n_panels
                 gamma_iter[i] -= residual[i]
             end
-        end
 
-        # Refresh side-effect state (alpha_dist, v_a_dist, cl_dist, ...) at the
-        # converged iterate; the inner FD loop left them set at the last
-        # perturbed gamma.
-        update_gamma_candidate!(
-            residual, gamma_iter, solver, panels, n_panels,
-            AIC_x, AIC_y, AIC_z,
-            velocity_view_x, velocity_view_y, velocity_view_z,
-            va_array, induced_velocity_all, relative_velocity_array,
-            y_airf_array, relative_velocity_crossz, v_acrossz_array,
-            z_airf_array, x_airf_array,
-            v_normal_array, v_tangential_array,
-            va_magw_array, cl_dist, chord_array,
-        )
+            update_gamma_candidate!(
+                residual, gamma_iter, solver, panels, n_panels,
+                AIC_x, AIC_y, AIC_z,
+                velocity_view_x, velocity_view_y, velocity_view_z,
+                va_array, induced_velocity_all, relative_velocity_array,
+                y_airf_array, relative_velocity_crossz, v_acrossz_array,
+                z_airf_array, x_airf_array,
+                v_normal_array, v_tangential_array,
+                va_magw_array, cl_dist, chord_array,
+            )
+            max_residual = 0.0
+            @inbounds for i in 1:n_panels
+                residual[i] -= gamma_iter[i]
+                a = abs(residual[i])
+                a > max_residual && (max_residual = a)
+            end
+            if max_residual < solver.atol
+                solver.lr.converged = true
+                break
+            end
+        end
 
         gamma .= gamma_iter
         return nothing
