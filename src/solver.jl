@@ -825,6 +825,11 @@ function gamma_loop!(
                 reltol = solver.rtol,
             )
             solver.nonlin_cache = nonlin_cache
+        else
+            SciMLBase.reinit!(
+                nonlin_cache, solver.lr.gamma_new;
+                p=SciMLBase.NullParameters(),
+            )
         end
         sol = NonlinearSolve.solve!(nonlin_cache)
         gamma .= sol.u
