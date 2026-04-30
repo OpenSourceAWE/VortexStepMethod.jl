@@ -141,9 +141,11 @@ sol::VSMSolution = VSMSolution(): The result of calling [solve!](@ref)
     relaxation_factor::Float64 = 0.03
 
     # Nonlin solver fields
-    prob::Union{NonlinearProblem, Nothing} = nothing
-    nonlin_cache::Union{NonlinearSolveFirstOrder.GeneralizedFirstOrderAlgorithmCache, Nothing} = nothing
     atol::Float64 = 1e-5
+    nonlin_jac::Matrix{Float64} = zeros(P, P)
+    nonlin_residual::MVector{P, Float64} = zeros(P)
+    nonlin_residual_perturbed::MVector{P, Float64} = zeros(P)
+    nonlin_gamma_perturbed::MVector{P, Float64} = zeros(P)
     
     # Damping settings
     is_with_artificial_damping::Bool = false
@@ -733,8 +735,54 @@ end
     return nothing
 end
 
+@inline function lu_solve_inplace!(
+    A::AbstractMatrix{Float64},
+    b::AbstractVector{Float64},
+    n::Int,
+)
+    @inbounds for k in 1:n
+        amax = abs(A[k, k])
+        pivot_row = k
+        for i in (k + 1):n
+            v = abs(A[i, k])
+            if v > amax
+                amax = v
+                pivot_row = i
+            end
+        end
+        amax == 0.0 && return false
+        if pivot_row != k
+            for j in 1:n
+                tmp = A[k, j]
+                A[k, j] = A[pivot_row, j]
+                A[pivot_row, j] = tmp
+            end
+            tmp = b[k]
+            b[k] = b[pivot_row]
+            b[pivot_row] = tmp
+        end
+        inv_pivot = 1.0 / A[k, k]
+        for i in (k + 1):n
+            factor = A[i, k] * inv_pivot
+            A[i, k] = factor
+            for j in (k + 1):n
+                A[i, j] -= factor * A[k, j]
+            end
+            b[i] -= factor * b[k]
+        end
+    end
+    @inbounds for k in n:-1:1
+        s = b[k]
+        for j in (k + 1):n
+            s -= A[k, j] * b[j]
+        end
+        b[k] = s / A[k, k]
+    end
+    return true
+end
+
 """
-    gamma_loop!(solver::Solver, AIC_x::Matrix{Float64}, 
+    gamma_loop!(solver::Solver, AIC_x::Matrix{Float64},
               AIC_y::Matrix{Float64}, AIC_z::Matrix{Float64},
               panels::Vector{Panel}, relaxation_factor::Float64; log=true)
 
@@ -778,63 +826,82 @@ function gamma_loop!(
     velocity_view_z = @view induced_velocity_all[:, 3]
 
     if solver.solver_type == NONLIN
-        prob = solver.prob
-        if isnothing(prob)
-            function f_nonlin!(d_gamma, gamma, _p)
-                update_gamma_candidate!(
-                    solver.lr.gamma_new,
-                    gamma,
-                    solver,
-                    panels,
-                    n_panels,
-                    AIC_x,
-                    AIC_y,
-                    AIC_z,
-                    velocity_view_x,
-                    velocity_view_y,
-                    velocity_view_z,
-                    va_array,
-                    induced_velocity_all,
-                    relative_velocity_array,
-                    y_airf_array,
-                    relative_velocity_crossz,
-                    v_acrossz_array,
-                    z_airf_array,
-                    x_airf_array,
-                    v_normal_array,
-                    v_tangential_array,
-                    va_magw_array,
-                    cl_dist,
-                    chord_array,
-                )
-                d_gamma .= solver.lr.gamma_new .- gamma
-                nothing
-            end
-            prob = NonlinearProblem(f_nonlin!, solver.lr.gamma_new, SciMLBase.NullParameters())
-            solver.prob = prob
-        end
-        prob = prob::NonlinearProblem
+        gamma_iter = solver.lr.gamma_new
+        residual = solver.nonlin_residual
+        residual_perturbed = solver.nonlin_residual_perturbed
+        gamma_perturbed = solver.nonlin_gamma_perturbed
+        jac = solver.nonlin_jac
+        relstep = sqrt(eps(Float64))
+        abstep = sqrt(eps(Float64))
 
-        nonlin_cache = solver.nonlin_cache
-        if isnothing(nonlin_cache)
-            alg = NewtonRaphson(; autodiff=AutoFiniteDiff())
-            nonlin_cache = SciMLBase.init(
-                prob,
-                alg;
-                abstol = solver.atol,
-                reltol = solver.rtol,
+        solver.lr.converged = false
+        for iter in 1:solver.max_iterations
+            update_gamma_candidate!(
+                residual, gamma_iter, solver, panels, n_panels,
+                AIC_x, AIC_y, AIC_z,
+                velocity_view_x, velocity_view_y, velocity_view_z,
+                va_array, induced_velocity_all, relative_velocity_array,
+                y_airf_array, relative_velocity_crossz, v_acrossz_array,
+                z_airf_array, x_airf_array,
+                v_normal_array, v_tangential_array,
+                va_magw_array, cl_dist, chord_array,
             )
-            solver.nonlin_cache = nonlin_cache
-        else
-            SciMLBase.reinit!(
-                nonlin_cache, solver.lr.gamma_new;
-                p=SciMLBase.NullParameters(),
-            )
+            max_residual = 0.0
+            @inbounds for i in 1:n_panels
+                residual[i] -= gamma_iter[i]
+                a = abs(residual[i])
+                a > max_residual && (max_residual = a)
+            end
+            if max_residual < solver.atol
+                solver.lr.converged = true
+                break
+            end
+
+            @inbounds for j in 1:n_panels
+                for i in 1:n_panels
+                    gamma_perturbed[i] = gamma_iter[i]
+                end
+                step = max(abstep, relstep * abs(gamma_iter[j]))
+                gamma_perturbed[j] += step
+                update_gamma_candidate!(
+                    residual_perturbed, gamma_perturbed, solver, panels, n_panels,
+                    AIC_x, AIC_y, AIC_z,
+                    velocity_view_x, velocity_view_y, velocity_view_z,
+                    va_array, induced_velocity_all, relative_velocity_array,
+                    y_airf_array, relative_velocity_crossz, v_acrossz_array,
+                    z_airf_array, x_airf_array,
+                    v_normal_array, v_tangential_array,
+                    va_magw_array, cl_dist, chord_array,
+                )
+                inv_step = 1.0 / step
+                for i in 1:n_panels
+                    residual_perturbed[i] -= gamma_perturbed[i]
+                    jac[i, j] = (residual_perturbed[i] - residual[i]) * inv_step
+                end
+            end
+
+            lu_solve_inplace!(jac, residual, n_panels) || break
+
+            @inbounds for i in 1:n_panels
+                gamma_iter[i] -= residual[i]
+            end
         end
-        sol = NonlinearSolve.solve!(nonlin_cache)
-        gamma .= sol.u
-        solver.lr.gamma_new .= sol.u
-        solver.lr.converged = SciMLBase.successful_retcode(sol)
+
+        # Refresh side-effect state (alpha_dist, v_a_dist, cl_dist, ...) at the
+        # converged iterate; the inner FD loop left them set at the last
+        # perturbed gamma.
+        update_gamma_candidate!(
+            residual, gamma_iter, solver, panels, n_panels,
+            AIC_x, AIC_y, AIC_z,
+            velocity_view_x, velocity_view_y, velocity_view_z,
+            va_array, induced_velocity_all, relative_velocity_array,
+            y_airf_array, relative_velocity_crossz, v_acrossz_array,
+            z_airf_array, x_airf_array,
+            v_normal_array, v_tangential_array,
+            va_magw_array, cl_dist, chord_array,
+        )
+
+        gamma .= gamma_iter
         return nothing
     end
 
