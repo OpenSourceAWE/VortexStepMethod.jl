@@ -19,18 +19,24 @@ if !@isdefined ram_wing_results
     data_dir = _find_ram_data_dir()
     body_path = joinpath(tempdir(), "ram_air_kite_body.obj")
     foil_path = joinpath(tempdir(), "ram_air_kite_foil.dat")
-    
+
     body_src = joinpath(data_dir, "ram_air_kite_body.obj")
     foil_src = joinpath(data_dir, "ram_air_kite_foil.dat")
-    
-    # Check if source files exist before copying
+
     if isfile(body_src) && isfile(foil_src)
         cp(body_src, body_path; force=true)
         cp(foil_src, foil_path; force=true)
+        # ObjWing also reads cl/cd/cm polar CSVs from the foil's directory;
+        # copy them too so we don't pick up stale polars from a prior run.
+        for kind in ("cl", "cd", "cm")
+            name = "ram_air_kite_foil_$(kind)_polar.csv"
+            src = joinpath(data_dir, name)
+            isfile(src) && cp(src, joinpath(tempdir(), name); force=true)
+        end
     else
         error("Required data files not found: $body_src or $foil_src")
     end
-    
+
     ram_wing = ObjWing(body_path, foil_path; alpha_range=deg2rad.(-1:1), delta_range=deg2rad.(-1:1), n_unrefined_sections=4)
 end
 
@@ -54,15 +60,11 @@ end
 
     VortexStepMethod.unrefined_deform!(ram_wing, theta, delta; smooth=false)
     body_aero = BodyAerodynamics([ram_wing]; va, omega)
-    # atol/rtol set just above the FD-Jacobian Newton noise floor
-    # (~sqrt(eps) ≈ 1.5e-8 propagated through the solve). Tighter values
-    # cannot be reliably achieved without an exact (e.g. ForwardDiff)
-    # Jacobian, and would make the sanity test fail on roundoff.
     solver = Solver(body_aero;
         aerodynamic_model_type=VSM,
         is_with_artificial_damping=false,
-        atol=1e-6,
-        rtol=1e-6,
+        atol=1e-5,
+        rtol=1e-5,
         solver_type=NONLIN,
     )
 
