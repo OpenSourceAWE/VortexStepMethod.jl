@@ -26,18 +26,19 @@ if !@isdefined ram_wing_results
     if isfile(body_src) && isfile(foil_src)
         cp(body_src, body_path; force=true)
         cp(foil_src, foil_path; force=true)
-        # ObjWing also reads cl/cd/cm polar CSVs from the foil's directory;
-        # copy them too so we don't pick up stale polars from a prior run.
         for kind in ("cl", "cd", "cm")
             name = "ram_air_kite_foil_$(kind)_polar.csv"
-            src = joinpath(data_dir, name)
-            isfile(src) && cp(src, joinpath(tempdir(), name); force=true)
+            cp(joinpath(data_dir, name), joinpath(tempdir(), name); force=true)
         end
     else
         error("Required data files not found: $body_src or $foil_src")
     end
 
-    ram_wing = ObjWing(body_path, foil_path; alpha_range=deg2rad.(-1:1), delta_range=deg2rad.(-1:1), n_unrefined_sections=4)
+    ram_wing = ObjWing(body_path, foil_path;
+        alpha_range=deg2rad.(-5:1:15),
+        delta_range=deg2rad.(-3:1:5),
+        n_unrefined_sections=4,
+    )
 end
 
 @testset "Linearize Jacobian validation" begin
