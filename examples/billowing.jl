@@ -2,7 +2,9 @@ using LinearAlgebra
 using VortexStepMethod
 
 PLOT = true
+SAVE_ALL = false
 USE_TEX = false
+OUTPUT_DIR = joinpath(dirname(@__DIR__), "output")
 
 # Data paths (all within this repo)
 vsm_src_path = something(pathof(VortexStepMethod), @__FILE__)
@@ -132,28 +134,12 @@ println("Billowed:  CL=$(round(results_bill["cl"]; digits=4)), " *
         "CD=$(round(results_bill["cd"]; digits=4))")
 
 if PLOT
-    # Plot polars comparison
-    plot_polars(
-        [solver_flat, solver_bill],
-        [body_aero_flat, body_aero_bill],
-        labels;
-        literature_path_list=literature_paths,
-        angle_range=range(-5, 25, length=31),
-        angle_type="angle_of_attack",
-        angle_of_attack=angle_of_attack_deg,
-        side_slip=sideslip_deg,
-        v_a=wind_speed,
-        title="V3 Kite: flat vs billowing $(BILLOWING_PCT)%",
-        is_show=true,
-        use_tex=USE_TEX,
-        show_moments=true
-    )
-
     # Plot geometry (flat wing)
     plot_geometry(
         body_aero_flat,
         "Flat wing geometry";
-        is_save=false,
+        save_path=OUTPUT_DIR,
+        is_save=false || SAVE_ALL,
         is_show=true,
         use_tex=USE_TEX
     )
@@ -168,8 +154,29 @@ if PLOT
         [results_flat, results_bill],
         ["VSM flat", "VSM billowing"];
         title="Billowing comparison distributions",
+        save_path=OUTPUT_DIR,
+        is_save=false || SAVE_ALL,
         is_show=true,
         use_tex=USE_TEX
+    )
+
+    # Plot polars comparison
+    plot_polars(
+        [solver_flat, solver_bill],
+        [body_aero_flat, body_aero_bill],
+        labels;
+        literature_path_list=literature_paths,
+        angle_range=range(-5, 25, length=31),
+        angle_type="angle_of_attack",
+        angle_of_attack=angle_of_attack_deg,
+        side_slip=sideslip_deg,
+        v_a=wind_speed,
+        title="V3 Kite flat vs billowing $(BILLOWING_PCT)%",
+        save_path=OUTPUT_DIR,
+        is_save=false || SAVE_ALL,
+        is_show=true,
+        use_tex=USE_TEX,
+        show_moments=true
     )
 end
 

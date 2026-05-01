@@ -33,3 +33,7 @@ hooks
 .idea
 results/TUDELFT_V3_KITE/polars/tutorial_testing_stall_model_n_panels_54_distribution_SPLIT_PROVIDED.pdf
 .gitignore
+data/ram_air_kite/ram_air_kite_foil_cd_polar.csv
+data/ram_air_kite/ram_air_kite_foil_cm_polar.csv
+output/
+output_cairo/

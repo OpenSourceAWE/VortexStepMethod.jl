@@ -1,3 +1,8 @@
+## Unreleased
+
+### Added
+- allow using CairoMakie or GLMakie using the menu
+
 ## VortexStepMethod v3.1.3 2026-04-23
 
 ### Fixed

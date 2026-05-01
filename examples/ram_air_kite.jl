@@ -3,9 +3,11 @@ using LinearAlgebra
 
 PLOT = true
 PRN = true
+SAVE_ALL = false
 USE_TEX = false
 DEFORM = true
 LINEARIZE = false
+OUTPUT_DIR = joinpath(dirname(@__DIR__), "output")
 
 # Create wing geometry
 wing = ObjWing(
@@ -74,10 +76,9 @@ PLOT && plot_polar_data(body_aero)
 # Plotting geometry
 PLOT && plot_geometry(
     body_aero,
-    "";
-    data_type=".svg",
-    save_path="",
-    is_save=false,
+    "Ram air kite geometry";
+    save_path=OUTPUT_DIR,
+    is_save=false || SAVE_ALL,
     is_show=true,
     view_elevation=15,
     view_azimuth=-120,
@@ -96,8 +97,8 @@ PLOT && plot_distribution(
     [results],
     ["VSM"];
     title="CAD_spanwise_distributions_alpha_$(round(aoa, digits=1))_delta_$(round(side_slip, digits=1))_yaw_$(round(yaw_rate, digits=1))_v_a_$(round(v_a, digits=1))",
-    data_type=".pdf",
-    is_save=false,
+    save_path=OUTPUT_DIR,
+    is_save=false || SAVE_ALL,
     is_show=true,
     use_tex=USE_TEX
 )
@@ -114,8 +115,8 @@ PLOT && plot_polars(
     side_slip=0,
     v_a=10,
     title="ram_kite_panels_$(wing.n_panels)_distribution_$(wing.spanwise_distribution)",
-    data_type=".pdf",
-    is_save=false,
+    save_path=OUTPUT_DIR,
+    is_save=false || SAVE_ALL,
     is_show=true,
     use_tex=USE_TEX
 )

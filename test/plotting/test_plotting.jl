@@ -1,3 +1,18 @@
+module FakeMakieNoCurrentBackend end
+
+module FakeMakieCurrentBackendThrows
+    current_backend() = error("boom")
+end
+
+module FakeMakieReturnsCairoModule
+    import CairoMakie
+    current_backend() = CairoMakie
+end
+
+module FakeMakieReturnsOtherModule
+    import Base
+    current_backend() = Base
+end
 backend = if "plot-controlplots" in ARGS
     using ControlPlots
     import ControlPlots: plt
@@ -9,6 +24,9 @@ end
 
 using VortexStepMethod
 using Test
+
+const makie_ext = backend == "Makie" ?
+    Base.get_extension(VortexStepMethod, :VortexStepMethodMakieExt) : nothing
 
 # Resolve repo data directory for ram air kite assets
 _ram_data_dir = joinpath(dirname(dirname(@__DIR__)),
@@ -423,5 +441,88 @@ end
     )
     @test fig_no_moments !== nothing
     safe_rm(no_cm_path)
+
+    # Tests for save_plot function
+    if backend == "Makie"
+        @testset "_active_backend_prefers_vector_output" begin
+            @test makie_ext !== nothing
+
+            active_backend_prefers_vector_output =
+                getfield(makie_ext, :_active_backend_prefers_vector_output)
+
+
+            @test active_backend_prefers_vector_output(FakeMakieNoCurrentBackend) == false
+            @test active_backend_prefers_vector_output(FakeMakieCurrentBackendThrows) == false
+
+            @test active_backend_prefers_vector_output(FakeMakieReturnsCairoModule) == true
+            @test active_backend_prefers_vector_output(FakeMakieReturnsOtherModule) == false
+        end
+
+        body_aero = create_body_aero()
+        fig = plot_geometry(
+            body_aero,
+            "save_plot_test";
+            is_save=false,
+            is_show=false)
+        @test fig isa Figure
+
+        active_backend_prefers_vector_output =
+            getfield(makie_ext, :_active_backend_prefers_vector_output)
+
+        save_test_dir = tempdir()
+        
+        # Test 1: save_plot with explicit data_type (".png")
+        VortexStepMethod.save_plot(fig, save_test_dir, "test_explicit_png", data_type=".png")
+        @test isfile(joinpath(save_test_dir, "test_explicit_png.png"))
+        safe_rm(joinpath(save_test_dir, "test_explicit_png.png"))
+
+        # Test 2: save_plot with explicit data_type (".pdf")
+        VortexStepMethod.save_plot(fig, save_test_dir, "test_explicit_pdf", data_type=".pdf")
+        @test isfile(joinpath(save_test_dir, "test_explicit_pdf.pdf"))
+        safe_rm(joinpath(save_test_dir, "test_explicit_pdf.pdf"))
+
+        # Test 3: save_plot with data_type=nothing (backend-aware detection)
+        backend_aware_dir = mktempdir()
+        try
+            VortexStepMethod.save_plot(fig, backend_aware_dir, "test_backend_aware", data_type=nothing)
+            pdf_path = joinpath(backend_aware_dir, "test_backend_aware.pdf")
+            png_path = joinpath(backend_aware_dir, "test_backend_aware.png")
+            expected_ext = active_backend_prefers_vector_output(Makie) ? ".pdf" : ".png"
+
+            @test xor(isfile(pdf_path), isfile(png_path))
+            @test isfile(joinpath(backend_aware_dir, "test_backend_aware" * expected_ext))
+        finally
+            safe_rm(joinpath(backend_aware_dir, "test_backend_aware.pdf"))
+            safe_rm(joinpath(backend_aware_dir, "test_backend_aware.png"))
+            rm(backend_aware_dir; force=true, recursive=true)
+        end
+
+        # Test 4: save_plot with title containing spaces (should be sanitized to underscores)
+        VortexStepMethod.save_plot(fig, save_test_dir, "test with spaces", data_type=".png")
+        @test isfile(joinpath(save_test_dir, "test_with_spaces.png"))
+        safe_rm(joinpath(save_test_dir, "test_with_spaces.png"))
+
+        # Test 5: save_plot with title containing percent signs (should be sanitized to "pct")
+        VortexStepMethod.save_plot(fig, save_test_dir, "test%efficiency", data_type=".png")
+        @test isfile(joinpath(save_test_dir, "testpctefficiency.png"))
+        safe_rm(joinpath(save_test_dir, "testpctefficiency.png"))
+
+        # Test 6: save_plot with title containing both spaces and percent signs
+        VortexStepMethod.save_plot(fig, save_test_dir, "test %efficiency metric", data_type=".png")
+        @test isfile(joinpath(save_test_dir, "test_pctefficiency_metric.png"))
+        safe_rm(joinpath(save_test_dir, "test_pctefficiency_metric.png"))
+
+        # Test 7: save_plot creates directory if it doesn't exist
+        nested_dir = joinpath(save_test_dir, "nested_save_plot_dir")
+        !isdir(nested_dir) && @test !isdir(nested_dir)
+        VortexStepMethod.save_plot(fig, nested_dir, "test_nested_dir", data_type=".png")
+        @test isdir(nested_dir)
+        @test isfile(joinpath(nested_dir, "test_nested_dir.png"))
+        safe_rm(joinpath(nested_dir, "test_nested_dir.png"))
+        rm(nested_dir; force=true)
+
+        # Test 8: save_plot raises error when save_path is nothing
+        @test_throws ArgumentError VortexStepMethod.save_plot(fig, nothing, "test_title", data_type=".png")
+    end
 end
 nothing
