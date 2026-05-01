@@ -22,8 +22,8 @@ jobs:
       fail-fast: false
       matrix:
         version:
-          - 'lts'
-          - '1'
+          - '1.11'
+          - '1.12'
         os:
           - ubuntu-latest
         build_is_production_build:
@@ -33,11 +33,11 @@ jobs:
         include:
           - os: windows-latest
             arch: x64
-            version: 1
+            version: '1.12'
             build_is_production_build: true
           - os: macOS-latest
             arch: aarch64
-            version: 1
+            version: '1.12'
             build_is_production_build: true
     steps:
       - uses: actions/checkout@v6
@@ -68,8 +68,8 @@ jobs:
       fail-fast: false
       matrix:
         julia_version:
-          - "lts"
-          - "1"
+          - "1.11"
+          - "1.12"
         julia_arch:
           - x64
         os:
