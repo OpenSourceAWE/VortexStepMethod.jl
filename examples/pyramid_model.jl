@@ -24,7 +24,9 @@ results = VortexStepMethod.solve(solver, body_aero; log=true)
 
 # Using plotting modules, to create more comprehensive plots
 PLOT = true
+SAVE_ALL = false
 USE_TEX = false
+OUTPUT_DIR = joinpath(dirname(@__DIR__), "output")
 
 # Plotting polars
 PLOT && plot_polars(
@@ -37,8 +39,8 @@ PLOT && plot_polars(
     side_slip=sideslip_deg,
     v_a=wind_speed,
     title="$(wing.n_panels)_panels_$(wing.spanwise_distribution)_pyramid_model",
-    data_type=".pdf",
-    is_save=false,
+    save_path=OUTPUT_DIR,
+    is_save=false || SAVE_ALL,
     is_show=true,
     use_tex=USE_TEX
 )
@@ -46,10 +48,9 @@ PLOT && plot_polars(
 # Plotting geometry
 PLOT && plot_geometry(
     body_aero,
-    "";
-    data_type=".svg",
-    save_path="",
-    is_save=false,
+    "Pyramid model geometry";
+    save_path=OUTPUT_DIR,
+    is_save=false || SAVE_ALL,
     is_show=true,
     view_elevation=15,
     view_azimuth=-120,
@@ -64,8 +65,8 @@ PLOT && plot_distribution(
     [results],
     ["VSM"];
     title="pyramid_spanwise_distributions_alpha_$(round(angle_of_attack_deg, digits=1))_delta_$(round(sideslip_deg, digits=1))_yaw_$(round(yaw_rate, digits=1))_v_a_$(round(wind_speed, digits=1))",
-    data_type=".pdf",
-    is_save=false,
+    save_path=OUTPUT_DIR,
+    is_save=false || SAVE_ALL,
     is_show=true,
     use_tex=USE_TEX
 )

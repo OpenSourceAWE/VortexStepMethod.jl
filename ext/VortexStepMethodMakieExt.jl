@@ -236,8 +236,20 @@ function Makie.plot(body_aero::VortexStepMethod.BodyAerodynamics; size=(1200, 80
     return fig
 end
 
+function _active_backend_prefers_vector_output(makie=Makie)
+    isdefined(makie, :current_backend) || return false
+
+    backend = try
+        makie.current_backend()
+    catch
+        return false
+    end
+
+    return nameof(backend) == :CairoMakie
+end
+
 """
-    save_plot(fig, save_path, title; data_type=".png")
+    save_plot(fig, save_path, title; data_type=nothing)
 
 Save a Makie figure to a file.
 
@@ -247,14 +259,19 @@ Save a Makie figure to a file.
 - `title`: Title of the plot
 
 # Keyword arguments
-- `data_type`: File extension (default: ".png", also supports ".jpeg")
+- `data_type`: File extension. If `nothing`, defaults to `".pdf"` when the
+    active Makie backend is CairoMakie and `".png"` otherwise.
 """
-function VortexStepMethod.save_plot(fig::Makie.Figure, save_path, title; data_type=".png")
+function VortexStepMethod.save_plot(fig::Makie.Figure, save_path, title; data_type=nothing)
+    if isnothing(data_type)
+        data_type = _active_backend_prefers_vector_output() ? ".pdf" : ".png"
+    end
     isnothing(save_path) && throw(ArgumentError("save_path should be provided"))
 
     !isdir(save_path) && mkpath(save_path)
-    full_path = joinpath(save_path, title * data_type)
-    fallback_path = joinpath(save_path, title * ".png")
+    sanitized_title = replace(replace(String(title), ' ' => '_'), '%' => "pct")
+    full_path = joinpath(save_path, sanitized_title * data_type)
+    fallback_path = joinpath(save_path, sanitized_title * ".png")
 
     @debug "Attempting to save figure to: $full_path"
     @debug "Current working directory: $(pwd())"
@@ -296,7 +313,7 @@ Display a Makie figure.
 - `dpi`: Dots per inch for the figure (default: 130) - currently unused in Makie
 """
 function VortexStepMethod.show_plot(fig::Makie.Figure; dpi=130)
-    display(fig)
+    isinteractive() && display(fig)
 end
 
 """
@@ -443,7 +460,7 @@ end
 
 """
     plot_geometry(body_aero::BodyAerodynamics, title;
-                  data_type=".png", save_path=nothing,
+                  data_type=nothing, save_path=nothing,
                   is_save=false, is_show=false,
                   view_elevation=15, view_azimuth=-120, use_tex=false)
 
@@ -454,7 +471,7 @@ Plot wing geometry from different viewpoints using Makie.
 - `title`: plot title
 
 # Keyword arguments:
-- `data_type`: File extension (default: ".png", also supports ".jpeg")
+- `data_type`: File extension (default: `nothing`; delegated to `save_plot` backend-aware default)
 - `save_path`: Path for saving (default: nothing)
 - `is_save`: Whether to save (default: false)
 - `is_show`: Whether to display (default: false)
@@ -463,7 +480,7 @@ Plot wing geometry from different viewpoints using Makie.
 - `use_tex`: Ignored for Makie (default: false)
 """
 function VortexStepMethod.plot_geometry(body_aero::BodyAerodynamics, title;
-    data_type=".png",
+    data_type=nothing,
     save_path=nothing,
     is_save=false,
     is_show=false,
@@ -491,7 +508,7 @@ function VortexStepMethod.plot_geometry(body_aero::BodyAerodynamics, title;
 
     fig = create_geometry_plot_makie(body_aero, title, view_elevation, view_azimuth)
 
-    if is_show
+    if is_show && isinteractive()
         display(fig)
     end
 
@@ -500,7 +517,7 @@ end
 
 """
     plot_distribution(y_coordinates_list, results_list, label_list;
-                      title="spanwise_distribution", data_type=".png",
+                      title="spanwise_distribution", data_type=nothing,
                       save_path=nothing, is_save=false, is_show=true, use_tex=false)
 
 Plot spanwise distributions of aerodynamic properties using Makie.
@@ -512,7 +529,7 @@ Plot spanwise distributions of aerodynamic properties using Makie.
 
 # Keyword arguments
 - `title`: Plot title (default: "spanwise_distribution")
-- `data_type`: File extension (default: ".png", also supports ".jpeg")
+- `data_type`: File extension (default: `nothing`; delegated to `save_plot` backend-aware default)
 - `save_path`: Path to save plots (default: nothing)
 - `is_save`: Whether to save (default: false)
 - `is_show`: Whether to display (default: true)
@@ -520,7 +537,7 @@ Plot spanwise distributions of aerodynamic properties using Makie.
 """
 function VortexStepMethod.plot_distribution(y_coordinates_list, results_list, label_list;
     title="spanwise_distribution",
-    data_type=".png",
+    data_type=nothing,
     save_path=nothing,
     is_save=false,
     is_show=true,
@@ -621,7 +638,7 @@ function VortexStepMethod.plot_distribution(y_coordinates_list, results_list, la
         save_plot(fig, save_path, title, data_type=data_type)
     end
 
-    if is_show
+    if is_show && isinteractive()
         display(fig)
     end
 
@@ -655,7 +672,7 @@ Generate polar data for aerodynamic analysis over a range of angles.
                 literature_path_list=String[],
                 angle_range=range(0, 20, 2), angle_type="angle_of_attack",
                 angle_of_attack=0.0, side_slip=0.0, v_a=10.0,
-                title="polar", data_type=".png", save_path=nothing,
+                title="polar", data_type=nothing, save_path=nothing,
                 is_save=true, is_show=true, use_tex=false)
 
 Plot polar data comparing different solvers using Makie.
@@ -673,7 +690,7 @@ Plot polar data comparing different solvers using Makie.
 - `side_slip`: Side slip angle [°] (default: 0.0)
 - `v_a`: Wind speed [m/s] (default: 10.0)
 - `title`: Plot title
-- `data_type`: File extension (default: ".png", also supports ".jpeg")
+- `data_type`: File extension (default: `nothing`; delegated to `save_plot` backend-aware default)
 - `save_path`: Path to save (default: nothing)
 - `is_save`: Whether to save (default: true)
 - `is_show`: Whether to display (default: true)
@@ -691,7 +708,7 @@ function VortexStepMethod.plot_polars(
     side_slip=0.0,
     v_a=10.0,
     title="polar",
-    data_type=".png",
+    data_type=nothing,
     save_path=nothing,
     is_save=true,
     is_show=true,
@@ -841,7 +858,7 @@ function VortexStepMethod.plot_polars(
         save_plot(fig, save_path, main_title; data_type)
     end
 
-    if is_show
+    if is_show && isinteractive()
         display(fig)
     end
 
@@ -900,7 +917,7 @@ function VortexStepMethod.plot_polar_data(body_aero::BodyAerodynamics;
                 color=:blue, linewidth=0.5, transparency=true)
         end
 
-        if is_show
+        if is_show && isinteractive()
             display(fig)
         end
         return fig
@@ -1272,7 +1289,7 @@ function VortexStepMethod.plot_combined_analysis(
     colsize!(fig.layout, 1, Relative(0.6))
     colsize!(fig.layout, 2, Relative(0.4))
 
-    if is_show
+    if is_show && isinteractive()
         display(fig)
     end
 

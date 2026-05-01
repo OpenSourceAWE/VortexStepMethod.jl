@@ -233,6 +233,11 @@ $_julia_cmd --project=examples -e 'using GLMakie, VortexStepMethod; @info "GLMak
 $_julia_cmd -t1 --project=examples_cp -e 'using ControlPlots, VortexStepMethod; @info "ControlPlots extension ready."'
 $_julia_cmd --project=. -e 'using Pkg; Pkg.test(test_args=["settings/test_settings.jl"]);
 @info "Minimal test smoke check complete."'
+
+echo
+echo "Creating output directory..."
+mkdir -p output
+
 echo
 echo "Installation complete."
 

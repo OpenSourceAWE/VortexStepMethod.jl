@@ -5,12 +5,12 @@ using CSV
 using DataFrames
 
 PLOT = true
+SAVE_ALL = false
 USE_TEX = false
+OUTPUT_DIR = joinpath(dirname(@__DIR__), "output")
 
 # Find root directory
 root_dir = dirname(@__DIR__)
-save_folder = joinpath(root_dir, "results", "TUDELFT_V3_KITE")
-mkpath(save_folder)
 
 # Defining discretisation
 n_panels = 54
@@ -67,10 +67,9 @@ set_va!(body_aero, vel_app)
 # Plotting geometry
 PLOT && plot_geometry(
     body_aero,
-    "";
-    data_type=".svg",
-    save_path="",
-    is_save=false,
+    "Stall model geometry";
+    save_path=OUTPUT_DIR,
+    is_save=false || SAVE_ALL,
     is_show=true,
     view_elevation=15,
     view_azimuth=-120,
@@ -89,15 +88,13 @@ PLOT && plot_distribution(
     [results, results_with_stall],
     ["VSM", "VSM with stall correction"];
     title="CAD_spanwise_distributions_alpha_$(round(aoa, digits=1))_delta_$(round(side_slip, digits=1))_yaw_$(round(yaw_rate, digits=1))_v_a_$(round(v_a, digits=1))",
-    data_type=".pdf",
-    save_path=joinpath(save_folder, "spanwise_distributions"),
-    is_save=false,
+    save_path=OUTPUT_DIR,
+    is_save=false || SAVE_ALL,
     is_show=true,
     use_tex=USE_TEX
 )
 
 # Plotting polar
-save_path = joinpath(root_dir, "results", "TUDELFT_V3_KITE")
 path_cfd_lebesque = joinpath(
     root_dir,
     "data",
@@ -128,9 +125,8 @@ PLOT && plot_polars(
     side_slip=side_slip,
     v_a=v_a,
     title="tutorial_testing_stall_model_n_panels_$(n_panels)_distribution_$(spanwise_distribution)",
-    data_type=".pdf",
-    save_path=joinpath(save_folder, "polars"),
-    is_save=true,
+    save_path=OUTPUT_DIR,
+    is_save=false || SAVE_ALL,
     is_show=true,
     use_tex=USE_TEX
 )

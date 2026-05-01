@@ -2,6 +2,7 @@ using Pkg
 Pkg.activate(@__DIR__)
 
 using GLMakie
+using CairoMakie
 using VortexStepMethod
 using REPL.TerminalMenus
 
@@ -43,12 +44,14 @@ end
 function example_menu()
     options = [
         [("$( splitext(f)[1]) = include(\"$f\")") for f in example_files];
+        "GLMakie.activate!()";
+        "CairoMakie.activate!()";
         "help_me = VortexStepMethod.help(\"$url\")";
         "quit"
     ]
     active = true
     while active
-        menu = RadioMenu(options, pagesize=8)
+        menu = RadioMenu(options, pagesize=11)
         choice = request(
             "\nChoose function to execute or `q` to quit: ",
             menu)
