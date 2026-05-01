@@ -146,6 +146,7 @@ sol::VSMSolution = VSMSolution(): The result of calling [solve!](@ref)
     nonlin_residual::MVector{P, Float64} = zeros(P)
     nonlin_residual_perturbed::MVector{P, Float64} = zeros(P)
     nonlin_gamma_perturbed::MVector{P, Float64} = zeros(P)
+    nonlin_ipiv::Vector{LinearAlgebra.BlasInt} = zeros(LinearAlgebra.BlasInt, P)
     
     # Damping settings
     is_with_artificial_damping::Bool = false
@@ -735,52 +736,6 @@ end
     return nothing
 end
 
-@inline function lu_solve_inplace!(
-    A::AbstractMatrix{Float64},
-    b::AbstractVector{Float64},
-    n::Int,
-)
-    @inbounds for k in 1:n
-        amax = abs(A[k, k])
-        pivot_row = k
-        for i in (k + 1):n
-            v = abs(A[i, k])
-            if v > amax
-                amax = v
-                pivot_row = i
-            end
-        end
-        amax == 0.0 && return false
-        if pivot_row != k
-            for j in 1:n
-                tmp = A[k, j]
-                A[k, j] = A[pivot_row, j]
-                A[pivot_row, j] = tmp
-            end
-            tmp = b[k]
-            b[k] = b[pivot_row]
-            b[pivot_row] = tmp
-        end
-        inv_pivot = 1.0 / A[k, k]
-        for i in (k + 1):n
-            factor = A[i, k] * inv_pivot
-            A[i, k] = factor
-            for j in (k + 1):n
-                A[i, j] -= factor * A[k, j]
-            end
-            b[i] -= factor * b[k]
-        end
-    end
-    @inbounds for k in n:-1:1
-        s = b[k]
-        for j in (k + 1):n
-            s -= A[k, j] * b[j]
-        end
-        b[k] = s / A[k, k]
-    end
-    return true
-end
-
 """
     gamma_loop!(solver::Solver, AIC_x::Matrix{Float64},
               AIC_y::Matrix{Float64}, AIC_z::Matrix{Float64},
@@ -831,6 +786,7 @@ function gamma_loop!(
         residual_perturbed = solver.nonlin_residual_perturbed
         gamma_perturbed = solver.nonlin_gamma_perturbed
         jac = solver.nonlin_jac
+        ipiv = solver.nonlin_ipiv
         relstep = sqrt(eps(Float64))
         abstep = sqrt(eps(Float64))
 
@@ -873,10 +829,22 @@ function gamma_loop!(
                 end
             end
 
-            lu_solve_inplace!(jac, residual, n_panels) || break
+            _, _, info = LinearAlgebra.LAPACK.getrf!(jac, ipiv; check=false)
+            info == 0 || break
+            LinearAlgebra.LAPACK.getrs!('N', jac, ipiv, residual)
 
+            max_step = 0.0
+            ref = solver.tol_reference_error
             @inbounds for i in 1:n_panels
+                s = abs(residual[i])
+                s > max_step && (max_step = s)
                 gamma_iter[i] -= residual[i]
+                g = abs(gamma_iter[i])
+                g > ref && (ref = g)
+            end
+            if max_step < solver.atol + solver.rtol * ref
+                solver.lr.converged = true
+                break
             end
 
             update_gamma_candidate!(
@@ -889,15 +857,8 @@ function gamma_loop!(
                 v_normal_array, v_tangential_array,
                 va_magw_array, cl_dist, chord_array,
             )
-            max_residual = 0.0
             @inbounds for i in 1:n_panels
                 residual[i] -= gamma_iter[i]
-                a = abs(residual[i])
-                a > max_residual && (max_residual = a)
-            end
-            if max_residual < solver.atol
-                solver.lr.converged = true
-                break
             end
         end
 
@@ -1068,6 +1029,9 @@ Jacobian computation. When the same angles are encountered, geometry deformation
 - `results::Vector{Float64}`: Output vector at operating point
     - If `aero_coeffs=false`: `(Fx, Fy, Fz, Mx, My, Mz, moment_unrefined_dist...)`
     - If `aero_coeffs=true`: `(CFx, CFy, CFz, CMx, CMy, CMz, cm_unrefined_dist...)`
+- `converged::Bool`: `true` iff every internal solve reached the solver's
+  tolerances. When `false`, a warning is also emitted and the corresponding
+  Jacobian columns may be unreliable.
 
 # Example
 ```julia
@@ -1082,7 +1046,7 @@ y_op = [zeros(4);        # theta angles [rad]
         zeros(3)]         # omega [rad/s]
 
 # Compute Jacobian
-jac, results = linearize(solver, body_aero, y_op;
+jac, results, converged = linearize(solver, body_aero, y_op;
     theta_idxs=1:4,
     va_idxs=5:7,
     omega_idxs=8:10,
@@ -1098,6 +1062,8 @@ function linearize(solver::Solver, body_aero::BodyAerodynamics, y::Vector{T};
         va_idxs=nothing,
         omega_idxs=nothing,
         aero_coeffs=false,
+        fd_absstep::Float64=1e-3,
+        fd_relstep::Float64=1e-3,
         kwargs...) where T
 
     !(length(body_aero.wings) == 1) && throw(ArgumentError("Linearization only works for a body_aero with one wing"))
@@ -1129,6 +1095,8 @@ function linearize(solver::Solver, body_aero::BodyAerodynamics, y::Vector{T};
         @views last_delta_ref[] = body_aero.cache[3][y[delta_idxs]]
         last_delta_ref[] .= NaN
     end
+
+    n_failed = Ref(0)
 
     # Function to compute forces for given control inputs
     function calc_results!(results, y)
@@ -1164,6 +1132,7 @@ function linearize(solver::Solver, body_aero::BodyAerodynamics, y::Vector{T};
         set_va!(body_aero, va, om)
 
         solve!(solver, body_aero; kwargs...)
+        solver.lr.converged || (n_failed[] += 1)
         if !aero_coeffs
             results[1:3] .= solver.sol.force
             results[4:6] .= solver.sol.moment
@@ -1178,10 +1147,15 @@ function linearize(solver::Solver, body_aero::BodyAerodynamics, y::Vector{T};
 
     results = zeros(3+3+length(solver.sol.moment_unrefined_dist))
     jac = zeros(length(results), length(y))
-    backend = AutoFiniteDiff(absstep=1e2solver.atol, relstep=1e2solver.rtol)
+    backend = AutoFiniteDiff(absstep=fd_absstep, relstep=fd_relstep)
     prep = prepare_jacobian(calc_results!, results, backend, y)
     jacobian!(calc_results!, results, jac, prep, backend, y)
 
     calc_results!(results, y)
-    return jac, results
+    converged = n_failed[] == 0
+    if !converged
+        @warn "linearize: $(n_failed[]) internal solve(s) did not converge; \
+               jacobian columns may be unreliable"
+    end
+    return jac, results, converged
 end
