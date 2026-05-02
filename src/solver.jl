@@ -141,9 +141,12 @@ sol::VSMSolution = VSMSolution(): The result of calling [solve!](@ref)
     relaxation_factor::Float64 = 0.03
 
     # Nonlin solver fields
-    prob::Union{NonlinearProblem, Nothing} = nothing
-    nonlin_cache::Union{NonlinearSolveFirstOrder.GeneralizedFirstOrderAlgorithmCache, Nothing} = nothing
     atol::Float64 = 1e-5
+    nonlin_jac::Matrix{Float64} = zeros(P, P)
+    nonlin_residual::MVector{P, Float64} = zeros(P)
+    nonlin_residual_perturbed::MVector{P, Float64} = zeros(P)
+    nonlin_gamma_perturbed::MVector{P, Float64} = zeros(P)
+    nonlin_ipiv::Vector{LinearAlgebra.BlasInt} = zeros(LinearAlgebra.BlasInt, P)
     
     # Damping settings
     is_with_artificial_damping::Bool = false
@@ -734,7 +737,7 @@ end
 end
 
 """
-    gamma_loop!(solver::Solver, AIC_x::Matrix{Float64}, 
+    gamma_loop!(solver::Solver, AIC_x::Matrix{Float64},
               AIC_y::Matrix{Float64}, AIC_z::Matrix{Float64},
               panels::Vector{Panel}, relaxation_factor::Float64; log=true)
 
@@ -778,58 +781,88 @@ function gamma_loop!(
     velocity_view_z = @view induced_velocity_all[:, 3]
 
     if solver.solver_type == NONLIN
-        prob = solver.prob
-        if isnothing(prob)
-            function f_nonlin!(d_gamma, gamma, _p)
-                update_gamma_candidate!(
-                    solver.lr.gamma_new,
-                    gamma,
-                    solver,
-                    panels,
-                    n_panels,
-                    AIC_x,
-                    AIC_y,
-                    AIC_z,
-                    velocity_view_x,
-                    velocity_view_y,
-                    velocity_view_z,
-                    va_array,
-                    induced_velocity_all,
-                    relative_velocity_array,
-                    y_airf_array,
-                    relative_velocity_crossz,
-                    v_acrossz_array,
-                    z_airf_array,
-                    x_airf_array,
-                    v_normal_array,
-                    v_tangential_array,
-                    va_magw_array,
-                    cl_dist,
-                    chord_array,
-                )
-                d_gamma .= solver.lr.gamma_new .- gamma
-                nothing
-            end
-            prob = NonlinearProblem(f_nonlin!, solver.lr.gamma_new, SciMLBase.NullParameters())
-            solver.prob = prob
-        end
-        prob = prob::NonlinearProblem
+        gamma_iter = solver.lr.gamma_new
+        residual = solver.nonlin_residual
+        residual_perturbed = solver.nonlin_residual_perturbed
+        gamma_perturbed = solver.nonlin_gamma_perturbed
+        jac = solver.nonlin_jac
+        ipiv = solver.nonlin_ipiv
+        relstep = sqrt(eps(Float64))
+        abstep = sqrt(eps(Float64))
 
-        nonlin_cache = solver.nonlin_cache
-        if isnothing(nonlin_cache)
-            alg = NewtonRaphson(; autodiff=AutoFiniteDiff())
-            nonlin_cache = SciMLBase.init(
-                prob,
-                alg;
-                abstol = solver.atol,
-                reltol = solver.rtol,
-            )
-            solver.nonlin_cache = nonlin_cache
+        update_gamma_candidate!(
+            residual, gamma_iter, solver, panels, n_panels,
+            AIC_x, AIC_y, AIC_z,
+            velocity_view_x, velocity_view_y, velocity_view_z,
+            va_array, induced_velocity_all, relative_velocity_array,
+            y_airf_array, relative_velocity_crossz, v_acrossz_array,
+            z_airf_array, x_airf_array,
+            v_normal_array, v_tangential_array,
+            va_magw_array, cl_dist, chord_array,
+        )
+        @inbounds for i in 1:n_panels
+            residual[i] -= gamma_iter[i]
         end
-        sol = NonlinearSolve.solve!(nonlin_cache)
-        gamma .= sol.u
-        solver.lr.gamma_new .= sol.u
-        solver.lr.converged = SciMLBase.successful_retcode(sol)
+
+        solver.lr.converged = false
+        for iter in 1:solver.max_iterations
+            @inbounds for j in 1:n_panels
+                for i in 1:n_panels
+                    gamma_perturbed[i] = gamma_iter[i]
+                end
+                step = max(abstep, relstep * abs(gamma_iter[j]))
+                gamma_perturbed[j] += step
+                update_gamma_candidate!(
+                    residual_perturbed, gamma_perturbed, solver, panels, n_panels,
+                    AIC_x, AIC_y, AIC_z,
+                    velocity_view_x, velocity_view_y, velocity_view_z,
+                    va_array, induced_velocity_all, relative_velocity_array,
+                    y_airf_array, relative_velocity_crossz, v_acrossz_array,
+                    z_airf_array, x_airf_array,
+                    v_normal_array, v_tangential_array,
+                    va_magw_array, cl_dist, chord_array,
+                )
+                inv_step = 1.0 / step
+                for i in 1:n_panels
+                    residual_perturbed[i] -= gamma_perturbed[i]
+                    jac[i, j] = (residual_perturbed[i] - residual[i]) * inv_step
+                end
+            end
+
+            _, _, info = LinearAlgebra.LAPACK.getrf!(jac, ipiv; check=false)
+            info == 0 || break
+            LinearAlgebra.LAPACK.getrs!('N', jac, ipiv, residual)
+
+            max_step = 0.0
+            ref = solver.tol_reference_error
+            @inbounds for i in 1:n_panels
+                s = abs(residual[i])
+                s > max_step && (max_step = s)
+                gamma_iter[i] -= residual[i]
+                g = abs(gamma_iter[i])
+                g > ref && (ref = g)
+            end
+            if max_step < solver.atol + solver.rtol * ref
+                solver.lr.converged = true
+                break
+            end
+
+            update_gamma_candidate!(
+                residual, gamma_iter, solver, panels, n_panels,
+                AIC_x, AIC_y, AIC_z,
+                velocity_view_x, velocity_view_y, velocity_view_z,
+                va_array, induced_velocity_all, relative_velocity_array,
+                y_airf_array, relative_velocity_crossz, v_acrossz_array,
+                z_airf_array, x_airf_array,
+                v_normal_array, v_tangential_array,
+                va_magw_array, cl_dist, chord_array,
+            )
+            @inbounds for i in 1:n_panels
+                residual[i] -= gamma_iter[i]
+            end
+        end
+
+        gamma .= gamma_iter
         return nothing
     end
 
@@ -996,6 +1029,9 @@ Jacobian computation. When the same angles are encountered, geometry deformation
 - `results::Vector{Float64}`: Output vector at operating point
     - If `aero_coeffs=false`: `(Fx, Fy, Fz, Mx, My, Mz, moment_unrefined_dist...)`
     - If `aero_coeffs=true`: `(CFx, CFy, CFz, CMx, CMy, CMz, cm_unrefined_dist...)`
+- `converged::Bool`: `true` iff every internal solve reached the solver's
+  tolerances. When `false`, a warning is also emitted and the corresponding
+  Jacobian columns may be unreliable.
 
 # Example
 ```julia
@@ -1010,7 +1046,7 @@ y_op = [zeros(4);        # theta angles [rad]
         zeros(3)]         # omega [rad/s]
 
 # Compute Jacobian
-jac, results = linearize(solver, body_aero, y_op;
+jac, results, converged = linearize(solver, body_aero, y_op;
     theta_idxs=1:4,
     va_idxs=5:7,
     omega_idxs=8:10,
@@ -1026,6 +1062,8 @@ function linearize(solver::Solver, body_aero::BodyAerodynamics, y::Vector{T};
         va_idxs=nothing,
         omega_idxs=nothing,
         aero_coeffs=false,
+        fd_absstep::Float64=1e-3,
+        fd_relstep::Float64=1e-3,
         kwargs...) where T
 
     !(length(body_aero.wings) == 1) && throw(ArgumentError("Linearization only works for a body_aero with one wing"))
@@ -1057,6 +1095,8 @@ function linearize(solver::Solver, body_aero::BodyAerodynamics, y::Vector{T};
         @views last_delta_ref[] = body_aero.cache[3][y[delta_idxs]]
         last_delta_ref[] .= NaN
     end
+
+    n_failed = Ref(0)
 
     # Function to compute forces for given control inputs
     function calc_results!(results, y)
@@ -1092,6 +1132,7 @@ function linearize(solver::Solver, body_aero::BodyAerodynamics, y::Vector{T};
         set_va!(body_aero, va, om)
 
         solve!(solver, body_aero; kwargs...)
+        solver.lr.converged || (n_failed[] += 1)
         if !aero_coeffs
             results[1:3] .= solver.sol.force
             results[4:6] .= solver.sol.moment
@@ -1106,10 +1147,15 @@ function linearize(solver::Solver, body_aero::BodyAerodynamics, y::Vector{T};
 
     results = zeros(3+3+length(solver.sol.moment_unrefined_dist))
     jac = zeros(length(results), length(y))
-    backend = AutoFiniteDiff(absstep=1e2solver.atol, relstep=1e2solver.rtol)
+    backend = AutoFiniteDiff(absstep=fd_absstep, relstep=fd_relstep)
     prep = prepare_jacobian(calc_results!, results, backend, y)
     jacobian!(calc_results!, results, jac, prep, backend, y)
 
     calc_results!(results, y)
-    return jac, results
+    converged = n_failed[] == 0
+    if !converged
+        @warn "linearize: $(n_failed[]) internal solve(s) did not converge; \
+               jacobian columns may be unreliable"
+    end
+    return jac, results, converged
 end
