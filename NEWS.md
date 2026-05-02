@@ -1,7 +1,21 @@
-## Unreleased
+## VortexStepMethod v3.2.0 2026-05-02
 
 ### Added
-- allow using CairoMakie or GLMakie using the menu
+- support for both CairoMakie and GLMakie in the example `menu()` via new
+  `CairoMakie.activate()` / `GLMakie.activate()` entries (#222)
+- plots are saved as PDF when CairoMakie is active
+- `bin/install` now creates the `output` folder used by examples to store
+  generated plots
+
+### Changed
+- examples write plots into the shared `output` folder instead of the working
+  directory
+- example plot file names are sanitized: spaces replaced with `_` and `%`
+  replaced with `pct`
+
+### Fixed
+- NONLIN solver no longer returns stale `gamma` on repeated `solve!` calls
+  (#228)
 
 ## VortexStepMethod v3.1.3 2026-04-23
 
