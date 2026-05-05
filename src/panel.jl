@@ -371,24 +371,25 @@ Calculate lift coefficient for given angle of attack.
 # Returns
 - `Float64`: Lift coefficient (Cl)
 """
-function calculate_cl(panel::Panel, alpha::T)::T where T
-    isnan(alpha) && return T(NaN)
+function calculate_cl(panel::Panel{Tp}, alpha::Ta) where {Tp, Ta}
+    R = promote_type(Tp, Ta)
+    isnan(alpha) && return R(NaN)
     if panel.aero_model == LEI_AIRFOIL_BREUKELS
         cl = evalpoly(rad2deg(alpha), reverse(panel.cl_coeffs))
         if abs(alpha) > (π/9)
             cl = 2 * cos(alpha) * sin(alpha)^2
         end
-        return cl
+        return R(cl)
     elseif panel.aero_model == INVISCID
-        return 2π * alpha
+        return R(2π * alpha)
     elseif panel.aero_model == POLAR_VECTORS
         interp = panel.cl_interp
         interp isa Union{I1, I2} || throw(ArgumentError("cl_interp is not initialized for POLAR_VECTORS."))
-        return (interp::Union{I1, I2})(alpha)::T
+        return R((interp::Union{I1, I2})(alpha))
     elseif panel.aero_model == POLAR_MATRICES
         interp = panel.cl_interp
         interp isa Union{I3, I4} || throw(ArgumentError("cl_interp is not initialized for POLAR_MATRICES."))
-        return (interp::Union{I3, I4})(alpha, panel.delta)::T
+        return R((interp::Union{I3, I4})(alpha, panel.delta))
     else
         throw(ArgumentError("Unsupported aero model: $(panel.aero_model)"))
     end
@@ -400,33 +401,34 @@ end
 
 Calculate drag and moment coefficients for given angle of attack.
 """
-function calculate_cd_cm(panel::Panel, alpha::T)::Tuple{T, T} where T
-    isnan(alpha) && return T(NaN), T(NaN)
+function calculate_cd_cm(panel::Panel{Tp}, alpha::Ta) where {Tp, Ta}
+    R = promote_type(Tp, Ta)
+    isnan(alpha) && return R(NaN), R(NaN)
     if panel.aero_model == LEI_AIRFOIL_BREUKELS
         cd = evalpoly(rad2deg(alpha), reverse(panel.cd_coeffs))
         cm = evalpoly(rad2deg(alpha), reverse(panel.cm_coeffs))
         if abs(alpha) > (π/9)  # Outside ±20 degrees
             cd = 2 * sin(alpha)^3
         end
-        return cd, cm
+        return R(cd), R(cm)
     elseif panel.aero_model == POLAR_VECTORS
         cd_interp = panel.cd_interp
         cm_interp = panel.cm_interp
         cd_interp isa Union{I1, I2, I5} || throw(ArgumentError("cd_interp is not initialized for POLAR_VECTORS."))
         cm_interp isa Union{I1, I2} || throw(ArgumentError("cm_interp is not initialized for POLAR_VECTORS."))
-        return (cd_interp::Union{I1, I2, I5})(alpha)::T,
-               (cm_interp::Union{I1, I2})(alpha)::T
+        return R((cd_interp::Union{I1, I2, I5})(alpha)),
+               R((cm_interp::Union{I1, I2})(alpha))
     elseif panel.aero_model == POLAR_MATRICES
         cd_interp = panel.cd_interp
         cm_interp = panel.cm_interp
         cd_interp isa Union{I3, I4, I6} || throw(ArgumentError("cd_interp is not initialized for POLAR_MATRICES."))
         cm_interp isa Union{I3, I4} || throw(ArgumentError("cm_interp is not initialized for POLAR_MATRICES."))
-        return (cd_interp::Union{I3, I4, I6})(alpha, panel.delta)::T,
-               (cm_interp::Union{I3, I4})(alpha, panel.delta)::T
+        return R((cd_interp::Union{I3, I4, I6})(alpha, panel.delta)),
+               R((cm_interp::Union{I3, I4})(alpha, panel.delta))
     elseif !(panel.aero_model == INVISCID)
         throw(ArgumentError("Unsupported aero model: $(panel.aero_model)"))
     end
-    return zero(T), zero(T)
+    return zero(R), zero(R)
 end
 
 """
