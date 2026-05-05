@@ -4,8 +4,6 @@ using LinearAlgebra
 using Test
 
 @testset "ForwardDiff linearize" begin
-    # Build a small rectangular wing with INVISCID polars so the test runs
-    # quickly and the comparison is dominated by the LOOP iteration itself.
     n_panels = 10
     span = 20.0
     chord = 1.0
@@ -22,9 +20,7 @@ using Test
     y0 = [va; omega]
 
     @testset "AutoForwardDiff matches AutoFiniteDiff (LOOP, INVISCID)" begin
-        # `use_gamma_prev=false` is required so that the FD path does not
-        # warm-start from the previous perturbed state — otherwise the FD
-        # Jacobian carries a small bias unrelated to the AD result.
+        # FD warm-starts otherwise bias the reference Jacobian.
         solver = Solver(body_aero; use_gamma_prev=false)
 
         jac_fwd, _, fwd_converged = VortexStepMethod.linearize(
@@ -53,10 +49,8 @@ using Test
     end
 
     @testset "AutoForwardDiff matches AutoFiniteDiff (LOOP, POLAR_MATRICES)" begin
-        # The ram-air-kite ObjWing exercises POLAR_MATRICES, which is the
-        # branch where calculate_cl(panel::Panel{Tp}, alpha::Ta) sees mixed
-        # eltypes (alpha=Float64 from calculate_stall_angle_list!,
-        # panel.delta=Dual from the shadow). INVISCID never hits this path.
+        # Exercises the mixed-eltype path: calculate_stall_angle_list! calls
+        # calculate_cl with Float64 alpha against Dual-typed panels.
         data_dir = joinpath(dirname(dirname(@__DIR__)), "data", "ram_air_kite")
         body_path = joinpath(tempdir(), "ram_air_kite_body.obj")
         foil_path = joinpath(tempdir(), "ram_air_kite_foil.dat")

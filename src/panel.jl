@@ -52,7 +52,6 @@ Represents a panel in a vortex step method simulation. All points and vectors ar
     va::MVector{3, T} = zeros(MVector{3, T})
     corner_points::MMatrix{3, 4, T, 12} = zeros(MMatrix{3, 4, T, 12})
     aero_model::AeroModel = INVISCID
-    # Polar / Breukels coefficients are static lookup-table data — kept Float64
     cl_coeffs::Vector{Float64} = zeros(Float64, 3)
     cd_coeffs::Vector{Float64} = zeros(Float64, 3)
     cm_coeffs::Vector{Float64} = zeros(Float64, 3)

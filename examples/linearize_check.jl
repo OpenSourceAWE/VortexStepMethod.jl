@@ -10,9 +10,7 @@ using VortexStepMethod
 using VortexStepMethod: linearize, unrefined_deform!, reinit!
 
 # Sweep each linearize input around the operating point and overlay the
-# linear predictions from both FiniteDiff and ForwardDiff Jacobians. If
-# the two tangents (red and green dashed) match the sweep slope at δ=0,
-# both Jacobian columns agree with the local sensitivity.
+# FiniteDiff and ForwardDiff tangents on the sweep curve.
 
 n_unrefined = 4
 
@@ -24,10 +22,6 @@ wing = ObjWing(
 )
 body_aero = BodyAerodynamics([wing])
 
-# LOOP is required for AutoForwardDiff (NONLIN uses LAPACK on Float64
-# and is not Dual-compatible). `use_gamma_prev=false` keeps the FD path
-# from warm-starting between perturbations, which would bias the FD
-# Jacobian relative to the AD result.
 solver = Solver(body_aero;
     aerodynamic_model_type=VSM,
     is_with_artificial_damping=false,
@@ -108,7 +102,6 @@ input_scales = [
 n_sweep      = 11
 sweep_frac   = range(-1.0, 1.0; length=n_sweep)
 
-# results[col][si, ri]
 results_sw = [zeros(n_sweep, n_outputs) for _ in 1:n_inputs]
 
 last_theta = fill(NaN, n_unrefined)
@@ -141,7 +134,6 @@ for ci in 1:n_inputs
     end
 end
 
-# Restore baseline
 solve_at!(y0)
 
 fig = Figure(size=(180 * n_inputs + 80, 90 * n_outputs + 100))
@@ -183,10 +175,7 @@ rowgap!(fig.layout, 4)
 
 display(fig)
 
-# Worst-case mismatch between sweep slope at δ=0 and Jacobian columns,
-# reported separately for FD and ForwardDiff. Skip near-zero Jacobian
-# entries — relative error is dominated by sweep rounding there and is
-# not informative.
+# Skip near-zero entries — relative error there is sweep rounding noise.
 function worst_jac_vs_sweep(jac, label)
     sig_threshold = 1e-3 * maximum(abs, jac)
     max_rel = 0.0
