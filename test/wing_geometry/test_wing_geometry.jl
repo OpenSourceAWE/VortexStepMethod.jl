@@ -20,6 +20,15 @@ function ==(a::Section, b::Section)
 end
 
 @testset "Wing Geometry Tests" begin
+    @testset "Section default constructor" begin
+        s = Section()
+        @test s isa Section{Float64}
+        @test s.LE_point == zeros(3)
+        @test s.TE_point == zeros(3)
+        @test s.aero_model === INVISCID
+        @test isnothing(s.aero_data)
+    end
+
     @testset "Wing initialization" begin
         example_wing = Wing(10; spanwise_distribution=LINEAR)
         @test example_wing.n_panels == 10

@@ -1,3 +1,14 @@
+## VortexStepMethod v3.3.0 2026-05-05
+
+### Added
+- `ForwardDiff` compatibility, used by default in `linearize` (#232)
+- `backend` keyword argument for `linearize`
+- example `linearize_check.jl` comparing FiniteDiff and ForwardDiff tangents
+
+### Changed
+- core structs are parameterized on the scalar type `T` so dual numbers can
+  propagate through them; public constructors are unchanged
+
 ## VortexStepMethod v3.2.0 2026-05-02
 
 ### Added

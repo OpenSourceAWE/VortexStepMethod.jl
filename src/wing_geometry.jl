@@ -30,6 +30,8 @@ and aerodynamic model.
 # Returns
 - `Section`: A new section with the specified parameters and no aerodynamic data
 """
+Section() = Section{Float64}()
+
 function Section(LE_point, TE_point, aero_model)
     return Section{Float64}(MVector{3,Float64}(LE_point), MVector{3,Float64}(TE_point), aero_model, nothing)
 end
