@@ -246,7 +246,7 @@ This method enables deformation support for OBJ wings by:
 # Effects
 Updates wing.refined_sections and wing.non_deformed_sections in-place.
 """
-function refine_obj_wing!(wing::AbstractWing; recompute_mapping=true)
+function refine_obj_wing!(wing::AbstractWing{T}; recompute_mapping=true) where {T}
     n_unrefined = wing.n_unrefined_sections
     n_refined = wing.n_panels + 1
 
@@ -274,7 +274,7 @@ function refine_obj_wing!(wing::AbstractWing; recompute_mapping=true)
     # 4. Create refined sections with interpolated deltas
     refined_gammas = range(-wing.gamma_tip, wing.gamma_tip, n_refined)
     if isempty(wing.refined_sections)
-        wing.refined_sections = [Section() for _ in 1:n_refined]
+        wing.refined_sections = [Section{T}() for _ in 1:n_refined]
     end
 
     for (idx, gamma) in enumerate(refined_gammas)
@@ -568,7 +568,7 @@ function ObjWing(
         end
 
         # Create unrefined sections (evenly spaced including both tips)
-        sections = Section[]
+        sections = Section{Float64}[]
         aero_data = (collect(alpha_range), collect(delta_range), cl_matrix, cd_matrix, cm_matrix)
         for gamma in range(-gamma_tip, gamma_tip, n_unrefined_sections)
             LE_point = [le_interp[i](gamma) for i in 1:3]
@@ -576,14 +576,18 @@ function ObjWing(
             push!(sections, Section(LE_point, TE_point, POLAR_MATRICES, aero_data))
         end
 
-        panel_props = PanelProperties{n_panels}()
+        panel_props = PanelProperties{n_panels, Float64}()
         cache = [PreallocationTools.LazyBufferCache()]
 
-        wing = Wing(Int16(n_panels), Int16(n_unrefined_sections), spanwise_distribution, panel_props, MVec3(spanwise_direction),
-            sections, Section[], remove_nan, use_prior_polar, 0.0,  # billowing_percentage
+        wing = Wing{n_panels, Float64}(
+            Int16(n_panels), Int16(n_unrefined_sections), spanwise_distribution, panel_props,
+            MVector{3, Float64}(spanwise_direction),
+            sections, Section{Float64}[], remove_nan, use_prior_polar, 0.0,  # billowing_percentage
             Int16[],  # refined_panel_mapping empty
-            Section[], zeros(n_panels), zeros(n_panels),  # non_deformed, theta, delta
-            mass, gamma_tip, inertia_tensor, MVec3(T_cad_body), MMat3(R_cad_body), radius,
+            Section{Float64}[], zeros(Float64, n_panels), zeros(Float64, n_panels),
+            Float64(mass), Float64(gamma_tip), Matrix{Float64}(inertia_tensor),
+            MVector{3, Float64}(T_cad_body), MMatrix{3, 3, Float64, 9}(R_cad_body),
+            Float64(radius),
             le_interp, te_interp, area_interp, cache)
 
         # Auto-refine for backward compatibility

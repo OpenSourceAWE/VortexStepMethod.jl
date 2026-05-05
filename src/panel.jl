@@ -43,14 +43,14 @@ Represents a panel in a vortex step method simulation. All points and vectors ar
         SemiInfiniteFilament()
     ): Panel filaments, see: [BoundFilament](@ref)
 """
-@with_kw mutable struct Panel
-    TE_point_1::MVec3 = zeros(MVec3)
-    LE_point_1::MVec3 = zeros(MVec3)
-    TE_point_2::MVec3 = zeros(MVec3)
-    LE_point_2::MVec3 = zeros(MVec3)
-    chord::Float64 = zero(Float64)
-    va::MVec3 = zeros(MVec3)
-    corner_points::MMatrix{3, 4, Float64, 12} = zeros(MMatrix{3, 4, Float64, 12})
+@with_kw mutable struct Panel{T}
+    TE_point_1::MVector{3, T} = zeros(MVector{3, T})
+    LE_point_1::MVector{3, T} = zeros(MVector{3, T})
+    TE_point_2::MVector{3, T} = zeros(MVector{3, T})
+    LE_point_2::MVector{3, T} = zeros(MVector{3, T})
+    chord::T = zero(T)
+    va::MVector{3, T} = zeros(MVector{3, T})
+    corner_points::MMatrix{3, 4, T, 12} = zeros(MMatrix{3, 4, T, 12})
     aero_model::AeroModel = INVISCID
     cl_coeffs::Vector{Float64} = zeros(Float64, 3)
     cd_coeffs::Vector{Float64} = zeros(Float64, 3)
@@ -58,26 +58,26 @@ Represents a panel in a vortex step method simulation. All points and vectors ar
     cl_interp::Union{Nothing, I1, I2, I3, I4} = nothing
     cd_interp::Union{Nothing, I1, I2, I3, I4, I5, I6} = nothing
     cm_interp::Union{Nothing, I1, I2, I3, I4} = nothing
-    aero_center::MVec3 = zeros(MVec3)
-    control_point::MVec3 = zeros(MVec3)
-    bound_point_1::MVec3 = zeros(MVec3)
-    bound_point_2::MVec3 = zeros(MVec3)
-    x_airf::MVec3 = zeros(MVec3)
-    y_airf::MVec3 = zeros(MVec3)
-    z_airf::MVec3 = zeros(MVec3)
-    width::Float64 = zero(Float64)
-    filaments::Tuple{BoundFilament,BoundFilament,BoundFilament,SemiInfiniteFilament,SemiInfiniteFilament} = (
-        BoundFilament(),
-        BoundFilament(),
-        BoundFilament(),
-        SemiInfiniteFilament(),
-        SemiInfiniteFilament()
+    aero_center::MVector{3, T} = zeros(MVector{3, T})
+    control_point::MVector{3, T} = zeros(MVector{3, T})
+    bound_point_1::MVector{3, T} = zeros(MVector{3, T})
+    bound_point_2::MVector{3, T} = zeros(MVector{3, T})
+    x_airf::MVector{3, T} = zeros(MVector{3, T})
+    y_airf::MVector{3, T} = zeros(MVector{3, T})
+    z_airf::MVector{3, T} = zeros(MVector{3, T})
+    width::T = zero(T)
+    filaments::Tuple{BoundFilament{T},BoundFilament{T},BoundFilament{T},SemiInfiniteFilament{T},SemiInfiniteFilament{T}} = (
+        BoundFilament{T}(),
+        BoundFilament{T}(),
+        BoundFilament{T}(),
+        SemiInfiniteFilament{T}(),
+        SemiInfiniteFilament{T}()
     )
-    delta::Float64 = 0.0
+    delta::T = zero(T)
 end
 
 function init_pos!(
-    panel::Panel,
+    panel::Panel{T},
     section_1::Section,
     section_2::Section,
     aero_center,
@@ -88,8 +88,8 @@ function init_pos!(
     y_airf,
     z_airf,
     delta,
-    vec::MVec3
-)
+    vec::AbstractVector{T}
+) where T
     # Initialize basic geometry
     panel.TE_point_1 .= section_1.TE_point
     panel.LE_point_1 .= section_1.LE_point
@@ -262,9 +262,9 @@ Calculate the relative angle of attack and relative velocity of the panel.
   - relative_velocity: Relative velocity vector of the panel
 """
 function calculate_relative_alpha_and_relative_velocity(
-    panel::Panel, 
-    induced_velocity::Vector{Float64}
-)
+    panel::Panel{T},
+    induced_velocity::AbstractVector{T}
+) where T
     # Calculate relative velocity and angle of attack
     # Constants throughout iterations: panel.va, panel.x_airf, panel.y_airf
     relative_velocity = panel.va .+ induced_velocity
@@ -370,24 +370,25 @@ Calculate lift coefficient for given angle of attack.
 # Returns
 - `Float64`: Lift coefficient (Cl)
 """
-function calculate_cl(panel::Panel, alpha::Float64)::Float64
-    isnan(alpha) && return NaN
+function calculate_cl(panel::Panel{Tp}, alpha::Ta) where {Tp, Ta}
+    R = promote_type(Tp, Ta)
+    isnan(alpha) && return R(NaN)
     if panel.aero_model == LEI_AIRFOIL_BREUKELS
         cl = evalpoly(rad2deg(alpha), reverse(panel.cl_coeffs))
         if abs(alpha) > (π/9)
             cl = 2 * cos(alpha) * sin(alpha)^2
         end
-        return cl
+        return R(cl)
     elseif panel.aero_model == INVISCID
-        return 2π * alpha
+        return R(2π * alpha)
     elseif panel.aero_model == POLAR_VECTORS
         interp = panel.cl_interp
         interp isa Union{I1, I2} || throw(ArgumentError("cl_interp is not initialized for POLAR_VECTORS."))
-        return (interp::Union{I1, I2})(alpha)::Float64
+        return R((interp::Union{I1, I2})(alpha))
     elseif panel.aero_model == POLAR_MATRICES
         interp = panel.cl_interp
         interp isa Union{I3, I4} || throw(ArgumentError("cl_interp is not initialized for POLAR_MATRICES."))
-        return (interp::Union{I3, I4})(alpha, panel.delta)::Float64
+        return R((interp::Union{I3, I4})(alpha, panel.delta))
     else
         throw(ArgumentError("Unsupported aero model: $(panel.aero_model)"))
     end
@@ -399,33 +400,34 @@ end
 
 Calculate drag and moment coefficients for given angle of attack.
 """
-function calculate_cd_cm(panel::Panel, alpha::Float64)
-    isnan(alpha) && return NaN, NaN
+function calculate_cd_cm(panel::Panel{Tp}, alpha::Ta) where {Tp, Ta}
+    R = promote_type(Tp, Ta)
+    isnan(alpha) && return R(NaN), R(NaN)
     if panel.aero_model == LEI_AIRFOIL_BREUKELS
         cd = evalpoly(rad2deg(alpha), reverse(panel.cd_coeffs))
         cm = evalpoly(rad2deg(alpha), reverse(panel.cm_coeffs))
         if abs(alpha) > (π/9)  # Outside ±20 degrees
             cd = 2 * sin(alpha)^3
         end
-        return cd, cm
+        return R(cd), R(cm)
     elseif panel.aero_model == POLAR_VECTORS
         cd_interp = panel.cd_interp
         cm_interp = panel.cm_interp
         cd_interp isa Union{I1, I2, I5} || throw(ArgumentError("cd_interp is not initialized for POLAR_VECTORS."))
         cm_interp isa Union{I1, I2} || throw(ArgumentError("cm_interp is not initialized for POLAR_VECTORS."))
-        return (cd_interp::Union{I1, I2, I5})(alpha)::Float64,
-               (cm_interp::Union{I1, I2})(alpha)::Float64
+        return R((cd_interp::Union{I1, I2, I5})(alpha)),
+               R((cm_interp::Union{I1, I2})(alpha))
     elseif panel.aero_model == POLAR_MATRICES
         cd_interp = panel.cd_interp
         cm_interp = panel.cm_interp
         cd_interp isa Union{I3, I4, I6} || throw(ArgumentError("cd_interp is not initialized for POLAR_MATRICES."))
         cm_interp isa Union{I3, I4} || throw(ArgumentError("cm_interp is not initialized for POLAR_MATRICES."))
-        return (cd_interp::Union{I3, I4, I6})(alpha, panel.delta)::Float64,
-               (cm_interp::Union{I3, I4})(alpha, panel.delta)::Float64
+        return R((cd_interp::Union{I3, I4, I6})(alpha, panel.delta)),
+               R((cm_interp::Union{I3, I4})(alpha, panel.delta))
     elseif !(panel.aero_model == INVISCID)
         throw(ArgumentError("Unsupported aero model: $(panel.aero_model)"))
     end
-    return 0.0, 0.0
+    return zero(R), zero(R)
 end
 
 """
@@ -498,17 +500,17 @@ Calculate the velocity induced by a vortex ring at a control point.
 - nothing
 """
 @inline function calculate_velocity_induced_single_ring_semiinfinite!(
-    velind::MVec3,
-    tempvel::MVec3,
+    velind::AbstractVector{T},
+    tempvel::AbstractVector{T},
     filaments,
-    evaluation_point::MVec3,
+    evaluation_point::AbstractVector{T},
     evaluation_point_on_bound::Bool,
-    va_norm::Float64,
-    va_unit::MVec3,
-    gamma::Float64,
-    core_radius_fraction::Float64,
-    work_vectors::NTuple{10, MVec3}
-)
+    va_norm::T,
+    va_unit::AbstractVector{T},
+    gamma::T,
+    core_radius_fraction::Real,
+    work_vectors
+) where T
     velind .= 0.0
 
     # Filament 1: bound filament (BoundFilament — compiler knows type)

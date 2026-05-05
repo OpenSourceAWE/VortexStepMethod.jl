@@ -1,5 +1,6 @@
 using VortexStepMethod
 using VortexStepMethod: calculate_cl, calculate_cd_cm, calculate_projected_area, calculate_AIC_matrices!, reinit!
+using DifferentiationInterface
 using LinearAlgebra
 using Test
 using Logging
@@ -74,7 +75,7 @@ end
         solver, body_aero, base_inputs;
         theta_idxs=1:4, va_idxs=5:7, omega_idxs=8:10, delta_idxs=11:14,
         moment_frac=0.1,
-        fd_absstep=fd_step, fd_relstep=fd_step,
+        backend=AutoFiniteDiff(absstep=fd_step, relstep=fd_step),
     )
     @test lin_converged
 

@@ -34,7 +34,7 @@ function create_panel(section1::Section, section2::Section)
     y_airf = bound_2 .- bound_1
     y_airf = y_airf ./ norm(y_airf)
 
-    panel = Panel()
+    panel = Panel{Float64}()
     reinit!(
         panel,
         section1,
