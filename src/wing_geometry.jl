@@ -17,7 +17,7 @@ Represents a wing section with leading edge, trailing edge, and aerodynamic prop
 end
 
 """
-    Section(LE_point::PosVector, TE_point::PosVector, aero_model)
+    Section(LE_point, TE_point, aero_model)
 
 Create a new wing section with the specified leading edge point, trailing edge point,
 and aerodynamic model.
