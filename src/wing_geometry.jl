@@ -1,20 +1,26 @@
 """
-    @with_kw mutable struct Section
+    mutable struct Section{T}
 
 Represents a wing section with leading edge, trailing edge, and aerodynamic properties.
 
 # Fields
-- `LE_point::MVec3` = zeros(MVec3): Leading edge point coordinates
-- `TE_point::MVec3` = zeros(MVec3): Trailing edge point coordinates
-- `aero_model`::AeroModel = INVISCID: [AeroModel](@ref)
-- `aero_data`::AeroData = nothing: See: [AeroData](@ref)
+- `LE_point::MVector{3, T}`: Leading edge point coordinates
+- `TE_point::MVector{3, T}`: Trailing edge point coordinates
+- `aero_model::AeroModel`: [AeroModel](@ref)
+- `aero_data::AeroData`: See: [AeroData](@ref)
 """
-@with_kw mutable struct Section{T}
-    LE_point::MVector{3, T} = zeros(MVector{3, T})
-    TE_point::MVector{3, T} = zeros(MVector{3, T})
-    aero_model::AeroModel = INVISCID
-    aero_data::AeroData = nothing
+mutable struct Section{T}
+    LE_point::MVector{3, T}
+    TE_point::MVector{3, T}
+    aero_model::AeroModel
+    aero_data::AeroData
 end
+
+Section{T}(; LE_point=zeros(MVector{3, T}), TE_point=zeros(MVector{3, T}),
+           aero_model=INVISCID, aero_data=nothing) where {T} =
+    Section{T}(LE_point, TE_point, aero_model, aero_data)
+
+Section() = Section{Float64}()
 
 """
     Section(LE_point, TE_point, aero_model)
@@ -30,8 +36,6 @@ and aerodynamic model.
 # Returns
 - `Section`: A new section with the specified parameters and no aerodynamic data
 """
-Section() = Section{Float64}()
-
 function Section(LE_point, TE_point, aero_model)
     return Section{Float64}(MVector{3,Float64}(LE_point), MVector{3,Float64}(TE_point), aero_model, nothing)
 end
