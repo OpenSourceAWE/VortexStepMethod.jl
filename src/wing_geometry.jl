@@ -9,9 +9,9 @@ Represents a wing section with leading edge, trailing edge, and aerodynamic prop
 - `aero_model`::AeroModel = INVISCID: [AeroModel](@ref)
 - `aero_data`::AeroData = nothing: See: [AeroData](@ref)
 """
-@with_kw mutable struct Section
-    LE_point::MVec3 = zeros(MVec3)
-    TE_point::MVec3 = zeros(MVec3)
+@with_kw mutable struct Section{T}
+    LE_point::MVector{3, T} = zeros(MVector{3, T})
+    TE_point::MVector{3, T} = zeros(MVector{3, T})
     aero_model::AeroModel = INVISCID
     aero_data::AeroData = nothing
 end
@@ -19,19 +19,23 @@ end
 """
     Section(LE_point::PosVector, TE_point::PosVector, aero_model)
 
-Create a new wing section with the specified leading edge point, trailing edge point, 
+Create a new wing section with the specified leading edge point, trailing edge point,
 and aerodynamic model.
 
 # Arguments
 - `LE_point::PosVector`: Leading edge point coordinates
-- `TE_point::PosVector`: Trailing edge point coordinates  
+- `TE_point::PosVector`: Trailing edge point coordinates
 - `aero_model::AeroModel`: Aerodynamic model type (e.g., INVISCID, POLAR_VECTORS)
 
 # Returns
 - `Section`: A new section with the specified parameters and no aerodynamic data
 """
 function Section(LE_point, TE_point, aero_model)
-    return Section(LE_point, TE_point, aero_model, nothing)
+    return Section{Float64}(MVector{3,Float64}(LE_point), MVector{3,Float64}(TE_point), aero_model, nothing)
+end
+
+function Section(LE_point, TE_point, aero_model, aero_data)
+    return Section{Float64}(MVector{3,Float64}(LE_point), MVector{3,Float64}(TE_point), aero_model, aero_data)
 end
 
 """
@@ -57,7 +61,7 @@ function reinit!(section::Section, LE_point, TE_point, aero_model=nothing, aero_
     nothing
 end
 
-function reinit!(refined_section::Section, section::Section)
+function reinit!(refined_section::Section{Tr}, section::Section) where {Tr}
     reinit!(
         refined_section,
         section.LE_point,
@@ -81,15 +85,15 @@ Structure to hold calculated panel properties.
 - `y_airf`::Matrix{Float64}: Vector of unit vectors in spanwise direction
 - `z_airf`::Matrix{Float64}: Vector of unit vectors pointing up (cross of x_airf and y_airf)
 """
-@with_kw mutable struct PanelProperties{P}
-    aero_centers::Matrix{Float64} = zeros(P, 3)
-    control_points::Matrix{Float64} = zeros(P, 3)
-    bound_points_1::Matrix{Float64} = zeros(P, 3)
-    bound_points_2::Matrix{Float64} = zeros(P, 3)
-    x_airf::Matrix{Float64} = zeros(P, 3)
-    y_airf::Matrix{Float64} = zeros(P, 3)
-    z_airf::Matrix{Float64} = zeros(P, 3)
-    coords::Matrix{Float64} = zeros(2(P+1), 3)
+@with_kw mutable struct PanelProperties{P, T}
+    aero_centers::Matrix{T} = zeros(T, P, 3)
+    control_points::Matrix{T} = zeros(T, P, 3)
+    bound_points_1::Matrix{T} = zeros(T, P, 3)
+    bound_points_2::Matrix{T} = zeros(T, P, 3)
+    x_airf::Matrix{T} = zeros(T, P, 3)
+    y_airf::Matrix{T} = zeros(T, P, 3)
+    z_airf::Matrix{T} = zeros(T, P, 3)
+    coords::Matrix{T} = zeros(T, 2(P+1), 3)
 end
 
 """
@@ -104,7 +108,7 @@ Update geometric properties for each panel.
 # Returns:
 `nothing`, updates the [PanelProperties](@ref) in-place
 """
-function update_panel_properties!(panel_props::PanelProperties, section_list::Vector{Section}, n_panels)
+function update_panel_properties!(panel_props::PanelProperties{P,T}, section_list::AbstractVector{<:Section}, n_panels) where {P,T}
     coords = panel_props.coords
     aero_centers = panel_props.aero_centers
     control_points = panel_props.control_points
@@ -113,8 +117,8 @@ function update_panel_properties!(panel_props::PanelProperties, section_list::Ve
     x_airf = panel_props.x_airf
     y_airf = panel_props.y_airf
     z_airf = panel_props.z_airf
-    vec = zeros(MVec3)
-    vec2 = zeros(MVec3)
+    vec = zeros(MVector{3, T})
+    vec2 = zeros(MVector{3, T})
     @debug "Shape of coordinates: $(size(coords))"
     
     for i in 1:n_panels
@@ -198,13 +202,13 @@ Represents a wing composed of multiple sections with aerodynamic properties.
 - `n_unrefined_sections::Int16`: Number of unrefined sections (sections before mesh refinement)
 - `spanwise_distribution`::PanelDistribution: [PanelDistribution](@ref)
 - `spanwise_direction::MVec3`: Wing span direction vector
-- `sections::Vector{Section}`: Vector of wing sections, see: [Section](@ref)
-- `refined_sections::Vector{Section}`: Vector of refined wing sections, see: [Section](@ref)
+- `sections::AbstractVector{<:Section}`: Vector of wing sections, see: [Section](@ref)
+- `refined_sections::AbstractVector{<:Section}`: Vector of refined wing sections, see: [Section](@ref)
 - `remove_nan::Bool`: Wether to remove the NaNs from interpolations or not
 - `use_prior_polar::Bool`: Keep previously-initialized section/panel polar data when refining geometry updates
 
 # Deformation Fields (optional, for deformable wings)
-- `non_deformed_sections::Vector{Section}`: Original undeformed sections
+- `non_deformed_sections::AbstractVector{<:Section}`: Original undeformed sections
 - `theta_dist::Vector{Float64}`: Panel twist angle distribution
 - `delta_dist::Vector{Float64}`: Trailing edge deflection distribution
 
@@ -221,14 +225,14 @@ Represents a wing composed of multiple sections with aerodynamic properties.
 - `cache::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}}`: Preallocated buffers
 
 """
-mutable struct Wing{P} <: AbstractWing
+mutable struct Wing{P, T} <: AbstractWing{T}
     n_panels::Int16
     n_unrefined_sections::Int16
     spanwise_distribution::PanelDistribution
-    panel_props::PanelProperties{P}
-    spanwise_direction::MVec3
-    unrefined_sections::Vector{Section}
-    refined_sections::Vector{Section}
+    panel_props::PanelProperties{P, T}
+    spanwise_direction::MVector{3, T}
+    unrefined_sections::Vector{Section{T}}
+    refined_sections::Vector{Section{T}}
     remove_nan::Bool
     use_prior_polar::Bool
     billowing_percentage::Float64  # TE billow as percentage of arc length (0=flat)
@@ -237,87 +241,23 @@ mutable struct Wing{P} <: AbstractWing
     refined_panel_mapping::Vector{Int16}  # Maps each refined panel index to unrefined section index (1 to n_unrefined_sections)
 
     # Deformation fields
-    non_deformed_sections::Vector{Section}
-    theta_dist::Vector{Float64}  # Length: n_panels (panel twist angles)
-    delta_dist::Vector{Float64}  # Length: n_panels (panel TE deflection angles)
+    non_deformed_sections::Vector{Section{T}}
+    theta_dist::Vector{T}  # Length: n_panels (panel twist angles)
+    delta_dist::Vector{T}  # Length: n_panels (panel TE deflection angles)
 
     # Physical properties (OBJ-based wings)
-    mass::Float64
-    gamma_tip::Float64
-    inertia_tensor::Matrix{Float64}
-    T_cad_body::MVec3
-    R_cad_body::MMat3
-    radius::Float64
+    mass::T
+    gamma_tip::T
+    inertia_tensor::Matrix{T}
+    T_cad_body::MVector{3, T}
+    R_cad_body::MMatrix{3, 3, T, 9}
+    radius::T
     le_interp::Union{Nothing, NTuple{3, Interpolations.Extrapolation}}
     te_interp::Union{Nothing, NTuple{3, Interpolations.Extrapolation}}
     area_interp::Union{Nothing, Interpolations.Extrapolation}
     cache::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}}
 end
 
-# Compatibility constructor for full positional initialization with integer panel counts.
-# This keeps call sites that pass Int values working after n_panels/n_unrefined_sections
-# were tightened to Int16 fields.
-function Wing(
-        n_panels::Integer,
-        n_unrefined_sections::Integer,
-        spanwise_distribution::PanelDistribution,
-        panel_props::PanelProperties{P},
-        spanwise_direction::MVec3,
-        unrefined_sections::Vector{Section},
-        refined_sections::Vector{Section},
-        remove_nan::Bool,
-        use_prior_polar::Bool,
-        billowing_percentage::Float64,
-        refined_panel_mapping::Vector{Int16},
-        non_deformed_sections::Vector{Section},
-        theta_dist::Vector{Float64},
-        delta_dist::Vector{Float64},
-        mass::Float64,
-        gamma_tip::Float64,
-        inertia_tensor::Matrix{Float64},
-        T_cad_body::MVec3,
-        R_cad_body::MMat3,
-        radius::Float64,
-        le_interp::Union{Nothing, NTuple{3, Interpolations.Extrapolation}},
-        te_interp::Union{Nothing, NTuple{3, Interpolations.Extrapolation}},
-        area_interp::Union{Nothing, Interpolations.Extrapolation},
-        cache::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}}
-    ) where {P}
-
-    n_panels_i16 = Int16(n_panels)
-    n_unrefined_sections_i16 = Int16(n_unrefined_sections)
-
-    Int(n_panels_i16) == P || throw(ArgumentError(
-        "n_panels ($n_panels) must match PanelProperties{$P}"
-    ))
-
-    return Wing{P}(
-        n_panels_i16,
-        n_unrefined_sections_i16,
-        spanwise_distribution,
-        panel_props,
-        spanwise_direction,
-        unrefined_sections,
-        refined_sections,
-        remove_nan,
-        use_prior_polar,
-        billowing_percentage,
-        refined_panel_mapping,
-        non_deformed_sections,
-        theta_dist,
-        delta_dist,
-        mass,
-        gamma_tip,
-        inertia_tensor,
-        T_cad_body,
-        R_cad_body,
-        radius,
-        le_interp,
-        te_interp,
-        area_interp,
-        cache
-    )
-end
 
 """
     Wing(n_panels::Int;
@@ -353,17 +293,17 @@ function Wing(n_panels::Int;
     n_unrefined_sections_value::Int16 =
         isnothing(n_unrefined_sections) ? Int16(0) : Int16(n_unrefined_sections)
 
-    panel_props::PanelProperties{n_panels} = PanelProperties{n_panels}()
-    spanwise_direction_m::MVec3 = MVec3(spanwise_direction)
+    panel_props::PanelProperties{n_panels, Float64} = PanelProperties{n_panels, Float64}()
+    spanwise_direction_m::MVector{3, Float64} = MVector{3, Float64}(spanwise_direction)
 
     # Initialize with default/empty values for optional fields
-    Wing{n_panels}(
+    Wing{n_panels, Float64}(
         Int16(n_panels), n_unrefined_sections_value, spanwise_distribution, panel_props, spanwise_direction_m,
-        Section[], Section[], remove_nan, use_prior_polar, Float64(billowing_percentage),
+        Section{Float64}[], Section{Float64}[], remove_nan, use_prior_polar, Float64(billowing_percentage),
         # Grouping
         Int16[],
         # Deformation fields
-        Section[], zeros(max(0, n_panels)), zeros(max(0, n_panels)),
+        Section{Float64}[], zeros(max(0, n_panels)), zeros(max(0, n_panels)),
         # Physical properties (defaults for non-OBJ wings)
         0.0, 0.0, zeros(0, 0), zeros(MVec3), MMat3(I),
         0.0, nothing, nothing, nothing,
@@ -553,7 +493,7 @@ Converts panel angles (n_panels) to section angles (n_panels+1) by averaging adj
 # Effects
 Updates wing.refined_sections based on wing.non_deformed_sections and stored distributions
 """
-function deform!(wing::Wing; smooth=false, smooth_window=nothing)
+function deform!(wing::Wing{P, T}; smooth=false, smooth_window=nothing) where {P, T}
     !isempty(wing.non_deformed_sections) || return nothing
 
     # Apply smoothing if requested
@@ -573,9 +513,9 @@ function deform!(wing::Wing; smooth=false, smooth_window=nothing)
         smooth_distribution!(wing.delta_dist, smooth_window)
     end
 
-    local_y = zeros(MVec3)
-    chord = zeros(MVec3)
-    normal = zeros(MVec3)
+    local_y = zeros(MVector{3, T})
+    chord = zeros(MVector{3, T})
+    normal = zeros(MVector{3, T})
 
     # Process all refined sections (n_panels + 1)
     # Convert panel angles to section angles by averaging
@@ -674,14 +614,14 @@ Add a new section to the wing.
 - `aero_model`::AeroModel: [AeroModel](@ref)
 - `aero_data`::AeroData: See [AeroData](@ref)  
 """
-function add_section!(wing::Wing, LE_point,
-                     TE_point, aero_model::AeroModel, aero_data::AeroData=nothing)
+function add_section!(wing::Wing{P, T}, LE_point,
+                     TE_point, aero_model::AeroModel, aero_data::AeroData=nothing) where {P, T}
     if aero_model == POLAR_VECTORS && wing.remove_nan
         aero_data = remove_vector_nans(aero_data)
     elseif aero_model == POLAR_MATRICES && wing.remove_nan
         interpolate_polar_matrix_nans!(aero_data)
     end
-    push!(wing.unrefined_sections, Section(LE_point, TE_point, aero_model, aero_data))
+    push!(wing.unrefined_sections, Section{T}(MVector{3,T}(LE_point), MVector{3,T}(TE_point), aero_model, aero_data))
     wing.n_unrefined_sections = Int16(length(wing.unrefined_sections))
     return nothing
 end
@@ -713,13 +653,13 @@ This enables deformation support for all wings (YAML and OBJ).
 Should be called after refined_sections are populated.
 Once populated, non_deformed_sections serves as the undeformed reference geometry.
 """
-function update_non_deformed_sections!(wing::AbstractWing)
+function update_non_deformed_sections!(wing::AbstractWing{T}) where {T}
     n_sections = wing.n_panels + 1
 
     # Populate or update non_deformed_sections
     if isempty(wing.non_deformed_sections)
         # Initial setup
-        wing.non_deformed_sections = [Section() for _ in 1:n_sections]
+        wing.non_deformed_sections = [Section{T}() for _ in 1:n_sections]
         for i in 1:n_sections
             reinit!(wing.non_deformed_sections[i], wing.refined_sections[i])
         end
@@ -829,7 +769,7 @@ body_aero = BodyAerodynamics([wing])
 unrefined_deform!(wing, theta_angles, delta_angles)
 ```
 """
-function refine!(wing::AbstractWing; recompute_mapping=true, sort_sections=true)
+function refine!(wing::AbstractWing{T}; recompute_mapping=true, sort_sections=true) where {T}
     # Validate unrefined_sections exist
     if isempty(wing.unrefined_sections)
         throw(ArgumentError(
@@ -863,7 +803,7 @@ function refine!(wing::AbstractWing; recompute_mapping=true, sort_sections=true)
             update_non_deformed_sections!(wing)
             return nothing
         else
-            wing.refined_sections = Section[Section() for _ in 1:wing.n_panels+1]
+            wing.refined_sections = Section{T}[Section{T}() for _ in 1:wing.n_panels+1]
         end
     end
     
@@ -997,7 +937,7 @@ end
 Interpolate aerodynamic input between two adjacent sections (zero-copy variant).
 """
 function calculate_new_aero_data(
-    sections::Vector{Section},
+    sections::AbstractVector{<:Section},
     section_index::Int,
     left_weight::Float64,
     right_weight::Float64
@@ -1122,7 +1062,7 @@ function refine_mesh_for_linear_cosine_distribution!(
     idx,
     spanwise_distribution::PanelDistribution,
     n_sections::Int,
-    sections::Vector{Section};
+    sections::AbstractVector{<:Section};
     endpoints::Bool=true,
     reuse_aero_data::Bool=false)
 
@@ -1248,16 +1188,16 @@ When `billowing_percentage > 0`, rotates chord vectors around the leading
 edge with a sinusoidal profile to simulate fabric billowing between ribs.
 """
 function refine_mesh_by_splitting_provided_sections!(
-    wing::AbstractWing;
+    wing::AbstractWing{T};
     reuse_aero_data::Bool=false,
     billowing_percentage::Float64=0.0
-)
+) where {T}
     n_sections_provided = length(wing.unrefined_sections)
     n_panels_provided = n_sections_provided - 1
     n_panels_desired = wing.n_panels
-    
+
     @debug "Panel counts" n_panels_provided n_panels_desired n_sections_provided
-    
+
     # Check if refinement is needed
     if n_panels_provided == n_panels_desired
         copy_sections_to_refined!(wing; reuse_aero_data)
@@ -1271,16 +1211,16 @@ function refine_mesh_by_splitting_provided_sections!(
             "($n_panels_provided). Choose: $(n_panels_provided*2), $(n_panels_provided*3), ..."
         ))
     end
-    
+
     # Calculate distribution
     n_new_sections = wing.n_panels + 1 - n_sections_provided
     n_section_pairs = n_sections_provided - 1
     new_sections_per_pair, remaining = divrem(n_new_sections, n_section_pairs)
-    
+
     sections = wing.unrefined_sections
 
     # Pre-allocate a 2-element section buffer for pair refinement
-    section_pair = Section[Section(), Section()]
+    section_pair = Section{T}[Section{T}(), Section{T}()]
 
     # Process each section pair
     idx = 1
@@ -1526,19 +1466,19 @@ Calculate projected wing area onto plane defined by normal vector.
 Returns:
     Float64: Projected area
 """
-function calculate_projected_area(wing::AbstractWing, 
-                                z_plane_vector=[0.0, 0.0, 1.0])
+function calculate_projected_area(wing::AbstractWing{T},
+                                z_plane_vector=[0.0, 0.0, 1.0]) where T
     # Normalize plane normal vector
     z_plane_vector = z_plane_vector ./ norm(z_plane_vector)
 
-    LE_current_proj = zeros(MVec3)
-    TE_current_proj = zeros(MVec3)
-    LE_next_proj = zeros(MVec3)
-    TE_next_proj = zeros(MVec3)
-    
+    LE_current_proj = zeros(MVector{3, T})
+    TE_current_proj = zeros(MVector{3, T})
+    LE_next_proj = zeros(MVector{3, T})
+    TE_next_proj = zeros(MVector{3, T})
+
     # Calculate area by decomposing each projected panel quadrilateral
     # into two triangles: (A, B, C) and (A, C, D).
-    projected_area = 0.0
+    projected_area = zero(T)
     for i in 1:(length(wing.unrefined_sections)-1)
         # Get section points
         LE_current = wing.unrefined_sections[i].LE_point

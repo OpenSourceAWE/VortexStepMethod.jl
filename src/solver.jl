@@ -33,68 +33,68 @@ Struct for storing the solution of the [solve!](@ref) function. Must contain all
 - `alpha_unrefined_dist`::MVector{U, Float64}: Averaged angles of attack for unrefined sections [rad]
 - `solver_status`::SolverStatus: enum, see [SolverStatus](@ref)
 """
-@with_kw mutable struct VSMSolution{P,U}
+@with_kw mutable struct VSMSolution{P, U, T}
     ### private vectors of solve_base!
-    _x_airf_dist::Matrix{Float64} = zeros(P, 3)
-    _y_airf_dist::Matrix{Float64} = zeros(P, 3)
-    _z_airf_dist::Matrix{Float64} = zeros(P, 3)
-    _va_dist::Matrix{Float64} = zeros(P, 3)
-    _chord_dist::Vector{Float64} = zeros(P)
+    _x_airf_dist::Matrix{T} = zeros(T, P, 3)
+    _y_airf_dist::Matrix{T} = zeros(T, P, 3)
+    _z_airf_dist::Matrix{T} = zeros(T, P, 3)
+    _va_dist::Matrix{T} = zeros(T, P, 3)
+    _chord_dist::Vector{T} = zeros(T, P)
     ### end of private vectors
-    width_dist::Vector{Float64} = zeros(P)
-    alpha_dist::Vector{Float64} = zeros(P)
-    alpha_geometric_dist::Vector{Float64} = zeros(P)
-    cl_dist::Vector{Float64} = zeros(P)
-    cd_dist::Vector{Float64} = zeros(P)
-    cm_dist::Vector{Float64} = zeros(P)
-    lift_dist::Vector{Float64} = zeros(P)
-    drag_dist::Vector{Float64} = zeros(P)
-    panel_moment_dist::Vector{Float64} = zeros(P)
-    f_body_3D::Matrix{Float64} = zeros(3, P)
-    m_body_3D::Matrix{Float64} = zeros(3, P)
-    gamma_distribution::Union{Nothing, Vector{Float64}} = nothing
-    force::MVec3 = zeros(MVec3)          
-    moment::MVec3 = zeros(MVec3)       
-    force_coeffs::MVec3 = zeros(MVec3)  
-    moment_coeffs::MVec3 = zeros(MVec3)  
-    center_of_pressure::Union{Nothing, MVec3} = nothing
-    panel_cp_locations::Vector{MVec3} = MVec3[]
-    moment_dist::MVector{P, Float64} = zeros(P)
-    moment_coeff_dist::MVector{P, Float64} = zeros(P)
-    moment_unrefined_dist::MVector{U, Float64} = zeros(U)
-    cl_unrefined_dist::MVector{U, Float64} = zeros(U)
-    cd_unrefined_dist::MVector{U, Float64} = zeros(U)
-    cm_unrefined_dist::MVector{U, Float64} = zeros(U)
-    alpha_unrefined_dist::MVector{U, Float64} = zeros(U)
-    x_airf_unrefined_dist::Vector{MVec3} = [MVec3(0,0,0) for _ in 1:U]
-    y_airf_unrefined_dist::Vector{MVec3} = [MVec3(0,0,0) for _ in 1:U]
-    z_airf_unrefined_dist::Vector{MVec3} = [MVec3(0,0,0) for _ in 1:U]
-    va_unrefined_dist::Vector{MVec3} = [MVec3(0,0,0) for _ in 1:U]
-    chord_unrefined_dist::MVector{U, Float64} = zeros(U)
-    width_unrefined_dist::MVector{U, Float64} = zeros(U)
+    width_dist::Vector{T} = zeros(T, P)
+    alpha_dist::Vector{T} = zeros(T, P)
+    alpha_geometric_dist::Vector{T} = zeros(T, P)
+    cl_dist::Vector{T} = zeros(T, P)
+    cd_dist::Vector{T} = zeros(T, P)
+    cm_dist::Vector{T} = zeros(T, P)
+    lift_dist::Vector{T} = zeros(T, P)
+    drag_dist::Vector{T} = zeros(T, P)
+    panel_moment_dist::Vector{T} = zeros(T, P)
+    f_body_3D::Matrix{T} = zeros(T, 3, P)
+    m_body_3D::Matrix{T} = zeros(T, 3, P)
+    gamma_distribution::Union{Nothing, Vector{T}} = nothing
+    force::MVector{3, T} = zeros(MVector{3, T})
+    moment::MVector{3, T} = zeros(MVector{3, T})
+    force_coeffs::MVector{3, T} = zeros(MVector{3, T})
+    moment_coeffs::MVector{3, T} = zeros(MVector{3, T})
+    center_of_pressure::Union{Nothing, MVector{3, T}} = nothing
+    panel_cp_locations::Vector{MVector{3, T}} = MVector{3, T}[]
+    moment_dist::MVector{P, T} = zeros(MVector{P, T})
+    moment_coeff_dist::MVector{P, T} = zeros(MVector{P, T})
+    moment_unrefined_dist::MVector{U, T} = zeros(MVector{U, T})
+    cl_unrefined_dist::MVector{U, T} = zeros(MVector{U, T})
+    cd_unrefined_dist::MVector{U, T} = zeros(MVector{U, T})
+    cm_unrefined_dist::MVector{U, T} = zeros(MVector{U, T})
+    alpha_unrefined_dist::MVector{U, T} = zeros(MVector{U, T})
+    x_airf_unrefined_dist::Vector{MVector{3, T}} = [zeros(MVector{3, T}) for _ in 1:U]
+    y_airf_unrefined_dist::Vector{MVector{3, T}} = [zeros(MVector{3, T}) for _ in 1:U]
+    z_airf_unrefined_dist::Vector{MVector{3, T}} = [zeros(MVector{3, T}) for _ in 1:U]
+    va_unrefined_dist::Vector{MVector{3, T}} = [zeros(MVector{3, T}) for _ in 1:U]
+    chord_unrefined_dist::MVector{U, T} = zeros(MVector{U, T})
+    width_unrefined_dist::MVector{U, T} = zeros(MVector{U, T})
     solver_status::SolverStatus = FAILURE
 end
 
 # Output of the function gamma_loop!
-@with_kw mutable struct LoopResult{P}
-    converged::Bool              = false
-    gamma_new::MVector{P, Float64}   = zeros(P)
-    alpha_dist::MVector{P, Float64} = zeros(P) # TODO: Is this different from BodyAerodynamics.alpha_dist ?
-    v_a_dist::MVector{P, Float64}   = zeros(P)
+@with_kw mutable struct LoopResult{P, T}
+    converged::Bool                  = false
+    gamma_new::MVector{P, T}         = zeros(MVector{P, T})
+    alpha_dist::MVector{P, T}        = zeros(MVector{P, T})
+    v_a_dist::MVector{P, T}          = zeros(MVector{P, T})
 end
 
-@with_kw struct BaseResult{P}
-    va_norm_dist::MVector{P, Float64} = zeros(P)
-    va_unit_dist::Matrix{Float64} = zeros(P, 3)
+@with_kw struct BaseResult{P, T}
+    va_norm_dist::MVector{P, T} = zeros(MVector{P, T})
+    va_unit_dist::Matrix{T} = zeros(T, P, 3)
 end
 
-@inline function check_reference_point(reference_point)
+@inline function check_reference_point(reference_point, ::Type{T}=Float64) where {T}
     msg = "reference_point must be a list/array with 3 numbers."
     reference_point isa AbstractVector || throw(ArgumentError(msg))
     length(reference_point) == 3 || throw(ArgumentError(msg))
     all(x -> x isa Number, reference_point) || throw(ArgumentError(msg))
     try
-        return MVec3(Float64(reference_point[1]), Float64(reference_point[2]), Float64(reference_point[3]))
+        return MVector{3, T}(reference_point[1], reference_point[2], reference_point[3])
     catch
         throw(ArgumentError(msg))
     end
@@ -130,53 +130,52 @@ Main solver structure for the Vortex Step Method.See also: [solve](@ref)
 ## Solution
 sol::VSMSolution = VSMSolution(): The result of calling [solve!](@ref) 
 """
-@with_kw mutable struct Solver{P,U}
+@with_kw mutable struct Solver{P, U, T}
     # General settings
     solver_type::SolverType = LOOP
     aerodynamic_model_type::Model = VSM
-    density::Float64 = 1.225
+    density::T = T(1.225)
     max_iterations::Int64 = 1500
-    rtol::Float64 = 1e-5
-    tol_reference_error::Float64 = 0.001
-    relaxation_factor::Float64 = 0.03
+    rtol::T = T(1e-5)
+    tol_reference_error::T = T(0.001)
+    relaxation_factor::T = T(0.03)
 
     # Nonlin solver fields
-    atol::Float64 = 1e-5
-    nonlin_jac::Matrix{Float64} = zeros(P, P)
-    nonlin_residual::MVector{P, Float64} = zeros(P)
-    nonlin_residual_perturbed::MVector{P, Float64} = zeros(P)
-    nonlin_gamma_perturbed::MVector{P, Float64} = zeros(P)
+    atol::T = T(1e-5)
+    nonlin_jac::Matrix{T} = zeros(T, P, P)
+    nonlin_residual::MVector{P, T} = zeros(MVector{P, T})
+    nonlin_residual_perturbed::MVector{P, T} = zeros(MVector{P, T})
+    nonlin_gamma_perturbed::MVector{P, T} = zeros(MVector{P, T})
     nonlin_ipiv::Vector{LinearAlgebra.BlasInt} = zeros(LinearAlgebra.BlasInt, P)
-    
+
     # Damping settings
     is_with_artificial_damping::Bool = false
     artificial_damping::NamedTuple{(:k2, :k4), Tuple{Float64, Float64}} =(k2=0.1, k4=0.0)
-    
+
     # Additional settings
     type_initial_gamma_distribution::InitialGammaDistribution = ZEROS
     use_gamma_prev::Bool = true
-    core_radius_fraction::Float64 = 0.05
-    mu::Float64 = 1.81e-5
+    core_radius_fraction::T = T(0.05)
+    mu::T = T(1.81e-5)
     is_only_f_and_gamma_output::Bool = false
     correct_aoa::Bool = false
-    reference_point::MVec3 = zeros(MVec3)
+    reference_point::MVector{3, T} = zeros(MVector{3, T})
 
     # Intermediate results
-    lr::LoopResult{P} = LoopResult{P}()
-    br::BaseResult{P} = BaseResult{P}()
+    lr::LoopResult{P, T} = LoopResult{P, T}()
+    br::BaseResult{P, T} = BaseResult{P, T}()
     cache::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}} = [LazyBufferCache() for _ in 1:11]
     cache_base::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}}  = [LazyBufferCache()]
     cache_lin::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}} = [LazyBufferCache() for _ in 1:4]
-    
+
     # Solution
-    sol::VSMSolution{P,U} = VSMSolution{P,U}()
+    sol::VSMSolution{P, U, T} = VSMSolution{P, U, T}()
 end
 
-function Solver(body_aero; reference_point=[0.0, 0.0, 0.0], kwargs...)
-    P = length(body_aero.panels)
+function Solver(body_aero::BodyAerodynamics{P, W, T}; reference_point=[0.0, 0.0, 0.0], kwargs...) where {P, W, T}
     U = sum([wing.n_unrefined_sections for wing in body_aero.wings])
-    reference_point_checked = check_reference_point(reference_point)
-    return Solver{P,U}(; reference_point=reference_point_checked, kwargs...)
+    reference_point_checked = check_reference_point(reference_point, T)
+    return Solver{P, U, T}(; reference_point=reference_point_checked, kwargs...)
 end
 
 function Solver(body_aero, settings::VSMSettings)
@@ -224,8 +223,8 @@ a dictionary.
 # Returns
 The solution of type [VSMSolution](@ref)
 """
-function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=solver.sol.gamma_distribution; 
-        log=false, reference_point=solver.reference_point, moment_frac=0.1)
+function solve!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics, gamma_distribution=solver.sol.gamma_distribution;
+        log=false, reference_point=solver.reference_point, moment_frac=0.1) where {P, U, T}
 
     # calculate intermediate result
     solve_base!(solver, body_aero, gamma_distribution; log)
@@ -320,8 +319,8 @@ function solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=
     end
 
     # Initialize result arrays
-    area_all_panels = 0.0
-    panel_areas = zeros(length(panels))
+    area_all_panels = zero(T)
+    panel_areas = zeros(T, length(panels))
 
     # Get wing properties
     spanwise_direction = body_aero.wings[1].spanwise_direction
@@ -583,8 +582,8 @@ end
     end
 end
 
-function solve_base!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=nothing;
-               log=false)
+function solve_base!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics, gamma_distribution=nothing;
+               log=false) where {P, U, T}
     
     # check arguments
     isnothing(body_aero.panels[1].va) && throw(ArgumentError("Inflow conditions are not set, use set_va!(body_aero, va)"))
@@ -661,7 +660,7 @@ end
     gamma_out,
     gamma_in,
     solver::Solver,
-    panels::Vector{Panel},
+    panels::AbstractVector{<:Panel},
     n_panels::Int,
     AIC_x,
     AIC_y,
@@ -739,17 +738,17 @@ end
 """
     gamma_loop!(solver::Solver, AIC_x::Matrix{Float64},
               AIC_y::Matrix{Float64}, AIC_z::Matrix{Float64},
-              panels::Vector{Panel}, relaxation_factor::Float64; log=true)
+              panels::AbstractVector{<:Panel}, relaxation_factor::Float64; log=true)
 
 Main iteration loop for calculating circulation distribution.
 """
 function gamma_loop!(
-    solver::Solver,
+    solver::Solver{P, U, T},
     body_aero::BodyAerodynamics,
-    panels::Vector{Panel},
-    relaxation_factor::Float64;
+    panels::AbstractVector{<:Panel},
+    relaxation_factor;
     log::Bool = true
-)
+) where {P, U, T}
     va_array = solver.sol._va_dist
     chord_array = solver.sol._chord_dist
     x_airf_array = solver.sol._x_airf_dist
@@ -781,6 +780,9 @@ function gamma_loop!(
     velocity_view_z = @view induced_velocity_all[:, 3]
 
     if solver.solver_type == NONLIN
+        T <: ForwardDiff.Dual && error(
+            "NONLIN solver does not support ForwardDiff in this release. " *
+            "Use `solver_type=LOOP` for differentiable solves.")
         gamma_iter = solver.lr.gamma_new
         residual = solver.nonlin_residual
         residual_perturbed = solver.nonlin_residual_perturbed
@@ -1056,12 +1058,93 @@ jac, results, converged = linearize(solver, body_aero, y_op;
 # jac is (10×10): [6 force/moment coeffs + 4 unrefined moment coeffs] × [4 theta + 3 va + 3 omega]
 ```
 """
+function _section_with_eltype(section::Section, ::Type{TD}) where TD
+    return Section{TD}(
+        MVector{3, TD}(section.LE_point),
+        MVector{3, TD}(section.TE_point),
+        section.aero_model,
+        section.aero_data,
+    )
+end
+
+function _wing_with_eltype(wing::Wing{P, Float64}, ::Type{TD}) where {P, TD}
+    return Wing{P, TD}(
+        wing.n_panels,
+        wing.n_unrefined_sections,
+        wing.spanwise_distribution,
+        PanelProperties{P, TD}(),
+        MVector{3, TD}(wing.spanwise_direction),
+        Section{TD}[_section_with_eltype(s, TD) for s in wing.unrefined_sections],
+        Section{TD}[_section_with_eltype(s, TD) for s in wing.refined_sections],
+        wing.remove_nan,
+        wing.use_prior_polar,
+        wing.billowing_percentage,
+        copy(wing.refined_panel_mapping),
+        Section{TD}[_section_with_eltype(s, TD) for s in wing.non_deformed_sections],
+        Vector{TD}(wing.theta_dist),
+        Vector{TD}(wing.delta_dist),
+        TD(wing.mass),
+        TD(wing.gamma_tip),
+        Matrix{TD}(wing.inertia_tensor),
+        MVector{3, TD}(wing.T_cad_body),
+        MMatrix{3, 3, TD, 9}(wing.R_cad_body),
+        TD(wing.radius),
+        wing.le_interp,
+        wing.te_interp,
+        wing.area_interp,
+        [PreallocationTools.LazyBufferCache()],
+    )
+end
+
+"""
+    make_dual_shadow(solver, body_aero, ::Type{TD}) where TD
+
+Build a `BodyAerodynamics`/`Solver` pair whose mutating buffers carry element type
+`TD` (typically a `ForwardDiff.Dual`). Wing geometry, polar coefficients and
+interpolators are reused from the Float64 originals; circulation/AIC/scratch
+buffers are freshly allocated as `TD`-typed.
+"""
+function make_dual_shadow(solver::Solver{P, U, Float64},
+                          body_aero::BodyAerodynamics{P, W, Float64},
+                          ::Type{TD}) where {P, U, W, TD}
+    length(body_aero.wings) == 1 || throw(ArgumentError(
+        "make_dual_shadow currently supports body_aero with one wing"))
+    wing_d = _wing_with_eltype(body_aero.wings[1], TD)
+    body_aero_d = BodyAerodynamics([wing_d];
+        va = MVector{3, TD}(body_aero._va),
+        omega = MVector{3, TD}(body_aero.omega),
+    )
+    solver_d = Solver(body_aero_d;
+        solver_type = solver.solver_type,
+        aerodynamic_model_type = solver.aerodynamic_model_type,
+        density = TD(solver.density),
+        max_iterations = solver.max_iterations,
+        rtol = TD(solver.rtol),
+        tol_reference_error = TD(solver.tol_reference_error),
+        relaxation_factor = TD(solver.relaxation_factor),
+        atol = TD(solver.atol),
+        is_with_artificial_damping = solver.is_with_artificial_damping,
+        artificial_damping = solver.artificial_damping,
+        type_initial_gamma_distribution = solver.type_initial_gamma_distribution,
+        # Forced off: warm-starting with Duals from a prior chunk would leak
+        # stale gradient information into the next column of the Jacobian.
+        use_gamma_prev = false,
+        core_radius_fraction = TD(solver.core_radius_fraction),
+        mu = TD(solver.mu),
+        is_only_f_and_gamma_output = solver.is_only_f_and_gamma_output,
+        correct_aoa = solver.correct_aoa,
+        reference_point = MVector{3, TD}(solver.reference_point),
+    )
+    return body_aero_d, solver_d
+end
+
 function linearize(solver::Solver, body_aero::BodyAerodynamics, y::Vector{T};
         theta_idxs=1:4,
         delta_idxs=nothing,
         va_idxs=nothing,
         omega_idxs=nothing,
         aero_coeffs=false,
+        backend = AutoForwardDiff(),
         fd_absstep::Float64=1e-3,
         fd_relstep::Float64=1e-3,
         kwargs...) where T
@@ -1082,75 +1165,90 @@ function linearize(solver::Solver, body_aero::BodyAerodynamics, y::Vector{T};
         throw(ArgumentError("Cannot use theta_idxs or delta_idxs when wing has no unrefined sections"))
     end
 
-    init_va = body_aero.cache[1][body_aero._va]
-    init_va .= body_aero._va
-    init_omega = copy(body_aero.omega)
-    last_theta_ref = Ref{Vector{T}}(Vector{T}(undef, 0))
-    if !isnothing(theta_idxs)
-        @views last_theta_ref[] = body_aero.cache[2][y[theta_idxs]]
-        last_theta_ref[] .= NaN
-    end
-    last_delta_ref = Ref{Vector{T}}(Vector{T}(undef, 0))
-    if !isnothing(delta_idxs)
-        @views last_delta_ref[] = body_aero.cache[3][y[delta_idxs]]
-        last_delta_ref[] .= NaN
-    end
-
     n_failed = Ref(0)
+    # Lazily-built Dual shadow keyed by element type; rebuilt only when
+    # eltype changes (e.g. across DI/ForwardDiff tag transitions).
+    shadow_ref = Ref{Any}(nothing)
+    last_theta_ref = Ref{Any}(nothing)
+    last_delta_ref = Ref{Any}(nothing)
 
-    # Function to compute forces for given control inputs
-    function calc_results!(results, y)
-        @views theta_angles = isnothing(theta_idxs) ? nothing : y[theta_idxs]
-        @views delta_angles = isnothing(delta_idxs) ? nothing : y[delta_idxs]
+    function calc_results!(results, y_in)
+        TI = eltype(y_in)
+        if TI === Float64
+            body_aero_c = body_aero
+            solver_c = solver
+            wing_c = wing
+        else
+            shadow = shadow_ref[]
+            need_new = shadow === nothing ||
+                eltype(shadow[1]._va) !== TI
+            if need_new
+                shadow_ref[] = make_dual_shadow(solver, body_aero, TI)
+            end
+            body_aero_c, solver_c = shadow_ref[]
+            wing_c = body_aero_c.wings[1]
+        end
+
+        if !isnothing(theta_idxs) &&
+                (last_theta_ref[] === nothing || eltype(last_theta_ref[]) !== TI)
+            last_theta_ref[] = fill(TI(NaN), length(theta_idxs))
+        end
+        if !isnothing(delta_idxs) &&
+                (last_delta_ref[] === nothing || eltype(last_delta_ref[]) !== TI)
+            last_delta_ref[] = fill(TI(NaN), length(delta_idxs))
+        end
+
+        @views theta_angles = isnothing(theta_idxs) ? nothing : y_in[theta_idxs]
+        @views delta_angles = isnothing(delta_idxs) ? nothing : y_in[delta_idxs]
         last_theta = last_theta_ref[]
         last_delta = last_delta_ref[]
 
         if !isnothing(theta_angles) && isnothing(delta_angles)
             if !all(theta_angles .== last_theta)
-                VortexStepMethod.unrefined_deform!(wing, theta_angles, nothing; smooth=false)
-                VortexStepMethod.reinit!(body_aero; init_aero=false)
+                VortexStepMethod.unrefined_deform!(wing_c, theta_angles, nothing; smooth=false)
+                VortexStepMethod.reinit!(body_aero_c; init_aero=false)
                 last_theta .= theta_angles
             end
         elseif !isnothing(theta_angles) && !isnothing(delta_angles)
             if !all(delta_angles .== last_delta) || !all(theta_angles .== last_theta)
-                VortexStepMethod.unrefined_deform!(wing, theta_angles, delta_angles; smooth=false)
-                VortexStepMethod.reinit!(body_aero; init_aero=false)
+                VortexStepMethod.unrefined_deform!(wing_c, theta_angles, delta_angles; smooth=false)
+                VortexStepMethod.reinit!(body_aero_c; init_aero=false)
                 last_theta .= theta_angles
                 last_delta .= delta_angles
             end
         elseif isnothing(theta_angles) && !isnothing(delta_angles)
             if !all(delta_angles .== last_delta)
-                VortexStepMethod.unrefined_deform!(wing, nothing, delta_angles; smooth=false)
-                VortexStepMethod.reinit!(body_aero; init_aero=false)
+                VortexStepMethod.unrefined_deform!(wing_c, nothing, delta_angles; smooth=false)
+                VortexStepMethod.reinit!(body_aero_c; init_aero=false)
                 last_delta .= delta_angles
             end
         end
 
-        va = isnothing(va_idxs) ? init_va : y[va_idxs]
-        om = isnothing(omega_idxs) ? init_omega :
-            y[omega_idxs]
-        set_va!(body_aero, va, om)
+        va = isnothing(va_idxs) ? MVector{3, TI}(body_aero_c._va) : y_in[va_idxs]
+        om = isnothing(omega_idxs) ? MVector{3, TI}(body_aero_c.omega) : y_in[omega_idxs]
+        set_va!(body_aero_c, va, om)
 
-        solve!(solver, body_aero; kwargs...)
-        solver.lr.converged || (n_failed[] += 1)
+        solve!(solver_c, body_aero_c; kwargs...)
+        solver_c.lr.converged || (n_failed[] += 1)
         if !aero_coeffs
-            results[1:3] .= solver.sol.force
-            results[4:6] .= solver.sol.moment
-            results[7:end] .= solver.sol.moment_unrefined_dist
+            results[1:3] .= solver_c.sol.force
+            results[4:6] .= solver_c.sol.moment
+            results[7:end] .= solver_c.sol.moment_unrefined_dist
         else
-            results[1:3] .= solver.sol.force_coeffs
-            results[4:6] .= solver.sol.moment_coeffs
-            results[7:end] .= solver.sol.cm_unrefined_dist
+            results[1:3] .= solver_c.sol.force_coeffs
+            results[4:6] .= solver_c.sol.moment_coeffs
+            results[7:end] .= solver_c.sol.cm_unrefined_dist
         end
         return nothing
     end
 
-    results = zeros(3+3+length(solver.sol.moment_unrefined_dist))
-    jac = zeros(length(results), length(y))
-    backend = AutoFiniteDiff(absstep=fd_absstep, relstep=fd_relstep)
-    prep = prepare_jacobian(calc_results!, results, backend, y)
-    jacobian!(calc_results!, results, jac, prep, backend, y)
-
+    n_results = 3 + 3 + length(solver.sol.moment_unrefined_dist)
+    jac = zeros(n_results, length(y))
+    results = zeros(n_results)
+    be = backend === nothing ?
+        AutoFiniteDiff(absstep=fd_absstep, relstep=fd_relstep) : backend
+    prep = prepare_jacobian(calc_results!, results, be, y)
+    jacobian!(calc_results!, results, jac, prep, be, y)
     calc_results!(results, y)
     converged = n_failed[] == 0
     if !converged

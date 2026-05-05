@@ -16,6 +16,7 @@ example_files = [
     "ram_air_kite.jl",
     "stall_model.jl",
     "bench.jl",
+    "linearize_check.jl",
     "cleanup.jl",
 ]
 

@@ -4,7 +4,7 @@
 Main structure for calculating aerodynamic properties of bodies. Use the constructor to initialize.
 
 # Fields
-- panels::Vector{Panel}: Vector of refined [Panel](@ref) structs
+- panels::Vector{<:Panel}: Vector of refined [Panel](@ref) structs
 - wings::Vector{W}: A vector of wings of type `W <: AbstractWing`; a body can have multiple wings
 - `va::MVec3` = zeros(MVec3):   A vector of the apparent wind speed, see: [MVec3](@ref)
 - `omega`::MVec3 = zeros(MVec3): A vector of the turn rates around the kite body axes
@@ -22,23 +22,23 @@ Main structure for calculating aerodynamic properties of bodies. Use the constru
 - `y::MVector{P, Float64}` = MVector{P,Float64}(zeros(P))
 - `cache::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}}` = [LazyBufferCache() for _ in 1:15]
 """
-@with_kw mutable struct BodyAerodynamics{P,W<:AbstractWing}
-    panels::Vector{Panel}
+@with_kw mutable struct BodyAerodynamics{P, W<:AbstractWing, T}
+    panels::Vector{Panel{T}}
     wings::Vector{W}
-    _va::MVec3 = zeros(MVec3)
+    _va::MVector{3, T} = zeros(MVector{3, T})
     has_distributed_va::Bool = false
-    omega::MVec3 = zeros(MVec3)
-    gamma_distribution::MVector{P, Float64} = zeros(P)
-    alpha_uncorrected::MVector{P, Float64} = zeros(P)
-    alpha_corrected::MVector{P, Float64} = zeros(P)
-    stall_angle_list::MVector{P, Float64} = zeros(P)
-    alpha_dist::MVector{P, Float64} = zeros(P)
-    v_a_dist::MVector{P, Float64} = zeros(P)
-    work_vectors::NTuple{10,MVec3} = ntuple(_ -> zeros(MVec3), 10)
-    AIC::Array{Float64, 3} = zeros(3, P, P)
-    projected_area::Float64 = one(Float64)
-    c_ref::Float64 = one(Float64)
-    y::MVector{P, Float64} = zeros(P)
+    omega::MVector{3, T} = zeros(MVector{3, T})
+    gamma_distribution::MVector{P, T} = zeros(MVector{P, T})
+    alpha_uncorrected::MVector{P, T} = zeros(MVector{P, T})
+    alpha_corrected::MVector{P, T} = zeros(MVector{P, T})
+    stall_angle_list::MVector{P, T} = zeros(MVector{P, T})
+    alpha_dist::MVector{P, T} = zeros(MVector{P, T})
+    v_a_dist::MVector{P, T} = zeros(MVector{P, T})
+    work_vectors::NTuple{10, MVector{3, T}} = ntuple(_ -> zeros(MVector{3, T}), 10)
+    AIC::Array{T, 3} = zeros(T, 3, P, P)
+    projected_area::T = one(T)
+    c_ref::T = one(T)
+    y::MVector{P, T} = zeros(MVector{P, T})
     cache::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}} = [LazyBufferCache() for _ in 1:15]
 end
 
@@ -69,11 +69,11 @@ body_aero = BodyAerodynamics([wing], va=[15.0, 0.0, 0.0], omega=zeros(3))
 ```
 """
 function BodyAerodynamics(
-    wings::Vector{T};
+    wings::Vector{W};
     kite_body_origin=zeros(MVec3),
     va=[15.0, 0.0, 0.0],
     omega=zeros(MVec3)
-) where T <: AbstractWing
+) where {T, W <: AbstractWing{T}}
     # Validate all wings are refined
     for (i, wing) in enumerate(wings)
         if isempty(wing.refined_sections) ||
@@ -96,7 +96,7 @@ function BodyAerodynamics(
     end
 
     # Initialize panels
-    panels = Panel[]
+    panels = Panel{T}[]
     for wing in wings
         for section in wing.unrefined_sections
             section.LE_point .-= kite_body_origin
@@ -105,12 +105,12 @@ function BodyAerodynamics(
 
         # Create panels
         for _ in 1:wing.n_panels
-            panel = Panel()
+            panel = Panel{T}()
             push!(panels, panel)
         end
     end
 
-    body_aero = BodyAerodynamics{length(panels),T}(; panels, wings)
+    body_aero = BodyAerodynamics{length(panels), W, T}(; panels, wings)
     reinit!(body_aero; va, omega)
     return body_aero
 end
@@ -162,7 +162,7 @@ end
 end
 
 """
-    calculate_stall_angle_list(panels::Vector{Panel};
+    calculate_stall_angle_list(panels::Vector{<:Panel};
                              begin_aoa=9.0,
                              end_aoa=22.0,
                              step_aoa=1.0,
@@ -174,7 +174,7 @@ Calculate stall angles for each panel.
 Returns:
     Vector{Float64}: Stall angles in radians
 """
-function calculate_stall_angle_list(panels::Vector{Panel};
+function calculate_stall_angle_list(panels::Vector{<:Panel};
                                   begin_aoa=9.0,
                                   end_aoa=22.0,
                                   step_aoa=1.0,
@@ -187,8 +187,8 @@ function calculate_stall_angle_list(panels::Vector{Panel};
     return stall_angles
 end
 
-function calculate_stall_angle_list!(stall_angles::AbstractVector{Float64},
-                                     panels::Vector{Panel};
+function calculate_stall_angle_list!(stall_angles::AbstractVector,
+                                     panels::Vector{<:Panel};
                                      begin_aoa=9.0,
                                      end_aoa=22.0,
                                      step_aoa=1.0,
@@ -238,13 +238,13 @@ Initialize a BodyAerodynamics struct in-place by setting up panels and coefficie
 # Returns
 nothing
 """
-function reinit!(body_aero::BodyAerodynamics;
+function reinit!(body_aero::BodyAerodynamics{P, W, T};
     init_aero=true,
     va=[15.0, 0.0, 0.0],
-    omega=zeros(MVec3)
-)
+    omega=zeros(MVector{3, T})
+) where {P, W, T}
     idx = 1
-    vec = @MVector zeros(3)
+    vec = zeros(MVector{3, T})
     for wing in body_aero.wings
         reinit!(wing)
         panel_props = wing.panel_props
@@ -256,7 +256,7 @@ function reinit!(body_aero::BodyAerodynamics;
                 # Panel i gets its delta directly from delta_dist[i]
                 delta = wing.delta_dist[i]
             else
-                delta = 0.0
+                delta = zero(T)
             end
             @views reinit!(
                 body_aero.panels[idx], 
@@ -304,7 +304,8 @@ the area-weighted mean direction.
 )
     length(va_input) == 3 ||
         throw(ArgumentError("'va' must be shape (3,) or ($(n_panels), 3); got length $(length(va_input))"))
-    return MVec3(Float64(va_input[1]), Float64(va_input[2]), Float64(va_input[3]))
+    T = eltype(va_input)
+    return MVector{3, T}(va_input[1], va_input[2], va_input[3])
 end
 
 @inline function _compute_reference_velocity_from_distribution(
@@ -315,19 +316,21 @@ end
     size(va_input) == (n_panels, 3) ||
         throw(ArgumentError("'va' must be shape (3,) or ($(n_panels), 3); got $(size(va_input))"))
 
+    T = promote_type(eltype(va_input),
+                     isnothing(panel_areas) ? Float64 : eltype(panel_areas))
     areas = if isnothing(panel_areas)
-        ones(Float64, n_panels)
+        ones(T, n_panels)
     else
         length(panel_areas) == n_panels ||
             throw(ArgumentError("panel_areas must be shape ($(n_panels),), got length $(length(panel_areas))"))
-        Float64.(panel_areas)
+        T.(panel_areas)
     end
 
     total_area = sum(areas)
     total_area > 0.0 || throw(ArgumentError("Total panel area must be positive."))
 
-    weighted_speed_sq = 0.0
-    direction = zeros(MVec3)
+    weighted_speed_sq = zero(T)
+    direction = zeros(MVector{3, T})
     @inbounds for i in 1:n_panels
         @views va_i = va_input[i, :]
         speed_i = norm(va_i)
@@ -338,8 +341,8 @@ end
     reference_speed = sqrt(weighted_speed_sq / total_area)
     direction_norm = norm(direction)
     if direction_norm <= 0.0
-        direction .= (1.0, 0.0, 0.0)
-        direction_norm = 1.0
+        direction .= (one(T), zero(T), zero(T))
+        direction_norm = one(T)
     end
 
     return direction ./ direction_norm .* reference_speed
@@ -357,23 +360,23 @@ See also: [BodyAerodynamics](@ref), [Model](@ref)
 
 Returns: nothing
 """
-@inline function calculate_AIC_matrices!(body_aero::BodyAerodynamics, model::Model,
+@inline function calculate_AIC_matrices!(body_aero::BodyAerodynamics{P, W, T}, model::Model,
                               core_radius_fraction,
-                              va_norm_array,
-                              va_unit_array)
+                              va_norm_array::AbstractVector{T},
+                              va_unit_array::AbstractMatrix{T}) where {P, W, T}
     # Determine evaluation point based on model
     evaluation_point = model == VSM ? :control_point : :aero_center
     evaluation_point_on_bound = model == LLT
 
     # Allocate work vectors for this function (separate from those used by child functions)
-    velocity_induced = @MVector zeros(3)
-    tempvel = @MVector zeros(3)
-    va_unit = @MVector zeros(3)
-    U_2D = @MVector zeros(3)
+    velocity_induced = zeros(MVector{3, T})
+    tempvel = zeros(MVector{3, T})
+    va_unit = zeros(MVector{3, T})
+    U_2D = zeros(MVector{3, T})
 
     # Python parity: one shared area-weighted wake vector for all panels.
     panel_areas = [panel.chord * panel.width for panel in body_aero.panels]
-    va_distribution = zeros(length(body_aero.panels), 3)
+    va_distribution = zeros(T, length(body_aero.panels), 3)
     @inbounds for i in 1:length(body_aero.panels), k in 1:3
         va_distribution[i, k] = va_unit_array[i, k] * va_norm_array[i]
     end
@@ -402,7 +405,7 @@ Returns: nothing
                 evaluation_point_on_bound,
                 va_norm,
                 va_unit,
-                1.0,
+                one(T),
                 core_radius_fraction,
                 body_aero.work_vectors
             )
@@ -712,7 +715,7 @@ end
                      chord_array, x_airf_array,
                      z_airf_array,
                      va_array, va_norm_array,
-                     va_unit_array, panels::Vector{Panel},
+                     va_unit_array, panels::Vector{<:Panel},
                      is_only_f_and_gamma_output::Bool)
 
 Calculate final aerodynamic results. Reference point is in the kite body (KB) frame.
@@ -735,7 +738,7 @@ function calculate_results(
     va_array,
     va_norm_array,
     va_unit_array,
-    panels::Vector{Panel},
+    panels::Vector{<:Panel},
     is_only_f_and_gamma_output::Bool;
     correct_aoa::Bool=false,
 )
@@ -1050,9 +1053,9 @@ Set velocity array and update wake filaments.
 - `va::VelVector`: Velocity vector of the apparent wind speed           [m/s]
 - `omega::VelVector`: Turn rate vector around x y and z axis            [rad/s]
 """
-function set_va!(body_aero::BodyAerodynamics, va::AbstractVector, omega=zeros(MVec3))
+function set_va!(body_aero::BodyAerodynamics{P, W, T}, va::AbstractVector, omega=zeros(MVector{3, T})) where {P, W, T}
     n_panels = length(body_aero.panels)
-    va_distribution = zeros(n_panels, 3)
+    va_distribution = zeros(T, n_panels, 3)
     body_aero.omega .= omega
 
     if all(iszero, omega)
@@ -1070,12 +1073,12 @@ function set_va!(body_aero::BodyAerodynamics, va::AbstractVector, omega=zeros(MV
             idx = panel_end + 1
         end
     end
-    
+
     # Update panel velocities
     for (i, panel) in enumerate(body_aero.panels)
         panel.va .= va_distribution[i,:]
     end
-    
+
     # Update wake elements
     frozen_wake!(body_aero, va_distribution)
     body_aero._va .= va

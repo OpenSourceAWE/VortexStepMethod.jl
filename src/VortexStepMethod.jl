@@ -20,6 +20,7 @@ using PreallocationTools
 using PrecompileTools
 using Pkg
 using DifferentiationInterface
+using ForwardDiff
 import YAML
 using StructMapping
 using Xfoil
@@ -175,7 +176,7 @@ Enumeration specifying the method used to solve for circulation distribution.
 """
 @enum SolverType LOOP NONLIN
 
-abstract type AbstractWing end
+abstract type AbstractWing{T} end
 
 """
     AeroData= Union{

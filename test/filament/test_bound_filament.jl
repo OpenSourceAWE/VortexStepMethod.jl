@@ -4,7 +4,7 @@ using Test
 
 # Test helper functions
 function create_test_filament()
-    fil = BoundFilament()
+    fil = BoundFilament{Float64}()
     reinit!(fil, [0.0, 0.0, 0.0], [1.0, 0.0, 0.0])
     return fil
 end
@@ -71,7 +71,7 @@ end
     end
 
     @testset "Long Filament" begin
-        filament = BoundFilament()
+        filament = BoundFilament{Float64}()
         reinit!(filament, [0.0, 0.0, 0.0], [1e6, 0.0, 0.0])
         control_point = [5e5, 1.0, 0.0]
         
@@ -121,7 +121,7 @@ end
     end
 
     @testset "Symmetry" begin
-        filament = BoundFilament()
+        filament = BoundFilament{Float64}()
         reinit!(filament, [-1.0, 0.0, 0.0], [1.0, 0.0, 0.0])
 
         velocity_3D_bound_vortex!(v1, filament, [0.0, 1.0, 0.0], gamma, core_radius_fraction, work_vectors)
