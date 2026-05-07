@@ -246,6 +246,12 @@ mutable struct Wing{P, T} <: AbstractWing{T}
     # Grouping
     refined_panel_mapping::Vector{Int16}  # Maps each refined panel index to unrefined section index (1 to n_unrefined_sections)
 
+    # Linear interpolation cache from unrefined sections to refined sections.
+    # For refined section i: value = weight * unrefined[left_idx] + (1 - weight) * unrefined[left_idx + 1].
+    # weight == 1 at unrefined endpoints, so refined section values match unrefined endpoints exactly.
+    refined_section_left_idx::Vector{Int16}  # Length: n_panels + 1
+    refined_section_weight::Vector{T}        # Length: n_panels + 1
+
     # Deformation fields
     non_deformed_sections::Vector{Section{T}}
     theta_dist::Vector{T}  # Length: n_panels (panel twist angles)
@@ -308,6 +314,8 @@ function Wing(n_panels::Int;
         Section{Float64}[], Section{Float64}[], remove_nan, use_prior_polar, Float64(billowing_percentage),
         # Grouping
         Int16[],
+        # Refined-section interpolation cache
+        Int16[], Float64[],
         # Deformation fields
         Section{Float64}[], zeros(max(0, n_panels)), zeros(max(0, n_panels)),
         # Physical properties (defaults for non-OBJ wings)
@@ -341,89 +349,77 @@ function reinit!(wing::AbstractWing)
 end
 
 """
-    unrefined_deform!(wing::Wing, theta_angles=nothing, delta_angles=nothing; smooth=false)
+    unrefined_deform!(wing::Wing, theta_angles=nothing, delta_angles=nothing)
 
-Apply deformation angles directly to unrefined wing sections.
+Apply deformation angles defined per unrefined section.
 
-For wings that support deformation (OBJ-based wings with non_deformed_sections), this
-applies theta_angles and delta_angles directly to unrefined sections and then applies deformation.
-For wings without deformation support (YAML-based), this is a no-op that only succeeds
-if both angle inputs are nothing.
+Refined-section twist and TE-deflection values are computed by linear interpolation
+from the unrefined-section inputs using the precomputed `refined_section_left_idx` /
+`refined_section_weight` cache built at refinement time. Endpoint refined sections
+take the unrefined endpoint values exactly. The panel-level `theta_dist` /
+`delta_dist` arrays are then filled by averaging adjacent refined-section values, so
+downstream consumers (solver, body aerodynamics) see a per-panel value.
 
 # Arguments
-- `wing::Wing`: The wing to deform
-- `theta_angles::AbstractVector`: Twist angles in radians for each unrefined section (or nothing).
-  Length must be `n_unrefined_sections`
-- `delta_angles::AbstractVector`: Trailing edge deflection angles in radians for each unrefined section (or nothing).
-  Length must be `n_unrefined_sections`
-- `smooth::Bool`: DEPRECATED - no longer used. Apply smoothing to input angles if needed.
-
-# Algorithm
-1. Copies theta_angles and delta_angles directly to wing.theta_dist and wing.delta_dist
-2. Calls deform! to update wing geometry and propagate to refined sections
-
-# Errors
-- Throws `ArgumentError` if wing doesn't support deformation but angles are provided
-- Throws `ArgumentError` if angle vectors don't match n_unrefined_sections
-
-# Returns
-- `nothing` (modifies wing in-place)
+- `wing::Wing`: Wing to deform (must have non_deformed_sections).
+- `theta_angles::AbstractVector`: Twist angles in radians, one per unrefined section.
+  Pass `nothing` to leave twist unchanged.
+- `delta_angles::AbstractVector`: TE deflection angles in radians, one per unrefined
+  section. Pass `nothing` to leave deflection unchanged.
 """
 function unrefined_deform!(wing::Wing, theta_angles=nothing, delta_angles=nothing;
                            smooth=false, smooth_window=nothing)
-    # Check if deformation is supported
     can_deform = !isempty(wing.non_deformed_sections)
-
-    # If no deformation requested, just return
     isnothing(theta_angles) && isnothing(delta_angles) && return nothing
 
-    # If deformation requested but not supported, throw error
     if !can_deform
         throw(ArgumentError("This Wing does not support deformation. Only OBJ-based wings created with ObjWing() can be deformed."))
     end
 
-    # Validate inputs
-    !isnothing(theta_angles) && length(theta_angles) != wing.n_unrefined_sections &&
-        throw(ArgumentError("theta_angles must have length n_unrefined_sections = $(wing.n_unrefined_sections), got $(length(theta_angles))"))
-    !isnothing(delta_angles) && length(delta_angles) != wing.n_unrefined_sections &&
-        throw(ArgumentError("delta_angles must have length n_unrefined_sections = $(wing.n_unrefined_sections), got $(length(delta_angles))"))
+    n_unref = wing.n_unrefined_sections
+    !isnothing(theta_angles) && length(theta_angles) != n_unref &&
+        throw(ArgumentError("theta_angles must have length n_unrefined_sections = $(n_unref), got $(length(theta_angles))"))
+    !isnothing(delta_angles) && length(delta_angles) != n_unref &&
+        throw(ArgumentError("delta_angles must have length n_unrefined_sections = $(n_unref), got $(length(delta_angles))"))
 
-    # Map unrefined sections → panels → sections (no smoothing yet)
+    n_sec = wing.n_panels + 1
+    length(wing.refined_section_left_idx) == n_sec &&
+        length(wing.refined_section_weight) == n_sec ||
+        throw(ArgumentError(
+            "Refined-section interpolation cache is not initialized. Call refine!(wing) first."))
+
     if !isnothing(theta_angles)
-        map_unrefined_to_sections!(wing.theta_dist, theta_angles, wing.refined_panel_mapping, wing.n_panels)
+        section_thetas = _interpolate_unrefined_to_refined(wing, theta_angles)
+        _apply_refined_section_thetas!(wing, section_thetas)
+        for i in 1:wing.n_panels
+            wing.theta_dist[i] = (section_thetas[i] + section_thetas[i + 1]) / 2
+        end
     end
     if !isnothing(delta_angles)
-        map_unrefined_to_sections!(wing.delta_dist, delta_angles, wing.refined_panel_mapping, wing.n_panels)
+        section_deltas = _interpolate_unrefined_to_refined(wing, delta_angles)
+        for i in 1:wing.n_panels
+            wing.delta_dist[i] = (section_deltas[i] + section_deltas[i + 1]) / 2
+        end
     end
-
-    # Apply deformation with optional smoothing
-    deform!(wing, smooth=smooth, smooth_window=smooth_window)
     return nothing
 end
 
 """
-    map_unrefined_to_sections!(panel_dist, unrefined_angles, panel_mapping, n_panels)
+    _interpolate_unrefined_to_refined(wing, unrefined_values) -> Vector
 
-Map angles from unrefined sections to panels.
-Steps: unrefined[1:n_unrefined] → panels[1:n_panels]
-
-# Arguments
-- `panel_dist::Vector{Float64}`: Output panel angles (length n_panels)
-- `unrefined_angles::Vector{Float64}`: Input unrefined section angles
-- `panel_mapping::Vector{Int16}`: Maps panel index to unrefined section index
-- `n_panels::Int`: Number of panels
+Linearly interpolate `unrefined_values` (length `n_unrefined_sections`) to refined
+sections (length `n_panels + 1`) using the cached weights. Endpoints match exactly.
 """
-function map_unrefined_to_sections!(panel_dist,
-                                     unrefined_angles,
-                                     panel_mapping,
-                                     n_panels)
-    # Map unrefined sections to panels
-    for i in 1:n_panels
-        unrefined_idx = panel_mapping[i]
-        panel_dist[i] = unrefined_angles[unrefined_idx]
+function _interpolate_unrefined_to_refined(wing::Wing{P, T},
+                                            unrefined_values) where {P, T}
+    n_sec = wing.n_panels + 1
+    out = Vector{T}(undef, n_sec)
+    for i in 1:n_sec
+        l = wing.refined_section_left_idx[i]
+        wl = wing.refined_section_weight[i]
+        out[i] = wl * unrefined_values[l] + (one(T) - wl) * unrefined_values[l + 1]
     end
-
-    return nothing
+    return out
 end
 
 """
@@ -502,51 +498,70 @@ Updates wing.refined_sections based on wing.non_deformed_sections and stored dis
 function deform!(wing::Wing{P, T}; smooth=false, smooth_window=nothing) where {P, T}
     !isempty(wing.non_deformed_sections) || return nothing
 
-    # Apply smoothing if requested
     if smooth
-        # Default window size based on refinement ratio
         if isnothing(smooth_window)
             smooth_window = max(3, round(Int, wing.n_panels / wing.n_unrefined_sections))
         end
-
-        # Ensure window is odd for symmetric averaging
         if smooth_window % 2 == 0
             smooth_window += 1
         end
-
-        # Apply moving average to theta_dist and delta_dist (panel-level)
         smooth_distribution!(wing.theta_dist, smooth_window)
         smooth_distribution!(wing.delta_dist, smooth_window)
     end
 
+    n_sec = wing.n_panels + 1
+    section_thetas = Vector{T}(undef, n_sec)
+    _panel_thetas_to_section_thetas!(section_thetas, wing.theta_dist)
+    _apply_refined_section_thetas!(wing, section_thetas)
+    return nothing
+end
+
+"""
+    _panel_thetas_to_section_thetas!(section_thetas, panel_thetas)
+
+Convert panel-level twist angles (length `n`) to refined-section angles (length `n+1`).
+Interior sections take the average of adjacent panels. Boundary sections use linear
+extrapolation from the two nearest panels, so a linear input produces a linear output
+across the full refined-section range.
+"""
+function _panel_thetas_to_section_thetas!(section_thetas, panel_thetas)
+    n = length(panel_thetas)
+    n_sec = length(section_thetas)
+    n_sec == n + 1 || throw(ArgumentError(
+        "section_thetas length $(n_sec) must equal panel_thetas length + 1 = $(n + 1)"))
+    if n == 1
+        section_thetas[1] = panel_thetas[1]
+        section_thetas[2] = panel_thetas[1]
+        return nothing
+    end
+    section_thetas[1] = 1.5 * panel_thetas[1] - 0.5 * panel_thetas[2]
+    for i in 2:n
+        section_thetas[i] = (panel_thetas[i - 1] + panel_thetas[i]) / 2
+    end
+    section_thetas[n_sec] = 1.5 * panel_thetas[n] - 0.5 * panel_thetas[n - 1]
+    return nothing
+end
+
+"""
+    _apply_refined_section_thetas!(wing, section_thetas)
+
+Rotate each refined section's TE point around its LE point by the given per-section
+twist angle, using `wing.non_deformed_sections` as the reference geometry.
+"""
+function _apply_refined_section_thetas!(wing::Wing{P, T}, section_thetas) where {P, T}
     local_y = zeros(MVector{3, T})
     chord = zeros(MVector{3, T})
     normal = zeros(MVector{3, T})
 
-    # Process all refined sections (n_panels + 1)
-    # Convert panel angles to section angles by averaging
     for i in 1:(wing.n_panels + 1)
-        # Determine theta for this section by averaging adjacent panels
-        if i == 1
-            # First section: use panel 1 angle
-            theta = wing.theta_dist[1]
-        elseif i == wing.n_panels + 1
-            # Last section: use last panel angle
-            theta = wing.theta_dist[wing.n_panels]
-        else
-            # Middle sections: average of panels (i-1) and i
-            theta = (wing.theta_dist[i-1] + wing.theta_dist[i]) / 2.0
-        end
-
+        theta = section_thetas[i]
         section = wing.non_deformed_sections[i]
 
-        # Compute local coordinate system
         if i < wing.n_panels + 1
-            section2 = wing.non_deformed_sections[i+1]
+            section2 = wing.non_deformed_sections[i + 1]
             local_y .= normalize(section.LE_point - section2.LE_point)
         else
-            # For last section, use same local_y as previous
-            section_prev = wing.non_deformed_sections[i-1]
+            section_prev = wing.non_deformed_sections[i - 1]
             local_y .= normalize(section_prev.LE_point - section.LE_point)
         end
 
@@ -805,19 +820,25 @@ function refine!(wing::AbstractWing{T}; recompute_mapping=true, sort_sections=tr
         if isequal(wing.spanwise_distribution, UNCHANGED) ||
                length(wing.unrefined_sections) == n_sections
             copy_sections_to_refined!(wing; reuse_aero_data)
-            recompute_mapping && compute_refined_panel_mapping!(wing)
+            if recompute_mapping
+                compute_refined_panel_mapping!(wing)
+                compute_refined_section_interpolation!(wing)
+            end
             update_non_deformed_sections!(wing)
             return nothing
         else
             wing.refined_sections = Section{T}[Section{T}() for _ in 1:wing.n_panels+1]
         end
     end
-    
+
     # Handle special cases
     if isequal(wing.spanwise_distribution, UNCHANGED) ||
             length(wing.unrefined_sections) == n_sections
         copy_sections_to_refined!(wing; reuse_aero_data)
-        recompute_mapping && compute_refined_panel_mapping!(wing)
+        if recompute_mapping
+            compute_refined_panel_mapping!(wing)
+            compute_refined_section_interpolation!(wing)
+        end
         update_non_deformed_sections!(wing)
         return nothing
     end
@@ -834,7 +855,10 @@ function refine!(wing::AbstractWing{T}; recompute_mapping=true, sort_sections=tr
         reinit!(wing.refined_sections[2],
             s2.LE_point, s2.TE_point, s2.aero_model,
             reuse_aero_data ? nothing : s2.aero_data)
-        recompute_mapping && compute_refined_panel_mapping!(wing)
+        if recompute_mapping
+            compute_refined_panel_mapping!(wing)
+            compute_refined_section_interpolation!(wing)
+        end
         update_non_deformed_sections!(wing)
         return nothing
     end
@@ -855,7 +879,10 @@ function refine!(wing::AbstractWing{T}; recompute_mapping=true, sort_sections=tr
     end
 
     # Compute panel mapping by finding closest unrefined section for each refined panel
-    recompute_mapping && compute_refined_panel_mapping!(wing)
+    if recompute_mapping
+        compute_refined_panel_mapping!(wing)
+        compute_refined_section_interpolation!(wing)
+    end
 
     # Update n_unrefined_sections based on actual sections
     wing.n_unrefined_sections = Int16(length(wing.unrefined_sections))
@@ -932,6 +959,90 @@ function compute_refined_panel_mapping!(wing::AbstractWing)
         end
         wing.refined_panel_mapping[pi] = closest
     end
+
+    return nothing
+end
+
+"""
+    compute_refined_section_interpolation!(wing::AbstractWing)
+
+Compute per-refined-section linear-interpolation weights from the unrefined
+sections. For refined section i, the interpolated value is:
+
+    out[i] = weight[i] * unrefined[left_idx[i]] +
+             (1 - weight[i]) * unrefined[left_idx[i] + 1]
+
+Positions are quarter-chord arc-length along the unrefined and refined sections.
+Endpoint refined sections always get `weight == 1` so they take the unrefined
+endpoint value exactly.
+"""
+function compute_refined_section_interpolation!(wing::AbstractWing{T}) where {T}
+    n_unref = length(wing.unrefined_sections)
+    n_sections = wing.n_panels + 1
+
+    if length(wing.refined_section_left_idx) != n_sections
+        resize!(wing.refined_section_left_idx, n_sections)
+    end
+    if length(wing.refined_section_weight) != n_sections
+        resize!(wing.refined_section_weight, n_sections)
+    end
+
+    if n_unref < 2
+        for i in 1:n_sections
+            wing.refined_section_left_idx[i] = Int16(1)
+            wing.refined_section_weight[i] = one(T)
+        end
+        return nothing
+    end
+
+    @inline qc(s, j) = s.LE_point[j] + 0.25 * (s.TE_point[j] - s.LE_point[j])
+
+    s_unref = Vector{Float64}(undef, n_unref)
+    s_unref[1] = 0.0
+    for k in 2:n_unref
+        u_prev = wing.unrefined_sections[k - 1]
+        u_cur = wing.unrefined_sections[k]
+        d = 0.0
+        for j in 1:3
+            dq = qc(u_cur, j) - qc(u_prev, j)
+            d += dq * dq
+        end
+        s_unref[k] = s_unref[k - 1] + sqrt(d)
+    end
+
+    s_ref = Vector{Float64}(undef, n_sections)
+    s_ref[1] = 0.0
+    for i in 2:n_sections
+        r_prev = wing.refined_sections[i - 1]
+        r_cur = wing.refined_sections[i]
+        d = 0.0
+        for j in 1:3
+            dq = qc(r_cur, j) - qc(r_prev, j)
+            d += dq * dq
+        end
+        s_ref[i] = s_ref[i - 1] + sqrt(d)
+    end
+
+    for i in 1:n_sections
+        target = s_ref[i]
+        left = 1
+        for k in 1:(n_unref - 1)
+            if s_unref[k + 1] >= target || k == n_unref - 1
+                left = k
+                break
+            end
+        end
+        seg = s_unref[left + 1] - s_unref[left]
+        t = seg > 1e-30 ? (target - s_unref[left]) / seg : 0.0
+        t = clamp(t, 0.0, 1.0)
+        wing.refined_section_left_idx[i] = Int16(left)
+        wing.refined_section_weight[i] = T(1.0 - t)
+    end
+
+    wing.refined_section_left_idx[1] = Int16(1)
+    wing.refined_section_weight[1] = one(T)
+    wing.refined_section_left_idx[n_sections] = Int16(n_unref - 1)
+    wing.refined_section_weight[n_sections] = zero(T)
 
     return nothing
 end

@@ -215,98 +215,60 @@ using Test
         @test body_aero.panels[4].delta ≈ deg2rad(20.0) atol=1e-6
     end
 
-    @testset "unrefined_deform! Maps to Panels" begin
-        # Test that unrefined_deform! correctly maps unrefined sections to panels
-        # Use complex_wing which has 7 unrefined sections
+    @testset "unrefined_deform! Linear Interpolation" begin
+        # unrefined_deform! linearly interpolates angles from unrefined sections to
+        # refined sections; panel-level dist values are the average of adjacent
+        # refined-section values.
         complex_wing_file = test_data_path("yaml_geometry", "complex_wing.yaml")
         wing = Wing(complex_wing_file; n_panels=12)
         refine!(wing)
         body_aero = BodyAerodynamics([wing])
 
-        # Verify we have 7 unrefined sections
         @test wing.n_unrefined_sections == 7
 
-        # Create unrefined section angles (7 sections)
-        # These will be mapped to panels via refined_panel_mapping
         theta_unrefined = deg2rad.([10.0, 15.0, 20.0, 25.0, 20.0, 15.0, 10.0])
         delta_unrefined = deg2rad.([5.0, 7.5, 10.0, 12.5, 10.0, 7.5, 5.0])
 
-        # Apply using unrefined_deform!
         VortexStepMethod.unrefined_deform!(wing, theta_unrefined, delta_unrefined)
         VortexStepMethod.reinit!(body_aero)
 
-        # Each panel should have the delta from its mapped unrefined section
-        for i in 1:wing.n_panels
-            unrefined_idx = wing.refined_panel_mapping[i]
-            expected_delta = delta_unrefined[unrefined_idx]
-            @test body_aero.panels[i].delta ≈ expected_delta atol=1e-6
+        # Endpoint refined sections take exact unrefined endpoint values, so the
+        # first/last panel value is the average of an endpoint and its neighbor.
+        n_sec = wing.n_panels + 1
+        @test wing.refined_section_weight[1] ≈ 1.0
+        @test wing.refined_section_weight[n_sec] ≈ 0.0
+        @test wing.refined_section_left_idx[1] == 1
+        @test wing.refined_section_left_idx[n_sec] == wing.n_unrefined_sections - 1
+
+        # All panel deltas lie within the input range (no overshoot from interp).
+        delta_min = minimum(delta_unrefined)
+        delta_max = maximum(delta_unrefined)
+        for p in body_aero.panels
+            @test delta_min - 1e-9 ≤ p.delta ≤ delta_max + 1e-9
         end
     end
 
-    @testset "Smooth vs Non-Smooth Deformation" begin
-        # Create test wing with 2 unrefined sections, refined to 40 panels
+    @testset "unrefined_deform! Endpoint and Linearity" begin
         simple_wing_file = test_data_path("yaml_geometry", "simple_wing.yaml")
         wing = Wing(simple_wing_file; n_panels=40)
         refine!(wing)
         @test wing.n_unrefined_sections == 2
 
-        # Define varying input angles at unrefined section level
         delta_input = deg2rad.([0.0, 10.0])
+        VortexStepMethod.unrefined_deform!(wing, nothing, delta_input)
+        delta_panels = copy(wing.delta_dist)
 
-        # Test 1: Non-smooth deformation has step-wise discontinuities
-        VortexStepMethod.unrefined_deform!(wing, nothing, delta_input; smooth=false)
-        delta_nonsmooth = copy(wing.delta_dist)
-
-        # Verify step-wise pattern: panels in same unrefined section have identical angles
-        for i in 1:wing.n_panels
-            unrefined_idx = wing.refined_panel_mapping[i]
-            @test delta_nonsmooth[i] ≈ delta_input[unrefined_idx] atol=1e-10
+        # With two unrefined sections, the refined-section interpolation is exactly
+        # linear in arc-length, so panel-level values (averages of adjacent refined
+        # sections) are linear and monotonic — no discontinuities.
+        for i in 1:(wing.n_panels - 1)
+            @test delta_panels[i + 1] ≥ delta_panels[i] - 1e-12
         end
+        max_gradient = maximum(abs.(diff(delta_panels)))
+        @test max_gradient < (delta_input[2] - delta_input[1]) / wing.n_panels * 1.5
 
-        # Verify discontinuities exist at unrefined section boundaries
-        # Find boundary indices (where panel mapping changes)
-        max_gradient_nonsmooth = 0.0
-        for i in 1:(wing.n_panels-1)
-            if wing.refined_panel_mapping[i] != wing.refined_panel_mapping[i+1]
-                gradient = abs(delta_nonsmooth[i+1] - delta_nonsmooth[i])
-                max_gradient_nonsmooth = max(max_gradient_nonsmooth, gradient)
-            end
-        end
-        @test max_gradient_nonsmooth > deg2rad(5.0)  # Should have large jumps
-
-        # Test 2: Smooth deformation is continuous
-        VortexStepMethod.unrefined_deform!(wing, nothing, delta_input; smooth=true)
-        delta_smooth = copy(wing.delta_dist)
-
-        # Verify gradients between adjacent panels are small
-        max_gradient_smooth = maximum(abs.(diff(delta_smooth)))
-        @test max_gradient_smooth < deg2rad(3.0)  # Should be smooth
-
-        # Verify no sharp discontinuities
-        for i in 1:(wing.n_panels-1)
-            @test abs(delta_smooth[i+1] - delta_smooth[i]) < deg2rad(3.0)
-        end
-
-        # Test 3: Smoothing reduces maximum gradient
-        @test max_gradient_smooth < max_gradient_nonsmooth
-
-        # Test 4: Angles match input at unrefined section centers (both modes)
-        # For non-smooth: extract angle at center panel of each unrefined section
-        VortexStepMethod.unrefined_deform!(wing, nothing, delta_input; smooth=false)
-        for i in 1:wing.n_unrefined_sections
-            # Find panels belonging to this unrefined section
-            panel_indices = findall(==(i), wing.refined_panel_mapping)
-            center_panel_idx = panel_indices[div(length(panel_indices), 2) + 1]
-            @test wing.delta_dist[center_panel_idx] ≈ delta_input[i] atol=1e-10
-        end
-
-        # For smooth: angles at center should be close to input (tolerance larger due to smoothing)
-        VortexStepMethod.unrefined_deform!(wing, nothing, delta_input; smooth=true)
-        for i in 1:wing.n_unrefined_sections
-            panel_indices = findall(==(i), wing.refined_panel_mapping)
-            center_panel_idx = panel_indices[div(length(panel_indices), 2) + 1]
-            # Smoothing may shift values slightly, use absolute tolerance for small angles
-            @test wing.delta_dist[center_panel_idx] ≈ delta_input[i] atol=deg2rad(2.0)
-        end
+        # Refined-section endpoints match unrefined endpoints exactly.
+        @test wing.refined_section_weight[1] ≈ 1.0
+        @test wing.refined_section_weight[end] ≈ 0.0
     end
 end

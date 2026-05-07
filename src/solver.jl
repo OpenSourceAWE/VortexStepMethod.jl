@@ -1015,6 +1015,8 @@ function _wing_with_eltype(wing::Wing{P, Float64}, ::Type{TD}) where {P, TD}
         wing.use_prior_polar,
         wing.billowing_percentage,
         copy(wing.refined_panel_mapping),
+        copy(wing.refined_section_left_idx),
+        Vector{TD}(wing.refined_section_weight),
         Section{TD}[_section_with_eltype(s, TD) for s in wing.non_deformed_sections],
         Vector{TD}(wing.theta_dist),
         Vector{TD}(wing.delta_dist),
