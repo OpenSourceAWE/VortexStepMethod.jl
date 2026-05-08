@@ -552,22 +552,45 @@ function _apply_refined_section_thetas!(wing::Wing{P, T}, section_thetas) where 
     local_y = zeros(MVector{3, T})
     chord = zeros(MVector{3, T})
     normal = zeros(MVector{3, T})
+    n_sec = wing.n_panels + 1
 
-    for i in 1:(wing.n_panels + 1)
+    for i in 1:n_sec
         theta = section_thetas[i]
         section = wing.non_deformed_sections[i]
+        le = section.LE_point
 
-        if i < wing.n_panels + 1
-            section2 = wing.non_deformed_sections[i + 1]
-            local_y .= normalize(section.LE_point - section2.LE_point)
-        else
-            section_prev = wing.non_deformed_sections[i - 1]
-            local_y .= normalize(section_prev.LE_point - section.LE_point)
+        # Spanwise axis: average of unit vectors to the left and right neighbour LE
+        # points so curvature does not bias the twist axis. Boundaries fall back to
+        # whichever side exists.
+        local_y .= zero(T)
+        if i > 1
+            le_prev = wing.non_deformed_sections[i - 1].LE_point
+            dx = le_prev[1] - le[1]
+            dy = le_prev[2] - le[2]
+            dz = le_prev[3] - le[3]
+            inv_n = 1 / sqrt(dx * dx + dy * dy + dz * dz)
+            local_y[1] += dx * inv_n
+            local_y[2] += dy * inv_n
+            local_y[3] += dz * inv_n
         end
+        if i < n_sec
+            le_next = wing.non_deformed_sections[i + 1].LE_point
+            dx = le[1] - le_next[1]
+            dy = le[2] - le_next[2]
+            dz = le[3] - le_next[3]
+            inv_n = 1 / sqrt(dx * dx + dy * dy + dz * dz)
+            local_y[1] += dx * inv_n
+            local_y[2] += dy * inv_n
+            local_y[3] += dz * inv_n
+        end
+        inv_n = 1 / sqrt(local_y[1]^2 + local_y[2]^2 + local_y[3]^2)
+        local_y[1] *= inv_n
+        local_y[2] *= inv_n
+        local_y[3] *= inv_n
 
-        chord .= section.TE_point .- section.LE_point
+        chord .= section.TE_point .- le
         normal .= chord × local_y
-        @. wing.refined_sections[i].TE_point = section.LE_point +
+        @. wing.refined_sections[i].TE_point = le +
             cos(theta) * chord - sin(theta) * normal
     end
     return nothing
