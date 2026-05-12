@@ -656,6 +656,8 @@ function solve_base!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics, gamma
     nothing
 end
 
+@inline smooth_sqrt(x) = sqrt(x + 1e-30)
+
 @inline function update_gamma_candidate!(
     gamma_out,
     gamma_in,
@@ -718,11 +720,11 @@ end
     solver.lr.alpha_dist .= atan.(v_normal_array, v_tangential_array)
 
     @inbounds for i in 1:n_panels
-        solver.lr.v_a_dist[i] = sqrt(
+        solver.lr.v_a_dist[i] = smooth_sqrt(
             relative_velocity_crossz[i,1]^2 +
             relative_velocity_crossz[i,2]^2 +
             relative_velocity_crossz[i,3]^2)
-        va_magw_array[i] = sqrt(
+        va_magw_array[i] = smooth_sqrt(
             v_acrossz_array[i,1]^2 +
             v_acrossz_array[i,2]^2 +
             v_acrossz_array[i,3]^2)
