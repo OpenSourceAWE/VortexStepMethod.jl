@@ -21,7 +21,7 @@ using Test
 
     @testset "AutoForwardDiff matches AutoFiniteDiff (LOOP, INVISCID)" begin
         # FD warm-starts otherwise bias the reference Jacobian.
-        solver = Solver(body_aero; use_gamma_prev=false)
+        solver = Solver(body_aero; use_gamma_prev=false, relaxation_factor=0.01)
 
         jac_fwd, _, fwd_converged = VortexStepMethod.linearize(
             solver, body_aero, y0;
@@ -36,6 +36,7 @@ using Test
             backend=AutoFiniteDiff(absstep=1e-5, relstep=1e-5))
         @test fd_converged
 
+        @info "INVISCID linearize jacobian norms" norm_fwd=norm(jac_fwd) norm_fd=norm(jac_fd)
         rel_err = maximum(abs.(jac_fwd .- jac_fd)) / maximum(abs, jac_fwd)
         @test rel_err < 1e-4
     end
@@ -73,6 +74,7 @@ using Test
             rtol=1e-7,
             solver_type=LOOP,
             use_gamma_prev=false,
+            relaxation_factor=0.01,
         )
 
         v_a = 15.0
@@ -94,6 +96,7 @@ using Test
             backend=AutoFiniteDiff(absstep=1e-5, relstep=1e-5))
         @test conv_fd
 
+        @info "POLAR_MATRICES linearize jacobian norms" norm_fwd=norm(jac_fwd) norm_fd=norm(jac_fd)
         rel_err = maximum(abs.(jac_fwd .- jac_fd)) / maximum(abs, jac_fwd)
         @test rel_err < 1e-3
     end
