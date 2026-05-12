@@ -20,8 +20,9 @@ using Test
     y0 = [va; omega]
 
     @testset "AutoForwardDiff matches AutoFiniteDiff (LOOP, INVISCID)" begin
-        # FD warm-starts otherwise bias the reference Jacobian.
-        solver = Solver(body_aero; use_gamma_prev=false, relaxation_factor=0.01)
+        solver = Solver(body_aero;
+            use_gamma_prev=false,
+            type_initial_gamma_distribution=ELLIPTIC)
 
         jac_fwd, _, fwd_converged = VortexStepMethod.linearize(
             solver, body_aero, y0;
@@ -50,8 +51,6 @@ using Test
     end
 
     @testset "AutoForwardDiff matches AutoFiniteDiff (LOOP, POLAR_MATRICES)" begin
-        # Exercises the mixed-eltype path: calculate_stall_angle_list! calls
-        # calculate_cl with Float64 alpha against Dual-typed panels.
         data_dir = joinpath(dirname(dirname(@__DIR__)), "data", "ram_air_kite")
         body_path = joinpath(tempdir(), "ram_air_kite_body.obj")
         foil_path = joinpath(tempdir(), "ram_air_kite_foil.dat")
@@ -74,7 +73,6 @@ using Test
             rtol=1e-7,
             solver_type=LOOP,
             use_gamma_prev=false,
-            relaxation_factor=0.01,
         )
 
         v_a = 15.0
