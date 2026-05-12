@@ -248,7 +248,8 @@ mutable struct Wing{P, T} <: AbstractWing{T}
 
     # Linear interpolation cache from unrefined sections to refined sections.
     # For refined section i: value = weight * unrefined[left_idx] + (1 - weight) * unrefined[left_idx + 1].
-    # weight == 1 at unrefined endpoints, so refined section values match unrefined endpoints exactly.
+    # First refined section is pinned to weight==1, left_idx==1 (takes unrefined[1]); last refined
+    # section is pinned to weight==0, left_idx==n_unref-1 (takes unrefined[end]).
     refined_section_left_idx::Vector{Int16}  # Length: n_panels + 1
     refined_section_weight::Vector{T}        # Length: n_panels + 1
 
@@ -361,11 +362,17 @@ take the unrefined endpoint values exactly. The panel-level `theta_dist` /
 downstream consumers (solver, body aerodynamics) see a per-panel value.
 
 # Arguments
-- `wing::Wing`: Wing to deform (must have non_deformed_sections).
+- `wing::Wing`: Wing to deform (must have non_deformed_sections, populated by
+  `refine!` for manual/YAML wings or by OBJ refinement for OBJ-based wings).
 - `theta_angles::AbstractVector`: Twist angles in radians, one per unrefined section.
   Pass `nothing` to leave twist unchanged.
 - `delta_angles::AbstractVector`: TE deflection angles in radians, one per unrefined
   section. Pass `nothing` to leave deflection unchanged.
+
+# Keyword arguments
+- `smooth`, `smooth_window`: accepted for backwards compatibility with callers of
+  `deform!`, but ignored here — the linear interpolation between unrefined sections
+  is already smooth, so no post-hoc smoothing is applied.
 """
 function unrefined_deform!(wing::Wing, theta_angles=nothing, delta_angles=nothing;
                            smooth=false, smooth_window=nothing)
@@ -373,7 +380,10 @@ function unrefined_deform!(wing::Wing, theta_angles=nothing, delta_angles=nothin
     isnothing(theta_angles) && isnothing(delta_angles) && return nothing
 
     if !can_deform
-        throw(ArgumentError("This Wing does not support deformation. Only OBJ-based wings created with ObjWing() can be deformed."))
+        throw(ArgumentError(
+            "This Wing has no non_deformed_sections to deform from. " *
+            "Call refine!(wing) (manual/YAML wings) or construct via ObjWing() " *
+            "before calling unrefined_deform!."))
     end
 
     n_unref = wing.n_unrefined_sections
@@ -996,8 +1006,9 @@ sections. For refined section i, the interpolated value is:
              (1 - weight[i]) * unrefined[left_idx[i] + 1]
 
 Positions are quarter-chord arc-length along the unrefined and refined sections.
-Endpoint refined sections always get `weight == 1` so they take the unrefined
-endpoint value exactly.
+The first refined section is pinned to `left_idx == 1`, `weight == 1` (returns
+`unrefined[1]` exactly) and the last refined section to `left_idx == n_unref - 1`,
+`weight == 0` (returns `unrefined[end]` exactly).
 """
 function compute_refined_section_interpolation!(wing::AbstractWing{T}) where {T}
     n_unref = length(wing.unrefined_sections)
