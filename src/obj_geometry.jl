@@ -309,7 +309,10 @@ function refine_obj_wing!(wing::AbstractWing{T}; recompute_mapping=true) where {
     end
 
     # 5. Compute panel mapping and update non_deformed_sections
-    recompute_mapping && VortexStepMethod.compute_refined_panel_mapping!(wing)
+    if recompute_mapping
+        VortexStepMethod.compute_refined_panel_mapping!(wing)
+        VortexStepMethod.compute_refined_section_interpolation!(wing)
+    end
     VortexStepMethod.update_non_deformed_sections!(wing)
 
     return nothing
@@ -584,6 +587,7 @@ function ObjWing(
             MVector{3, Float64}(spanwise_direction),
             sections, Section{Float64}[], remove_nan, use_prior_polar, 0.0,  # billowing_percentage
             Int16[],  # refined_panel_mapping empty
+            Int16[], Float64[],  # refined_section interpolation cache empty
             Section{Float64}[], zeros(Float64, n_panels), zeros(Float64, n_panels),
             Float64(mass), Float64(gamma_tip), Matrix{Float64}(inertia_tensor),
             MVector{3, Float64}(T_cad_body), MMatrix{3, 3, Float64, 9}(R_cad_body),
