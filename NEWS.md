@@ -1,3 +1,14 @@
+## VortexStepMethod v3.3.1 2026-05-13
+
+### Changed
+- `unrefined_deform!` linearly interpolates twist and TE deflection between
+  unrefined sections and rotates each refined section about the average of its
+  adjacent local airfoil normals (#234)
+
+### Fixed
+- `smooth_sqrt` in the solver hot loop keeps gradients defined at zero
+  velocity magnitude
+
 ## VortexStepMethod v3.3.0 2026-05-05
 
 ### Added
