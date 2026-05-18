@@ -270,7 +270,7 @@ function calculate_relative_alpha_and_relative_velocity(
     relative_velocity = panel.va .+ induced_velocity
     v_normal = dot(panel.z_airf, relative_velocity)
     v_tangential = dot(panel.x_airf, relative_velocity)
-    alpha = atan(v_normal / v_tangential)
+    alpha = atan(v_normal, v_tangential)
     
     return alpha, relative_velocity
 end
@@ -354,7 +354,7 @@ function calculate_relative_alpha_and_velocity(panel::Panel, induced_velocity)
     relative_velocity = panel.va + induced_velocity
     v_normal = dot(panel.z_airf, relative_velocity)
     v_tangential = dot(panel.x_airf, relative_velocity)
-    alpha = atan(v_normal / v_tangential)
+    alpha = atan(v_normal, v_tangential)
     return alpha, relative_velocity
 end
 
