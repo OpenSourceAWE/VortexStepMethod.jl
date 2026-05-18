@@ -83,13 +83,13 @@ jobs:
         version: ${{ matrix.julia_version }}
     - uses: julia-actions/cache@v2
     - uses: julia-actions/julia-buildpkg@v1
-    - uses: julia-actions/julia-runtest@v1
-      env:
-        BUILD_IS_PRODUCTION_BUILD: false
     - name: Install matplotlib
       run: sudo apt-get install -y python3-matplotlib
     - name: Build PyCall with system Python
       run: julia -e 'ENV["PYTHON"]="python3"; using Pkg; Pkg.add("PyCall"); Pkg.build("PyCall")'
+    - uses: julia-actions/julia-runtest@v1
+      env:
+        BUILD_IS_PRODUCTION_BUILD: false
     - uses: julia-actions/julia-runtest@v1
       env:
         JULIA_NUM_THREADS: 1
