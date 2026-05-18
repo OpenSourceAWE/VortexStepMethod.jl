@@ -1,3 +1,8 @@
+## VortexStepMethod v3.3.2 2026-05-18
+
+### Changed
+- use 2-arg version of atan to avoid possible NaN
+
 ## VortexStepMethod v3.3.1 2026-05-13
 
 ### Changed
