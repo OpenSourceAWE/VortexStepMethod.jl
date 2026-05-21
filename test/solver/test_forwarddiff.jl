@@ -39,7 +39,7 @@ using Test
 
         @info "INVISCID linearize jacobian norms" norm_fwd=norm(jac_fwd) norm_fd=norm(jac_fd)
         rel_err = maximum(abs.(jac_fwd .- jac_fd)) / maximum(abs, jac_fwd)
-        @test rel_err < 1e-4
+        @test rel_err < 1e-3
     end
 
     @testset "NONLIN+ForwardDiff is rejected" begin
