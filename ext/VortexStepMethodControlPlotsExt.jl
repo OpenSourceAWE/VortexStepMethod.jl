@@ -6,6 +6,12 @@ import VortexStepMethod: calculate_filaments_for_plotting
 export plot_wing, plot_circulation_distribution, plot_geometry, plot_distribution,
        plot_polars, save_plot, show_plot, plot_polar_data, plot_combined_analysis
 
+# Set this extension as the active plotting backend when loaded (only if not already set)
+function __init__()
+    isnothing(VortexStepMethod._PLOT_BACKEND[]) &&
+        (VortexStepMethod._PLOT_BACKEND[] = VortexStepMethod.ControlPlotsBackend())
+end
+
 """
     set_plot_style(titel_size=16; use_tex=false)
 
@@ -263,16 +269,16 @@ function create_geometry_plot(body_aero::BodyAerodynamics, title, view_elevation
 end
 
 """
-    plot_geometry(body_aero::BodyAerodynamics, title;
+    plot_geometry(body_aero::BodyAerodynamics, title, ::ControlPlotsBackend;
                   data_type=".pdf", save_path=nothing,
                   is_save=false, is_show=false,
                   view_elevation=15, view_azimuth=-120, use_tex=false)
 
-Plot wing geometry from different viewpoints and optionally save/show plots.
+ControlPlots backend implementation of [`plot_geometry`](@ref).
 
 # Arguments:
 - `body_aero`: the [BodyAerodynamics](@ref) to plot
-- title: plot title
+- `title`: plot title
 
 # Keyword arguments:
 - `data_type``: string with the file type postfix (default: ".pdf")
@@ -284,7 +290,8 @@ Plot wing geometry from different viewpoints and optionally save/show plots.
 - `use_tex`: if the external `pdflatex` command shall be used (default: false)
 
 """
-function VortexStepMethod.plot_geometry(body_aero::BodyAerodynamics, title;
+function VortexStepMethod.plot_geometry(body_aero::BodyAerodynamics, title,
+    ::VortexStepMethod.ControlPlotsBackend;
     data_type=".pdf",
     save_path=nothing,
     is_save=false,
@@ -323,11 +330,11 @@ function VortexStepMethod.plot_geometry(body_aero::BodyAerodynamics, title;
 end
 
 """
-    plot_distribution(y_coordinates_list, results_list, label_list;
+    plot_distribution(y_coordinates_list, results_list, label_list, ::ControlPlotsBackend;
                       title="spanwise_distribution", data_type=".pdf",
                       save_path=nothing, is_save=false, is_show=true, use_tex=false)
 
-Plot spanwise distributions of aerodynamic properties.
+ControlPlots backend implementation of [`plot_distribution`](@ref).
 
 # Arguments
 - `y_coordinates_list`: List of spanwise coordinates
@@ -342,7 +349,8 @@ Plot spanwise distributions of aerodynamic properties.
 - `is_show`: Whether to display plots (default: true)
 - `use_tex`: if the external `pdflatex` command shall be used
 """
-function VortexStepMethod.plot_distribution(y_coordinates_list, results_list, label_list;
+function VortexStepMethod.plot_distribution(y_coordinates_list, results_list, label_list,
+    ::VortexStepMethod.ControlPlotsBackend;
     title="spanwise_distribution",
     data_type=".pdf",
     save_path=nothing,
@@ -515,14 +523,14 @@ Generate polar data for aerodynamic analysis over a range of angles.
 """
 
 """
-    plot_polars(solver_list, body_aero_list, label_list;
+    plot_polars(solver_list, body_aero_list, label_list, ::ControlPlotsBackend;
                 literature_path_list=String[],
                 angle_range=range(0, 20, 2), angle_type="angle_of_attack",
                 angle_of_attack=0.0, side_slip=0.0, v_a=10.0,
                 title="polar", data_type=".pdf", save_path=nothing,
                 is_save=true, is_show=true, use_tex=false)
 
-Plot polar data comparing different solvers and configurations.
+ControlPlots backend implementation of [`plot_polars`](@ref).
 
 # Arguments
 - `solver_list`: List of aerodynamic solvers
@@ -547,7 +555,8 @@ Plot polar data comparing different solvers and configurations.
 function VortexStepMethod.plot_polars(
     solver_list,
     body_aero_list,
-    label_list;
+    label_list,
+    ::VortexStepMethod.ControlPlotsBackend;
     literature_path_list=String[],
     angle_range=range(0, 20, 2),
     angle_type="angle_of_attack",
@@ -741,10 +750,12 @@ function VortexStepMethod.plot_polars(
 end
 
 """
-    plot_polar_data(body_aero::BodyAerodynamics; alphas=collect(deg2rad.(-5:0.3:25)), delta_tes=collect(deg2rad.(-5:0.3:25)))
+    plot_polar_data(body_aero::BodyAerodynamics, ::ControlPlotsBackend;
+                    alphas=collect(deg2rad.(-5:0.3:25)),
+                    delta_tes=collect(deg2rad.(-5:0.3:25)))
 
-Plot polar data (Cl, Cd, Cm) as 3D surfaces against alpha and delta_te angles. delta_te is the trailing edge deflection angle
-relative to the 2d airfoil or panel chord line.
+ControlPlots backend implementation of [`plot_polar_data`](@ref). Plots Cl, Cd, Cm as 3D surfaces
+against angle of attack and trailing edge deflection angle.
 
 # Arguments
 - `body_aero`: Wing aerodynamics struct
@@ -755,7 +766,8 @@ relative to the 2d airfoil or panel chord line.
 - `is_show`: Whether to display plots (default: true)
 - `use_tex`: if the external `pdflatex` command shall be used
 """
-function VortexStepMethod.plot_polar_data(body_aero::BodyAerodynamics;
+function VortexStepMethod.plot_polar_data(body_aero::BodyAerodynamics,
+        ::VortexStepMethod.ControlPlotsBackend;
         alphas=collect(deg2rad.(-5:0.3:25)),
         delta_tes = collect(deg2rad.(-5:0.3:25)),
         is_show = true,
@@ -812,10 +824,10 @@ function VortexStepMethod.plot_polar_data(body_aero::BodyAerodynamics;
 end
 
 """
-    plot_combined_analysis(solver, body_aero, results; kwargs...)
+    plot_combined_analysis(solver, body_aero, results, ::ControlPlotsBackend; kwargs...)
 
-Create combined analysis by calling plot_geometry, plot_distribution,
-and plot_polars sequentially. Each creates a separate matplotlib window.
+ControlPlots backend implementation of [`plot_combined_analysis`](@ref).
+Calls `plot_geometry`, `plot_distribution`, and `plot_polars` sequentially.
 
 # Arguments
 - `solver`: Solver or array of solvers
@@ -827,7 +839,8 @@ See individual functions for detailed parameter descriptions.
 function VortexStepMethod.plot_combined_analysis(
     solver,
     body_aero,
-    results;
+    results,
+    backend::VortexStepMethod.ControlPlotsBackend;
     solver_label="VSM",
     labels=nothing,
     angle_range=range(0, 20, length=20),
@@ -888,7 +901,8 @@ function VortexStepMethod.plot_combined_analysis(
     # Plot geometry (first body_aero only)
     plot_geometry(
         body_aeros[1],
-        title;
+        title,
+        backend;
         data_type, save_path, is_save, is_show,
         view_elevation, view_azimuth, use_tex
     )
@@ -897,7 +911,8 @@ function VortexStepMethod.plot_combined_analysis(
     plot_distribution(
         y_coords_list,
         results_spanwise,
-        solver_labels;
+        solver_labels,
+        backend;
         title=title * " - Distributions",
         data_type, save_path, is_save, is_show, use_tex
     )
@@ -912,7 +927,8 @@ function VortexStepMethod.plot_combined_analysis(
     plot_polars(
         solvers,
         body_aeros,
-        polar_labels;
+        polar_labels,
+        backend;
         literature_path_list, angle_range, angle_type,
         angle_of_attack, side_slip, v_a,
         title=title * " - Polars",

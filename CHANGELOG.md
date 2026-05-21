@@ -1,3 +1,14 @@
+# Changelog
+
+## VortexStepMethod v3.3.3 2026-05-21
+
+### Fixed
+- `MakieExt` and `ControlPlotsExt` no longer both define
+  `VortexStepMethod.plot_geometry` for the same type, resolving a method
+  ambiguity when both extensions were loaded (#236)
+- `menu()` and `menu_cp()` now always set the active backend before dispatching
+  to a plot function, preventing stale-backend errors
+
 ## VortexStepMethod v3.3.2 2026-05-18
 
 ### Changed

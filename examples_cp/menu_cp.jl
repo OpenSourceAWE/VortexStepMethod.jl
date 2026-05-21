@@ -7,6 +7,8 @@ using ControlPlots
 using VortexStepMethod
 using REPL.TerminalMenus
 
+set_plot_backend!(ControlPlotsBackend())
+
 url = "https://opensourceawe.github.io/VortexStepMethod.jl/dev"
 
 examples_dir = joinpath(@__DIR__, "..", "examples")

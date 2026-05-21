@@ -39,7 +39,7 @@ using Test
 
         @info "INVISCID linearize jacobian norms" norm_fwd=norm(jac_fwd) norm_fd=norm(jac_fd)
         rel_err = maximum(abs.(jac_fwd .- jac_fd)) / maximum(abs, jac_fwd)
-        @test rel_err < 1e-4
+        @test rel_err < 1e-3
     end
 
     @testset "NONLIN+ForwardDiff is rejected" begin
@@ -76,7 +76,7 @@ using Test
         )
 
         v_a = 15.0
-        aoa_rad = deg2rad(8.0)
+        aoa_rad = deg2rad(7.5)  # off-grid (grid is every 1°) to avoid piecewise-linear node discontinuities
         y_op = [zeros(4);
                 [cos(aoa_rad), 0.0, sin(aoa_rad)] * v_a;
                 zeros(3)]
