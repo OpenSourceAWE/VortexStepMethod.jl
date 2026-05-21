@@ -5,9 +5,10 @@ import VortexStepMethod: calculate_filaments_for_plotting
 export plot_geometry, plot_distribution, plot_polars, save_plot, show_plot,
     plot_polar_data, plot_combined_analysis
 
-# Set this extension as the active plotting backend when loaded
+# Set this extension as the active plotting backend when loaded (only if not already set)
 function __init__()
-    VortexStepMethod._PLOT_BACKEND[] = VortexStepMethod.MakieBackend()
+    isnothing(VortexStepMethod._PLOT_BACKEND[]) &&
+        (VortexStepMethod._PLOT_BACKEND[] = VortexStepMethod.MakieBackend())
 end
 
 # Global storage for panel mesh observables (for dynamic plotting)

@@ -6,9 +6,10 @@ import VortexStepMethod: calculate_filaments_for_plotting
 export plot_wing, plot_circulation_distribution, plot_geometry, plot_distribution,
        plot_polars, save_plot, show_plot, plot_polar_data, plot_combined_analysis
 
-# Set this extension as the active plotting backend when loaded
+# Set this extension as the active plotting backend when loaded (only if not already set)
 function __init__()
-    VortexStepMethod._PLOT_BACKEND[] = VortexStepMethod.ControlPlotsBackend()
+    isnothing(VortexStepMethod._PLOT_BACKEND[]) &&
+        (VortexStepMethod._PLOT_BACKEND[] = VortexStepMethod.ControlPlotsBackend())
 end
 
 """
@@ -839,7 +840,7 @@ function VortexStepMethod.plot_combined_analysis(
     solver,
     body_aero,
     results,
-    ::VortexStepMethod.ControlPlotsBackend;
+    backend::VortexStepMethod.ControlPlotsBackend;
     solver_label="VSM",
     labels=nothing,
     angle_range=range(0, 20, length=20),
@@ -900,7 +901,8 @@ function VortexStepMethod.plot_combined_analysis(
     # Plot geometry (first body_aero only)
     plot_geometry(
         body_aeros[1],
-        title;
+        title,
+        backend;
         data_type, save_path, is_save, is_show,
         view_elevation, view_azimuth, use_tex
     )
@@ -909,7 +911,8 @@ function VortexStepMethod.plot_combined_analysis(
     plot_distribution(
         y_coords_list,
         results_spanwise,
-        solver_labels;
+        solver_labels,
+        backend;
         title=title * " - Distributions",
         data_type, save_path, is_save, is_show, use_tex
     )
@@ -924,7 +927,8 @@ function VortexStepMethod.plot_combined_analysis(
     plot_polars(
         solvers,
         body_aeros,
-        polar_labels;
+        polar_labels,
+        backend;
         literature_path_list, angle_range, angle_type,
         angle_of_attack, side_slip, v_a,
         title=title * " - Polars",
