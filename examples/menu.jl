@@ -6,6 +6,8 @@ using CairoMakie
 using VortexStepMethod
 using REPL.TerminalMenus
 
+set_plot_backend!(MakieBackend())
+
 url = "https://opensourceawe.github.io/VortexStepMethod.jl/dev"
 
 example_files = [
