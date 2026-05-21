@@ -6,6 +6,11 @@ import VortexStepMethod: calculate_filaments_for_plotting
 export plot_wing, plot_circulation_distribution, plot_geometry, plot_distribution,
        plot_polars, save_plot, show_plot, plot_polar_data, plot_combined_analysis
 
+# Set this extension as the active plotting backend when loaded
+function __init__()
+    VortexStepMethod._PLOT_BACKEND[] = VortexStepMethod.ControlPlotsBackend()
+end
+
 """
     set_plot_style(titel_size=16; use_tex=false)
 
@@ -284,7 +289,8 @@ Plot wing geometry from different viewpoints and optionally save/show plots.
 - `use_tex`: if the external `pdflatex` command shall be used (default: false)
 
 """
-function VortexStepMethod.plot_geometry(body_aero::BodyAerodynamics, title;
+function VortexStepMethod.plot_geometry(body_aero::BodyAerodynamics, title,
+    ::VortexStepMethod.ControlPlotsBackend;
     data_type=".pdf",
     save_path=nothing,
     is_save=false,
@@ -342,7 +348,8 @@ Plot spanwise distributions of aerodynamic properties.
 - `is_show`: Whether to display plots (default: true)
 - `use_tex`: if the external `pdflatex` command shall be used
 """
-function VortexStepMethod.plot_distribution(y_coordinates_list, results_list, label_list;
+function VortexStepMethod.plot_distribution(y_coordinates_list, results_list, label_list,
+    ::VortexStepMethod.ControlPlotsBackend;
     title="spanwise_distribution",
     data_type=".pdf",
     save_path=nothing,
@@ -547,7 +554,8 @@ Plot polar data comparing different solvers and configurations.
 function VortexStepMethod.plot_polars(
     solver_list,
     body_aero_list,
-    label_list;
+    label_list,
+    ::VortexStepMethod.ControlPlotsBackend;
     literature_path_list=String[],
     angle_range=range(0, 20, 2),
     angle_type="angle_of_attack",
@@ -755,7 +763,8 @@ relative to the 2d airfoil or panel chord line.
 - `is_show`: Whether to display plots (default: true)
 - `use_tex`: if the external `pdflatex` command shall be used
 """
-function VortexStepMethod.plot_polar_data(body_aero::BodyAerodynamics;
+function VortexStepMethod.plot_polar_data(body_aero::BodyAerodynamics,
+        ::VortexStepMethod.ControlPlotsBackend;
         alphas=collect(deg2rad.(-5:0.3:25)),
         delta_tes = collect(deg2rad.(-5:0.3:25)),
         is_show = true,
@@ -827,7 +836,8 @@ See individual functions for detailed parameter descriptions.
 function VortexStepMethod.plot_combined_analysis(
     solver,
     body_aero,
-    results;
+    results,
+    ::VortexStepMethod.ControlPlotsBackend;
     solver_label="VSM",
     labels=nothing,
     angle_range=range(0, 20, length=20),

@@ -5,6 +5,11 @@ import VortexStepMethod: calculate_filaments_for_plotting
 export plot_geometry, plot_distribution, plot_polars, save_plot, show_plot,
     plot_polar_data, plot_combined_analysis
 
+# Set this extension as the active plotting backend when loaded
+function __init__()
+    VortexStepMethod._PLOT_BACKEND[] = VortexStepMethod.MakieBackend()
+end
+
 # Global storage for panel mesh observables (for dynamic plotting)
 const PANEL_MESH_OBSERVABLES = Ref{Union{Nothing,Dict}}(nothing)
 
@@ -479,7 +484,8 @@ Plot wing geometry from different viewpoints using Makie.
 - `view_azimuth`: View azimuth angle in degrees (default: -120)
 - `use_tex`: Ignored for Makie (default: false)
 """
-function VortexStepMethod.plot_geometry(body_aero::BodyAerodynamics, title;
+function VortexStepMethod.plot_geometry(body_aero::BodyAerodynamics, title,
+    ::VortexStepMethod.MakieBackend;
     data_type=nothing,
     save_path=nothing,
     is_save=false,
@@ -535,7 +541,8 @@ Plot spanwise distributions of aerodynamic properties using Makie.
 - `is_show`: Whether to display (default: true)
 - `use_tex`: Ignored for Makie (default: false)
 """
-function VortexStepMethod.plot_distribution(y_coordinates_list, results_list, label_list;
+function VortexStepMethod.plot_distribution(y_coordinates_list, results_list, label_list,
+    ::VortexStepMethod.MakieBackend;
     title="spanwise_distribution",
     data_type=nothing,
     save_path=nothing,
@@ -700,7 +707,8 @@ Plot polar data comparing different solvers using Makie.
 function VortexStepMethod.plot_polars(
     solver_list,
     body_aero_list,
-    label_list;
+    label_list,
+    ::VortexStepMethod.MakieBackend;
     literature_path_list=String[],
     angle_range=range(0, 20, 2),
     angle_type="angle_of_attack",
@@ -882,7 +890,8 @@ Plot polar data (Cl, Cd, Cm) as 3D surfaces using Makie.
 - `is_show`: Whether to display (default: true)
 - `use_tex`: Ignored for Makie (default: false)
 """
-function VortexStepMethod.plot_polar_data(body_aero::BodyAerodynamics;
+function VortexStepMethod.plot_polar_data(body_aero::BodyAerodynamics,
+    ::VortexStepMethod.MakieBackend;
     alphas=collect(deg2rad.(-5:0.3:25)),
     delta_tes=collect(deg2rad.(-5:0.3:25)),
     is_show=true,
@@ -972,7 +981,8 @@ Create combined multi-panel figure with geometry, polar data, distributions, and
 function VortexStepMethod.plot_combined_analysis(
     solver,
     body_aero,
-    results;
+    results,
+    ::VortexStepMethod.MakieBackend;
     solver_label="VSM",
     labels=nothing,
     angle_range=range(0, 20, length=20),

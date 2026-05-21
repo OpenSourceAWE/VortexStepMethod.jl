@@ -46,7 +46,32 @@ export load_polar_data
 export plot_circulation_distribution, plot_combined_analysis, plot_distribution, plot_geometry,
     plot_polar_data, plot_polars, save_plot, show_plot
 
-# the following functions are defined in ext/VortexStepMethodExt.jl
+# Backend dispatch types for multi-backend support (Makie and ControlPlots can coexist)
+abstract type PlotBackend end
+struct MakieBackend <: PlotBackend end
+struct ControlPlotsBackend <: PlotBackend end
+export PlotBackend, MakieBackend, ControlPlotsBackend
+
+const _PLOT_BACKEND = Ref{Union{Nothing, PlotBackend}}(nothing)
+
+"""
+    set_plot_backend!(backend::PlotBackend)
+
+Select the active plotting backend when both Makie and ControlPlots are loaded.
+
+# Example
+```julia
+set_plot_backend!(MakieBackend())
+set_plot_backend!(ControlPlotsBackend())
+```
+"""
+function set_plot_backend!(backend::PlotBackend)
+    _PLOT_BACKEND[] = backend
+end
+export set_plot_backend!
+
+# Generic stubs — extended by MakieExt and ControlPlotsExt with a PlotBackend argument.
+# The no-backend-argument wrappers below route through the active backend.
 function plot_geometry end
 function plot_distribution end
 function plot_circulation_distribution end
@@ -55,6 +80,36 @@ function save_plot end
 function show_plot end
 function plot_polar_data end
 function plot_combined_analysis end
+
+function _active_backend()
+    b = _PLOT_BACKEND[]
+    isnothing(b) && error(
+        "No plotting backend loaded. Load Makie or ControlPlots first, " *
+        "or call set_plot_backend!(MakieBackend()) / set_plot_backend!(ControlPlotsBackend()) " *
+        "when both are loaded."
+    )
+    b
+end
+
+function plot_geometry(body_aero, title; kwargs...)
+    plot_geometry(body_aero, title, _active_backend(); kwargs...)
+end
+
+function plot_distribution(y_coordinates_list, results_list, label_list; kwargs...)
+    plot_distribution(y_coordinates_list, results_list, label_list, _active_backend(); kwargs...)
+end
+
+function plot_polars(solver_list, body_aero_list, label_list; kwargs...)
+    plot_polars(solver_list, body_aero_list, label_list, _active_backend(); kwargs...)
+end
+
+function plot_polar_data(body_aero; kwargs...)
+    plot_polar_data(body_aero, _active_backend(); kwargs...)
+end
+
+function plot_combined_analysis(solver, body_aero, results; kwargs...)
+    plot_combined_analysis(solver, body_aero, results, _active_backend(); kwargs...)
+end
 
 """
    const MVec3    = MVector{3, Float64}
