@@ -73,7 +73,10 @@ end
         ]
         induced_velocity = zeros(3)
 
-        # Filament start point is singular in the current implementation.
+        # Singular geometry: smooth_norm3 floors the cross-product
+        # magnitude, so no division-by-zero produces NaN. Result must
+        # be finite; structural zero cross-products on the axis give
+        # zero velocity.
         velocity_3D_trailing_vortex_semiinfinite!(
             induced_velocity,
             filament,
@@ -83,7 +86,7 @@ end
             filament.vel_mag,
             work_vectors
         )
-        @test all(isnan.(induced_velocity))
+        @test all(isfinite.(induced_velocity))
 
         for point in test_points
             velocity_3D_trailing_vortex_semiinfinite!(

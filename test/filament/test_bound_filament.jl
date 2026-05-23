@@ -133,35 +133,35 @@ end
     @testset "Around Core Radius" begin
         filament = create_test_filament()
         delta = 1e-5
-        
+
         points = [
             [0.5, core_radius_fraction - delta, 0.0],
             [0.5, core_radius_fraction, 0.0],
             [0.5, core_radius_fraction + delta, 0.0]
         ]
-        
+
         velocities = [zeros(3) for p in points]
         [
             velocity_3D_bound_vortex!(velocities[i], filament, p, gamma, core_radius_fraction, work_vectors)
             for (i, p) in enumerate(points)
         ]
-        
+
         # Check for NaN and finite values
         @test all(!any(isnan.(v)) for v in velocities)
         @test all(all(isfinite.(v)) for v in velocities)
-        
+
         # Check magnitude is maximum at core radius
         @test norm(velocities[2]) > norm(velocities[1])
         @test norm(velocities[2]) > norm(velocities[3])
-        
+
         # Check continuity around core radius
         @test isapprox(velocities[1], velocities[2], rtol=1e-2)
-        
+
         # Check non-zero velocities
         @test !all(isapprox.(velocities[1], zeros(3), atol=1e-10))
         @test !all(isapprox.(velocities[2], zeros(3), atol=1e-10))
         @test !all(isapprox.(velocities[3], zeros(3), atol=1e-10))
-        
+
         # Check symmetry
         v_neg = zeros(3)
         velocity_3D_bound_vortex!(

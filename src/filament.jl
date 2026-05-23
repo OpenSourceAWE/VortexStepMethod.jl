@@ -78,8 +78,6 @@ function velocity_3D_bound_vortex!(
         @inbounds for k in 1:3
             vel[k] = coeff * r1Xr2[k]
         end
-    elseif nr1Xr0 / nr0 < 1e-12 * epsilon
-        vel .= 0.0
     else
         @debug "inside core radius"
         @debug "distance from control point to filament: $(nr1Xr0 / nr0)"
@@ -284,8 +282,6 @@ function velocity_3D_trailing_vortex_semiinfinite!(
         @inbounds for k in 1:3
             vel[k] = K * r1XVf[k]
         end
-    elseif nr1XVf / nVf < 1e-12 * epsilon
-        vel .= 0.0
     else
         r1_proj = work_vectors[4]
         cross_tmp = work_vectors[5]
@@ -324,7 +320,7 @@ Compute cross product of 3D vectors in-place.
     nothing
 end
 
-@inline smooth_norm3(a) = sqrt(a[1]*a[1] + a[2]*a[2] + a[3]*a[3] + 1e-12)
+@inline smooth_norm3(a) = sqrt(a[1]*a[1] + a[2]*a[2] + a[3]*a[3] + 1e-18)
 @inline dot3(a, b) = a[1]*b[1] + a[2]*b[2] + a[3]*b[3]
 @inline function smooth_normalize3!(v)
     n = smooth_norm3(v)

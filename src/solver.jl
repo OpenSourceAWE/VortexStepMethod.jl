@@ -656,7 +656,7 @@ function solve_base!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics, gamma
     nothing
 end
 
-@inline smooth_sqrt(x) = sqrt(x + 1e-12)
+@inline smooth_sqrt(x) = sqrt(x + 1e-18)
 
 @inline function update_gamma_candidate!(
     gamma_out,
