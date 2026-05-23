@@ -625,7 +625,7 @@ function find_center_of_pressure(
         normal[1] = v1y*v2z - v1z*v2y
         normal[2] = v1z*v2x - v1x*v2z
         normal[3] = v1x*v2y - v1y*v2x
-        normal_norm = norm3(normal)
+        normal_norm = smooth_norm3(normal)
         if normal_norm != 0
             normal[1] /= normal_norm
             normal[2] /= normal_norm
@@ -771,8 +771,8 @@ function calculate_results(
             panel, alpha_dist[i])
         panel_width_array[i] = panel.width
         va_norm = va_norm_array[i]
-        x_norm = norm3(panel.x_airf)
-        z_norm = norm3(panel.z_airf)
+        x_norm = smooth_norm3(panel.x_airf)
+        z_norm = smooth_norm3(panel.z_airf)
         if va_norm == 0.0 || x_norm == 0.0 || z_norm == 0.0
             alpha_geometric[i] = NaN
         else
@@ -824,7 +824,7 @@ function calculate_results(
     total_area > 0.0 || throw(ArgumentError(
         "Total panel area must be positive."))
     reference_speed = sqrt(weighted_speed_sq / total_area)
-    direction_norm = norm3(va_ref_vector)
+    direction_norm = smooth_norm3(va_ref_vector)
     if direction_norm <= 0.0
         va_ref_vector .= (1.0, 0.0, 0.0)
         direction_norm = 1.0
@@ -833,7 +833,7 @@ function calculate_results(
         va_ref_vector[k] = va_ref_vector[k] / direction_norm *
                            reference_speed
     end
-    va_ref_mag = norm3(va_ref_vector)
+    va_ref_mag = smooth_norm3(va_ref_vector)
     va_ref_mag > 0.0 || throw(ArgumentError(
         "Reference freestream magnitude must be positive."))
     va_ref_unit = body_aero.work_vectors[1]
@@ -843,7 +843,7 @@ function calculate_results(
     end
     dir_lift_ref = body_aero.work_vectors[2]
     cross3!(dir_lift_ref, va_ref_vector, spanwise_direction)
-    dir_lift_ref_norm = norm3(dir_lift_ref)
+    dir_lift_ref_norm = smooth_norm3(dir_lift_ref)
     dir_lift_ref_norm > 0.0 || throw(ArgumentError(
         "Reference lift direction is undefined because " *
         "reference flow is parallel to spanwise direction."))
@@ -874,14 +874,14 @@ function calculate_results(
             induced_va_airfoil[k] = c_alpha * panel.x_airf[k] +
                                     s_alpha * panel.z_airf[k]
         end
-        normalize3!(induced_va_airfoil)
+        smooth_normalize3!(induced_va_airfoil)
 
         cross3!(dir_lift_induced_va,
                 induced_va_airfoil, panel.y_airf)
-        normalize3!(dir_lift_induced_va)
+        smooth_normalize3!(dir_lift_induced_va)
         cross3!(dir_drag_induced_va,
                 spanwise_direction, dir_lift_induced_va)
-        normalize3!(dir_drag_induced_va)
+        smooth_normalize3!(dir_drag_induced_va)
 
         q_lift = 0.5 * density * v_a_dist[i]^2
         lift_i = cl_array[i] * q_lift * chord_array[i]
@@ -900,7 +900,7 @@ function calculate_results(
         q_panel = 0.5 * density * va_panel_mag^2
         cross3!(dir_lift_prescribed_va,
                 panel.va, spanwise_direction)
-        normalize3!(dir_lift_prescribed_va)
+        smooth_normalize3!(dir_lift_prescribed_va)
 
         lift_prescribed_va =
             dot3(lift_induced_va, dir_lift_prescribed_va) +

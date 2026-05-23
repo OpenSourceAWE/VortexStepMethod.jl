@@ -596,7 +596,7 @@ function calculate_velocity_induced_bound_2D!(
     cross3!(cross_, r0, r3)
 
     # Calculate induced velocity
-    coeff = norm3(r0) / (2π * norm3(cross_)^2)
+    coeff = smooth_norm3(r0) / (2π * smooth_norm3(cross_)^2)
     @inbounds for k in 1:3
         U_2D[k] = cross_[k] * coeff
     end

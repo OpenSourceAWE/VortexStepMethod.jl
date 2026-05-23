@@ -354,13 +354,13 @@ function solve!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics, gamma_dist
             dir_iva[k] = c_alpha * panel.x_airf[k] +
                          s_alpha * panel.z_airf[k]
         end
-        normalize3!(dir_iva)
+        smooth_normalize3!(dir_iva)
 
         # Calculate lift and drag directions
         cross3!(dir_lift, dir_iva, panel.y_airf)
-        normalize3!(dir_lift)
+        smooth_normalize3!(dir_lift)
         cross3!(dir_drag, spanwise_direction, dir_lift)
-        normalize3!(dir_drag)
+        smooth_normalize3!(dir_drag)
 
         # Calculate force vectors
         li = lift[i]
@@ -656,7 +656,7 @@ function solve_base!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics, gamma
     nothing
 end
 
-@inline smooth_sqrt(x) = sqrt(x + 1e-30)
+@inline smooth_sqrt(x) = sqrt(x + 1e-12)
 
 @inline function update_gamma_candidate!(
     gamma_out,

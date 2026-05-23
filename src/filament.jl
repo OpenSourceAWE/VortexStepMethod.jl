@@ -59,21 +59,21 @@ function velocity_3D_bound_vortex!(
     r2 .= XVP .- filament.x2
 
     # Cut-off radius
-    nr0 = norm3(r0)
+    nr0 = smooth_norm3(r0)
     epsilon = core_radius_fraction * nr0
 
     cross3!(r1Xr2, r1, r2)
     cross3!(r1Xr0, r1, r0)
-    nr1 = norm3(r1)
-    nr2 = norm3(r2)
+    nr1 = smooth_norm3(r1)
+    nr2 = smooth_norm3(r2)
     @inbounds for k in 1:3
         r1r2norm[k] = r1[k]/nr1 - r2[k]/nr2
     end
 
     # Check point location relative to filament
-    nr1Xr0 = norm3(r1Xr0)
+    nr1Xr0 = smooth_norm3(r1Xr0)
     if nr1Xr0 / nr0 > epsilon
-        nr1Xr2 = norm3(r1Xr2)
+        nr1Xr2 = smooth_norm3(r1Xr2)
         coeff = (gamma / (4π)) / (nr1Xr2^2) * dot3(r0, r1r2norm)
         @inbounds for k in 1:3
             vel[k] = coeff * r1Xr2[k]
@@ -87,7 +87,7 @@ function velocity_3D_bound_vortex!(
         # Project onto core radius
         cross3!(r2Xr0, r2, r0)
         nr0sq = nr0 * nr0
-        nr2Xr0 = norm3(r2Xr0)
+        nr2Xr0 = smooth_norm3(r2Xr0)
         d_r1_r0 = dot3(r1, r0)
         d_r2_r0 = dot3(r2, r0)
         @inbounds for k in 1:3
@@ -98,9 +98,9 @@ function velocity_3D_bound_vortex!(
         end
         cross3!(r1_projXr2_proj, r1_proj, r2_proj)
 
-        nr1pXr2p = norm3(r1_projXr2_proj)
-        nr1_proj = norm3(r1_proj)
-        nr2_proj = norm3(r2_proj)
+        nr1pXr2p = smooth_norm3(r1_projXr2_proj)
+        nr1_proj = smooth_norm3(r1_proj)
+        nr2_proj = smooth_norm3(r2_proj)
         d_sum = 0.0
         @inbounds for k in 1:3
             d_sum += r0[k] * (r1_proj[k]/nr1_proj -
@@ -156,7 +156,7 @@ as implemented in KiteAeroDyn".
     r2 .= XVP .- filament.x2
 
     # Vector perpendicular to core radius
-    nr0 = norm3(r0)
+    nr0 = smooth_norm3(r0)
     nr0sq = nr0 * nr0
     d_r1_r0 = dot3(r1, r0)
     @inbounds for k in 1:3
@@ -164,22 +164,22 @@ as implemented in KiteAeroDyn".
     end
 
     # Cut-off radius
-    epsilon = sqrt(4 * ALPHA0 * NU * norm3(r_perp) / v_a)
+    epsilon = sqrt(4 * ALPHA0 * NU * smooth_norm3(r_perp) / v_a)
 
     cross3!(r1Xr2, r1, r2)
     cross3!(r1Xr0, r1, r0)
     cross3!(r2Xr0, r2, r0)
 
-    nr1 = norm3(r1)
-    nr2 = norm3(r2)
+    nr1 = smooth_norm3(r1)
+    nr2 = smooth_norm3(r2)
     @inbounds for k in 1:3
         normr1r2[k] = r1[k]/nr1 - r2[k]/nr2
     end
 
     # Check point location relative to filament
-    nr1Xr0 = norm3(r1Xr0)
+    nr1Xr0 = smooth_norm3(r1Xr0)
     if nr1Xr0 / nr0 > epsilon
-        nr1Xr2 = norm3(r1Xr2)
+        nr1Xr2 = smooth_norm3(r1Xr2)
         coeff = (gamma / (4π)) / (nr1Xr2^2) * dot3(r0, normr1r2)
         @inbounds for k in 1:3
             vel[k] = coeff * r1Xr2[k]
@@ -190,7 +190,7 @@ as implemented in KiteAeroDyn".
         # Project onto core radius — reuse r_perp, normr1r2
         r1_proj = r_perp
         r2_proj = normr1r2
-        nr2Xr0 = norm3(r2Xr0)
+        nr2Xr0 = smooth_norm3(r2Xr0)
         d_r2_r0 = dot3(r2, r0)
         @inbounds for k in 1:3
             r1_proj[k] = d_r1_r0 * r0[k] / nr0sq +
@@ -200,9 +200,9 @@ as implemented in KiteAeroDyn".
         end
 
         cross3!(r1Xr2, r1_proj, r2_proj)
-        nr1Xr2_val = norm3(r1Xr2)
-        nr1_proj = norm3(r1_proj)
-        nr2_proj = norm3(r2_proj)
+        nr1Xr2_val = smooth_norm3(r1Xr2)
+        nr1_proj = smooth_norm3(r1_proj)
+        nr2_proj = smooth_norm3(r2_proj)
         d_sum = 0.0
         @inbounds for k in 1:3
             d_sum += r0[k] * (r1_proj[k]/nr1_proj -
@@ -272,13 +272,13 @@ function velocity_3D_trailing_vortex_semiinfinite!(
     @inbounds for k in 1:3
         r_perp[k] = d_r1_Vf * Vf[k]
     end
-    epsilon = sqrt(4 * ALPHA0 * NU * norm3(r_perp) / v_a)
+    epsilon = sqrt(4 * ALPHA0 * NU * smooth_norm3(r_perp) / v_a)
 
     cross3!(r1XVf, r1, Vf)
 
-    nr1XVf = norm3(r1XVf)
-    nVf = norm3(Vf)
-    nr1 = norm3(r1)
+    nr1XVf = smooth_norm3(r1XVf)
+    nVf = smooth_norm3(Vf)
+    nr1 = smooth_norm3(r1)
     if nr1XVf / nVf > epsilon
         K = GAMMA / (4π) / (nr1XVf^2) * (1 + d_r1_Vf / nr1)
         @inbounds for k in 1:3
@@ -293,14 +293,14 @@ function velocity_3D_trailing_vortex_semiinfinite!(
         @inbounds for k in 1:3
             cross_tmp[k] = r1[k]/nr1 - Vf[k]
         end
-        n_tmp = norm3(cross_tmp)
+        n_tmp = smooth_norm3(cross_tmp)
         @inbounds for k in 1:3
             r1_proj[k] = d_r1_Vf * Vf[k] +
                          epsilon * cross_tmp[k] / n_tmp
         end
         cross3!(cross_tmp, r1_proj, Vf)
-        K = GAMMA / (4π) / (norm3(cross_tmp)^2) *
-            (1 + dot3(r1_proj, Vf) / norm3(r1_proj))
+        K = GAMMA / (4π) / (smooth_norm3(cross_tmp)^2) *
+            (1 + dot3(r1_proj, Vf) / smooth_norm3(r1_proj))
         @inbounds for k in 1:3
             vel[k] = K * cross_tmp[k]
         end
@@ -324,10 +324,10 @@ Compute cross product of 3D vectors in-place.
     nothing
 end
 
-@inline norm3(a) = sqrt(a[1]*a[1] + a[2]*a[2] + a[3]*a[3])
+@inline smooth_norm3(a) = sqrt(a[1]*a[1] + a[2]*a[2] + a[3]*a[3] + 1e-12)
 @inline dot3(a, b) = a[1]*b[1] + a[2]*b[2] + a[3]*b[3]
-@inline function normalize3!(v)
-    n = norm3(v)
-    n > 0 && (v[1] /= n; v[2] /= n; v[3] /= n)
+@inline function smooth_normalize3!(v)
+    n = smooth_norm3(v)
+    v[1] /= n; v[2] /= n; v[3] /= n
     nothing
 end
