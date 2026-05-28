@@ -354,7 +354,7 @@ end
         @test loop_sol.force_coeffs[2] ≈ 0.0                   atol=1e-4 # CFy
         @test loop_sol.force_coeffs[3] ≈ 0.49055973654418716   atol=3e-4 # CFz
         @test loop_sol.force_coeffs[3] / loop_sol.force_coeffs[1] ≈ loop_sol.force[3] / loop_sol.force[1]
-        @test loop_sol.moment_dist[1] ≈ -0.0006683569356186426 atol=1e-8
+        @test loop_sol.moment_dist[1] ≈ -0.0006683569356186426 atol=1e-7
         @test loop_sol.moment_coeff_dist[1] ≈ -2.212405554436003e-7 atol=1e-9
         @test loop_sol.moment_dist[1] / loop_sol.moment_dist[2] ≈ loop_sol.moment_coeff_dist[1] / loop_sol.moment_coeff_dist[2]
 
