@@ -322,7 +322,7 @@ Compute cross product of 3D vectors in-place.
     nothing
 end
 
-@inline smooth_norm3(a) = sqrt(a[1]*a[1] + a[2]*a[2] + a[3]*a[3] + 1e-18)
+@inline smooth_norm3(a) = sqrt(a[1]*a[1] + a[2]*a[2] + a[3]*a[3] + 1e-12)
 @inline dot3(a, b) = a[1]*b[1] + a[2]*b[2] + a[3]*b[3]
 @inline function smooth_normalize3!(v)
     n = smooth_norm3(v)
