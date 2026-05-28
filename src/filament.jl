@@ -82,13 +82,10 @@ function velocity_3D_bound_vortex!(
         @debug "inside core radius"
         @debug "distance from control point to filament: $(nr1Xr0 / nr0)"
 
-        # Project onto core cylinder along the radial direction
-        # (perpendicular component of r1 to r0). r1 and r2 share the
-        # same radial component, so one radial unit vector serves both.
         nr0sq = nr0 * nr0
         d_r1_r0 = dot3(r1, r0)
         d_r2_r0 = dot3(r2, r0)
-        r_rad = r1Xr0  # reuse buffer; no longer needed below
+        r_rad = r1Xr0
         @inbounds for k in 1:3
             r_rad[k] = r1[k] - d_r1_r0 * r0[k] / nr0sq
         end
@@ -290,7 +287,6 @@ function velocity_3D_trailing_vortex_semiinfinite!(
     else
         r1_proj = work_vectors[4]
         cross_tmp = work_vectors[5]
-        # Radial direction: perpendicular component of r1 to Vf.
         nVfsq = nVf * nVf
         @inbounds for k in 1:3
             cross_tmp[k] = r1[k] - d_r1_Vf * Vf[k] / nVfsq
