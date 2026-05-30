@@ -11,7 +11,9 @@
 - backend-agnostic plotting wrappers now route through the active plotting
   backend, and each plotting extension initializes itself as the default only
   when no backend has been selected yet
-- relaxed `ControlPlots` compatibility to include both `0.2.5` and `0.3`
+- relaxed `ControlPlots` compatibility to include both `0.2.5` and `0.3
+
+## VortexStepMethod v3.3.3 2026-05-21
 
 ### Fixed
 - `MakieExt` and `ControlPlotsExt` no longer both define
