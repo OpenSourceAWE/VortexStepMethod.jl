@@ -58,6 +58,7 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 cd "${REPO_ROOT}"
 
 CONTROLPLOTS_PROJECT="examples_cp"
+TEST_PROJECT="test"
 
 # ── Interactive backend selection ─────────────────────────────────────────────
 
@@ -290,11 +291,10 @@ if [[ "$_backend" == "system" ]]; then
 
     echo ""
     echo "Saving python_exe=$_syspython to LocalPreferences.toml files..."
-    # Write to both the root project and examples_cp project, because
-    # `julia --project=examples_cp` reads examples_cp/LocalPreferences.toml,
-    # not the root one.
+    # Write to the root project plus the subprojects that load PythonCall.
     _write_system_python_prefs "LocalPreferences.toml"
     _write_system_python_prefs "${CONTROLPLOTS_PROJECT}/LocalPreferences.toml"
+    _write_system_python_prefs "${TEST_PROJECT}/LocalPreferences.toml"
 
     _set_mplbackend_qtagg
     _verify_controlplots
@@ -328,6 +328,7 @@ elif [[ "$_backend" == "conda" ]]; then
     }
     _remove_python_prefs "LocalPreferences.toml"
     _remove_python_prefs "${CONTROLPLOTS_PROJECT}/LocalPreferences.toml"
+    _remove_python_prefs "${TEST_PROJECT}/LocalPreferences.toml"
 
     _install_matplotlib_condapkg
 
