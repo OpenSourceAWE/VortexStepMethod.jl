@@ -245,7 +245,20 @@ $_julia_cmd --project=. -e 'using Pkg; Pkg.precompile(); Pkg.activate("examples"
 Pkg.activate("examples_cp"); Pkg.precompile(); Pkg.activate("test"); Pkg.precompile();
 @info "Precompilation complete."'
 $_julia_cmd --project=examples -e 'using GLMakie, VortexStepMethod; @info "GLMakie extension ready."'
-$_julia_cmd -t1 --project=examples_cp -e 'using ControlPlots, VortexStepMethod; @info "ControlPlots extension ready."'
+# Julia's @load_preference bakes the CondaPkg backend into the precompiled image
+# at compile time. If the image was compiled before LocalPreferences.toml was
+# written (e.g. by a previous install_controlplots run), the baked-in value may
+# be stale. JULIA_CONDAPKG_BACKEND is always read at runtime and reliably
+# overrides the cached value, so we read the preference from the file and
+# forward it as an env var.
+_cp_lp="examples_cp/LocalPreferences.toml"
+if grep -q 'backend = "Null"' "$_cp_lp" 2>/dev/null; then
+    JULIA_CONDAPKG_BACKEND=Null $_julia_cmd -t1 --project=examples_cp \
+        -e 'using ControlPlots, VortexStepMethod; @info "ControlPlots extension ready."'
+else
+    $_julia_cmd -t1 --project=examples_cp \
+        -e 'using ControlPlots, VortexStepMethod; @info "ControlPlots extension ready."'
+fi
 $_julia_cmd --project=. -e 'using Pkg; Pkg.test(test_args=["settings/test_settings.jl"]);
 @info "Minimal test smoke check complete."'
 
