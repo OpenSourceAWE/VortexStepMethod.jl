@@ -115,7 +115,15 @@ _verify_controlplots() {
     echo "Verifying ControlPlots can be loaded..."
     local _julia_prefix=""
     if [[ "$(uname -s)" == "Linux" ]]; then
-        _julia_prefix="env -u LD_PRELOAD -u LD_LIBRARY_PATH"
+        # Julia 1.12+ ships libssl.so.3 compiled against OpenSSL 3.3+, which may
+        # not match the system libcrypto.so.3 (e.g. Ubuntu 22.04 ships 3.0).
+        # Prepend Julia's own lib/julia directory so its bundled libcrypto.so.3
+        # is found before the system one.  We keep any existing LD_LIBRARY_PATH
+        # entries so other libraries set by callers are not lost.
+        _julia_lib=$(julia -e 'print(joinpath(Sys.BINDIR, "..", "lib", "julia"))' 2>/dev/null || true)
+        if [[ -n "$_julia_lib" && -d "$_julia_lib" ]]; then
+            _julia_prefix="env LD_LIBRARY_PATH=${_julia_lib}${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+        fi
     fi
     if $_julia_prefix julia --project="${CONTROLPLOTS_PROJECT}" -e '
 using ControlPlots
