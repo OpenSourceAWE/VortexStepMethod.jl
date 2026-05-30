@@ -40,3 +40,5 @@ output_cairo/
 examples_cp/.CondaPkg/
 test/.CondaPkg/
 LocalPreferences.toml
+!test/LocalPreferences.toml
+test/LocalPreferences.toml
