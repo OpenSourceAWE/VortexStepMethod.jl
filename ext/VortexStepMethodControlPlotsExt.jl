@@ -1,5 +1,6 @@
 module VortexStepMethodControlPlotsExt
 using ControlPlots, LaTeXStrings, VortexStepMethod, LinearAlgebra, Statistics, DelimitedFiles
+using PythonCall: pyconvert
 import ControlPlots: plt
 import VortexStepMethod: calculate_filaments_for_plotting
 
@@ -22,7 +23,7 @@ Set the default style for plots using LaTeX.
 - `ùse_tex`: if the external `pdflatex` command shall be used
 """
 function set_plot_style(titel_size=16; use_tex=false)
-    rcParams = plt.PyDict(plt.matplotlib."rcParams")
+    rcParams = plt.matplotlib."rcParams"
     rcParams["text.usetex"] = use_tex
     rcParams["font.family"] = "serif"
     if use_tex
@@ -99,7 +100,7 @@ Display a plot at specified DPI.
 # Keyword arguments
 - `dpi`: Dots per inch for the figure (default: 130)
 """
-function VortexStepMethod.show_plot(fig::plt.Figure; dpi=130)
+function VortexStepMethod.show_plot(fig; dpi=130)
     fig.set_dpi(dpi)
     plt.display(fig)
 end
@@ -146,9 +147,9 @@ Set 3D plot axes to equal scale.
 zoom: zoom factor (default: 1.8)
 """
 function set_axes_equal!(ax; zoom=1.8)
-    x_lims = ax.get_xlim3d() ./ zoom
-    y_lims = ax.get_ylim3d() ./ zoom
-    z_lims = ax.get_zlim3d() ./ zoom
+    x_lims = pyconvert(Vector{Float64}, ax.get_xlim3d()) ./ zoom
+    y_lims = pyconvert(Vector{Float64}, ax.get_ylim3d()) ./ zoom
+    z_lims = pyconvert(Vector{Float64}, ax.get_zlim3d()) ./ zoom
 
     x_range = abs(x_lims[2] - x_lims[1])
     y_range = abs(y_lims[2] - y_lims[1])
@@ -218,15 +219,15 @@ function create_geometry_plot(body_aero::BodyAerodynamics, title, view_elevation
         ax.plot(x_corners,
             y_corners,
             z_corners,
-            color=:grey,
+            color="grey",
             linewidth=1,
             label=i == 1 ? "Panel Edges" : "")
 
         # Plot control points and aerodynamic centers
         ax.scatter([control_points[i][1]], [control_points[i][2]], [control_points[i][3]],
-            color=:green, label=i == 1 ? "Control Points" : "")
+            color="green", label=i == 1 ? "Control Points" : "")
         ax.scatter([aero_centers[i][1]], [aero_centers[i][2]], [aero_centers[i][3]],
-            color=:blue, label=i == 1 ? "Aerodynamic Centers" : "")
+            color="blue", label=i == 1 ? "Aerodynamic Centers" : "")
 
         # Plot filaments
         filaments = calculate_filaments_for_plotting(panel)
@@ -246,7 +247,7 @@ function create_geometry_plot(body_aero::BodyAerodynamics, title, view_elevation
     va_mag = norm(va)
     va_vector_begin = -2 * max_chord * va / va_mag
     va_vector_end = va_vector_begin + 1.5 * va / va_mag
-    plot_line_segment!(ax, [va_vector_begin, va_vector_end], :lightblue, "va")
+    plot_line_segment!(ax, [va_vector_begin, va_vector_end], "lightblue", "va")
 
     # Add legends for the first occurrence of each label
     # by_label = Dict(zip(labels, handles))
@@ -650,8 +651,8 @@ function VortexStepMethod.plot_polars(
             (6, raw"$C_\mathrm{Mz}$", nothing, :cmz),
         ]
         for (ax_idx, ylabel, pd_col, cm_field) in coeff_specs
-            row = (ax_idx - 1) ÷ 3 + 1
-            col = (ax_idx - 1) % 3 + 1
+            row = (ax_idx - 1) ÷ 3
+            col = (ax_idx - 1) % 3
             ax = axs[row, col]
             for (i, (polar_data, cm, label)) in enumerate(
                     zip(polar_data_list, cm_data_list,
@@ -678,9 +679,9 @@ function VortexStepMethod.plot_polars(
         # 2x2 layout: CL, CD, CS, CL/CD or CL-vs-CD
         fig, axs = plt.subplots(2, 2, figsize=(14, 14))
         coeff_specs = [
-            ((1, 1), raw"$C_\mathrm{L}$", 2),
-            ((1, 2), raw"$C_\mathrm{D}$", 3),
-            ((2, 1), raw"$C_\mathrm{S}$", 4),
+            ((0, 0), raw"$C_\mathrm{L}$", 2),
+            ((0, 1), raw"$C_\mathrm{D}$", 3),
+            ((1, 0), raw"$C_\mathrm{S}$", 4),
         ]
         for (pos, ylabel, pd_col) in coeff_specs
             ax = axs[pos...]
@@ -702,7 +703,7 @@ function VortexStepMethod.plot_polars(
             ax.legend()
         end
         # Fourth panel: CL/CD or CL-vs-CD
-        ax4 = axs[2, 2]
+        ax4 = axs[1, 1]
         for (i, (polar_data, label)) in enumerate(
                 zip(polar_data_list, label_list))
             label, ls, mk, ms = format_label(

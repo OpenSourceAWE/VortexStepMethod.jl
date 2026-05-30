@@ -141,7 +141,7 @@ function generate_polar_data(
     end
 
     polar_data = [
-        angle_range, cl, cd, cs,
+        collect(angle_range), cl, cd, cs,
         gamma_distribution, cl_distribution,
         cd_distribution, cs_distribution,
         reynolds_number
