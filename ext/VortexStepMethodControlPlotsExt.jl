@@ -378,16 +378,16 @@ function VortexStepMethod.plot_distribution(y_coordinates_list, results_list, la
         else
             label = label_i * L" $C_\mathrm{L}$: " * value
         end
-        axs[1, 1].plot(
+        axs[0, 0].plot(
             y_coordinates_i,
             result_i["cl_distribution"],
             label=label
         )
     end
-    axs[1, 1].set_title(L"$C_\mathrm{L}$ Distribution", size=16)
-    axs[1, 1].set_xlabel(L"Spanwise Position $y/b$")
-    axs[1, 1].set_ylabel(L"Lift Coefficient $C_\mathrm{L}$")
-    axs[1, 1].legend()
+    axs[0, 0].set_title(L"$C_\mathrm{L}$ Distribution", size=16)
+    axs[0, 0].set_xlabel(L"Spanwise Position $y/b$")
+    axs[0, 0].set_ylabel(L"Lift Coefficient $C_\mathrm{L}$")
+    axs[0, 0].legend()
 
     # CD plot
     for (y_coordinates_i, result_i, label_i) in zip(y_coordinates_list, results_list, label_list)
@@ -397,74 +397,74 @@ function VortexStepMethod.plot_distribution(y_coordinates_list, results_list, la
         else
             label = label_i * L" $C_\mathrm{D}$: " * value
         end
-        axs[1, 2].plot(
+        axs[0, 1].plot(
             y_coordinates_i,
             result_i["cd_distribution"],
             label=label
         )
     end
-    axs[1, 2].set_title(L"$C_\mathrm{D}$ Distribution", size=16)
-    axs[1, 2].set_xlabel(L"Spanwise Position $y/b$")
-    axs[1, 2].set_ylabel(L"Drag Coefficient $C_\mathrm{D}$")
-    axs[1, 2].legend()
+    axs[0, 1].set_title(L"$C_\mathrm{D}$ Distribution", size=16)
+    axs[0, 1].set_xlabel(L"Spanwise Position $y/b$")
+    axs[0, 1].set_ylabel(L"Drag Coefficient $C_\mathrm{D}$")
+    axs[0, 1].legend()
 
     # Gamma Distribution
     for (y_coordinates_i, result_i, label_i) in zip(y_coordinates_list, results_list, label_list)
-        axs[1, 3].plot(
+        axs[0, 2].plot(
             y_coordinates_i,
             result_i["gamma_distribution"],
             label=label_i
         )
     end
-    axs[1, 3].set_title(L"\Gamma~Distribution", size=16)
-    axs[1, 3].set_xlabel(L"Spanwise Position $y/b$")
-    axs[1, 3].set_ylabel(L"Circulation~\Gamma")
-    axs[1, 3].legend()
+    axs[0, 2].set_title(L"\Gamma~Distribution", size=16)
+    axs[0, 2].set_xlabel(L"Spanwise Position $y/b$")
+    axs[0, 2].set_ylabel(L"Circulation~\Gamma")
+    axs[0, 2].legend()
 
     # Geometric Alpha
     for (y_coordinates_i, result_i, label_i) in zip(y_coordinates_list, results_list, label_list)
-        axs[2, 1].plot(
+        axs[1, 0].plot(
             y_coordinates_i,
             result_i["alpha_geometric"],
             label=label_i
         )
     end
-    axs[2, 1].set_title(L"$\alpha$ Geometric", size=16)
-    axs[2, 1].set_xlabel(L"Spanwise Position $y/b$")
-    axs[2, 1].set_ylabel(L"Angle of Attack $\alpha$ (deg)")
-    axs[2, 1].legend()
+    axs[1, 0].set_title(L"$\alpha$ Geometric", size=16)
+    axs[1, 0].set_xlabel(L"Spanwise Position $y/b$")
+    axs[1, 0].set_ylabel(L"Angle of Attack $\alpha$ (deg)")
+    axs[1, 0].legend()
 
     # Calculated/ Corrected Alpha
     for (y_coordinates_i, result_i, label_i) in zip(y_coordinates_list, results_list, label_list)
-        axs[2, 2].plot(
+        axs[1, 1].plot(
             y_coordinates_i,
             result_i["alpha_at_ac"],
             label=label_i
         )
     end
-    axs[2, 2].set_title(L"$\alpha$ result (corrected to aerodynamic center)", size=16)
-    axs[2, 2].set_xlabel(L"Spanwise Position $y/b$")
-    axs[2, 2].set_ylabel(L"Angle of Attack $\alpha$ (deg)")
-    axs[2, 2].legend()
+    axs[1, 1].set_title(L"$\alpha$ result (corrected to aerodynamic center)", size=16)
+    axs[1, 1].set_xlabel(L"Spanwise Position $y/b$")
+    axs[1, 1].set_ylabel(L"Angle of Attack $\alpha$ (deg)")
+    axs[1, 1].legend()
 
     # Uncorrected Alpha plot
     for (y_coordinates_i, result_i, label_i) in zip(y_coordinates_list, results_list, label_list)
-        axs[2, 3].plot(
+        axs[1, 2].plot(
             y_coordinates_i,
             result_i["alpha_uncorrected"],
             label=label_i
         )
     end
-    axs[2, 3].set_title(L"$\alpha$ Uncorrected (if VSM, at the control point)", size=16)
-    axs[2, 3].set_xlabel(L"Spanwise Position $y/b$")
-    axs[2, 3].set_ylabel(L"Angle of Attack $\alpha$ (deg)")
-    axs[2, 3].legend()
+    axs[1, 2].set_title(L"$\alpha$ Uncorrected (if VSM, at the control point)", size=16)
+    axs[1, 2].set_xlabel(L"Spanwise Position $y/b$")
+    axs[1, 2].set_ylabel(L"Angle of Attack $\alpha$ (deg)")
+    axs[1, 2].legend()
 
     # Force Components
     for (idx, component) in enumerate(["x", "y", "z"])
-        axs[3, idx].set_title("Force in $component direction", size=16)
-        axs[3, idx].set_xlabel(L"Spanwise Position $y/b$")
-        axs[3, idx].set_ylabel(raw"$F_\mathrm" * "{$component}" * raw"$")
+        axs[2, idx-1].set_title("Force in $component direction", size=16)
+        axs[2, idx-1].set_xlabel(L"Spanwise Position $y/b$")
+        axs[2, idx-1].set_ylabel(raw"$F_\mathrm" * "{$component}" * raw"$")
         for (y_coords, results, label) in zip(y_coordinates_list, results_list, label_list)
             # Extract force components for the current direction (idx)
             forces = results["F_distribution"][idx, :]
@@ -477,13 +477,13 @@ function VortexStepMethod.plot_distribution(y_coordinates_list, results_list, la
             if label == "LLT"
                 space = "~"
             end
-            axs[3, idx].plot(
+            axs[2, idx-1].plot(
                 y_coords,
                 forces,
                 label="$label" * space * raw"$~\Sigma~F_\mathrm" * "{$component}:~" *
                       raw"$" * "$(round(results["F$component"], digits=2)) N"
             )
-            axs[3, idx].legend()
+            axs[2, idx-1].legend()
         end
     end
 
