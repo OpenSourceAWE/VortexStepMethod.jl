@@ -245,19 +245,26 @@ $_julia_cmd --project=. -e 'using Pkg; Pkg.precompile(); Pkg.activate("examples"
 Pkg.activate("examples_cp"); Pkg.precompile(); Pkg.activate("test"); Pkg.precompile();
 @info "Precompilation complete."'
 $_julia_cmd --project=examples -e 'using GLMakie, VortexStepMethod; @info "GLMakie extension ready."'
-# Julia's @load_preference bakes the CondaPkg backend into the precompiled image
-# at compile time. If the image was compiled before LocalPreferences.toml was
-# written (e.g. by a previous install_controlplots run), the baked-in value may
-# be stale. JULIA_CONDAPKG_BACKEND is always read at runtime and reliably
-# overrides the cached value, so we read the preference from the file and
-# forward it as an env var.
 _cp_lp="examples_cp/LocalPreferences.toml"
-if grep -q 'backend = "Null"' "$_cp_lp" 2>/dev/null; then
-    JULIA_CONDAPKG_BACKEND=Null $_julia_cmd -t1 --project=examples_cp \
-        -e 'using ControlPlots, VortexStepMethod; @info "ControlPlots extension ready."'
+# Skip ControlPlots verification only when Python is genuinely not yet configured
+# (Null backend with no exe= set).  After install_controlplots --system the file
+# still has backend="Null" but also has exe=..., so we proceed with verification.
+if grep -q 'backend = "Null"' "$_cp_lp" 2>/dev/null && ! grep -q 'exe = ' "$_cp_lp" 2>/dev/null; then
+    echo "Skipping ControlPlots extension verification (Python not yet configured)."
+    echo "Run ./bin/install_controlplots to set up Python and verify ControlPlots."
 else
-    $_julia_cmd -t1 --project=examples_cp \
-        -e 'using ControlPlots, VortexStepMethod; @info "ControlPlots extension ready."'
+    # On Linux, prepend Julia's lib/julia so its bundled libcrypto.so.3 takes
+    # priority over an older system OpenSSL (e.g. Ubuntu 22.04 ships 3.0 while
+    # Julia 1.12 bundles 3.3+).
+    _julia_lib=$($_julia_cmd -e 'print(joinpath(Sys.BINDIR, "..", "lib", "julia"))' 2>/dev/null || true)
+    if [[ "$(uname -s)" == "Linux" && -n "$_julia_lib" && -d "$_julia_lib" ]]; then
+        LD_LIBRARY_PATH="${_julia_lib}${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}" \
+            $_julia_cmd -t1 --project=examples_cp \
+            -e 'using ControlPlots, VortexStepMethod; @info "ControlPlots extension ready."'
+    else
+        $_julia_cmd -t1 --project=examples_cp \
+            -e 'using ControlPlots, VortexStepMethod; @info "ControlPlots extension ready."'
+    fi
 fi
 $_julia_cmd --project=. -e 'using Pkg; Pkg.test(test_args=["settings/test_settings.jl"]);
 @info "Minimal test smoke check complete."'
