@@ -38,3 +38,4 @@ data/ram_air_kite/ram_air_kite_foil_cm_polar.csv
 output/
 output_cairo/
 examples_cp/.CondaPkg/
+LocalPreferences.toml
