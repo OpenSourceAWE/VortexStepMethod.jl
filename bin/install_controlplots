@@ -252,6 +252,10 @@ if [[ "$_backend" == "system" ]]; then
         echo "Removing ${CONTROLPLOTS_PROJECT}/.CondaPkg (switching from CondaPkg to system Python)..."
         rm -rf "${CONTROLPLOTS_PROJECT}/.CondaPkg"
     fi
+    if [[ -d "${TEST_PROJECT}/.CondaPkg" ]]; then
+        echo "Removing ${TEST_PROJECT}/.CondaPkg (switching from CondaPkg to system Python)..."
+        rm -rf "${TEST_PROJECT}/.CondaPkg"
+    fi
     # Unset JULIA_PYTHONCALL_EXE so the LocalPreferences.toml exe setting takes
     # effect.
     unset JULIA_PYTHONCALL_EXE
