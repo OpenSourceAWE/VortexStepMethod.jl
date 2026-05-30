@@ -2,7 +2,7 @@
 
 julia_version = "1.12.6"
 manifest_format = "2.0"
-project_hash = "e2d94bdf72deac4dbd818e6d3a02636620cdc5a0"
+project_hash = "356626525ca9bb0f9ff17fd7cd0e99e15eac7f01"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "bbc22a9a08a0ef6460041086d8a7b27940ed4ffd"
@@ -2451,10 +2451,10 @@ deps = ["Colors", "DefaultApplication", "DelimitedFiles", "DifferentiationInterf
 path = "."
 uuid = "ed3cd733-9f0f-46a9-93e0-89b8d4998dd9"
 version = "3.3.4"
-weakdeps = ["ControlPlots", "Makie"]
+weakdeps = ["ControlPlots", "Makie", "PythonCall"]
 
     [deps.VortexStepMethod.extensions]
-    VortexStepMethodControlPlotsExt = "ControlPlots"
+    VortexStepMethodControlPlotsExt = ["ControlPlots", "PythonCall"]
     VortexStepMethodMakieExt = "Makie"
 
 [[deps.Wayland_jll]]
