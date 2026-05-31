@@ -101,6 +101,7 @@ Display a plot at specified DPI.
 - `dpi`: Dots per inch for the figure (default: 130)
 """
 function VortexStepMethod.show_plot(fig; dpi=130)
+    isnothing(fig) && throw(MethodError(VortexStepMethod.show_plot, (fig,)))
     fig.set_dpi(dpi)
     plt.display(fig)
 end
