@@ -22,6 +22,7 @@
   always measured from the filament axis, not from the origin (#241)
 - fixed 0-based subplot indexing in `ControlPlotsExt` for PythonPlot
   compatibility (`plot_distribution` no longer errors with PythonPlot backend)
+- fixed missing initialization of `damp` in `solver.jl`
 
 ## VortexStepMethod v3.3.3 2026-05-21
 
