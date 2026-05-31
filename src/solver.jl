@@ -770,6 +770,7 @@ function gamma_loop!(
     v_acrossz_array          = solver.cache[7][va_array]
     cl_dist                 = solver.cache[8][solver.lr.gamma_new]
     damp                     = solver.cache[9][solver.lr.gamma_new]
+    damp                    .= zero(T)
     v_normal_array           = solver.cache[10][solver.lr.gamma_new]
     v_tangential_array       = solver.cache[11][solver.lr.gamma_new]
 
