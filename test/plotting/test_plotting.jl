@@ -16,6 +16,7 @@ end
 backend = if "plot-controlplots" in ARGS
     using ControlPlots
     import ControlPlots: plt
+    using PythonCall: pyconvert
     "ControlPlots"
 else
     using CairoMakie
@@ -293,15 +294,19 @@ end
 
     # CP-specific tests (DPI, matplotlib internals)
     if backend == "ControlPlots"
+        # `get_dpi()` returns a Python float; convert to a Julia Float64 so the
+        # comparisons below evaluate to a Julia `Bool` rather than a `Py` object.
+        get_dpi(fig) = pyconvert(Float64, fig.get_dpi())
+
         fig_dpi = plt.figure()
-        default_dpi = fig_dpi.get_dpi()
+        default_dpi = get_dpi(fig_dpi)
         @test default_dpi != 173
 
         show_plot(fig_dpi; dpi=173)
-        @test fig_dpi.get_dpi() == 173
+        @test get_dpi(fig_dpi) == 173
 
         show_plot(fig_dpi)
-        @test fig_dpi.get_dpi() == 130
+        @test get_dpi(fig_dpi) == 130
         plt.close(fig_dpi)
     end
 
