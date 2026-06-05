@@ -1,7 +1,7 @@
 name = "VortexStepMethod"
 uuid = "ed3cd733-9f0f-46a9-93e0-89b8d4998dd9"
-authors = ["1-Bart-1 <bart@vandelint.net>", "Oriol Cayon and contributors"]
 version = "3.3.4"
+authors = ["1-Bart-1 <bart@vandelint.net>", "Oriol Cayon and contributors"]
 
 [workspace]
 projects = ["examples", "examples_cp", "docs", "test"]
@@ -57,11 +57,11 @@ Logging = "1"
 Makie = "0.24.6"
 Measures = "0.3"
 NonlinearSolve = "4.8.0"
-Parameters = "0.12"
+Parameters = "0.12, 0.13"
 Pkg = "1"
 PreallocationTools = "1.1.2"
-PythonCall = "0.9"
 PrecompileTools = "1.2.1"
+PythonCall = "0.9"
 RecursiveArrayTools = "3, 4"
 SciMLBase = "2, 3"
 Serialization = "1"
