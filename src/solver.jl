@@ -29,7 +29,8 @@ Struct for storing the solution of the [solve!](@ref) function. Must contain all
 - `moment_unrefined_dist`::MVector{U, Float64}: Averaged moments for unrefined sections [Nm]
 - `cl_unrefined_dist`::MVector{U, Float64}: Averaged lift coefficients for unrefined sections [-]
 - `cd_unrefined_dist`::MVector{U, Float64}: Averaged drag coefficients for unrefined sections [-]
-- `cm_unrefined_dist`::MVector{U, Float64}: Averaged moment coefficients for unrefined sections [-]
+- `cm_unrefined_dist`::MVector{U, Float64}: Averaged airfoil moment coefficients for unrefined sections [-]
+- `moment_coeff_unrefined_dist`::MVector{U, Float64}: Summed `moment_frac`-referenced pitching-moment coefficient per unrefined section [-]
 - `alpha_unrefined_dist`::MVector{U, Float64}: Averaged angles of attack for unrefined sections [rad]
 - `solver_status`::SolverStatus: enum, see [SolverStatus](@ref)
 """
@@ -65,6 +66,7 @@ Struct for storing the solution of the [solve!](@ref) function. Must contain all
     cl_unrefined_dist::MVector{U, T} = zeros(MVector{U, T})
     cd_unrefined_dist::MVector{U, T} = zeros(MVector{U, T})
     cm_unrefined_dist::MVector{U, T} = zeros(MVector{U, T})
+    moment_coeff_unrefined_dist::MVector{U, T} = zeros(MVector{U, T})
     alpha_unrefined_dist::MVector{U, T} = zeros(MVector{U, T})
     x_airf_unrefined_dist::Vector{MVector{3, T}} = [zeros(MVector{3, T}) for _ in 1:U]
     y_airf_unrefined_dist::Vector{MVector{3, T}} = [zeros(MVector{3, T}) for _ in 1:U]
@@ -418,6 +420,7 @@ function solve!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics, gamma_dist
         cl_unrefined_dist = solver.sol.cl_unrefined_dist
         cd_unrefined_dist = solver.sol.cd_unrefined_dist
         cm_unrefined_dist = solver.sol.cm_unrefined_dist
+        moment_coeff_unrefined_dist = solver.sol.moment_coeff_unrefined_dist
         alpha_unrefined_dist = solver.sol.alpha_unrefined_dist
         x_airf_unrefined_dist = solver.sol.x_airf_unrefined_dist
         y_airf_unrefined_dist = solver.sol.y_airf_unrefined_dist
@@ -431,6 +434,7 @@ function solve!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics, gamma_dist
         cl_unrefined_dist .= 0.0
         cd_unrefined_dist .= 0.0
         cm_unrefined_dist .= 0.0
+        moment_coeff_unrefined_dist .= 0.0
         alpha_unrefined_dist .= 0.0
         for i in eachindex(x_airf_unrefined_dist)
             x_airf_unrefined_dist[i] .= 0.0
@@ -457,6 +461,7 @@ function solve!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics, gamma_dist
                     cl_unrefined_dist[target_unrefined_idx] += solver.sol.cl_dist[panel_idx]
                     cd_unrefined_dist[target_unrefined_idx] += solver.sol.cd_dist[panel_idx]
                     cm_unrefined_dist[target_unrefined_idx] += solver.sol.cm_dist[panel_idx]
+                    moment_coeff_unrefined_dist[target_unrefined_idx] += solver.sol.moment_coeff_dist[panel_idx]
                     alpha_unrefined_dist[target_unrefined_idx] += solver.sol.alpha_dist[panel_idx]
 
                     # Accumulate geometry
@@ -471,7 +476,11 @@ function solve!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics, gamma_dist
                     panel_idx += 1
                 end
 
-                # Average coefficients and geometry (width stays summed)
+                # Average coefficients and geometry. width and
+                # moment_coeff_unrefined_dist stay summed: the latter is an
+                # extensive per-panel contribution to the wing moment
+                # coefficient, so a group's total moment is the sum over its
+                # sections, not the mean.
                 for i in 1:wing.n_unrefined_sections
                     target_unrefined_idx = unrefined_idx + i - 1
                     if unrefined_section_counts[i] > 0
