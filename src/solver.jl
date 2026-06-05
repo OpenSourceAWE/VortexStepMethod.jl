@@ -1169,7 +1169,7 @@ function linearize(solver::Solver, body_aero::BodyAerodynamics, y::Vector{T};
         else
             results[1:3] .= solver_c.sol.force_coeffs
             results[4:6] .= solver_c.sol.moment_coeffs
-            results[7:end] .= solver_c.sol.cm_unrefined_dist
+            results[7:end] .= solver_c.sol.moment_coeff_unrefined_dist
         end
         return nothing
     end
