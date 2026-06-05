@@ -1,5 +1,11 @@
 # Changelog
 
+## VortexStepMethod v3.3.5 2026-06-05
+
+### Added
+- `moment_coeff_unrefined_dist` field in `VSMSolution`: the summed
+  `moment_frac`-referenced pitching-moment coefficient per unrefined section [-]
+
 ## VortexStepMethod v3.3.4 2026-05-31
 
 ### Added
