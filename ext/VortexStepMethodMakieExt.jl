@@ -920,7 +920,7 @@ function VortexStepMethod.plot_polar_data(body_aero::BodyAerodynamics,
 
             # Create interpolation matrix
             interp_matrix = [interp(alpha, delta_te)
-                             for alpha in alphas, delta_te in delta_tes]
+                             for delta_te in delta_tes, alpha in alphas]
 
             # Create wireframe
             wireframe!(ax, delta_tes, alphas, interp_matrix;

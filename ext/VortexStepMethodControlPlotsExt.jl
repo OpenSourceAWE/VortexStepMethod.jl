@@ -793,8 +793,9 @@ function VortexStepMethod.plot_polar_data(body_aero::BodyAerodynamics,
             ax = fig.add_subplot(1, 3, idx, projection="3d")
 
             # Create interpolation matrix
-            interp_matrix = zeros(length(alphas), length(delta_tes))
-            interp_matrix .= [interp(alpha, delta_te) for alpha in alphas, delta_te in delta_tes]
+            interp_matrix = zeros(length(delta_tes), length(alphas))
+            interp_matrix .= [interp(alpha, delta_te)
+                              for delta_te in delta_tes, alpha in alphas]
             X = collect(delta_tes) .+ zeros(length(alphas))'
             Y = collect(alphas)' .+ zeros(length(delta_tes))
 
