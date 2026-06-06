@@ -477,10 +477,7 @@ function solve!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics, gamma_dist
                 end
 
                 # Average coefficients and geometry. width and
-                # moment_coeff_unrefined_dist stay summed: the latter is an
-                # extensive per-panel contribution to the wing moment
-                # coefficient, so a group's total moment is the sum over its
-                # sections, not the mean.
+                # moment_coeff_unrefined_dist stay summed (extensive).
                 for i in 1:wing.n_unrefined_sections
                     target_unrefined_idx = unrefined_idx + i - 1
                     if unrefined_section_counts[i] > 0
