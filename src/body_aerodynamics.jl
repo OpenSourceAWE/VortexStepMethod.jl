@@ -315,28 +315,29 @@ end
 )
     size(va_input) == (n_panels, 3) ||
         throw(ArgumentError("'va' must be shape (3,) or ($(n_panels), 3); got $(size(va_input))"))
+    if !isnothing(panel_areas)
+        length(panel_areas) == n_panels ||
+            throw(ArgumentError("panel_areas must be shape ($(n_panels),), got length $(length(panel_areas))"))
+    end
 
     T = promote_type(eltype(va_input),
                      isnothing(panel_areas) ? Float64 : eltype(panel_areas))
-    areas = if isnothing(panel_areas)
-        ones(T, n_panels)
-    else
-        length(panel_areas) == n_panels ||
-            throw(ArgumentError("panel_areas must be shape ($(n_panels),), got length $(length(panel_areas))"))
-        T.(panel_areas)
-    end
-
-    total_area = sum(areas)
-    total_area > 0.0 || throw(ArgumentError("Total panel area must be positive."))
-
+    total_area = zero(T)
     weighted_speed_sq = zero(T)
     direction = zeros(MVector{3, T})
     @inbounds for i in 1:n_panels
-        @views va_i = va_input[i, :]
-        speed_i = norm(va_i)
-        weighted_speed_sq += areas[i] * speed_i^2
-        direction .+= areas[i] .* va_i
+        area_i = isnothing(panel_areas) ? one(T) : T(panel_areas[i])
+        va1 = va_input[i, 1]
+        va2 = va_input[i, 2]
+        va3 = va_input[i, 3]
+        speed_i = sqrt(va1^2 + va2^2 + va3^2)
+        total_area += area_i
+        weighted_speed_sq += area_i * speed_i^2
+        direction[1] += area_i * va1
+        direction[2] += area_i * va2
+        direction[3] += area_i * va3
     end
+    total_area > 0.0 || throw(ArgumentError("Total panel area must be positive."))
 
     reference_speed = sqrt(weighted_speed_sq / total_area)
     direction_norm = norm(direction)

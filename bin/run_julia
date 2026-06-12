@@ -19,7 +19,7 @@ done
 if [[ $# -gt 0 ]]; then
     JULIA_ARGS=("$@")
 else
-    JULIA_ARGS=(-i -e 'using VortexStepMethod; function menu(); include("examples/menu.jl"); end; function menu_cp(); include("examples_cp/menu_cp.jl"); end')
+    JULIA_ARGS=()
 fi
 
 julia --project "${JULIA_ARGS[@]}"

@@ -245,6 +245,16 @@ end
         @test fig !== nothing
     end
 
+    fig_rect = plot_polar_data(body_aero;
+        alphas=collect(deg2rad.(-5:1.0:15)),
+        delta_tes=collect(deg2rad.(-3:1.0:5)),
+        is_show=false)
+    if backend == "Makie"
+        @test fig_rect isa Figure
+    else
+        @test fig_rect !== nothing
+    end
+
     # Tests for both backends
     body_aero_empty = create_body_aero()
     empty!(body_aero_empty.panels)

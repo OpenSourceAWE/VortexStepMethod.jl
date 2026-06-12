@@ -43,6 +43,7 @@ Struct for storing the solution of the [solve!](@ref) function. Must contain all
     _chord_dist::Vector{T} = zeros(T, P)
     ### end of private vectors
     width_dist::Vector{T} = zeros(T, P)
+    panel_area_dist::Vector{T} = zeros(T, P)
     alpha_dist::Vector{T} = zeros(T, P)
     alpha_geometric_dist::Vector{T} = zeros(T, P)
     cl_dist::Vector{T} = zeros(T, P)
@@ -74,6 +75,7 @@ Struct for storing the solution of the [solve!](@ref) function. Must contain all
     va_unrefined_dist::Vector{MVector{3, T}} = [zeros(MVector{3, T}) for _ in 1:U]
     chord_unrefined_dist::MVector{U, T} = zeros(MVector{U, T})
     width_unrefined_dist::MVector{U, T} = zeros(MVector{U, T})
+    unrefined_count_dist::Vector{Int} = zeros(Int, U)
     solver_status::SolverStatus = FAILURE
 end
 
@@ -237,6 +239,20 @@ function solve!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics, gamma_dist
         solver.sol.gamma_distribution = gamma_new
     end
 
+    return calc_forces!(solver, body_aero; reference_point, moment_frac)
+end
+
+"""
+    calc_forces!(solver::Solver, body_aero::BodyAerodynamics;
+                 reference_point=solver.reference_point, moment_frac=0.1)
+
+Assemble aerodynamic forces and moments from the circulation already converged
+by [`solve_base!`](@ref) and stored in `solver`. Split out of [`solve!`](@ref).
+"""
+function calc_forces!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics;
+        reference_point=solver.reference_point, moment_frac=0.1) where {P, U, T}
+    gamma_new = solver.lr.gamma_new
+
     # Initialize arrays
     cl_dist = solver.sol.cl_dist
     cd_dist = solver.sol.cd_dist
@@ -322,7 +338,7 @@ function solve!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics, gamma_dist
 
     # Initialize result arrays
     area_all_panels = zero(T)
-    panel_areas = zeros(T, length(panels))
+    panel_areas = solver.sol.panel_area_dist
 
     # Get wing properties
     spanwise_direction = body_aero.wings[1].spanwise_direction
@@ -428,6 +444,7 @@ function solve!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics, gamma_dist
         va_unrefined_dist = solver.sol.va_unrefined_dist
         chord_unrefined_dist = solver.sol.chord_unrefined_dist
         width_unrefined_dist = solver.sol.width_unrefined_dist
+        unrefined_count_dist = solver.sol.unrefined_count_dist
 
         # Zero all unrefined arrays
         moment_unrefined_dist .= 0.0
@@ -444,13 +461,12 @@ function solve!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics, gamma_dist
         end
         chord_unrefined_dist .= 0.0
         width_unrefined_dist .= 0.0
+        fill!(unrefined_count_dist, 0)
 
         panel_idx = 1
         unrefined_idx = 1
         for wing in body_aero.wings
             if wing.n_unrefined_sections > 0
-                # Accumulate values from refined panels to unrefined sections
-                unrefined_section_counts = zeros(Int, wing.n_unrefined_sections)
                 for local_panel_idx in 1:wing.n_panels
                     panel = body_aero.panels[panel_idx]
                     original_section_idx = wing.refined_panel_mapping[local_panel_idx]
@@ -472,7 +488,7 @@ function solve!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics, gamma_dist
                     chord_unrefined_dist[target_unrefined_idx] += panel.chord
                     width_unrefined_dist[target_unrefined_idx] += panel.width
 
-                    unrefined_section_counts[original_section_idx] += 1
+                    unrefined_count_dist[target_unrefined_idx] += 1
                     panel_idx += 1
                 end
 
@@ -480,8 +496,8 @@ function solve!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics, gamma_dist
                 # moment_coeff_unrefined_dist stay summed (extensive).
                 for i in 1:wing.n_unrefined_sections
                     target_unrefined_idx = unrefined_idx + i - 1
-                    if unrefined_section_counts[i] > 0
-                        count = unrefined_section_counts[i]
+                    if unrefined_count_dist[target_unrefined_idx] > 0
+                        count = unrefined_count_dist[target_unrefined_idx]
                         moment_unrefined_dist[target_unrefined_idx] /= count
                         cl_unrefined_dist[target_unrefined_idx] /= count
                         cd_unrefined_dist[target_unrefined_idx] /= count
