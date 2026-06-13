@@ -1,5 +1,24 @@
 # Changelog
 
+## VortexStepMethod v3.3.6 2026-06-13
+
+### Added
+- `calc_forces!` and `solve_base!` (both exported): `solve!` is now
+  `solve_base!` followed by `calc_forces!`, so a frozen circulation can be
+  mapped to forces without re-running the nonlinear gamma solve (#245)
+- `calculate_cd` and `calculate_cm`, splitting the combined `calculate_cd_cm`
+  into separate drag- and moment-coefficient functions; `calculate_cd_cm` is
+  kept as a thin wrapper (#246)
+
+### Changed
+- `calc_forces!` is now allocation-free in the per-step hot path
+  (preallocated `panel_area_dist` and `unrefined_count_dist` buffers) (#245)
+
+### Fixed
+- 3D polar plotting (#245)
+- flaky Aqua `persistent_tasks` test now actually disabled via
+  `persistent_tasks=false` (`()` did not disable it) (#246)
+
 ## VortexStepMethod v3.3.5 2026-06-05
 
 ### Added
