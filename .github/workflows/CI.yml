@@ -58,7 +58,7 @@ jobs:
       - uses: julia-actions/julia-buildpkg@v1
       - name: Install matplotlib
         if: runner.os == 'Linux'
-        run: sudo apt-get install -y python3-matplotlib
+        run: sudo apt-get update && sudo apt-get install -y python3-matplotlib
       - name: Build PyCall with system Python
         if: runner.os == 'Linux'
         run: julia -e 'ENV["PYTHON"]="python3"; using Pkg; Pkg.add("PyCall"); Pkg.build("PyCall")'
@@ -90,7 +90,7 @@ jobs:
     - uses: julia-actions/cache@v2
     - uses: julia-actions/julia-buildpkg@v1
     - name: Install matplotlib
-      run: sudo apt-get install -y python3-matplotlib
+      run: sudo apt-get update && sudo apt-get install -y python3-matplotlib
     - name: Build PyCall with system Python
       run: julia -e 'ENV["PYTHON"]="python3"; using Pkg; Pkg.add("PyCall"); Pkg.build("PyCall")'
     - uses: julia-actions/julia-runtest@v1

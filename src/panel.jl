@@ -396,39 +396,64 @@ end
 
 
 """
-    calculate_cd_cm(panel::Panel, alpha::Float64)
+    calculate_cd(panel::Panel, alpha)
 
-Calculate drag and moment coefficients for given angle of attack.
+Calculate the drag coefficient for the given angle of attack.
 """
-function calculate_cd_cm(panel::Panel{Tp}, alpha::Ta) where {Tp, Ta}
+function calculate_cd(panel::Panel{Tp}, alpha::Ta) where {Tp, Ta}
     R = promote_type(Tp, Ta)
-    isnan(alpha) && return R(NaN), R(NaN)
+    isnan(alpha) && return R(NaN)
     if panel.aero_model == LEI_AIRFOIL_BREUKELS
-        cd = evalpoly(rad2deg(alpha), reverse(panel.cd_coeffs))
-        cm = evalpoly(rad2deg(alpha), reverse(panel.cm_coeffs))
         if abs(alpha) > (π/9)  # Outside ±20 degrees
-            cd = 2 * sin(alpha)^3
+            return R(2 * sin(alpha)^3)
         end
-        return R(cd), R(cm)
+        return R(evalpoly(rad2deg(alpha), reverse(panel.cd_coeffs)))
     elseif panel.aero_model == POLAR_VECTORS
         cd_interp = panel.cd_interp
-        cm_interp = panel.cm_interp
         cd_interp isa Union{I1, I2, I5} || throw(ArgumentError("cd_interp is not initialized for POLAR_VECTORS."))
-        cm_interp isa Union{I1, I2} || throw(ArgumentError("cm_interp is not initialized for POLAR_VECTORS."))
-        return R((cd_interp::Union{I1, I2, I5})(alpha)),
-               R((cm_interp::Union{I1, I2})(alpha))
+        return R((cd_interp::Union{I1, I2, I5})(alpha))
     elseif panel.aero_model == POLAR_MATRICES
         cd_interp = panel.cd_interp
-        cm_interp = panel.cm_interp
         cd_interp isa Union{I3, I4, I6} || throw(ArgumentError("cd_interp is not initialized for POLAR_MATRICES."))
-        cm_interp isa Union{I3, I4} || throw(ArgumentError("cm_interp is not initialized for POLAR_MATRICES."))
-        return R((cd_interp::Union{I3, I4, I6})(alpha, panel.delta)),
-               R((cm_interp::Union{I3, I4})(alpha, panel.delta))
+        return R((cd_interp::Union{I3, I4, I6})(alpha, panel.delta))
     elseif !(panel.aero_model == INVISCID)
         throw(ArgumentError("Unsupported aero model: $(panel.aero_model)"))
     end
-    return zero(R), zero(R)
+    return zero(R)
 end
+
+"""
+    calculate_cm(panel::Panel, alpha)
+
+Calculate the pitching-moment coefficient for the given angle of attack.
+"""
+function calculate_cm(panel::Panel{Tp}, alpha::Ta) where {Tp, Ta}
+    R = promote_type(Tp, Ta)
+    isnan(alpha) && return R(NaN)
+    if panel.aero_model == LEI_AIRFOIL_BREUKELS
+        return R(evalpoly(rad2deg(alpha), reverse(panel.cm_coeffs)))
+    elseif panel.aero_model == POLAR_VECTORS
+        cm_interp = panel.cm_interp
+        cm_interp isa Union{I1, I2} || throw(ArgumentError("cm_interp is not initialized for POLAR_VECTORS."))
+        return R((cm_interp::Union{I1, I2})(alpha))
+    elseif panel.aero_model == POLAR_MATRICES
+        cm_interp = panel.cm_interp
+        cm_interp isa Union{I3, I4} || throw(ArgumentError("cm_interp is not initialized for POLAR_MATRICES."))
+        return R((cm_interp::Union{I3, I4})(alpha, panel.delta))
+    elseif !(panel.aero_model == INVISCID)
+        throw(ArgumentError("Unsupported aero model: $(panel.aero_model)"))
+    end
+    return zero(R)
+end
+
+"""
+    calculate_cd_cm(panel::Panel, alpha)
+
+Calculate drag and moment coefficients for the given angle of attack
+([`calculate_cd`](@ref) and [`calculate_cm`](@ref)).
+"""
+calculate_cd_cm(panel::Panel{Tp}, alpha::Ta) where {Tp, Ta} =
+    (calculate_cd(panel, alpha), calculate_cm(panel, alpha))
 
 """
     calculate_filaments_for_plotting(panel::Panel)
