@@ -785,7 +785,7 @@ function calculate_results(
                            inv_va_norm / x_norm
             v_normal = -dot3(panel.z_airf, panel.va) *
                        inv_va_norm / z_norm
-            alpha_geometric[i] = pi + atan(v_normal, v_tangential)
+            alpha_geometric[i] = atan(-v_normal, -v_tangential)
         end
     end
 

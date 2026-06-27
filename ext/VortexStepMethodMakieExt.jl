@@ -607,19 +607,19 @@ function VortexStepMethod.plot_distribution(y_coordinates_list, results_list, la
 
     # Plot alpha geometric
     for (y_coords, results, label) in zip(y_coordinates_list, results_list, label_list)
-        lines!(ax_alpha_geo, Vector(y_coords), Vector(results["alpha_geometric"]),
+        lines!(ax_alpha_geo, Vector(y_coords), rad2deg.(Vector(results["alpha_geometric"])),
             label=label)
     end
 
     # Plot alpha at ac
     for (y_coords, results, label) in zip(y_coordinates_list, results_list, label_list)
-        lines!(ax_alpha_ac, Vector(y_coords), Vector(results["alpha_at_ac"]),
+        lines!(ax_alpha_ac, Vector(y_coords), rad2deg.(Vector(results["alpha_at_ac"])),
             label=label)
     end
 
     # Plot alpha uncorrected
     for (y_coords, results, label) in zip(y_coordinates_list, results_list, label_list)
-        lines!(ax_alpha_unc, Vector(y_coords), Vector(results["alpha_uncorrected"]),
+        lines!(ax_alpha_unc, Vector(y_coords), rad2deg.(Vector(results["alpha_uncorrected"])),
             label=label)
     end
 

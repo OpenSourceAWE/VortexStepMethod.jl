@@ -426,7 +426,7 @@ function VortexStepMethod.plot_distribution(y_coordinates_list, results_list, la
     for (y_coordinates_i, result_i, label_i) in zip(y_coordinates_list, results_list, label_list)
         axs[1, 0].plot(
             y_coordinates_i,
-            result_i["alpha_geometric"],
+            rad2deg.(result_i["alpha_geometric"]),
             label=label_i
         )
     end
@@ -439,7 +439,7 @@ function VortexStepMethod.plot_distribution(y_coordinates_list, results_list, la
     for (y_coordinates_i, result_i, label_i) in zip(y_coordinates_list, results_list, label_list)
         axs[1, 1].plot(
             y_coordinates_i,
-            result_i["alpha_at_ac"],
+            rad2deg.(result_i["alpha_at_ac"]),
             label=label_i
         )
     end
@@ -452,7 +452,7 @@ function VortexStepMethod.plot_distribution(y_coordinates_list, results_list, la
     for (y_coordinates_i, result_i, label_i) in zip(y_coordinates_list, results_list, label_list)
         axs[1, 2].plot(
             y_coordinates_i,
-            result_i["alpha_uncorrected"],
+            rad2deg.(result_i["alpha_uncorrected"]),
             label=label_i
         )
     end

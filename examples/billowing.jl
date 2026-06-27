@@ -6,8 +6,8 @@ using LinearAlgebra
 using VortexStepMethod
 
 PLOT = true
-SAVE_ALL = false
-USE_TEX = false
+SAVE_ALL = true
+USE_TEX = true
 OUTPUT_DIR = joinpath(dirname(@__DIR__), "output")
 
 # Data paths (all within this repo)
@@ -117,7 +117,7 @@ solver_bill = make_solver(body_aero_bill)
 
 # --- Set flight conditions ---
 wind_speed = condition_cfg["wind_speed"]
-angle_of_attack_deg = condition_cfg["alpha"]
+angle_of_attack_deg = 10.0
 sideslip_deg = condition_cfg["beta"]
 
 α0 = deg2rad(angle_of_attack_deg)
@@ -140,8 +140,8 @@ println("Billowed:  CL=$(round(results_bill["cl"]; digits=4)), " *
 if PLOT
     # Plot geometry (flat wing)
     plot_geometry(
-        body_aero_flat,
-        "Flat wing geometry";
+        body_aero_bill,
+        "Billowing wing geometry";
         save_path=OUTPUT_DIR,
         is_save=false || SAVE_ALL,
         is_show=true,
