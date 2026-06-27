@@ -126,6 +126,12 @@ Main solver structure for the Vortex Step Method.See also: [solve](@ref)
 - `is_with_artificial_damping`::Bool = false: Whether to apply artificial damping
 - `artificial_damping`::NamedTuple{(:k2, :k4), Tuple{Float64, Float64}} = (k2=0.1, k4=0.0): Artificial damping parameters
 
+## Artificial viscosity settings
+- `is_with_artificial_viscosity`::Bool = false: Enable the Li/Gaunaa spanwise artificial
+    viscosity (TORQUE 2026) for post-stall stabilization in the LOOP solver
+- `artificial_viscosity_factor`::Float64 = 0.035: Coefficient k in the viscosity scaling
+    (the conservative envelope from the paper)
+
 ## Additional settings
 - `type_initial_gamma_distribution`::InitialGammaDistribution = ELLIPTIC: see: [InitialGammaDistribution](@ref)
 - `use_gamma_prev`::Bool = true: reuse provided previous gamma as initial guess when available
@@ -158,6 +164,10 @@ sol::VSMSolution = VSMSolution(): The result of calling [solve!](@ref)
     # Damping settings
     is_with_artificial_damping::Bool = false
     artificial_damping::NamedTuple{(:k2, :k4), Tuple{Float64, Float64}} =(k2=0.1, k4=0.0)
+
+    # Li/Gaunaa spanwise artificial viscosity (TORQUE 2026) settings
+    is_with_artificial_viscosity::Bool = false
+    artificial_viscosity_factor::T = T(0.035)
 
     # Additional settings
     type_initial_gamma_distribution::InitialGammaDistribution = ZEROS
@@ -199,6 +209,8 @@ function Solver(body_aero, settings::VSMSettings)
         relaxation_factor=ss.relaxation_factor,
         is_with_artificial_damping=ss.artificial_damping,
         artificial_damping=(k2=ss.k2, k4=ss.k4),
+        is_with_artificial_viscosity=ss.is_with_artificial_viscosity,
+        artificial_viscosity_factor=ss.artificial_viscosity_factor,
         type_initial_gamma_distribution=ss.type_initial_gamma_distribution,
         use_gamma_prev=ss.use_gamma_prev,
         core_radius_fraction=ss.core_radius_fraction,
@@ -347,8 +359,8 @@ function calc_forces!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics;
                 vu3 = va3 * inv_va
                 v_tangential = (x1*vu1+x2*vu2+x3*vu3) / x_norm
                 v_normal = (z1*vu1+z2*vu2+z3*vu3) / z_norm
-                alpha_geometric_dist[i] = pi + atan(
-                    v_normal, v_tangential)
+                alpha_geometric_dist[i] = atan(
+                    -v_normal, -v_tangential)
             end
         end
 
@@ -805,11 +817,62 @@ end
 end
 
 """
+    build_spanwise_laplacian!(laplacian, n_panels)
+
+Fill the `n_panels × n_panels` matrix `laplacian` with the discrete spanwise
+Laplacian used by the Li/Gaunaa post-stall artificial-viscosity regularization.
+Interior rows use the three-point stencil `gamma[i-1] - 2 gamma[i] + gamma[i+1]`;
+the tip rows use the second-order closures of Li, Gaunaa, Pirrung & Lønbæk
+(TORQUE 2026, Eq. 15) that enforce `gamma -> 0` at the wing tips. Panels are
+assumed ordered consecutively along the span and approximately uniformly spaced.
+Returns the matrix unchanged (all zeros) when `n_panels < 3`.
+"""
+function build_spanwise_laplacian!(laplacian, n_panels)
+    laplacian .= 0
+    n_panels < 3 && return laplacian
+    @inbounds for i in 2:n_panels-1
+        laplacian[i, i-1] = 1.0
+        laplacian[i, i]   = -2.0
+        laplacian[i, i+1] = 1.0
+    end
+    laplacian[1, 1] = -4.0
+    laplacian[1, 2] = 4.0 / 3.0
+    laplacian[n_panels, n_panels]   = -4.0
+    laplacian[n_panels, n_panels-1] = 4.0 / 3.0
+    return laplacian
+end
+
+"""
+    local_lift_slope!(slopes, panels, alpha_dist, delta=deg2rad(0.5))
+
+Per-panel local lift-curve slope `dCl/dalpha`, evaluated from each panel's own
+2-D polar at its current effective angle of attack by central differences. The
+slope turns negative in post-stall, which is what activates the
+artificial-viscosity regularization in [`gamma_loop!`](@ref).
+"""
+function local_lift_slope!(slopes, panels, alpha_dist, delta=deg2rad(0.5))
+    inv_2delta = 1.0 / (2delta)
+    @inbounds for i in eachindex(panels)
+        cl_plus  = calculate_cl(panels[i], alpha_dist[i] + delta)
+        cl_minus = calculate_cl(panels[i], alpha_dist[i] - delta)
+        slopes[i] = (cl_plus - cl_minus) * inv_2delta
+    end
+    return slopes
+end
+
+"""
     gamma_loop!(solver::Solver, AIC_x::Matrix{Float64},
               AIC_y::Matrix{Float64}, AIC_z::Matrix{Float64},
               panels::AbstractVector{<:Panel}, relaxation_factor::Float64; log=true)
 
 Main iteration loop for calculating circulation distribution.
+
+When `solver.is_with_artificial_viscosity` is set, the LOOP solver replaces the
+explicit target `F(gamma)` with the implicit Li/Gaunaa solution
+`(I - diag(mu) L) gamma = F(gamma)` before relaxation, stabilizing post-stall
+distributions. The Python reference gates this on precomputed per-panel stall
+angles; here the polar is an interpolation object, so the expensive linear solve
+is gated on `any(mu > 0)` instead, which is behaviourally identical.
 """
 function gamma_loop!(
     solver::Solver{P, U, T},
@@ -939,6 +1002,21 @@ function gamma_loop!(
     end
 
     if solver.solver_type == LOOP
+        # Work buffers allocated once: the geometry is frozen during iteration.
+        use_viscosity = solver.is_with_artificial_viscosity
+        laplacian        = use_viscosity ? zeros(T, n_panels, n_panels) : zeros(T, 0, 0)
+        viscosity_matrix = use_viscosity ? zeros(T, n_panels, n_panels) : zeros(T, 0, 0)
+        lift_slope       = use_viscosity ? zeros(T, n_panels) : zeros(T, 0)
+        mu_array         = use_viscosity ? zeros(T, n_panels) : zeros(T, 0)
+        gamma_target     = use_viscosity ? zeros(T, n_panels) : zeros(T, 0)
+        planform_area    = zero(T)
+        if use_viscosity
+            build_spanwise_laplacian!(laplacian, n_panels)
+            @inbounds for i in 1:n_panels
+                planform_area += panels[i].width * chord_array[i]
+            end
+        end
+
         function f_loop!(gamma_new, gamma, damp)
             gamma .= gamma_new
             update_gamma_candidate!(
@@ -967,10 +1045,31 @@ function gamma_loop!(
                 cl_dist,
                 chord_array,
             )
+            # Gate the linear solve on any(mu > 0): fires exactly in post-stall.
+            if use_viscosity
+                local_lift_slope!(lift_slope, panels, solver.lr.alpha_dist)
+                any_stalled = false
+                @inbounds for i in 1:n_panels
+                    m = -solver.artificial_viscosity_factor * planform_area *
+                        lift_slope[i] / panels[i].width^2
+                    mu_array[i] = max(zero(T), m)
+                    mu_array[i] > 0 && (any_stalled = true)
+                end
+                if any_stalled
+                    gamma_target .= gamma_new
+                    @inbounds for col in 1:n_panels, row in 1:n_panels
+                        viscosity_matrix[row, col] =
+                            (row == col ? one(T) : zero(T)) -
+                            mu_array[row] * laplacian[row, col]
+                    end
+                    gamma_new .= viscosity_matrix \ gamma_target
+                end
+            end
+
             # Update gamma with relaxation and damping
-            @. gamma_new = (1 - relaxation_factor) * gamma + 
+            @. gamma_new = (1 - relaxation_factor) * gamma +
                     relaxation_factor * gamma_new + damp
-            
+
             # Apply damping if needed
             if solver.is_with_artificial_damping
                 smooth_circulation!(damp, gamma, 0.1, 0.5)
@@ -1133,6 +1232,8 @@ function make_dual_shadow(solver::Solver{P, U, Float64},
         atol = TD(solver.atol),
         is_with_artificial_damping = solver.is_with_artificial_damping,
         artificial_damping = solver.artificial_damping,
+        is_with_artificial_viscosity = solver.is_with_artificial_viscosity,
+        artificial_viscosity_factor = TD(solver.artificial_viscosity_factor),
         type_initial_gamma_distribution = solver.type_initial_gamma_distribution,
         use_gamma_prev = false,
         core_radius_fraction = TD(solver.core_radius_fraction),
