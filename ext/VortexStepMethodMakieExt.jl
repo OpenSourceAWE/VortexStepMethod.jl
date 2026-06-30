@@ -3,7 +3,8 @@ using Makie, VortexStepMethod, LinearAlgebra, Statistics, DelimitedFiles
 import VortexStepMethod: calculate_filaments_for_plotting
 
 export plot_geometry, plot_distribution, plot_polars, save_plot, show_plot,
-    plot_polar_data, plot_combined_analysis, plot_airfoil_slices
+    plot_polar_data, plot_combined_analysis, plot_airfoil_slices, plot_airfoils,
+    plot_section_polars
 
 # Set this extension as the active plotting backend when loaded (only if not already set)
 function __init__()
@@ -1472,6 +1473,78 @@ function plot_airfoil_fit(x::Vector, y::Vector; title::String="Airfoil Fit",
     end
 
     return fig, params
+end
+
+"""
+    plot_airfoils(geometry_file, ::MakieBackend; n_cols=3, is_show=true,
+                  is_save=false, save_path=nothing, data_type=".png")
+
+Makie backend implementation of [`plot_airfoils`](@ref).
+"""
+function VortexStepMethod.plot_airfoils(geometry_file::String,
+    ::VortexStepMethod.MakieBackend;
+    n_cols::Int=3, is_show::Bool=true, is_save::Bool=false,
+    save_path=nothing, data_type::String=".png")
+
+    airfoils = VortexStepMethod.airfoils_from_yaml(geometry_file)
+    isempty(airfoils) && error("No airfoils with a dat_file found in $geometry_file")
+
+    n = length(airfoils)
+    ncol = min(n_cols, n)
+    nrow = ceil(Int, n / ncol)
+    fig = Figure(size=(380 * ncol, 320 * nrow))
+    Label(fig[0, :], "Airfoils: $(basename(geometry_file))", fontsize=16)
+
+    for (i, (id, x, y)) in enumerate(airfoils)
+        ax = Axis(fig[div(i - 1, ncol) + 1, mod1(i, ncol)];
+            title="Airfoil $id", xlabel="x/c", ylabel="y/c", aspect=DataAspect())
+        lines!(ax, x, y; color=:black)
+    end
+
+    if is_save && !isnothing(save_path)
+        VortexStepMethod.save_plot(fig, save_path, "airfoils"; data_type)
+    end
+    is_show && display(fig)
+    return fig
+end
+
+"""
+    plot_section_polars(body_aero, coefficient, ::MakieBackend; is_show=true,
+                        is_save=false, save_path=nothing, data_type=".png")
+
+Makie backend implementation of [`plot_section_polars`](@ref).
+"""
+function VortexStepMethod.plot_section_polars(body_aero::BodyAerodynamics,
+    coefficient::Symbol, ::VortexStepMethod.MakieBackend;
+    is_show::Bool=true, is_save::Bool=false,
+    save_path=nothing, data_type::String=".png")
+
+    coefficient in (:cl, :cd, :cm) ||
+        throw(ArgumentError("coefficient must be :cl, :cd, or :cm, got :$coefficient"))
+    idx = coefficient === :cl ? 2 : coefficient === :cd ? 3 : 4
+    label = uppercasefirst(string(coefficient))
+
+    fig = Figure(size=(900, 600))
+    ax = Axis(fig[1, 1]; title="$label per section", xlabel="α [deg]", ylabel=label)
+
+    n_sections = 0
+    for wing in body_aero.wings
+        for (s, section) in enumerate(wing.unrefined_sections)
+            section.aero_model == POLAR_VECTORS || continue
+            aero = section.aero_data
+            aero === nothing && continue
+            lines!(ax, rad2deg.(aero[1]), aero[idx]; label="section $s")
+            n_sections += 1
+        end
+    end
+    n_sections == 0 && error("No POLAR_VECTORS sections found in body")
+    n_sections <= 12 && axislegend(ax; position=:rt, framevisible=false)
+
+    if is_save && !isnothing(save_path)
+        VortexStepMethod.save_plot(fig, save_path, "section_polars_$coefficient"; data_type)
+    end
+    is_show && display(fig)
+    return fig
 end
 
 end

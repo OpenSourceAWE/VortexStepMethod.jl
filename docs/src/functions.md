@@ -8,6 +8,7 @@ refine!
 calculate_span
 calculate_projected_area
 load_polar_data
+obj_to_yaml
 ```
 
 ## Setting the inflow conditions and solving
@@ -28,6 +29,8 @@ plot_distribution
 plot_polars
 plot_polar_data
 plot_combined_analysis
+plot_airfoils
+plot_section_polars
 ```
 
 ## Helper Functions

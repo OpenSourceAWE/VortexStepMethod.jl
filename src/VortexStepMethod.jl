@@ -51,8 +51,9 @@ export slice_obj_wing, slice_obj_at_positions
 export generate_neuralfoil_polars, generate_polar_from_coordinates, generate_polar_from_dat
 export obj_to_yaml
 
-export plot_airfoil_slices, plot_circulation_distribution, plot_combined_analysis,
-    plot_distribution, plot_geometry, plot_polar_data, plot_polars, save_plot, show_plot
+export plot_airfoil_slices, plot_airfoils, plot_circulation_distribution,
+    plot_combined_analysis, plot_distribution, plot_geometry, plot_polar_data,
+    plot_polars, plot_section_polars, save_plot, show_plot
 
 # Backend dispatch types for multi-backend support (Makie and ControlPlots can coexist)
 abstract type PlotBackend end
@@ -89,6 +90,8 @@ function show_plot end
 function plot_polar_data end
 function plot_combined_analysis end
 function plot_airfoil_slices end
+function plot_airfoils end
+function plot_section_polars end
 
 function _active_backend()
     b = _PLOT_BACKEND[]
@@ -227,6 +230,49 @@ in sequence. Routes to the active plotting backend (Makie or ControlPlots).
 """
 function plot_combined_analysis(solver, body_aero, results; kwargs...)
     plot_combined_analysis(solver, body_aero, results, _active_backend(); kwargs...)
+end
+
+"""
+    plot_airfoils(geometry_file::String; kwargs...)
+
+Plot every airfoil of a YAML wing geometry in a grid of subfigures. The airfoil
+shapes are read from the `.dat` files referenced by the geometry's
+`wing_airfoils` (a loaded [`BodyAerodynamics`](@ref) does not retain airfoil
+coordinates, so the YAML is the source). Routes to the active plotting backend.
+
+# Arguments
+- `geometry_file`: path to a YAML geometry file (e.g. written by [`obj_to_yaml`](@ref))
+
+# Keyword arguments
+- `n_cols`: number of subfigure columns (default: `3`)
+- `is_show`: whether to display (default: `true`)
+- `is_save`: whether to save (default: `false`)
+- `save_path`: directory to save the figure (default: `nothing`)
+- `data_type`: file extension for saving (default: `".png"`)
+"""
+function plot_airfoils(geometry_file::String; kwargs...)
+    plot_airfoils(geometry_file, _active_backend(); kwargs...)
+end
+
+"""
+    plot_section_polars(body_aero::BodyAerodynamics, coefficient=:cl; kwargs...)
+
+Plot one polar coefficient (`:cl`, `:cd`, or `:cm`) against angle of attack for
+every section of a wing using stored `POLAR_VECTORS` data. Routes to the active
+plotting backend.
+
+# Arguments
+- `body_aero`: the [`BodyAerodynamics`](@ref) to plot
+- `coefficient`: `:cl`, `:cd`, or `:cm` (default: `:cl`)
+
+# Keyword arguments
+- `is_show`: whether to display (default: `true`)
+- `is_save`: whether to save (default: `false`)
+- `save_path`: directory to save the figure (default: `nothing`)
+- `data_type`: file extension for saving (default: `".png"`)
+"""
+function plot_section_polars(body_aero, coefficient::Symbol=:cl; kwargs...)
+    plot_section_polars(body_aero, coefficient, _active_backend(); kwargs...)
 end
 
 """
