@@ -29,8 +29,38 @@ output_dir = joinpath(project_dir, "output", "ram_air_kite_converted")
 # --- Convert the .obj mesh to the YAML route ---
 println("Converting $(basename(obj_path)) to YAML...")
 geometry_file = obj_to_yaml(obj_path, output_dir;
-    n_sections=10, Re=5e5, alpha_range=-20:1:20, model_size="xlarge",
+    n_sections=36, Re=5e5, alpha_range=-20:1:20, model_size="xlarge",
     fit_method=EnvelopeFit(min_distance=0.0001))
+
+# --- Report per-section fit error: how far any raw point sticks OUTSIDE the
+# fitted envelope (interior structure points are ignored by the envelope fit). ---
+function max_outside(x_fit, y_fit, x_raw, y_raw)
+    isempty(x_raw) && return 0.0
+    le = argmin(x_fit)
+    xu, yu = reverse(x_fit[1:le]), reverse(y_fit[1:le])
+    xl, yl = x_fit[le:end], y_fit[le:end]
+    interp(xs, ys, px) = begin
+        px <= xs[1] && return ys[1]
+        px >= xs[end] && return ys[end]
+        k = searchsortedfirst(xs, px)
+        t = (px - xs[k-1]) / (xs[k] - xs[k-1])
+        ys[k-1] + t * (ys[k] - ys[k-1])
+    end
+    v = 0.0
+    for (px, py) in zip(x_raw, y_raw)
+        uy = interp(xu, yu, px)
+        ly = interp(xl, yl, px)
+        v = max(v, py > uy ? py - uy : (py < ly ? ly - py : 0.0))
+    end
+    return v
+end
+
+println("Per-section fit error (max raw point outside the fitted envelope):")
+for af in VortexStepMethod.airfoils_from_yaml(geometry_file)
+    err = max_outside(af.x, af.y, af.x_raw, af.y_raw)
+    println("  Airfoil $(af.id): max_outside=$(round(err, digits=4))" *
+            (err > 0.01 ? "  <-- poor fit" : ""))
+end
 
 # --- Everything below is the standard YAML wing route ---
 wing = Wing(geometry_file; n_panels=20, spanwise_distribution=LINEAR)
@@ -47,7 +77,7 @@ if PLOT
         view_elevation=15, view_azimuth=-120, use_tex=USE_TEX)
 
     # Airfoils and per-section polars recovered from the converted geometry
-    plot_airfoils(geometry_file; is_show=true)
+    plot_airfoils(geometry_file; symmetric=true, is_show=true)
     plot_section_polars(body_aero, :cl; is_show=true)
     plot_section_polars(body_aero, :cd; is_show=true)
 

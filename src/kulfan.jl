@@ -85,16 +85,6 @@ Two knobs trade off the fit:
 end
 
 """
-    fit_clearance(method::KulfanFitMethod) -> Float64
-
-Chordwise/normal clearance a fit method wraps around the points: `min_distance`
-for [`EnvelopeFit`](@ref), `0` otherwise. Used to inset the stored raw points to
-the same frame as the fitted airfoil.
-"""
-fit_clearance(method::EnvelopeFit) = method.min_distance
-fit_clearance(::KulfanFitMethod) = 0.0
-
-"""
     bernstein_basis(x::AbstractVector, n::Int)
 
 Compute Bernstein polynomial basis matrix.
@@ -160,21 +150,6 @@ function normalize_airfoil(x::Vector{T}, y::Vector{T}) where T
     end
 
     return x_norm, y_norm, (x_le=x_le, y_le=y_le, chord=chord, angle=angle)
-end
-
-"""
-    inset_airfoil(x::Vector, y::Vector, clearance) -> (x_inset, y_inset)
-
-Normalize coordinates to unit chord, then uniformly scale them into the box
-`[clearance, 1 - clearance]`. This leaves `clearance` of chordwise room at each end
-so an airfoil fitted on `[0, 1]` can wrap around the leading and trailing edges
-(and close the trailing edge) instead of being pinned to the extreme points. With
-`clearance == 0` this is plain normalization.
-"""
-function inset_airfoil(x::Vector{T}, y::Vector{T}, clearance::Real) where T
-    x_norm, y_norm, _ = normalize_airfoil(x, y)
-    scale = one(T) - 2 * T(clearance)
-    return T(clearance) .+ scale .* x_norm, scale .* y_norm
 end
 
 """
@@ -256,11 +231,10 @@ slice), this fits a tight outer envelope: the upper surface stays above every
 point and the lower surface below it, so only the outermost points are active and
 interior points are ignored. For flat/thin sections where the surfaces nearly
 coincide, `min_distance` sets the minimum clearance between each surface and the
-points, preventing the envelope from collapsing to zero thickness. The points are
-first inset into `[min_distance, 1 - min_distance]` (see [`inset_airfoil`](@ref))
-so the fitted `[0, 1]` airfoil has chordwise room to wrap around the leading and
-trailing edges and to close the trailing edge, rather than being pinned to the
-extreme points.
+points, preventing the envelope from collapsing to zero thickness. The leading and
+trailing edges are pinned at the extreme points (the CST class function ties both
+surfaces to the chord there), so the clearance applies between the points and the
+upper/lower surfaces, not chordwise at the nose and tail.
 
 It approximates the program "minimise `tightness`·(enclosed area) +
 `perimeter_weight`·(surface arc length) subject to
@@ -284,8 +258,8 @@ function fit_kulfan_parameters(x::Vector{T}, y::Vector{T},
                                method::EnvelopeFit) where T
     n_weights = method.n_weights
     d = T(method.min_distance)
-    x_inset, y_norm = inset_airfoil(x, y, d)
-    xv = clamp.(x_inset, zero(T), one(T))
+    x_norm, y_norm, _ = normalize_airfoil(x, y)
+    xv = clamp.(x_norm, zero(T), one(T))
     m = length(xv)
     n_params = 2n_weights + 2
 

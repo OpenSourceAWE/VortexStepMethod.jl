@@ -120,11 +120,21 @@ an [`EnvelopeFit`](@ref) to wrap each section tightly *around* the slice points;
 this is robust to the noisy interior-structure points of a ram-air kite slice
 (ribs, spars) that otherwise pull the default [`LeastSquaresFit`](@ref) inward.
 
+A slice whose fitted airfoil is implausibly thick relative to the others (e.g. a
+near-vanishing wingtip slice that fits to a blob) is flagged as degenerate: a
+section is degenerate when its fitted `max|y|` exceeds `max_thickness_ratio` times
+the median over all sections. With `reuse_valid_airfoils=true` (default) each
+degenerate section reuses the nearest valid section's airfoil shape and polar,
+while keeping its own leading- and trailing-edge positions, so the station is
+still placed but carries a sane airfoil; a warning lists which sections were
+reused. With `reuse_valid_airfoils=false` the degenerate fit is written as is.
+
 # Output
-Writes into `output_dir`:
-- `airfoils/{i}.dat`     — fitted Kulfan airfoil coordinates (matches the polar)
-- `airfoils/{i}_raw.dat` — raw sliced section points (the fit is wrapped around these)
-- `polars/{i}.csv`    — NeuralFoil polar (alpha, Cd, Cs, Cl, Cm)
+Writes into `output_dir`, indexed by source-airfoil id `j` (degenerate sections
+share a neighbour's id):
+- `airfoils/{j}.dat`     — fitted Kulfan airfoil coordinates (matches the polar)
+- `airfoils/{j}_raw.dat` — raw sliced section points (the fit is wrapped around these)
+- `polars/{j}.csv`    — NeuralFoil polar (alpha, Cd, Cs, Cl, Cm)
 - `geometry.yaml`     — `wing_sections` + `wing_airfoils` referencing the above
 
 # Returns
@@ -135,6 +145,7 @@ function obj_to_yaml(obj_path::String, output_dir::String;
                      alpha_range=-180:1:180,
                      model_size::String="xlarge", weights_dir=nothing,
                      n_crit=9.0, fit_method::KulfanFitMethod=LeastSquaresFit(),
+                     reuse_valid_airfoils::Bool=true, max_thickness_ratio::Real=2.0,
                      spanwise_direction=[0.0, 1.0, 0.0],
                      verbose::Bool=true)
     (!endswith(obj_path, ".obj")) && (obj_path *= ".obj")
@@ -156,41 +167,57 @@ function obj_to_yaml(obj_path::String, output_dir::String;
     alphas = collect(Float64, alpha_range)
     load_neuralfoil_model(model_size; weights_dir)
 
-    section_rows = Vector{Any}[]
-    airfoil_rows = Vector{Any}[]
-
+    stations = NamedTuple[]
     for (i, y) in enumerate(y_positions)
         verbose && print("  Section $i (y=$(round(y, digits=3)))... ")
         slice = slice_obj_section(vertices, faces, y)
         if slice === nothing
-            verbose && println("degenerate, skipped")
+            verbose && println("empty slice, skipped")
             continue
         end
         LE_point, TE_point, xa, ya = slice
-
-        dat_rel = joinpath("airfoils", "$i.dat")
-        raw_rel = joinpath("airfoils", "$(i)_raw.dat")
-        csv_rel = joinpath("polars", "$i.csv")
-
         params = fit_kulfan_parameters(xa, ya, fit_method)
         x_fit, y_fit = kulfan_to_coordinates(params)
-        x_raw, y_raw = inset_airfoil(xa, ya, fit_clearance(fit_method))
-        write_dat(joinpath(output_dir, dat_rel), "section_$i", x_fit, y_fit)
-        write_dat(joinpath(output_dir, raw_rel), "section_$(i)_raw", x_raw, y_raw)
+        thickness = maximum(abs, y_fit)
+        verbose && println("fitted (thickness=$(round(thickness, digits=3)))")
+        push!(stations, (; LE_point, TE_point, xa, ya, params, x_fit, y_fit,
+                         thickness))
+    end
+    isempty(stations) && error("No valid sections sliced from $obj_path")
 
-        result = neuralfoil_aero(params, alphas, Float64(Re);
+    n = length(stations)
+    thickness_limit = max_thickness_ratio * median(s.thickness for s in stations)
+    degenerate = [s.thickness > thickness_limit for s in stations]
+    valid = [k for k in 1:n if !degenerate[k]]
+    isempty(valid) && error("All sliced sections are degenerate in $obj_path")
+    ids = [degenerate[k] && reuse_valid_airfoils ?
+           valid[argmin(abs.(valid .- k))] : k for k in 1:n]
+    reused = [k => ids[k] for k in 1:n if degenerate[k] && ids[k] != k]
+    isempty(reused) || @warn "Degenerate section fits reused the nearest valid " *
+        "airfoil: " * join(["section $k → airfoil $j" for (k, j) in reused], ", ")
+
+    section_rows = Vector{Any}[]
+    airfoil_rows = Vector{Any}[]
+    for j in unique(ids)
+        s = stations[j]
+        dat_rel = joinpath("airfoils", "$j.dat")
+        raw_rel = joinpath("airfoils", "$(j)_raw.dat")
+        csv_rel = joinpath("polars", "$j.csv")
+        write_dat(joinpath(output_dir, dat_rel), "section_$j", s.x_fit, s.y_fit)
+        write_dat(joinpath(output_dir, raw_rel), "section_$(j)_raw", s.xa, s.ya)
+        result = neuralfoil_aero(s.params, alphas, Float64(Re);
                                  model_size, weights_dir, n_crit)
         write_polar_csv(joinpath(output_dir, csv_rel), result)
-
-        push!(section_rows, Any[i, LE_point[1], LE_point[2], LE_point[3],
-                                TE_point[1], TE_point[2], TE_point[3]])
-        push!(airfoil_rows, Any[i, "polar_vectors",
+        push!(airfoil_rows, Any[j, "polar_vectors",
                                 Dict("dat_file" => dat_rel, "raw_dat_file" => raw_rel,
                                      "csv_file_path" => csv_rel)])
-        verbose && println("done (CL_max=$(round(maximum(result.CL), digits=2)))")
+        verbose && println("  Airfoil $j: CL_max=$(round(maximum(result.CL), digits=2))")
     end
-
-    isempty(section_rows) && error("No valid sections sliced from $obj_path")
+    for k in 1:n
+        s = stations[k]
+        push!(section_rows, Any[ids[k], s.LE_point[1], s.LE_point[2], s.LE_point[3],
+                                s.TE_point[1], s.TE_point[2], s.TE_point[3]])
+    end
 
     yaml_path = joinpath(output_dir, "geometry.yaml")
     write_geometry_yaml(yaml_path, section_rows, airfoil_rows)

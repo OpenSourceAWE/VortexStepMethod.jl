@@ -3,7 +3,7 @@ using VortexStepMethod
 using VortexStepMethod: KulfanParameters, LeastSquaresFit, EnvelopeFit,
                        fit_kulfan_parameters, kulfan_to_coordinates, neuralfoil_aero,
                        class_function, bernstein_basis, leading_edge_basis,
-                       normalize_airfoil, inset_airfoil, fit_clearance
+                       normalize_airfoil
 
 read_dat_coords(path) = begin
     x = Float64[]; y = Float64[]
@@ -46,22 +46,21 @@ end
     end
 
     @testset "Envelope fit encloses points with clearance" begin
-        # Measure clearance in the fit's own frame: the points are inset by the
-        # method's clearance before fitting (see inset_airfoil).
+        xn, yn, _ = normalize_airfoil(xr, yr)
+        xc = clamp.(xn, 0.0, 1.0)
+        mid = (xn .> 0.05) .& (xn .< 0.95)
+
         function min_clearance(method)
-            params = fit_kulfan_parameters(xr, yr, method)
-            xi, yi = inset_airfoil(xr, yr, fit_clearance(method))
-            xc = clamp.(xi, 0.0, 1.0)
-            mid = (xi .> 0.05) .& (xi .< 0.95)
-            n = length(params.upper_weights)
+            fitted = fit_kulfan_parameters(xr, yr, method)
+            n = length(fitted.upper_weights)
             shape = class_function(xc) .* (bernstein_basis(xc, n - 1) *
-                    params.upper_weights) .+ params.leading_edge_weight .*
+                    fitted.upper_weights) .+ fitted.leading_edge_weight .*
                     leading_edge_basis(xc, n)
-            upper = shape .+ xc .* (params.TE_thickness / 2)
+            upper = shape .+ xc .* (fitted.TE_thickness / 2)
             lower = class_function(xc) .* (bernstein_basis(xc, n - 1) *
-                    params.lower_weights) .+ params.leading_edge_weight .*
-                    leading_edge_basis(xc, n) .- xc .* (params.TE_thickness / 2)
-            return minimum((upper .- yi)[mid]), minimum((yi .- lower)[mid])
+                    fitted.lower_weights) .+ fitted.leading_edge_weight .*
+                    leading_edge_basis(xc, n) .- xc .* (fitted.TE_thickness / 2)
+            return minimum((upper .- yn)[mid]), minimum((yn .- lower)[mid])
         end
 
         env_upper, env_lower = min_clearance(EnvelopeFit(min_distance=0.005))

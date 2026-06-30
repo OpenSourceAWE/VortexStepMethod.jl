@@ -1476,31 +1476,62 @@ function plot_airfoil_fit(x::Vector, y::Vector; title::String="Airfoil Fit",
 end
 
 """
-    plot_airfoils(geometry_file, ::MakieBackend; n_cols=3, is_show=true,
-                  is_save=false, save_path=nothing, data_type=".png")
+    plot_airfoils(geometry_file, ::MakieBackend; overlay=nothing, symmetric=false,
+                  idxs=nothing, n_cols=3, is_show=true, is_save=false,
+                  save_path=nothing, data_type=".png")
 
 Makie backend implementation of [`plot_airfoils`](@ref).
+
+With `overlay=false` each airfoil gets its own subplot; with `overlay=true` all
+airfoils are drawn on one axis coloured by section. By default (`overlay=nothing`)
+the overlay is used when there are more than 12 sections, where a subplot grid
+becomes unreadable. Both modes show the raw `_raw.dat` slice points as dots with
+the fitted airfoil as a line. Pass `idxs` (e.g. `idxs=[1]`) to plot only those
+airfoils by position; otherwise `symmetric=true` shows just the first half of the
+sections (the wing is mirror-symmetric, so the other half is redundant).
 """
 function VortexStepMethod.plot_airfoils(geometry_file::String,
     ::VortexStepMethod.MakieBackend;
-    n_cols::Int=3, is_show::Bool=true, is_save::Bool=false,
-    save_path=nothing, data_type::String=".png")
+    overlay=nothing, symmetric::Bool=false, idxs=nothing, n_cols::Int=3,
+    is_show::Bool=true, is_save::Bool=false, save_path=nothing,
+    data_type::String=".png")
 
     airfoils = VortexStepMethod.airfoils_from_yaml(geometry_file)
     isempty(airfoils) && error("No airfoils with a dat_file found in $geometry_file")
+    if idxs !== nothing
+        airfoils = airfoils[idxs]
+    elseif symmetric
+        airfoils = airfoils[1:cld(length(airfoils), 2)]
+    end
 
     n = length(airfoils)
-    ncol = min(n_cols, n)
-    nrow = ceil(Int, n / ncol)
-    fig = Figure(size=(380 * ncol, 320 * nrow))
-    Label(fig[0, :], "Airfoils: $(basename(geometry_file))", fontsize=16)
+    use_overlay = overlay === nothing ? n > 12 : overlay
+    title = "Airfoils: $(basename(geometry_file))"
 
-    for (i, af) in enumerate(airfoils)
-        ax = Axis(fig[div(i - 1, ncol) + 1, mod1(i, ncol)];
-            title="Airfoil $(af.id)", xlabel="x/c", ylabel="y/c", aspect=DataAspect())
-        isempty(af.x_raw) ||
-            scatter!(ax, af.x_raw, af.y_raw; color=(:gray, 0.5), markersize=4)
-        lines!(ax, af.x, af.y; color=:black)
+    if use_overlay
+        ids = [af.id for af in airfoils]
+        crange = (minimum(ids), maximum(ids))
+        fig = Figure(size=(900, 600))
+        ax = Axis(fig[1, 1]; title, xlabel="x/c", ylabel="y/c", aspect=DataAspect())
+        for af in airfoils
+            isempty(af.x_raw) || scatter!(ax, af.x_raw, af.y_raw;
+                color=af.id, colorrange=crange, colormap=:viridis, markersize=3)
+            lines!(ax, af.x, af.y; color=af.id, colorrange=crange, colormap=:viridis)
+        end
+        Colorbar(fig[1, 2]; colormap=:viridis, limits=crange, label="section")
+    else
+        ncol = min(n_cols, n)
+        nrow = ceil(Int, n / ncol)
+        fig = Figure(size=(380 * ncol, 320 * nrow))
+        Label(fig[0, :], title, fontsize=16)
+        for (i, af) in enumerate(airfoils)
+            ax = Axis(fig[div(i - 1, ncol) + 1, mod1(i, ncol)];
+                title="Airfoil $(af.id)", xlabel="x/c", ylabel="y/c",
+                aspect=DataAspect())
+            isempty(af.x_raw) ||
+                scatter!(ax, af.x_raw, af.y_raw; color=(:gray, 0.5), markersize=4)
+            lines!(ax, af.x, af.y; color=:black)
+        end
     end
 
     if is_save && !isnothing(save_path)
