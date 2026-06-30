@@ -93,51 +93,25 @@ function normalize_airfoil(x::Vector{T}, y::Vector{T}) where T
 end
 
 """
-    split_airfoil_surfaces(x::Vector, y::Vector)
+    leading_edge_basis(x::AbstractVector, n_weights::Int)
 
-Split airfoil coordinates into upper and lower surfaces.
-
-Assumes coordinates start from TE upper, go around LE, end at TE lower (Selig format),
-or a closed contour. Returns (x_upper, y_upper, x_lower, y_lower) with x sorted 0->1.
+Leading-edge-modification basis used by AeroSandbox/NeuralFoil:
+`x * (1 - x)^(n_weights + 0.5)`. Added identically to both surfaces.
 """
-function split_airfoil_surfaces(x::Vector{T}, y::Vector{T}) where T
-    n = length(x)
-
-    # Find leading edge (minimum x)
-    le_idx = argmin(x)
-
-    # Split into upper (indices 1:le_idx) and lower (indices le_idx:end)
-    # Upper surface goes from TE to LE (reverse to get LE to TE)
-    if le_idx > 1
-        upper_indices = le_idx:-1:1
-    else
-        upper_indices = [1]
-    end
-
-    # Lower surface goes from LE to TE
-    if le_idx < n
-        lower_indices = le_idx:n
-    else
-        lower_indices = [n]
-    end
-
-    x_upper = x[upper_indices]
-    y_upper = y[upper_indices]
-    x_lower = x[lower_indices]
-    y_lower = y[lower_indices]
-
-    # Ensure sorted by x (LE to TE)
-    upper_order = sortperm(x_upper)
-    lower_order = sortperm(x_lower)
-
-    return (x_upper[upper_order], y_upper[upper_order],
-            x_lower[lower_order], y_lower[lower_order])
+function leading_edge_basis(x::AbstractVector{T}, n_weights::Int) where T
+    return x .* max.(1 .- x, zero(T)).^(n_weights + 0.5)
 end
 
 """
     fit_kulfan_parameters(x::Vector, y::Vector; n_weights=8)
 
-Fit Kulfan CST parameters to airfoil coordinates using least squares.
+Fit Kulfan CST parameters to airfoil coordinates using a single least-squares
+system, matching AeroSandbox's `get_kulfan_parameters` (the parameterization
+NeuralFoil was trained on).
+
+Upper and lower surfaces are fit together with a shared leading-edge weight and
+a trailing-edge thickness. Input coordinates are assumed to be in Selig order
+(TE upper -> LE -> TE lower).
 
 # Arguments
 - `x::Vector`: x-coordinates
@@ -148,76 +122,32 @@ Fit Kulfan CST parameters to airfoil coordinates using least squares.
 - `KulfanParameters`: Fitted parameters
 """
 function fit_kulfan_parameters(x::Vector{T}, y::Vector{T}; n_weights::Int=8) where T
-    # Normalize coordinates
     x_norm, y_norm, _ = normalize_airfoil(x, y)
+    xv = clamp.(x_norm, zero(T), one(T))
 
-    # Split into upper and lower surfaces
-    x_upper, y_upper, x_lower, y_lower = split_airfoil_surfaces(x_norm, y_norm)
+    le_idx = argmin(xv)
+    is_upper = (1:length(xv)) .<= le_idx
 
-    # Fit each surface separately
-    upper_weights, le_weight_upper, te_upper = fit_surface(
-        x_upper, y_upper, n_weights, true
-    )
-    lower_weights, le_weight_lower, te_lower = fit_surface(
-        x_lower, y_lower, n_weights, false
-    )
+    CS = class_function(xv) .* bernstein_basis(xv, n_weights - 1)
+    le_col = leading_edge_basis(xv, n_weights)
+    te_col = ifelse.(is_upper, xv ./ 2, .-xv ./ 2)
 
-    # Average LE weight (should be similar for both surfaces)
-    leading_edge_weight = (le_weight_upper + le_weight_lower) / 2
+    A = hcat((.!is_upper) .* CS, is_upper .* CS, le_col, te_col)
+    coeffs = A \ y_norm
+    TE_thickness = coeffs[end]
 
-    # TE thickness is difference between upper and lower at TE
-    TE_thickness = te_upper - te_lower
-
-    return KulfanParameters(upper_weights, lower_weights, leading_edge_weight,
-                           max(0.0, TE_thickness))
-end
-
-"""
-    fit_surface(x::Vector, y::Vector, n_weights::Int, is_upper::Bool)
-
-Fit Kulfan parameters to a single surface using least squares.
-
-The CST equation is: y(x) = C(x) * S(x) + x * TE_offset
-where C(x) = x^0.5 * (1-x) is the class function
-and S(x) = sum(w_i * B_i(x)) is the shape function
-
-We solve for weights using least squares: A * [w; TE_offset] = y
-"""
-function fit_surface(x::Vector{T}, y::Vector{T}, n_weights::Int,
-                     is_upper::Bool) where T
-    n = length(x)
-
-    # Filter out points too close to endpoints (causes numerical issues)
-    valid = (x .> 1e-6) .& (x .< 1 - 1e-6)
-    x_fit = x[valid]
-    y_fit = y[valid]
-    n_fit = length(x_fit)
-
-    if n_fit < n_weights + 1
-        @warn "Not enough points for fitting, using fewer weights"
-        n_weights = max(1, n_fit - 1)
+    if TE_thickness < 0
+        A = hcat((.!is_upper) .* CS, is_upper .* CS, le_col)
+        coeffs = A \ y_norm
+        TE_thickness = zero(T)
     end
 
-    # Build design matrix
-    # y = C(x) * (B * w) + x * TE_offset
-    # y = [C(x) .* B, x] * [w; TE_offset]
-    C = class_function(x_fit)
-    B = bernstein_basis(x_fit, n_weights - 1)  # n_weights basis functions
+    lower_weights = coeffs[1:n_weights]
+    upper_weights = coeffs[n_weights+1:2n_weights]
+    leading_edge_weight = coeffs[2n_weights+1]
 
-    # Design matrix: [C .* B, x]
-    A = hcat(C .* B, x_fit)
-
-    # Solve least squares
-    params = A \ y_fit
-
-    weights = params[1:n_weights]
-    te_offset = params[end]
-
-    # Leading edge weight is related to the curvature at LE
-    # For CST, the LE modification is typically the first weight
-    le_weight = weights[1]
-
-    return weights, le_weight, te_offset
+    return KulfanParameters(upper_weights, lower_weights, leading_edge_weight,
+                            TE_thickness)
 end
 
 """
@@ -243,9 +173,12 @@ function kulfan_to_coordinates(params::KulfanParameters; n_points::Int=100)
     S_upper = B_upper * params.upper_weights
     S_lower = B_lower * params.lower_weights
 
+    # Leading-edge modification (shared, added to both surfaces)
+    le = params.leading_edge_weight .* leading_edge_basis(x, n_upper)
+
     # y coordinates
-    y_upper = C .* S_upper .+ x .* (params.TE_thickness / 2)
-    y_lower = C .* S_lower .- x .* (params.TE_thickness / 2)
+    y_upper = C .* S_upper .+ le .+ x .* (params.TE_thickness / 2)
+    y_lower = C .* S_lower .+ le .- x .* (params.TE_thickness / 2)
 
     # Combine in Selig format
     x_coords = vcat(reverse(x), x[2:end])
