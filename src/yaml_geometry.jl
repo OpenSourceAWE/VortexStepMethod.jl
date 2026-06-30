@@ -1,6 +1,7 @@
 # Data structures for YAML wing geometry
 @with_kw struct WingAirfoilInfo
     csv_file_path::String
+    dat_file::String = ""
 end
 
 @with_kw struct WingSectionData
@@ -228,7 +229,9 @@ function Wing(
         push!(airfoils, WingAirfoilData(
             airfoil_id = airfoil_dict["airfoil_id"],
             type = airfoil_dict["type"],
-            info_dict = WingAirfoilInfo(csv_file_path = get(airfoil_dict["info_dict"], "csv_file_path", ""))
+            info_dict = WingAirfoilInfo(
+                csv_file_path = get(airfoil_dict["info_dict"], "csv_file_path", ""),
+                dat_file = get(airfoil_dict["info_dict"], "dat_file", ""))
         ))
     end
     

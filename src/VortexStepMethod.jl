@@ -49,6 +49,7 @@ export KulfanParameters, fit_kulfan_parameters, kulfan_to_coordinates
 export NeuralFoilModel, NeuralFoilResult, load_neuralfoil_model, neuralfoil_aero
 export slice_obj_wing, slice_obj_at_positions
 export generate_neuralfoil_polars, generate_polar_from_coordinates, generate_polar_from_dat
+export obj_to_yaml
 
 export plot_airfoil_slices, plot_circulation_distribution, plot_combined_analysis,
     plot_distribution, plot_geometry, plot_polar_data, plot_polars, save_plot, show_plot
@@ -455,6 +456,7 @@ include("kulfan.jl")
 include("neuralfoil.jl")
 include("obj_slice.jl")
 include("polar_generation.jl")
+include("obj_to_yaml.jl")
 
 include("plotting_helpers.jl")
 include("precompile.jl")
