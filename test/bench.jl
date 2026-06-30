@@ -22,9 +22,6 @@ using VortexStepMethod: calculate_AIC_matrices!, gamma_loop!, calculate_results,
 using Test
 using LinearAlgebra
 
-# Check Julia version for known allocation issues
-const IS_JULIA_1_12_OR_NEWER = VERSION >= v"1.12"
-
 @testset "Function Allocation Tests" begin
     # Define wing parameters
     n_panels = 20          # Number of panels
@@ -98,11 +95,7 @@ const IS_JULIA_1_12_OR_NEWER = VERSION >= v"1.12"
             for frac in core_radius_fractions
                 @testset "Model $model Core Radius Fraction $frac" begin
                     result = @benchmark calculate_AIC_matrices!($body_aero, $model, $frac, $va_norm_array, $va_unit_array) samples=1 evals=1
-                    if IS_JULIA_1_12_OR_NEWER
-                        @test_broken result.allocs ≤ 30
-                    else
-                        @test result.allocs ≤ 30
-                    end
+                    @test result.allocs ≤ 30
                     @info "Model: $(model) \t Core radius fraction: $(frac) \t Allocations: $(result.allocs) \t Memory: $(result.memory)"
                 end
             end
