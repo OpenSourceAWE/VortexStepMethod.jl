@@ -107,7 +107,8 @@ function load_polar_data(csv_file_path::String)
             data_vectors[col] = Float64[]
         end
 
-        for line_num in 2:length(lines)
+        for line_num in eachindex(lines)
+            line_num == firstindex(lines) && continue
             line = strip(lines[line_num])
             isempty(line) && continue  # Skip empty lines
             
@@ -150,7 +151,7 @@ end
 """
     Wing(geometry_file::String; n_panels=20, spanwise_distribution=LINEAR,
          spanwise_direction=[0.0, 1.0, 0.0], remove_nan=true,
-         use_prior_polar=false, prn=false)
+         use_prior_polar=false, billowing_percentage=0.0, prn=false)
 
 Constructs a `Wing` object from a YAML geometry file.
 
@@ -163,6 +164,7 @@ Constructs a `Wing` object from a YAML geometry file.
 - `spanwise_direction::Vector{Float64}`: Direction of the spanwise axis (default: `[0.0, 1.0, 0.0]`). Must be the global Y axis.
 - `remove_nan::Bool`: Remove NaN values from the geometry (default: `true`).
 - `use_prior_polar::Bool`: Reuse prior refined/panel polar mapping on geometry updates (default: `false`).
+- `billowing_percentage::Float64`: TE billow as percentage of arc length (default: `0.0`).
 - `prn::Bool`: Print informational messages during construction (default: `false`).
 
 # Returns
@@ -189,6 +191,7 @@ function Wing(
     spanwise_direction=[0.0, 1.0, 0.0],
     remove_nan=true,
     use_prior_polar=false,
+    billowing_percentage=0.0,
     prn=false,
     sort_sections=true
 )
@@ -243,7 +246,8 @@ function Wing(
         spanwise_distribution=spanwise_distribution,
         spanwise_direction=MVec3(spanwise_direction),
         remove_nan=remove_nan,
-        use_prior_polar=use_prior_polar
+        use_prior_polar=use_prior_polar,
+        billowing_percentage=Float64(billowing_percentage)
     )
     
     # Parse sections and populate wing
@@ -334,6 +338,7 @@ function Wing(settings::VSMSettings; sort_sections::Bool=true)
             spanwise_distribution=wing_settings.spanwise_panel_distribution,
             remove_nan=wing_settings.remove_nan,
             use_prior_polar=wing_settings.use_prior_polar,
+            billowing_percentage=wing_settings.billowing_percentage,
             sort_sections
         )
     elseif has_obj && has_dat

@@ -20,6 +20,15 @@ function ==(a::Section, b::Section)
 end
 
 @testset "Wing Geometry Tests" begin
+    @testset "Section default constructor" begin
+        s = Section()
+        @test s isa Section{Float64}
+        @test s.LE_point == zeros(3)
+        @test s.TE_point == zeros(3)
+        @test s.aero_model === INVISCID
+        @test isnothing(s.aero_data)
+    end
+
     @testset "Wing initialization" begin
         example_wing = Wing(10; spanwise_distribution=LINEAR)
         @test example_wing.n_panels == 10
@@ -90,6 +99,60 @@ end
         @test !any(isnan, cleaned_data[5])   # cm
         @test all(diff(cleaned_data[1]) .> 0) # alpha still monotonic
         @test all(diff(cleaned_data[2]) .> 0) # delta still monotonic
+    end
+
+    @testset "Matrix polar interpolation" begin
+        alpha = [-0.2, 0.0, 0.2]
+        delta = [-0.1, 0.1]
+
+        cl_left = [1.0 2.0; 3.0 4.0; 5.0 6.0]
+        cd_left = [0.1 0.2; 0.3 0.4; 0.5 0.6]
+        cm_left = [-0.1 -0.2; -0.3 -0.4; -0.5 -0.6]
+
+        cl_right = cl_left .+ 6.0
+        cd_right = cd_left .+ 0.6
+        cm_right = cm_left .- 0.6
+
+        polar_left = (alpha, delta, cl_left, cd_left, cm_left)
+        polar_right = (copy(alpha), copy(delta), cl_right, cd_right, cm_right)
+
+        result = VortexStepMethod.calculate_new_aero_data(
+            (POLAR_MATRICES, POLAR_MATRICES),
+            (polar_left, polar_right),
+            1,
+            0.25,
+            0.75,
+        )
+
+        @test result[1] === alpha
+        @test result[2] === delta
+        @test result[3] ≈ cl_left .* 0.25 .+ cl_right .* 0.75
+        @test result[4] ≈ cd_left .* 0.25 .+ cd_right .* 0.75
+        @test result[5] ≈ cm_left .* 0.25 .+ cm_right .* 0.75
+
+        bad_alpha_right = [-0.2, 0.05, 0.2]
+        @test_throws(
+            ArgumentError("Alpha steps must be identical."),
+            VortexStepMethod.calculate_new_aero_data(
+                (POLAR_MATRICES, POLAR_MATRICES),
+                (polar_left, (bad_alpha_right, delta, cl_right, cd_right, cm_right)),
+                1,
+                0.5,
+                0.5,
+            )
+        )
+
+        bad_delta_right = [-0.1, 0.15]
+        @test_throws(
+            ArgumentError("Delta steps must be identical."),
+            VortexStepMethod.calculate_new_aero_data(
+                (POLAR_MATRICES, POLAR_MATRICES),
+                (polar_left, (copy(alpha), bad_delta_right, cl_right, cd_right, cm_right)),
+                1,
+                0.5,
+                0.5,
+            )
+        )
     end
 
     @testset "Robustness left to right" begin
@@ -505,5 +568,104 @@ end
             end
         end
 
+    end
+
+    @testset "UNCHANGED preserves sections exactly" begin
+        n_panels = 4
+        span = 10.0
+        wing = Wing(n_panels; spanwise_distribution=UNCHANGED)
+        ys = range(span/2, -span/2; length=n_panels+1)
+        for y in ys
+            add_section!(wing,
+                [0.0, y, 0.0], [-1.0, y, 0.0], INVISCID)
+        end
+        refine!(wing)
+        @test length(wing.refined_sections) == n_panels + 1
+        for (i, sec) in enumerate(wing.refined_sections)
+            @test isapprox(sec.LE_point,
+                wing.unrefined_sections[i].LE_point;
+                atol=1e-14)
+            @test isapprox(sec.TE_point,
+                wing.unrefined_sections[i].TE_point;
+                atol=1e-14)
+            chord = norm(sec.TE_point - sec.LE_point)
+            @test isapprox(chord, 1.0; atol=1e-14)
+        end
+        # Re-refine preserves same result
+        refine!(wing)
+        for (i, sec) in enumerate(wing.refined_sections)
+            @test isapprox(sec.LE_point,
+                wing.unrefined_sections[i].LE_point;
+                atol=1e-14)
+        end
+    end
+
+    @testset "COSINE concentrates panels at tips" begin
+        n_panels = 20
+        span = 10.0
+        wing = Wing(n_panels; spanwise_distribution=COSINE)
+        add_section!(wing,
+            [0.0, span/2, 0.0], [-1.0, span/2, 0.0],
+            INVISCID)
+        add_section!(wing,
+            [0.0, -span/2, 0.0], [-1.0, -span/2, 0.0],
+            INVISCID)
+        refine!(wing)
+        sections = wing.refined_sections
+        @test length(sections) == n_panels + 1
+        # Endpoints match
+        @test isapprox(sections[1].LE_point[2],
+            span/2; atol=1e-10)
+        @test isapprox(sections[end].LE_point[2],
+            -span/2; atol=1e-10)
+        # Tip spacing smaller than root spacing
+        tip_gap = abs(sections[1].LE_point[2] -
+            sections[2].LE_point[2])
+        mid = div(n_panels, 2) + 1
+        root_gap = abs(sections[mid].LE_point[2] -
+            sections[mid+1].LE_point[2])
+        @test tip_gap < root_gap
+        # All chords preserved
+        for sec in sections
+            @test isapprox(
+                norm(sec.TE_point - sec.LE_point),
+                1.0; atol=1e-10)
+        end
+    end
+
+    @testset "SPLIT_PROVIDED chord preservation" begin
+        n_panels = 12
+        n_ribs = 4
+        span = 9.0
+        wing = Wing(n_panels;
+            spanwise_distribution=SPLIT_PROVIDED)
+        for i in 1:n_ribs
+            y = span/2 - (i-1) * span / (n_ribs - 1)
+            add_section!(wing,
+                [0.0, y, 0.0], [-1.0, y, 0.0], INVISCID)
+        end
+        refine!(wing)
+        @test length(wing.refined_sections) == n_panels + 1
+        for sec in wing.refined_sections
+            @test isapprox(
+                norm(sec.TE_point - sec.LE_point),
+                1.0; atol=1e-10)
+        end
+        # Rib endpoints preserved
+        for i in 1:n_ribs
+            found = false
+            for sec in wing.refined_sections
+                if isapprox(sec.LE_point,
+                        wing.unrefined_sections[i].LE_point;
+                        atol=1e-10)
+                    @test isapprox(sec.TE_point,
+                        wing.unrefined_sections[i].TE_point;
+                        atol=1e-10)
+                    found = true
+                    break
+                end
+            end
+            @test found
+        end
     end
 end

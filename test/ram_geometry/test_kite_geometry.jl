@@ -190,22 +190,23 @@ using Serialization
         wing = ObjWing(test_obj_path, test_dat_path; remove_nan=true)
         body_aero = BodyAerodynamics([wing])
 
-        # Store original TE point for comparison
-        i = length(body_aero.panels) ÷ 2
+        # Sample the apex panel: with even n_panels, refined section (n_panels/2 + 1)
+        # sits exactly at γ=0, so panels[n_panels/2 + 1].TE_point_1 is the apex TE
+        # where the LE tangent is purely along y and twist preserves y exactly.
+        @test iseven(wing.n_panels)
+        i = wing.n_panels ÷ 2 + 1
         original_te_point = copy(body_aero.panels[i].TE_point_1)
 
-        # Apply deformation with non-zero angles
-        theta_dist = fill(deg2rad(30.0), wing.n_panels)  # 30 degrees twist for all panels
-        delta_dist = fill(deg2rad(5.0), wing.n_panels)   # 5 degrees TE deflection for all panels
+        theta_dist = fill(deg2rad(30.0), wing.n_panels)
+        delta_dist = fill(deg2rad(5.0), wing.n_panels)
 
         VortexStepMethod.deform!(wing, theta_dist, delta_dist)
         VortexStepMethod.reinit!(body_aero)
 
-        # Check if TE point changed after deformation
         deformed_te_point = copy(body_aero.panels[i].TE_point_1)
         @test !isapprox(original_te_point, deformed_te_point, atol=1e-2)
         @test deformed_te_point[3] < original_te_point[3] # right hand rule
-        @test deformed_te_point[2] ≈ original_te_point[2] atol=1e-2 # right hand rule
+        @test deformed_te_point[2] ≈ original_te_point[2] atol=1e-5 # right hand rule
         @test deformed_te_point[1] < original_te_point[1] # right hand rule
         @test body_aero.panels[i].delta ≈ deg2rad(5.0)
 

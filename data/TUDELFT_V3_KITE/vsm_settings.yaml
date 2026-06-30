@@ -51,8 +51,8 @@ wings:
 # Numerical method settings and convergence criteria
 solver_settings:
     # --- Core Aerodynamic Model ---
-    aerodynamic_model_type: VSM      # VSM=3D vortex method, LLT=lifting line theory
-    solver_type: LOOP                # LOOP=fixed-point iteration, NEWTON=Newton-Raphson
+    aerodynamic_model_type: VSM       # VSM=3D vortex method, LLT=lifting line theory
+    solver_type: LOOP                 # LOOP=fixed-point iteration, NEWTON=Newton-Raphson
     #correct_aoa: false               # Defaults to false, meaning the computed AoA at 3/4c is used
     
     # --- Physical Properties ---

@@ -5,6 +5,9 @@ using Test
 using Logging
 
 include("../utils.jl")
+if !@isdefined(create_temp_wing_settings)
+    include("../test_data_utils.jl")
+end
 
 @testset "Induction Matrix Creation" begin
     # Setup
@@ -465,4 +468,42 @@ end
     set_va!(body_aero, [11.0, 0.0, 0.0])
     @test !body_aero.has_distributed_va
     @test body_aero.va ≈ [11.0, 0.0, 0.0]
+end
+
+@testset "set_va! with omega on multi-wing body" begin
+    wing1 = Wing(2; spanwise_distribution=UNCHANGED)
+    add_section!(wing1, [0.0, 0.0, 0.0], [1.0, 0.0, 0.0], INVISCID)
+    add_section!(wing1, [0.0, 1.0, 0.0], [1.0, 1.0, 0.0], INVISCID)
+    add_section!(wing1, [0.0, 2.0, 0.0], [1.0, 2.0, 0.0], INVISCID)
+
+    wing2 = Wing(2; spanwise_distribution=UNCHANGED)
+    add_section!(wing2, [0.0, 10.0, 0.0], [1.0, 10.0, 0.0], INVISCID)
+    add_section!(wing2, [0.0, 11.0, 0.0], [1.0, 11.0, 0.0], INVISCID)
+    add_section!(wing2, [0.0, 12.0, 0.0], [1.0, 12.0, 0.0], INVISCID)
+
+    refine!(wing1)
+    refine!(wing2)
+    body_aero = BodyAerodynamics([wing1, wing2])
+
+    va = [10.0, 0.0, 0.0]
+    omega = [0.0, 0.0, 1.0]
+    set_va!(body_aero, va, omega)
+
+    for panel in body_aero.panels
+        expected_va = va .+ (-omega × panel.control_point)
+        @test panel.va ≈ expected_va atol=1e-12
+    end
+    @test body_aero.omega ≈ omega
+    @test !body_aero.has_distributed_va
+    @test body_aero.va ≈ va
+
+    new_omega = [0.0, 0.0, 2.0]
+    @test body_aero._va ≈ va
+    body_aero.omega = new_omega
+
+    for panel in body_aero.panels
+        expected_va = va .+ (-new_omega × panel.control_point)
+        @test panel.va ≈ expected_va atol=1e-12
+    end
+    @test body_aero.omega ≈ new_omega
 end

@@ -1,5 +1,22 @@
+module FakeMakieNoCurrentBackend end
+
+module FakeMakieCurrentBackendThrows
+    current_backend() = error("boom")
+end
+
+module FakeMakieReturnsCairoModule
+    import CairoMakie
+    current_backend() = CairoMakie
+end
+
+module FakeMakieReturnsOtherModule
+    import Base
+    current_backend() = Base
+end
 backend = if "plot-controlplots" in ARGS
     using ControlPlots
+    import ControlPlots: plt
+    using PythonCall: pyconvert
     "ControlPlots"
 else
     using CairoMakie
@@ -9,9 +26,12 @@ end
 using VortexStepMethod
 using Test
 
+const makie_ext = backend == "Makie" ?
+    Base.get_extension(VortexStepMethod, :VortexStepMethodMakieExt) : nothing
+
 # Resolve repo data directory for ram air kite assets
-const _ram_data_dir = joinpath(dirname(dirname(@__DIR__)),
-                               "data", "ram_air_kite")
+_ram_data_dir = joinpath(dirname(dirname(@__DIR__)),
+                         "data", "ram_air_kite")
 
 # Helper to robustly delete files on platforms with occasional file locks
 safe_rm(path) = begin
@@ -30,16 +50,16 @@ safe_rm(path) = begin
     nothing
 end
 
-if !@isdefined ram_wing
+let
     body_path = joinpath(tempdir(), "ram_air_kite_body.obj")
     foil_path = joinpath(tempdir(), "ram_air_kite_foil.dat")
     body_src = joinpath(_ram_data_dir, "ram_air_kite_body.obj")
     foil_src = joinpath(_ram_data_dir, "ram_air_kite_foil.dat")
     cp(body_src, body_path; force=true)
     cp(foil_src, foil_path; force=true)
-    ram_wing = ObjWing(body_path, foil_path;
-                       alpha_range=deg2rad.(-1:1),
-                       delta_range=deg2rad.(-1:1))
+    global ram_wing = ObjWing(body_path, foil_path;
+                              alpha_range=deg2rad.(-1:1),
+                              delta_range=deg2rad.(-1:1))
 end
 
 function create_body_aero()
@@ -84,6 +104,17 @@ end
     else
         @test fig !== nothing
     end
+
+    if backend == "Makie"
+        @test hasmethod(VortexStepMethod.show_plot, Tuple{Figure})
+        @test_throws MethodError VortexStepMethod.show_plot(nothing)
+        @test_nowarn VortexStepMethod.show_plot(fig)
+    else
+        FigType = plt.Figure
+        @test hasmethod(VortexStepMethod.show_plot, Tuple{FigType})
+        @test_throws MethodError VortexStepMethod.show_plot(nothing)
+    end
+
     @test isfile(joinpath(save_dir,
                           "Rectangular_wing_geometry_angled_view.png"))
     safe_rm(joinpath(save_dir,
@@ -150,6 +181,61 @@ end
     @test isfile(joinpath(save_dir, "Rectangular_Wing_Polars.png"))
     safe_rm(joinpath(save_dir, "Rectangular_Wing_Polars.png"))
 
+    # Plot polars with CL vs CD (cl_over_cd=false)
+    fig = plot_polars(
+        [llt_solver, vsm_solver],
+        [body_aero, body_aero],
+        ["VSM", "LLT"],
+        angle_range=angle_range,
+        angle_type="angle_of_attack",
+        v_a=v_a,
+        title="Polars CL vs CD",
+        is_save=false,
+        is_show=false,
+        cl_over_cd=false
+    )
+    if backend == "Makie"
+        @test fig isa Figure
+    else
+        @test fig !== nothing
+    end
+
+    # Plot combined analysis with cl_over_cd
+    fig = plot_combined_analysis(
+        vsm_solver, body_aero, results_vsm;
+        angle_range=angle_range,
+        angle_type="angle_of_attack",
+        angle_of_attack=30.0,
+        v_a=v_a,
+        title="Combined Analysis",
+        is_save=false,
+        is_show=false,
+        cl_over_cd=true
+    )
+    if backend == "Makie"
+        @test fig isa Figure
+    else
+        @test fig !== nothing
+    end
+
+    # Plot combined analysis with cl_over_cd=false
+    fig = plot_combined_analysis(
+        vsm_solver, body_aero, results_vsm;
+        angle_range=angle_range,
+        angle_type="angle_of_attack",
+        angle_of_attack=30.0,
+        v_a=v_a,
+        title="Combined CL vs CD",
+        is_save=false,
+        is_show=false,
+        cl_over_cd=false
+    )
+    if backend == "Makie"
+        @test fig isa Figure
+    else
+        @test fig !== nothing
+    end
+
     # Test polar data plotting
     body_aero = BodyAerodynamics([ram_wing])
     fig = plot_polar_data(body_aero; is_show=false)
@@ -157,6 +243,301 @@ end
         @test fig isa Figure
     else
         @test fig !== nothing
+    end
+
+    fig_rect = plot_polar_data(body_aero;
+        alphas=collect(deg2rad.(-5:1.0:15)),
+        delta_tes=collect(deg2rad.(-3:1.0:5)),
+        is_show=false)
+    if backend == "Makie"
+        @test fig_rect isa Figure
+    else
+        @test fig_rect !== nothing
+    end
+
+    # Tests for both backends
+    body_aero_empty = create_body_aero()
+    empty!(body_aero_empty.panels)
+    @test_throws Exception plot_geometry(
+        body_aero_empty,
+        "Rectangular_wing_geometry_empty_panels";
+        is_save=false,
+        is_show=false,
+    )
+
+    body_aero_distributed = create_body_aero()
+    n_panels = length(body_aero_distributed.panels)
+    va_distribution = repeat([12.0 0.0 1.0], n_panels, 1)
+    set_va!(body_aero_distributed, va_distribution)
+
+    @test body_aero_distributed.has_distributed_va
+    fig = plot_geometry(
+        body_aero_distributed,
+        "Rectangular_wing_geometry_distributed_va";
+        is_save=false,
+        is_show=false,
+    )
+    @test fig !== nothing
+
+    literature_csv = joinpath(tempdir(), "polar_literature_aoa.csv")
+    open(literature_csv, "w") do io
+        write(io, "AOA,cl,cd,cs\n")
+        write(io, "0.0,0.1,0.01,0.0\n")
+        write(io, "5.0,0.5,0.02,0.01\n")
+        write(io, "10.0,0.9,0.04,0.02\n")
+    end
+
+    try
+        fig = plot_polars(
+            Solver[],
+            BodyAerodynamics[],
+            ["Literature"],
+            literature_path_list=[literature_csv],
+            title="Literature AOA Header",
+            is_save=false,
+            is_show=false,
+        )
+        @test fig !== nothing
+    finally
+        safe_rm(literature_csv)
+    end
+
+    # CP-specific tests (DPI, matplotlib internals)
+    if backend == "ControlPlots"
+        # `get_dpi()` returns a Python float; convert to a Julia Float64 so the
+        # comparisons below evaluate to a Julia `Bool` rather than a `Py` object.
+        get_dpi(fig) = pyconvert(Float64, fig.get_dpi())
+
+        fig_dpi = plt.figure()
+        default_dpi = get_dpi(fig_dpi)
+        @test default_dpi != 173
+
+        show_plot(fig_dpi; dpi=173)
+        @test get_dpi(fig_dpi) == 173
+
+        show_plot(fig_dpi)
+        @test get_dpi(fig_dpi) == 130
+        plt.close(fig_dpi)
+    end
+
+    # Unit tests for shared extract_literature_polar_data (both backends)
+    using DelimitedFiles
+
+    # Tuple parsing branch (e.g. readdlm(...; header=true) shape)
+    tuple_table = [0.0 0.10 0.010; 5.0 0.20 0.020]
+    tuple_header = [" AoA " "CL" "CD"]
+    tuple_result = VortexStepMethod.extract_literature_polar_data(
+        (tuple_table, tuple_header), "tuple.csv")
+    @test tuple_result.polar_data[1] == tuple_table[:, 1]
+    @test tuple_result.polar_data[2] == tuple_table[:, 2]
+    @test tuple_result.polar_data[3] == tuple_table[:, 3]
+    @test tuple_result.polar_data[4] == zeros(size(tuple_table, 1))
+    @test all(isnan, tuple_result.cmx)
+    @test all(isnan, tuple_result.cmy)
+    @test all(isnan, tuple_result.cmz)
+
+    # Matrix parsing branch (header in first row + explicit CS column)
+    matrix_data = Any[
+        "alpha" "cl" "cd" "cs";
+        0.0 0.11 0.011 0.001;
+        4.0 0.21 0.021 0.002
+    ]
+    matrix_result = VortexStepMethod.extract_literature_polar_data(
+        matrix_data, "matrix.csv")
+    @test Float64.(matrix_result.polar_data[1]) == [0.0, 4.0]
+    @test Float64.(matrix_result.polar_data[2]) == [0.11, 0.21]
+    @test Float64.(matrix_result.polar_data[3]) == [0.011, 0.021]
+    @test Float64.(matrix_result.polar_data[4]) == [0.001, 0.002]
+
+    # Missing required columns should throw a clear ArgumentError
+    bad_data = Any[
+        "aoa" "cl" "cs";
+        0.0 0.1 0.0
+    ]
+    @test_throws ArgumentError VortexStepMethod.extract_literature_polar_data(
+        bad_data, "bad.csv")
+
+    # CM coefficient extraction from literature data
+    cm_csv = tempname() * "_lit_cm.csv"
+    open(cm_csv, "w") do io_cm
+        write(io_cm,
+            "alpha,cl,cd,cs,cmx,cmy,cmz\n" *
+            "0.0,0.1,0.01,0.0,0.001,0.002,0.003\n" *
+            "5.0,0.5,0.02,0.01,0.004,0.005,0.006\n")
+    end
+    cm_result = VortexStepMethod.extract_literature_polar_data(
+        readdlm(cm_csv, ','), cm_csv)
+    @test cm_result.polar_data[1] == [0.0, 5.0]
+    @test Float64.(cm_result.cmx) == [0.001, 0.004]
+    @test Float64.(cm_result.cmy) == [0.002, 0.005]
+    @test Float64.(cm_result.cmz) == [0.003, 0.006]
+    safe_rm(cm_csv)
+
+    # angle_type="side_slip" literature loading
+    beta_csv = tempname() * "_lit_beta.csv"
+    open(beta_csv, "w") do io_beta
+        write(io_beta,
+            "alpha,beta,cl,cd,cs\n" *
+            "7.4,0.0,0.7,0.06,0.0\n" *
+            "7.4,5.0,0.68,0.07,0.01\n")
+    end
+    beta_result = VortexStepMethod.extract_literature_polar_data(
+        readdlm(beta_csv, ','), beta_csv;
+        angle_type="side_slip")
+    @test beta_result.polar_data[1] == [0.0, 5.0]
+    safe_rm(beta_csv)
+
+    # Integration: literature CSV with AoA alias and no CS
+    lit_no_cs_path = tempname() * "_lit_no_cs.csv"
+    open(lit_no_cs_path, "w") do io_no_cs
+        write(io_no_cs, "aoa,cl,cd\n0.0,0.10,0.010\n5.0,0.20,0.020\n")
+    end
+    fig_lit_no_cs = plot_polars(
+        Any[],
+        Any[],
+        ["Literature no CS"];
+        literature_path_list=[lit_no_cs_path],
+        is_save=false,
+        is_show=false
+    )
+    @test fig_lit_no_cs !== nothing
+    safe_rm(lit_no_cs_path)
+
+    # Integration: missing CD column should fail
+    lit_bad_path = tempname() * "_lit_bad.csv"
+    open(lit_bad_path, "w") do io_bad
+        write(io_bad, "alpha,cl\n0.0,0.10\n5.0,0.20\n")
+    end
+    @test_throws ArgumentError plot_polars(
+        Any[],
+        Any[],
+        ["Literature bad"];
+        literature_path_list=[lit_bad_path],
+        is_save=false,
+        is_show=false
+    )
+    safe_rm(lit_bad_path)
+
+    # Test show_moments=true with literature data (both backends)
+    cm_lit_path = tempname() * "_lit_moments.csv"
+    open(cm_lit_path, "w") do io_cm_lit
+        write(io_cm_lit,
+            "alpha,cl,cd,cs,cmx,cmy,cmz\n" *
+            "0.0,0.1,0.01,0.0,0.001,0.002,0.003\n" *
+            "5.0,0.5,0.02,0.01,0.004,0.005,0.006\n")
+    end
+    fig_moments = plot_polars(
+        Any[],
+        Any[],
+        ["Literature with moments"];
+        literature_path_list=[cm_lit_path],
+        show_moments=true,
+        is_save=false,
+        is_show=false
+    )
+    @test fig_moments !== nothing
+    safe_rm(cm_lit_path)
+
+    # Test show_moments=false (default)
+    no_cm_path = tempname() * "_lit_no_cm.csv"
+    open(no_cm_path, "w") do io_no_cm
+        write(io_no_cm,
+            "alpha,cl,cd\n" *
+            "0.0,0.1,0.01\n5.0,0.5,0.02\n")
+    end
+    fig_no_moments = plot_polars(
+        Any[],
+        Any[],
+        ["Literature no moments"];
+        literature_path_list=[no_cm_path],
+        show_moments=false,
+        is_save=false,
+        is_show=false
+    )
+    @test fig_no_moments !== nothing
+    safe_rm(no_cm_path)
+
+    # Tests for save_plot function
+    if backend == "Makie"
+        @testset "_active_backend_prefers_vector_output" begin
+            @test makie_ext !== nothing
+
+            active_backend_prefers_vector_output =
+                getfield(makie_ext, :_active_backend_prefers_vector_output)
+
+
+            @test active_backend_prefers_vector_output(FakeMakieNoCurrentBackend) == false
+            @test active_backend_prefers_vector_output(FakeMakieCurrentBackendThrows) == false
+
+            @test active_backend_prefers_vector_output(FakeMakieReturnsCairoModule) == true
+            @test active_backend_prefers_vector_output(FakeMakieReturnsOtherModule) == false
+        end
+
+        body_aero = create_body_aero()
+        fig = plot_geometry(
+            body_aero,
+            "save_plot_test";
+            is_save=false,
+            is_show=false)
+        @test fig isa Figure
+
+        active_backend_prefers_vector_output =
+            getfield(makie_ext, :_active_backend_prefers_vector_output)
+
+        save_test_dir = tempdir()
+        
+        # Test 1: save_plot with explicit data_type (".png")
+        VortexStepMethod.save_plot(fig, save_test_dir, "test_explicit_png", data_type=".png")
+        @test isfile(joinpath(save_test_dir, "test_explicit_png.png"))
+        safe_rm(joinpath(save_test_dir, "test_explicit_png.png"))
+
+        # Test 2: save_plot with explicit data_type (".pdf")
+        VortexStepMethod.save_plot(fig, save_test_dir, "test_explicit_pdf", data_type=".pdf")
+        @test isfile(joinpath(save_test_dir, "test_explicit_pdf.pdf"))
+        safe_rm(joinpath(save_test_dir, "test_explicit_pdf.pdf"))
+
+        # Test 3: save_plot with data_type=nothing (backend-aware detection)
+        backend_aware_dir = mktempdir()
+        try
+            VortexStepMethod.save_plot(fig, backend_aware_dir, "test_backend_aware", data_type=nothing)
+            pdf_path = joinpath(backend_aware_dir, "test_backend_aware.pdf")
+            png_path = joinpath(backend_aware_dir, "test_backend_aware.png")
+            expected_ext = active_backend_prefers_vector_output(Makie) ? ".pdf" : ".png"
+
+            @test xor(isfile(pdf_path), isfile(png_path))
+            @test isfile(joinpath(backend_aware_dir, "test_backend_aware" * expected_ext))
+        finally
+            safe_rm(joinpath(backend_aware_dir, "test_backend_aware.pdf"))
+            safe_rm(joinpath(backend_aware_dir, "test_backend_aware.png"))
+            rm(backend_aware_dir; force=true, recursive=true)
+        end
+
+        # Test 4: save_plot with title containing spaces (should be sanitized to underscores)
+        VortexStepMethod.save_plot(fig, save_test_dir, "test with spaces", data_type=".png")
+        @test isfile(joinpath(save_test_dir, "test_with_spaces.png"))
+        safe_rm(joinpath(save_test_dir, "test_with_spaces.png"))
+
+        # Test 5: save_plot with title containing percent signs (should be sanitized to "pct")
+        VortexStepMethod.save_plot(fig, save_test_dir, "test%efficiency", data_type=".png")
+        @test isfile(joinpath(save_test_dir, "testpctefficiency.png"))
+        safe_rm(joinpath(save_test_dir, "testpctefficiency.png"))
+
+        # Test 6: save_plot with title containing both spaces and percent signs
+        VortexStepMethod.save_plot(fig, save_test_dir, "test %efficiency metric", data_type=".png")
+        @test isfile(joinpath(save_test_dir, "test_pctefficiency_metric.png"))
+        safe_rm(joinpath(save_test_dir, "test_pctefficiency_metric.png"))
+
+        # Test 7: save_plot creates directory if it doesn't exist
+        nested_dir = joinpath(save_test_dir, "nested_save_plot_dir")
+        !isdir(nested_dir) && @test !isdir(nested_dir)
+        VortexStepMethod.save_plot(fig, nested_dir, "test_nested_dir", data_type=".png")
+        @test isdir(nested_dir)
+        @test isfile(joinpath(nested_dir, "test_nested_dir.png"))
+        safe_rm(joinpath(nested_dir, "test_nested_dir.png"))
+        rm(nested_dir; force=true)
+
+        # Test 8: save_plot raises error when save_path is nothing
+        @test_throws ArgumentError VortexStepMethod.save_plot(fig, nothing, "test_title", data_type=".png")
     end
 end
 nothing

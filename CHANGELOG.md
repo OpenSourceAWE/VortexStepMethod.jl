@@ -1,3 +1,162 @@
+# Changelog
+
+## VortexStepMethod v3.3.6 2026-06-13
+
+### Added
+- `calc_forces!` and `solve_base!` (both exported): `solve!` is now
+  `solve_base!` followed by `calc_forces!`, so a frozen circulation can be
+  mapped to forces without re-running the nonlinear gamma solve (#245)
+- `calculate_cd` and `calculate_cm`, splitting the combined `calculate_cd_cm`
+  into separate drag- and moment-coefficient functions; `calculate_cd_cm` is
+  kept as a thin wrapper (#246)
+
+### Changed
+- `calc_forces!` is now allocation-free in the per-step hot path
+  (preallocated `panel_area_dist` and `unrefined_count_dist` buffers) (#245)
+
+### Fixed
+- 3D polar plotting (#245)
+- flaky Aqua `persistent_tasks` test now actually disabled via
+  `persistent_tasks=false` (`()` did not disable it) (#246)
+
+## VortexStepMethod v3.3.5 2026-06-05
+
+### Added
+- `moment_coeff_unrefined_dist` field in `VSMSolution`: the summed
+  `moment_frac`-referenced pitching-moment coefficient per unrefined section [-]
+
+## VortexStepMethod v3.3.4 2026-05-31
+
+### Added
+- `PlotBackend`, `MakieBackend`, `ControlPlotsBackend`, and
+  `set_plot_backend!` so applications can explicitly choose which plotting
+  extension the backend-agnostic plotting API should use
+- `PythonCall` added as a weak dependency to support the `ControlPlots`
+  backend with PythonPlot
+
+### Changed
+- backend-agnostic plotting wrappers now route through the active plotting
+  backend, and each plotting extension initializes itself as the default only
+  when no backend has been selected yet
+- relaxed `ControlPlots` compatibility to include both `0.2.5` and `0.3`
+- improved `bin/install` and `bin/install_controlplots` scripts
+
+### Fixed
+- corrected projection onto core radius in `velocity_3D_bound_vortex!` and
+  semi-infinite trailing vortex projection so that the radial direction is
+  always measured from the filament axis, not from the origin (#241)
+- fixed 0-based subplot indexing in `ControlPlotsExt` for PythonPlot
+  compatibility (`plot_distribution` no longer errors with PythonPlot backend)
+- fixed missing initialization of `damp` in `solver.jl`
+
+## VortexStepMethod v3.3.3 2026-05-21
+
+### Fixed
+- `MakieExt` and `ControlPlotsExt` no longer both define
+  `VortexStepMethod.plot_geometry` for the same type, resolving a method
+  ambiguity when both extensions were loaded (#236)
+- `menu()` and `menu_cp()` now always set the active backend before dispatching
+  to a plot function, preventing stale-backend errors
+
+## VortexStepMethod v3.3.2 2026-05-18
+
+### Changed
+- use 2-arg version of atan to avoid possible NaN
+
+## VortexStepMethod v3.3.1 2026-05-13
+
+### Changed
+- `unrefined_deform!` linearly interpolates twist and TE deflection between
+  unrefined sections and rotates each refined section about the average of its
+  adjacent local airfoil normals (#234)
+
+### Fixed
+- `smooth_sqrt` in the solver hot loop keeps gradients defined at zero
+  velocity magnitude
+
+## VortexStepMethod v3.3.0 2026-05-05
+
+### Added
+- `ForwardDiff` compatibility, used by default in `linearize` (#232)
+- `backend` keyword argument for `linearize`
+- example `linearize_check.jl` comparing FiniteDiff and ForwardDiff tangents
+
+### Changed
+- core structs are parameterized on the scalar type `T` so dual numbers can
+  propagate through them; public constructors are unchanged
+
+## VortexStepMethod v3.2.0 2026-05-02
+
+### Added
+- support for both CairoMakie and GLMakie in the example `menu()` via new
+  `CairoMakie.activate()` / `GLMakie.activate()` entries (#222)
+- plots are saved as PDF when CairoMakie is active
+- `bin/install` now creates the `output` folder used by examples to store
+  generated plots
+
+### Changed
+- examples write plots into the shared `output` folder instead of the working
+  directory
+- example plot file names are sanitized: spaces replaced with `_` and `%`
+  replaced with `pct`
+
+### Fixed
+- NONLIN solver no longer returns stale `gamma` on repeated `solve!` calls
+  (#228)
+
+## VortexStepMethod v3.1.3 2026-04-23
+
+### Fixed
+- bug in `linearize` where `body_aero.va` was used instead of `body_aero._va`,
+  causing incorrect initial velocity storage (#227)
+- `set_va!` no longer overwrites `_va` with a computed reference velocity when
+  omega is nonzero; this simplifies the function and fixes linearization with
+  turn rates
+- linearize now correctly preserves and restores `omega` across perturbations
+
+## VortexStepMethod v3.1.2 2025-04-20
+### Added
+- add back compat entry v2 for SciMLBase
+
+## VortexStepMethod v3.1.1 2025-04-20
+### Added
+- add back compat entry v3 for RecursiveArrayTools
+
+## VortexStepMethod v3.1.0 2025-04-19
+
+### Breaking
+- `billowing_angle` replaced by `billowing_percentage` on `Wing` and
+  `WingSettings` (percentage of arc length, not radians)
+- `billowing_angle_from_percentage()` removed
+- `BILLOWING` distribution now uses sinusoidal rotation instead of circular arc
+
+### Added
+- `billowing.jl` example comparing flat vs billowed V3 kite
+- Coarse V3 kite geometry, settings, and combined CFD polar data
+- `cl_over_cd` keyword for `plot_polars` and `plot_combined_analysis`
+- the function `menu_cp()` can now be used to run the examples with the ControlPlots backend
+- the script `bin/install` can and should be used to instantiate the project and all sub-projects after git checkout
+- the files `Manifest-v1.11.toml.default` and `Manifest-v12.toml.default` for enhanced reproducibility
+- the scripts `bin/jetls` and `bin/jetls_examples` for running a static check of the source code
+- the script `test_bench.jl` for benchmarking the refinement method and measuring allocations
+
+### Changed
+- Plot legends moved to shared horizontal legend at bottom of grid layouts
+- the script bin/run_julia now can be called with a script name as parameter
+- fixed all JETLS warnings in the source code for improved performance and stability
+
+### Fixed errors
+- Domain error in elliptical gamma distribution when control points lie
+  outside the nominal span envelope
+
+## VortexStepMethod v3.0.1 2025-04-04
+
+### Changed
+- the file `CITATION.cff`
+- compat entry for RecursiveArrayTools
+### Added
+- the file `.zenodo.json`
+
 ## VortexStepMethod v3.0.0
 
 ### Breaking Changes

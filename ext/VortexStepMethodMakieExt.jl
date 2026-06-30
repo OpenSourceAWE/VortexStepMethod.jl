@@ -5,6 +5,12 @@ import VortexStepMethod: calculate_filaments_for_plotting
 export plot_geometry, plot_distribution, plot_polars, save_plot, show_plot,
     plot_polar_data, plot_combined_analysis, plot_airfoil_slices
 
+# Set this extension as the active plotting backend when loaded (only if not already set)
+function __init__()
+    isnothing(VortexStepMethod._PLOT_BACKEND[]) &&
+        (VortexStepMethod._PLOT_BACKEND[] = VortexStepMethod.MakieBackend())
+end
+
 # Global storage for panel mesh observables (for dynamic plotting)
 const PANEL_MESH_OBSERVABLES = Ref{Union{Nothing,Dict}}(nothing)
 
@@ -236,8 +242,20 @@ function Makie.plot(body_aero::VortexStepMethod.BodyAerodynamics; size=(1200, 80
     return fig
 end
 
+function _active_backend_prefers_vector_output(makie=Makie)
+    isdefined(makie, :current_backend) || return false
+
+    backend = try
+        makie.current_backend()
+    catch
+        return false
+    end
+
+    return nameof(backend) == :CairoMakie
+end
+
 """
-    save_plot(fig, save_path, title; data_type=".png")
+    save_plot(fig, save_path, title; data_type=nothing)
 
 Save a Makie figure to a file.
 
@@ -247,13 +265,19 @@ Save a Makie figure to a file.
 - `title`: Title of the plot
 
 # Keyword arguments
-- `data_type`: File extension (default: ".png", also supports ".jpeg")
+- `data_type`: File extension. If `nothing`, defaults to `".pdf"` when the
+    active Makie backend is CairoMakie and `".png"` otherwise.
 """
-function VortexStepMethod.save_plot(fig, save_path, title; data_type=".png")
+function VortexStepMethod.save_plot(fig::Makie.Figure, save_path, title; data_type=nothing)
+    if isnothing(data_type)
+        data_type = _active_backend_prefers_vector_output() ? ".pdf" : ".png"
+    end
     isnothing(save_path) && throw(ArgumentError("save_path should be provided"))
 
     !isdir(save_path) && mkpath(save_path)
-    full_path = joinpath(save_path, title * data_type)
+    sanitized_title = replace(replace(String(title), ' ' => '_'), '%' => "pct")
+    full_path = joinpath(save_path, sanitized_title * data_type)
+    fallback_path = joinpath(save_path, sanitized_title * ".png")
 
     @debug "Attempting to save figure to: $full_path"
     @debug "Current working directory: $(pwd())"
@@ -269,6 +293,14 @@ function VortexStepMethod.save_plot(fig, save_path, title; data_type=".png")
             @info "File does not exist after save attempt: $full_path"
         end
     catch e
+        # GLMakie cannot export vector formats such as PDF/SVG directly.
+        # If that happens, save as PNG so batch example runs keep working.
+        if e isa MethodError && lowercase(data_type) in (".pdf", ".svg")
+            @warn "Vector export format $data_type is not supported by the active Makie backend; falling back to PNG" requested_path=full_path fallback_path=fallback_path
+            save(fallback_path, fig)
+            @debug "Figure saved as PNG fallback"
+            return nothing
+        end
         @error "Error saving figure: $e"
         @error "Error type: $(typeof(e))"
         rethrow(e)
@@ -286,8 +318,8 @@ Display a Makie figure.
 # Keyword arguments
 - `dpi`: Dots per inch for the figure (default: 130) - currently unused in Makie
 """
-function VortexStepMethod.show_plot(fig; dpi=130)
-    display(fig)
+function VortexStepMethod.show_plot(fig::Makie.Figure; dpi=130)
+    isinteractive() && display(fig)
 end
 
 """
@@ -373,7 +405,7 @@ Create a 3D Makie plot of wing geometry including panels and filaments.
 function create_geometry_plot_makie(body_aero::BodyAerodynamics, title,
     view_elevation, view_azimuth; zoom=0.5)
     panels = body_aero.panels
-    va = isa(body_aero.va, Tuple) ? body_aero.va[1] : body_aero.va
+    va = getfield(body_aero, :_va)
 
     # Create figure
     fig = Figure(size=(1400, 1400))
@@ -433,28 +465,29 @@ function create_geometry_plot_makie(body_aero::BodyAerodynamics, title,
 end
 
 """
-    plot_geometry(body_aero::BodyAerodynamics, title;
-                  data_type=".png", save_path=nothing,
+    plot_geometry(body_aero::BodyAerodynamics, title, ::MakieBackend;
+                  data_type=nothing, save_path=nothing,
                   is_save=false, is_show=false,
                   view_elevation=15, view_azimuth=-120, use_tex=false)
 
-Plot wing geometry from different viewpoints using Makie.
+Makie backend implementation of [`plot_geometry`](@ref).
 
 # Arguments:
 - `body_aero`: the BodyAerodynamics to plot
 - `title`: plot title
 
 # Keyword arguments:
-- `data_type`: File extension (default: ".png", also supports ".jpeg")
+- `data_type`: File extension (default: `nothing`; delegated to `save_plot` backend-aware default)
 - `save_path`: Path for saving (default: nothing)
 - `is_save`: Whether to save (default: false)
 - `is_show`: Whether to display (default: false)
-- `view_elevation`: View elevation angle [°] (default: 15)
-- `view_azimuth`: View azimuth angle [°] (default: -120)
+- `view_elevation`: View elevation angle in degrees (default: 15)
+- `view_azimuth`: View azimuth angle in degrees (default: -120)
 - `use_tex`: Ignored for Makie (default: false)
 """
-function VortexStepMethod.plot_geometry(body_aero::BodyAerodynamics, title;
-    data_type=".png",
+function VortexStepMethod.plot_geometry(body_aero::BodyAerodynamics, title,
+    ::VortexStepMethod.MakieBackend;
+    data_type=nothing,
     save_path=nothing,
     is_save=false,
     is_show=false,
@@ -482,7 +515,7 @@ function VortexStepMethod.plot_geometry(body_aero::BodyAerodynamics, title;
 
     fig = create_geometry_plot_makie(body_aero, title, view_elevation, view_azimuth)
 
-    if is_show
+    if is_show && isinteractive()
         display(fig)
     end
 
@@ -490,11 +523,11 @@ function VortexStepMethod.plot_geometry(body_aero::BodyAerodynamics, title;
 end
 
 """
-    plot_distribution(y_coordinates_list, results_list, label_list;
-                      title="spanwise_distribution", data_type=".png",
+    plot_distribution(y_coordinates_list, results_list, label_list, ::MakieBackend;
+                      title="spanwise_distribution", data_type=nothing,
                       save_path=nothing, is_save=false, is_show=true, use_tex=false)
 
-Plot spanwise distributions of aerodynamic properties using Makie.
+Makie backend implementation of [`plot_distribution`](@ref).
 
 # Arguments
 - `y_coordinates_list`: List of spanwise coordinates
@@ -503,15 +536,16 @@ Plot spanwise distributions of aerodynamic properties using Makie.
 
 # Keyword arguments
 - `title`: Plot title (default: "spanwise_distribution")
-- `data_type`: File extension (default: ".png", also supports ".jpeg")
+- `data_type`: File extension (default: `nothing`; delegated to `save_plot` backend-aware default)
 - `save_path`: Path to save plots (default: nothing)
 - `is_save`: Whether to save (default: false)
 - `is_show`: Whether to display (default: true)
 - `use_tex`: Ignored for Makie (default: false)
 """
-function VortexStepMethod.plot_distribution(y_coordinates_list, results_list, label_list;
+function VortexStepMethod.plot_distribution(y_coordinates_list, results_list, label_list,
+    ::VortexStepMethod.MakieBackend;
     title="spanwise_distribution",
-    data_type=".png",
+    data_type=nothing,
     save_path=nothing,
     is_save=false,
     is_show=true,
@@ -555,7 +589,6 @@ function VortexStepMethod.plot_distribution(y_coordinates_list, results_list, la
         lines!(ax_cl, Vector(y_coords), Vector(results["cl_distribution"]),
             label="$label CL: $value")
     end
-    axislegend(ax_cl, position=:lt)
 
     # Plot CD
     for (y_coords, results, label) in zip(y_coordinates_list, results_list, label_list)
@@ -563,35 +596,30 @@ function VortexStepMethod.plot_distribution(y_coordinates_list, results_list, la
         lines!(ax_cd, Vector(y_coords), Vector(results["cd_distribution"]),
             label="$label CD: $value")
     end
-    axislegend(ax_cd, position=:lt)
 
     # Plot Gamma
     for (y_coords, results, label) in zip(y_coordinates_list, results_list, label_list)
         lines!(ax_gamma, Vector(y_coords), Vector(results["gamma_distribution"]),
             label=label)
     end
-    axislegend(ax_gamma, position=:lt)
 
     # Plot alpha geometric
     for (y_coords, results, label) in zip(y_coordinates_list, results_list, label_list)
         lines!(ax_alpha_geo, Vector(y_coords), Vector(results["alpha_geometric"]),
             label=label)
     end
-    axislegend(ax_alpha_geo, position=:lt)
 
     # Plot alpha at ac
     for (y_coords, results, label) in zip(y_coordinates_list, results_list, label_list)
         lines!(ax_alpha_ac, Vector(y_coords), Vector(results["alpha_at_ac"]),
             label=label)
     end
-    axislegend(ax_alpha_ac, position=:lt)
 
     # Plot alpha uncorrected
     for (y_coords, results, label) in zip(y_coordinates_list, results_list, label_list)
         lines!(ax_alpha_unc, Vector(y_coords), Vector(results["alpha_uncorrected"]),
             label=label)
     end
-    axislegend(ax_alpha_unc, position=:lt)
 
     # Plot force components
     force_axes = [ax_fx, ax_fy, ax_fz]
@@ -607,15 +635,18 @@ function VortexStepMethod.plot_distribution(y_coordinates_list, results_list, la
             lines!(ax, Vector(y_coords), Vector(forces),
                 label="$label ΣF$comp: $total_force N")
         end
-        axislegend(ax, position=:lt)
     end
+
+    # Shared legend at bottom of grid
+    Legend(fig[4, :], ax_gamma;
+        orientation=:horizontal, tellwidth=false, tellheight=true)
 
     # Save and show
     if is_save
         save_plot(fig, save_path, title, data_type=data_type)
     end
 
-    if is_show
+    if is_show && isinteractive()
         display(fig)
     end
 
@@ -636,134 +667,23 @@ Generate polar data for aerodynamic analysis over a range of angles.
 
 # Keyword arguments
 - `angle_type`: Type of angle variation ("angle_of_attack" or "side_slip")
-- `angle_of_attack`: Initial angle of attack [rad]
-- `side_slip`: Initial side slip angle [rad]
-- `v_a`: norm of apparent wind speed [m/s]
+- `angle_of_attack`: Initial angle of attack [°]
+- `side_slip`: Initial side slip angle [°]
+- `v_a`: Norm of apparent wind speed [m/s]
 
 # Returns
 - Tuple of polar data array and Reynolds number
 """
-function generate_polar_data_makie(
-    solver,
-    body_aero::BodyAerodynamics,
-    angle_range;
-    angle_type="angle_of_attack",
-    angle_of_attack=0.0,
-    side_slip=0.0,
-    v_a=10.0
-)
-    n_panels = length(body_aero.panels)
-    n_angles = length(angle_range)
-
-    # Initialize arrays
-    cl = zeros(n_angles)
-    cd = zeros(n_angles)
-    cs = zeros(n_angles)
-    gamma_distribution = zeros(n_angles, n_panels)
-    reynolds_number = zeros(n_angles)
-
-    for (i, angle_i) in enumerate(angle_range)
-        # Set angle based on type
-        if angle_type == "angle_of_attack"
-            α = deg2rad(angle_i)
-            β = side_slip
-        elseif angle_type == "side_slip"
-            α = angle_of_attack
-            β = deg2rad(angle_i)
-        else
-            throw(ArgumentError("angle_type must be 'angle_of_attack' or 'side_slip'"))
-        end
-
-        # Update inflow conditions
-        set_va!(
-            body_aero,
-            [
-                cos(α) * cos(β),
-                sin(β),
-                sin(α)
-            ] * v_a
-        )
-
-        # Solve and store results
-        results = solve(solver, body_aero, gamma_distribution[i, :])
-
-        cl[i] = results["cl"]
-        cd[i] = results["cd"]
-        cs[i] = results["cs"]
-        gamma_distribution[i, :] = results["gamma_distribution"]
-        reynolds_number[i] = results["Rey"]
-    end
-
-    polar_data = [angle_range, cl, cd, cs]
-    return polar_data, reynolds_number[1]
-end
 
 """
-    compute_polar_with_cmy(solver, body_aero, angle_range; angle_type=\"angle_of_attack\",
-                           angle_of_attack=0.0, side_slip=0.0, v_a=10.0)
-
-Compute CL/CD/CS polars and optional CMy for a sweep, reusing the previous gamma
-as initial guess for faster convergence. Returns a named tuple with angle,
-cl, cd, cs, cmy (NaN when unavailable) and per-sample Reynolds numbers.
-"""
-function compute_polar_with_cmy(
-    solver,
-    body_aero,
-    angle_range;
-    angle_type::String="angle_of_attack",
-    angle_of_attack::Float64=0.0,
-    side_slip::Float64=0.0,
-    v_a::Float64=10.0
-)
-    n_angles = length(angle_range)
-    cl = zeros(n_angles)
-    cd = zeros(n_angles)
-    cs = zeros(n_angles)
-    cmy = fill(NaN, n_angles)  # moment coefficient about body y (pitch)
-    reynolds_number = zeros(n_angles)
-
-    gamma_prev = nothing
-    for (i, angle_i) in enumerate(angle_range)
-        if angle_type == "angle_of_attack"
-            α = deg2rad(angle_i)
-            β = deg2rad(side_slip)
-        elseif angle_type == "side_slip"
-            α = deg2rad(angle_of_attack)
-            β = deg2rad(angle_i)
-        else
-            throw(ArgumentError("angle_type must be 'angle_of_attack' or 'side_slip'"))
-        end
-
-        set_va!(body_aero, [cos(α) * cos(β), sin(β), sin(α)] * v_a)
-        results = solve(solver, body_aero, gamma_prev)
-
-        cl[i] = results["cl"]
-        cd[i] = results["cd"]
-        cs[i] = results["cs"]
-        cmy[i] = get(results, "cmy", NaN)
-        reynolds_number[i] = results["Rey"]
-        gamma_prev = results["gamma_distribution"]
-    end
-
-    return (
-        angle=collect(angle_range),
-        cl=cl,
-        cd=cd,
-        cs=cs,
-        cmy=cmy,
-        rey=reynolds_number,
-    )
-end
-
-"""
-    plot_polars(solver_list, body_aero_list, label_list;
+    plot_polars(solver_list, body_aero_list, label_list, ::MakieBackend;
                 literature_path_list=String[],
                 angle_range=range(0, 20, 2), angle_type="angle_of_attack",
                 angle_of_attack=0.0, side_slip=0.0, v_a=10.0,
-                title="polar", data_type=".png", save_path=nothing,
+                title="polar", data_type=nothing, save_path=nothing,
                 is_save=true, is_show=true, use_tex=false)
 
-Plot polar data comparing different solvers using Makie.
+Makie backend implementation of [`plot_polars`](@ref).
 
 # Arguments
 - `solver_list`: List of aerodynamic solvers
@@ -772,22 +692,24 @@ Plot polar data comparing different solvers using Makie.
 
 # Keyword arguments
 - `literature_path_list`: Optional paths to literature data files
-- `angle_range`: Range of angles [°]
+- `angle_range`: Range of angles in degrees
 - `angle_type`: "angle_of_attack" or "side_slip" (default: angle_of_attack)
-- `angle_of_attack`: AoA [rad] (default: 0.0)
-- `side_slip`: Side slip angle [rad] (default: 0.0)
+- `angle_of_attack`: AoA [°] (default: 0.0)
+- `side_slip`: Side slip angle [°] (default: 0.0)
 - `v_a`: Wind speed [m/s] (default: 10.0)
 - `title`: Plot title
-- `data_type`: File extension (default: ".png", also supports ".jpeg")
+- `data_type`: File extension (default: `nothing`; delegated to `save_plot` backend-aware default)
 - `save_path`: Path to save (default: nothing)
 - `is_save`: Whether to save (default: true)
 - `is_show`: Whether to display (default: true)
 - `use_tex`: Ignored for Makie (default: false)
+- `cl_over_cd`: Plot CL/CD vs angle instead of CL vs CD (default: true)
 """
 function VortexStepMethod.plot_polars(
     solver_list,
     body_aero_list,
-    label_list;
+    label_list,
+    ::VortexStepMethod.MakieBackend;
     literature_path_list=String[],
     angle_range=range(0, 20, 2),
     angle_type="angle_of_attack",
@@ -795,11 +717,13 @@ function VortexStepMethod.plot_polars(
     side_slip=0.0,
     v_a=10.0,
     title="polar",
-    data_type=".png",
+    data_type=nothing,
     save_path=nothing,
     is_save=true,
     is_show=true,
-    use_tex=false
+    use_tex=false,
+    cl_over_cd=true,
+    show_moments=false,
 )
     # Validate inputs
     total_cases = length(body_aero_list) + length(literature_path_list)
@@ -810,105 +734,140 @@ function VortexStepMethod.plot_polars(
 
     # Generate polar data
     polar_data_list = []
+    cm_data_list = []
     labels_with_re = copy(label_list)
     for (i, (solver, body_aero)) in enumerate(zip(solver_list, body_aero_list))
-        polar_data, rey = generate_polar_data_makie(
+        result = VortexStepMethod.generate_polar_data(
             solver, body_aero, angle_range;
             angle_type, angle_of_attack, side_slip, v_a
         )
-        push!(polar_data_list, polar_data)
-        labels_with_re[i] = "$(label_list[i]) Re = $(round(Int64, rey*1e-5))e5"
+        push!(polar_data_list, result.polar_data)
+        push!(cm_data_list, (cmx=result.cmx, cmy=result.cmy,
+                             cmz=result.cmz))
+        labels_with_re[i] = "$(label_list[i]) Re = $(round(Int64, result.rey*1e-5))e5"
     end
 
     # Load literature data if provided
     if !isempty(literature_path_list)
         for path in literature_path_list
-            data = readdlm(path, ',')
-            header = lowercase.(string.(data[1, :]))
-            alpha_idx = findfirst(x -> occursin("alpha", x), header)
-            cl_idx = findfirst(x -> occursin("cl", x), header)
-            cd_idx = findfirst(x -> occursin("cd", x), header)
-            cs_idx = findfirst(x -> occursin("cs", x), header)
-            cs_col = cs_idx === nothing ? zeros(size(data, 1) - 1) : data[2:end, cs_idx]
-            push!(polar_data_list, [
-                data[2:end, alpha_idx],
-                data[2:end, cl_idx],
-                data[2:end, cd_idx],
-                cs_col
-            ])
+            lit = VortexStepMethod.extract_literature_polar_data(
+                readdlm(path, ','), path; angle_type)
+            push!(polar_data_list, lit.polar_data)
+            push!(cm_data_list, (cmx=lit.cmx, cmy=lit.cmy,
+                                 cmz=lit.cmz))
         end
     end
-
-    # Create figure with 2x2 grid
-    fig = Figure(size=(1400, 1400))
-
-    ax_cl = Axis(fig[1, 1], title="CL vs $angle_type [°]",
-        xlabel="$angle_type [°]", ylabel="CL")
-    ax_cd = Axis(fig[1, 2], title="CD vs $angle_type [°]",
-        xlabel="$angle_type [°]", ylabel="CD")
-    ax_cs = Axis(fig[2, 1], title="CS vs $angle_type [°]",
-        xlabel="$angle_type [°]", ylabel="CS")
-    ax_polar = Axis(fig[2, 2], title="CL vs CD",
-        xlabel="CD", ylabel="CL")
 
     # Number of computational results
     n_solvers = length(solver_list)
 
-    # Plot CL vs angle
-    for (i, (polar_data, label)) in enumerate(zip(polar_data_list, labels_with_re))
-        marker = i <= n_solvers ? :star5 : :circle
-        markersize = i <= n_solvers ? 12 : 8
-        scatterlines!(ax_cl, polar_data[1], polar_data[2];
-            label=label, marker=marker, markersize=markersize)
-        if maximum(polar_data[2]) > 10
-            ylims!(ax_cl, -0.5, 2)
-        end
-    end
-    axislegend(ax_cl, position=:lt)
+    if show_moments
+        # 2x3 layout: CL, CD, CS, CMx, CMy, CMz
+        fig = Figure(size=(1800, 1000))
+        ax_cl = Axis(fig[1, 1], title="CL vs $angle_type [°]",
+            xlabel="$angle_type [°]", ylabel="CL")
+        ax_cd = Axis(fig[1, 2], title="CD vs $angle_type [°]",
+            xlabel="$angle_type [°]", ylabel="CD")
+        ax_cs = Axis(fig[1, 3], title="CS vs $angle_type [°]",
+            xlabel="$angle_type [°]", ylabel="CS")
+        ax_cmx = Axis(fig[2, 1], title="CMx vs $angle_type [°]",
+            xlabel="$angle_type [°]", ylabel="CMx")
+        ax_cmy = Axis(fig[2, 2], title="CMy vs $angle_type [°]",
+            xlabel="$angle_type [°]", ylabel="CMy")
+        ax_cmz = Axis(fig[2, 3], title="CMz vs $angle_type [°]",
+            xlabel="$angle_type [°]", ylabel="CMz")
 
-    # Plot CD vs angle
-    for (i, (polar_data, label)) in enumerate(zip(polar_data_list, labels_with_re))
-        marker = i <= n_solvers ? :star5 : :circle
-        markersize = i <= n_solvers ? 12 : 8
-        scatterlines!(ax_cd, polar_data[1], polar_data[3];
-            label=label, marker=marker, markersize=markersize)
-        if maximum(polar_data[2]) > 10
-            ylims!(ax_cd, -0.5, 2)
+        for ax in (ax_cl, ax_cd, ax_cs, ax_cmx, ax_cmy, ax_cmz)
+            ax.yticklabelspace = 36.0
+            ax.xticklabelspace = 24.0
         end
-    end
-    axislegend(ax_cd, position=:lt)
 
-    # Plot CS vs angle
-    for (i, (polar_data, label)) in enumerate(zip(polar_data_list, labels_with_re))
-        marker = i <= n_solvers ? :star5 : :circle
-        markersize = i <= n_solvers ? 12 : 8
-        scatterlines!(ax_cs, polar_data[1], polar_data[4];
-            label=label, marker=marker, markersize=markersize)
-        if maximum(polar_data[2]) > 10
-            ylims!(ax_cs, -0.5, 2)
+        for (i, (polar_data, cm, label)) in enumerate(
+                zip(polar_data_list, cm_data_list, labels_with_re))
+            marker = i <= n_solvers ? :star5 : :circle
+            markersize = i <= n_solvers ? 12 : 8
+            angles = polar_data[1]
+            scatterlines!(ax_cl, angles, polar_data[2];
+                label=label, marker=marker, markersize=markersize)
+            scatterlines!(ax_cd, angles, polar_data[3];
+                label=label, marker=marker, markersize=markersize)
+            scatterlines!(ax_cs, angles, polar_data[4];
+                label=label, marker=marker, markersize=markersize)
+            if !all(isnan, cm.cmx)
+                scatterlines!(ax_cmx, angles,
+                    Float64.(cm.cmx);
+                    label=label, marker=marker,
+                    markersize=markersize)
+            end
+            if !all(isnan, cm.cmy)
+                scatterlines!(ax_cmy, angles,
+                    Float64.(cm.cmy);
+                    label=label, marker=marker,
+                    markersize=markersize)
+            end
+            if !all(isnan, cm.cmz)
+                scatterlines!(ax_cmz, angles,
+                    Float64.(cm.cmz);
+                    label=label, marker=marker,
+                    markersize=markersize)
+            end
         end
-    end
-    axislegend(ax_cs, position=:lt)
+        Legend(fig[3, 1:3], ax_cl;
+            orientation=:horizontal, tellwidth=false,
+            tellheight=true)
+    else
+        # 2x2 layout: CL, CD, CS, CL/CD or CL-vs-CD
+        fig = Figure(size=(1400, 1400))
+        ax_cl = Axis(fig[1, 1], title="CL vs $angle_type [°]",
+            xlabel="$angle_type [°]", ylabel="CL")
+        ax_cd = Axis(fig[1, 2], title="CD vs $angle_type [°]",
+            xlabel="$angle_type [°]", ylabel="CD")
+        ax_cs = Axis(fig[2, 1], title="CS vs $angle_type [°]",
+            xlabel="$angle_type [°]", ylabel="CS")
+        ax_fourth = if cl_over_cd
+            Axis(fig[2, 2], title="CL/CD vs $angle_type [°]",
+                xlabel="$angle_type [°]", ylabel="CL/CD")
+        else
+            Axis(fig[2, 2], title="CL vs CD",
+                xlabel="CD", ylabel="CL")
+        end
 
-    # Plot CL vs CD
-    for (i, (polar_data, label)) in enumerate(zip(polar_data_list, labels_with_re))
-        marker = i <= n_solvers ? :star5 : :circle
-        markersize = i <= n_solvers ? 12 : 8
-        scatterlines!(ax_polar, polar_data[3], polar_data[2];
-            label=label, marker=marker, markersize=markersize)
-        if maximum(polar_data[2]) > 10 || maximum(polar_data[3]) > 10
-            ylims!(ax_polar, -0.5, 2)
-            xlims!(ax_polar, -0.5, 2)
+        for (i, (polar_data, label)) in enumerate(
+                zip(polar_data_list, labels_with_re))
+            marker = i <= n_solvers ? :star5 : :circle
+            markersize = i <= n_solvers ? 12 : 8
+            scatterlines!(ax_cl, polar_data[1], polar_data[2];
+                label=label, marker=marker,
+                markersize=markersize)
+            scatterlines!(ax_cd, polar_data[1], polar_data[3];
+                label=label, marker=marker,
+                markersize=markersize)
+            scatterlines!(ax_cs, polar_data[1], polar_data[4];
+                label=label, marker=marker,
+                markersize=markersize)
+            if cl_over_cd
+                cl_cd = polar_data[2] ./ polar_data[3]
+                scatterlines!(ax_fourth, polar_data[1], cl_cd;
+                    label=label, marker=marker,
+                    markersize=markersize)
+            else
+                scatterlines!(ax_fourth, polar_data[3],
+                    polar_data[2];
+                    label=label, marker=marker,
+                    markersize=markersize)
+            end
         end
+        Legend(fig[3, :], ax_cl;
+            orientation=:horizontal, tellwidth=false,
+            tellheight=true)
     end
-    axislegend(ax_polar, position=:lt)
 
     # Save and show
     if is_save && !isnothing(save_path)
         save_plot(fig, save_path, main_title; data_type)
     end
 
-    if is_show
+    if is_show && isinteractive()
         display(fig)
     end
 
@@ -916,23 +875,24 @@ function VortexStepMethod.plot_polars(
 end
 
 """
-    plot_polar_data(body_aero::BodyAerodynamics;
+    plot_polar_data(body_aero::BodyAerodynamics, ::MakieBackend;
                     alphas=collect(deg2rad.(-5:0.3:25)),
                     delta_tes=collect(deg2rad.(-5:0.3:25)),
                     is_show=true, use_tex=false)
 
-Plot polar data (Cl, Cd, Cm) as 3D surfaces using Makie.
+Makie backend implementation of [`plot_polar_data`](@ref).
 
 # Arguments
 - `body_aero`: Wing aerodynamics struct
 
 # Keyword arguments
-- `alphas`: Range of AoA values [rad] (default: -5° to 25° in 0.3° steps)
-- `delta_tes`: Range of trailing edge angles [rad] (default: -5° to 25° in 0.3° steps)
+- `alphas`: Range of AoA values in radians (default: `deg2rad.(-5:0.3:25)`)
+- `delta_tes`: Range of trailing edge angles in radians (default: `deg2rad.(-5:0.3:25)`)
 - `is_show`: Whether to display (default: true)
 - `use_tex`: Ignored for Makie (default: false)
 """
-function VortexStepMethod.plot_polar_data(body_aero::BodyAerodynamics;
+function VortexStepMethod.plot_polar_data(body_aero::BodyAerodynamics,
+    ::VortexStepMethod.MakieBackend;
     alphas=collect(deg2rad.(-5:0.3:25)),
     delta_tes=collect(deg2rad.(-5:0.3:25)),
     is_show=true,
@@ -960,14 +920,14 @@ function VortexStepMethod.plot_polar_data(body_aero::BodyAerodynamics;
 
             # Create interpolation matrix
             interp_matrix = [interp(alpha, delta_te)
-                             for alpha in alphas, delta_te in delta_tes]
+                             for delta_te in delta_tes, alpha in alphas]
 
             # Create wireframe
             wireframe!(ax, delta_tes, alphas, interp_matrix;
                 color=:blue, linewidth=0.5, transparency=true)
         end
 
-        if is_show
+        if is_show && isinteractive()
             display(fig)
         end
         return fig
@@ -979,7 +939,7 @@ function VortexStepMethod.plot_polar_data(body_aero::BodyAerodynamics;
 end
 
 """
-    plot_combined_analysis(solver, body_aero, results;
+    plot_combined_analysis(solver, body_aero, results, ::MakieBackend;
                           solver_label="VSM",
                           angle_range=range(0,20,length=20),
                           angle_type="angle_of_attack",
@@ -990,7 +950,7 @@ end
                           literature_path_list=String[],
                           data_type=".png", save_path=nothing, is_save=false)
 
-Create combined multi-panel figure with geometry, polar data, distributions, and polars.
+Makie backend implementation of [`plot_combined_analysis`](@ref).
 
 # Arguments
 - `solver`: Aerodynamic solver
@@ -1008,19 +968,22 @@ Create combined multi-panel figure with geometry, polar data, distributions, and
 - `side_slip`: Side slip in degrees (default: 0.0)
 - `v_a`: Wind speed in m/s (default: 10.0)
 - `title`: Overall figure title (default: "Combined Analysis")
-- `view_elevation`: Geometry view elevation [°] (default: 15)
-- `view_azimuth`: Geometry view azimuth [°] (default: -120)
+- `view_elevation`: Geometry view elevation in degrees (default: 15)
+- `view_azimuth`: Geometry view azimuth in degrees (default: -120)
 - `is_show`: Display figure (default: true)
 - `use_tex`: Ignored for Makie (default: false)
 - `literature_path_list`: Paths to literature CSV files (default: String[])
 - `data_type`: File extension (default: ".png", also supports ".jpeg")
 - `save_path`: Directory path to save files (default: nothing)
 - `is_save`: Save plots to files (default: false)
+- `cl_over_cd`: Plot CL/CD vs angle instead of CL vs CD (default: true)
+- `angle_of_attack_for_spanwise_distribution`: AoA for spanwise plots (default: 5.0)
 """
 function VortexStepMethod.plot_combined_analysis(
     solver,
     body_aero,
-    results;
+    results,
+    ::VortexStepMethod.MakieBackend;
     solver_label="VSM",
     labels=nothing,
     angle_range=range(0, 20, length=20),
@@ -1038,6 +1001,7 @@ function VortexStepMethod.plot_combined_analysis(
     save_path=nothing,
     is_save=false,
     angle_of_attack_for_spanwise_distribution=5.0,
+    cl_over_cd=true,
 )
     # Normalize inputs to arrays for consistent handling
     solvers = solver isa Vector ? solver : [solver]
@@ -1084,7 +1048,7 @@ function VortexStepMethod.plot_combined_analysis(
     # Use first body_aero for geometry and polar data display
     first_body = body_aeros[1]
     panels = first_body.panels
-    va = isa(first_body.va, Tuple) ? first_body.va[1] : first_body.va
+    va = getfield(first_body, :_va)
 
     # Compute spanwise results for each solver
     results_spanwise_list = copy(results_list)
@@ -1092,12 +1056,13 @@ function VortexStepMethod.plot_combined_analysis(
         α_span = deg2rad(angle_of_attack_for_spanwise_distribution)
         β_span = deg2rad(side_slip)
         for (i, (s, ba)) in enumerate(zip(solvers, body_aeros))
-            va_old = copy(ba.va)
+            va_old = copy(getfield(ba, :_va))
+            omega_old = copy(ba.omega)
             set_va!(ba, [cos(α_span) * cos(β_span), sin(β_span),
                 sin(α_span)] * v_a)
             results_spanwise_list[i] = solve(s, ba,
                 s.sol.gamma_distribution)
-            set_va!(ba, va_old)
+            set_va!(ba, va_old, omega_old)
         end
     end
 
@@ -1258,62 +1223,41 @@ function VortexStepMethod.plot_combined_analysis(
         end
     end
 
-    for ax in [ax_cl, ax_cd, ax_gamma, ax_alpha_geo, ax_alpha_ac,
-        ax_alpha_unc, ax_fx, ax_fy, ax_fz]
-        axislegend(ax, position=:lt)
-    end
+    Legend(fig[2, 1][4, :], ax_gamma;
+        orientation=:horizontal, tellwidth=false, tellheight=true)
 
     # force y-limits
     ylims!(ax_alpha_geo, -0.25 * aoa_span, 1.1 * aoa_span)
 
     # [2,2] Polars (2×2 grid)
     polar_series = Tuple[]
-    for (si, (s, ba, lbl)) in enumerate(zip(solvers, body_aeros, solver_labels))
-        polar_solver = compute_polar_with_cmy(
+    for (si, (s, ba, lbl)) in enumerate(
+            zip(solvers, body_aeros, solver_labels))
+        result = VortexStepMethod.generate_polar_data(
             s, ba, angle_range;
-            angle_type=angle_type,
-            angle_of_attack=angle_of_attack,
-            side_slip=side_slip,
-            v_a=v_a
-        )
+            angle_type, angle_of_attack, side_slip, v_a)
+        pd = result.polar_data
         label_re = "$lbl Re = $(round(Int64,
-                     first(polar_solver.rey) * 1e-5))e5"
-        push!(polar_series, (polar_solver, label_re))
+                     result.rey * 1e-5))e5"
+        push!(polar_series, (
+            (angle=pd[1], cl=pd[2], cd=pd[3], cs=pd[4],
+             cmy=result.cmy,
+             rey=pd[9]),
+            label_re))
     end
 
     # Load literature data (if any)
     if !isempty(literature_path_list)
-        for (path, lit_label) in zip(literature_path_list, literature_labels)
-            data = readdlm(path, ',')
-            header_raw = string.(data[1, :])
-            header = lowercase.(strip.(header_raw))
-            alpha_idx = findfirst(x -> occursin("alpha", x) || occursin("aoa", x), header)
-            cl_idx = findfirst(x -> occursin("cl", x), header)
-            cd_idx = findfirst(x -> occursin("cd", x), header)
-            cs_idx = findfirst(x -> occursin("cs", x), header)
-            cmy_idx = findfirst(x -> occursin("cmy", x), header)
-
-            parse_col(col) = begin
-                vals = Float64[]
-                for v in col
-                    if v isa Real
-                        push!(vals, Float64(v))
-                    else
-                        s = strip(String(v))
-                        y = tryparse(Float64, s)
-                        push!(vals, isnothing(y) ? NaN : y)
-                    end
-                end
-                vals
-            end
-
-            angles = parse_col(data[2:end, alpha_idx])
-            cl_vals = parse_col(data[2:end, cl_idx])
-            cd_vals = parse_col(data[2:end, cd_idx])
-            cs_vals = cs_idx === nothing ? zeros(size(data, 1) - 1) : parse_col(data[2:end, cs_idx])
-            cmy_vals = cmy_idx === nothing ? fill(NaN, length(angles)) : parse_col(data[2:end, cmy_idx])
-
-            push!(polar_series, ((angle=angles, cl=cl_vals, cd=cd_vals, cs=cs_vals, cmy=cmy_vals, rey=fill(NaN, length(angles))), lit_label))
+        for (path, lit_label) in zip(
+                literature_path_list, literature_labels)
+            lit = VortexStepMethod.extract_literature_polar_data(
+                readdlm(path, ','), path; angle_type)
+            pd = lit.polar_data
+            push!(polar_series, (
+                (angle=pd[1], cl=pd[2], cd=pd[3], cs=pd[4],
+                 cmy=lit.cmy,
+                 rey=fill(NaN, length(pd[1]))),
+                lit_label))
         end
     end
 
@@ -1323,8 +1267,13 @@ function VortexStepMethod.plot_combined_analysis(
         xlabel="$angle_type [°]", ylabel="CD")
     ax_cs_polar = Axis(fig[2, 2][2, 1], title="CS vs $angle_type [°]",
         xlabel="$angle_type [°]", ylabel="CS")
-    ax_polar = Axis(fig[2, 2][2, 2], title="CL vs CD",
-        xlabel="CD", ylabel="CL")
+    ax_fourth_polar = if cl_over_cd
+        Axis(fig[2, 2][2, 2], title="CL/CD vs $angle_type [°]",
+            xlabel="$angle_type [°]", ylabel="CL/CD")
+    else
+        Axis(fig[2, 2][2, 2], title="CL vs CD",
+            xlabel="CD", ylabel="CL")
+    end
 
     for (idx, (pd, lbl)) in enumerate(polar_series)
         color = colors[mod1(idx, length(colors))]
@@ -1334,18 +1283,24 @@ function VortexStepMethod.plot_combined_analysis(
         scatterlines!(ax_cl_polar, pd.angle, pd.cl; label=lbl, marker, markersize, color)
         scatterlines!(ax_cd_polar, pd.angle, pd.cd; label=lbl, marker, markersize, color)
         scatterlines!(ax_cs_polar, pd.angle, pd.cs; label=lbl, marker, markersize, color)
-        scatterlines!(ax_polar, pd.cd, pd.cl; label=lbl, marker, markersize, color)
+        if cl_over_cd
+            cl_cd = pd.cl ./ pd.cd
+            scatterlines!(ax_fourth_polar, pd.angle, cl_cd;
+                label=lbl, marker, markersize, color)
+        else
+            scatterlines!(ax_fourth_polar, pd.cd, pd.cl;
+                label=lbl, marker, markersize, color)
+        end
     end
-    # axislegend(ax_cl_polar, position=:lt)
-    # axislegend(ax_cd_polar, position=:lt)
-    axislegend(ax_cs_polar, position=:lb)
-    # axislegend(ax_polar, position=:lt)
+    Legend(fig[2, 2][3, :], ax_cl_polar;
+        orientation=:horizontal, nbanks=2,
+        tellwidth=false, tellheight=true)
 
     # Set column widths: left column wider for 3x3 grid
     colsize!(fig.layout, 1, Relative(0.6))
     colsize!(fig.layout, 2, Relative(0.4))
 
-    if is_show
+    if is_show && isinteractive()
         display(fig)
     end
 

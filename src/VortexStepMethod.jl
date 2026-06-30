@@ -10,9 +10,9 @@ using DefaultApplication
 using Measures
 using LaTeXStrings
 using NonlinearSolve
-import NonlinearSolve: solve!, solve
+using SciMLBase
+import NonlinearSolve: solve, solve!
 using Interpolations
-import Interpolations: Extrapolation
 using Parameters
 using Serialization
 using Timers
@@ -20,27 +20,28 @@ using PreallocationTools
 using PrecompileTools
 using Pkg
 using DifferentiationInterface
-import SciMLBase: successful_retcode
+using ForwardDiff
 import YAML
 using StructMapping
 using Xfoil
 using NPZ
 
 # Export public interface
-export VSMSettings, WingSettings, SolverSettings
-export Wing, Section, ObjWing, reinit!, refine!
+export SolverSettings, VSMSettings, WingSettings
+export ObjWing, Section, Wing, refine!, reinit!
 export BodyAerodynamics
-export Solver, solve, solve_base!, solve!, VSMSolution, linearize
+export Solver, VSMSolution, linearize, solve, solve!, solve_base!, calc_forces!
 export calculate_results
 export add_section!, set_va!
-export calculate_span, calculate_projected_area
+export calculate_projected_area, calculate_span
 export MVec3
-export Model, VSM, LLT
-export AeroModel, LEI_AIRFOIL_BREUKELS, POLAR_VECTORS, POLAR_MATRICES, INVISCID
-export PanelDistribution, LINEAR, COSINE, SPLIT_PROVIDED, UNCHANGED
-export InitialGammaDistribution, ELLIPTIC, ZEROS
-export SolverStatus, FEASIBLE, INFEASIBLE, FAILURE
-export SolverType, LOOP, NONLIN
+
+export LLT, Model, VSM
+export AeroModel, INVISCID, LEI_AIRFOIL_BREUKELS, POLAR_MATRICES, POLAR_VECTORS
+export BILLOWING, COSINE, LINEAR, PanelDistribution, SPLIT_PROVIDED, UNCHANGED
+export ELLIPTIC, InitialGammaDistribution, ZEROS
+export FAILURE, FEASIBLE, INFEASIBLE, SolverStatus
+export LOOP, NONLIN, SolverType
 export load_polar_data
 
 # NeuralFoil exports
@@ -49,10 +50,35 @@ export NeuralFoilModel, NeuralFoilResult, load_neuralfoil_model, neuralfoil_aero
 export slice_obj_wing, slice_obj_at_positions
 export generate_neuralfoil_polars, generate_polar_from_coordinates, generate_polar_from_dat
 
-export plot_geometry, plot_distribution, plot_circulation_distribution, plot_polars,
-        save_plot, show_plot, plot_polar_data, plot_combined_analysis, plot_airfoil_slices
+export plot_airfoil_slices, plot_circulation_distribution, plot_combined_analysis,
+    plot_distribution, plot_geometry, plot_polar_data, plot_polars, save_plot, show_plot
 
-# the following functions are defined in ext/VortexStepMethodExt.jl
+# Backend dispatch types for multi-backend support (Makie and ControlPlots can coexist)
+abstract type PlotBackend end
+struct MakieBackend <: PlotBackend end
+struct ControlPlotsBackend <: PlotBackend end
+export PlotBackend, MakieBackend, ControlPlotsBackend
+
+const _PLOT_BACKEND = Ref{Union{Nothing, PlotBackend}}(nothing)
+
+"""
+    set_plot_backend!(backend::PlotBackend)
+
+Select the active plotting backend when both Makie and ControlPlots are loaded.
+
+# Example
+```julia
+set_plot_backend!(MakieBackend())
+set_plot_backend!(ControlPlotsBackend())
+```
+"""
+function set_plot_backend!(backend::PlotBackend)
+    _PLOT_BACKEND[] = backend
+end
+export set_plot_backend!
+
+# Generic stubs — extended by MakieExt and ControlPlotsExt with a PlotBackend argument.
+# The no-backend-argument wrappers below route through the active backend.
 function plot_geometry end
 function plot_distribution end
 function plot_circulation_distribution end
@@ -63,13 +89,152 @@ function plot_polar_data end
 function plot_combined_analysis end
 function plot_airfoil_slices end
 
+function _active_backend()
+    b = _PLOT_BACKEND[]
+    isnothing(b) && error(
+        "No plotting backend loaded. Load Makie or ControlPlots first, " *
+        "or call set_plot_backend!(MakieBackend()) / set_plot_backend!(ControlPlotsBackend()) " *
+        "when both are loaded."
+    )
+    b
+end
+
+"""
+    plot_geometry(body_aero::BodyAerodynamics, title; kwargs...)
+
+Plot wing geometry from different viewpoints and optionally save/show plots.
+Routes to the active plotting backend (Makie or ControlPlots).
+
+# Arguments
+- `body_aero`: the [`BodyAerodynamics`](@ref) to plot
+- `title`: plot title
+
+# Keyword arguments
+- `data_type`: file extension for saving (default depends on backend)
+- `save_path`: path for saving the graphic (default: `nothing`)
+- `is_save`: whether to save the graphic (default: `false`)
+- `is_show`: whether to display the graphic (default: `false`)
+- `view_elevation`: initial view elevation angle in degrees (default: `15`)
+- `view_azimuth`: initial view azimuth angle in degrees (default: `-120`)
+- `use_tex`: use external `pdflatex` for rendering (default: `false`; ignored by Makie)
+"""
+function plot_geometry(body_aero, title; kwargs...)
+    plot_geometry(body_aero, title, _active_backend(); kwargs...)
+end
+
+"""
+    plot_distribution(y_coordinates_list, results_list, label_list; kwargs...)
+
+Plot spanwise distributions of aerodynamic properties.
+Routes to the active plotting backend (Makie or ControlPlots).
+
+# Arguments
+- `y_coordinates_list`: list of spanwise coordinate arrays
+- `results_list`: list of result dictionaries from [`solve!`](@ref)
+- `label_list`: list of labels for each result
+
+# Keyword arguments
+- `title`: plot title (default: `"spanwise_distribution"`)
+- `data_type`: file extension for saving (default depends on backend)
+- `save_path`: path to save plots (default: `nothing`)
+- `is_save`: whether to save (default: `false`)
+- `is_show`: whether to display (default: `true`)
+- `use_tex`: use external `pdflatex` for rendering (default: `false`; ignored by Makie)
+"""
+function plot_distribution(y_coordinates_list, results_list, label_list; kwargs...)
+    plot_distribution(y_coordinates_list, results_list, label_list, _active_backend(); kwargs...)
+end
+
+"""
+    plot_polars(solver_list, body_aero_list, label_list; kwargs...)
+
+Plot polar data comparing different solvers and configurations.
+Routes to the active plotting backend (Makie or ControlPlots).
+
+# Arguments
+- `solver_list`: list of aerodynamic solvers
+- `body_aero_list`: list of [`BodyAerodynamics`](@ref) objects
+- `label_list`: list of labels for each configuration
+
+# Keyword arguments
+- `literature_path_list`: optional paths to literature data CSV files (default: `String[]`)
+- `angle_range`: range of angles to analyze in degrees (default: `range(0, 20, 2)`)
+- `angle_type`: `"angle_of_attack"` or `"side_slip"` (default: `"angle_of_attack"`)
+- `angle_of_attack`: AoA for the polar sweep (default: `0.0`) [°]
+- `side_slip`: side slip angle (default: `0.0`) [°]
+- `v_a`: apparent wind speed magnitude (default: `10.0`) [m/s]
+- `title`: plot title (default: `"polar"`)
+- `data_type`: file extension for saving (default depends on backend)
+- `save_path`: path to save plots (default: `nothing`)
+- `is_save`: whether to save (default: `true`)
+- `is_show`: whether to display (default: `true`)
+- `use_tex`: use external `pdflatex` for rendering (default: `false`; ignored by Makie)
+- `cl_over_cd`: plot CL/CD vs angle instead of CL vs CD (default: `true`)
+"""
+function plot_polars(solver_list, body_aero_list, label_list; kwargs...)
+    plot_polars(solver_list, body_aero_list, label_list, _active_backend(); kwargs...)
+end
+
+"""
+    plot_polar_data(body_aero::BodyAerodynamics; kwargs...)
+
+Plot polar data (Cl, Cd, Cm) as 3-D surfaces against angle of attack and trailing edge deflection.
+Routes to the active plotting backend (Makie or ControlPlots).
+
+# Arguments
+- `body_aero`: the [`BodyAerodynamics`](@ref) to plot (must use `POLAR_MATRICES` aero model)
+
+# Keyword arguments
+- `alphas`: AoA values in radians (default: `deg2rad.(-5:0.3:25)`)
+- `delta_tes`: trailing edge deflection angles in radians (default: `deg2rad.(-5:0.3:25)`)
+- `is_show`: whether to display (default: `true`)
+- `use_tex`: use external `pdflatex` for rendering (default: `false`; ignored by Makie)
+"""
+function plot_polar_data(body_aero; kwargs...)
+    plot_polar_data(body_aero, _active_backend(); kwargs...)
+end
+
+"""
+    plot_combined_analysis(solver, body_aero, results; kwargs...)
+
+Create a combined analysis by calling `plot_geometry`, `plot_distribution`, and `plot_polars`
+in sequence. Routes to the active plotting backend (Makie or ControlPlots).
+
+# Arguments
+- `solver`: solver or vector of solvers
+- `body_aero`: [`BodyAerodynamics`](@ref) object or vector thereof
+- `results`: results dictionary (or vector) from [`solve!`](@ref)
+
+# Keyword arguments
+- `solver_label`: label string for the solver (backward-compatible alias for `labels`)
+- `labels`: optional label string or vector
+- `angle_range`: range of angles for polar plots (default: `range(0, 20, length=20)`)
+- `angle_type`: `"angle_of_attack"` or `"side_slip"` (default: `"angle_of_attack"`)
+- `angle_of_attack`: AoA in degrees (default: `0.0`)
+- `side_slip`: side slip angle in degrees (default: `0.0`)
+- `v_a`: wind speed in m/s (default: `10.0`)
+- `title`: overall figure title (default: `"Combined Analysis"`)
+- `view_elevation`: geometry view elevation in degrees (default: `15`)
+- `view_azimuth`: geometry view azimuth in degrees (default: `-120`)
+- `is_show`: whether to display (default: `true`)
+- `use_tex`: use external `pdflatex` for rendering (default: `false`; ignored by Makie)
+- `literature_path_list`: paths to literature CSV files (default: `String[]`)
+- `data_type`: file extension for saving (default depends on backend)
+- `save_path`: directory to save files (default: `nothing`)
+- `is_save`: whether to save (default: `false`)
+- `cl_over_cd`: plot CL/CD vs angle (default: `true`)
+"""
+function plot_combined_analysis(solver, body_aero, results; kwargs...)
+    plot_combined_analysis(solver, body_aero, results, _active_backend(); kwargs...)
+end
+
 """
    const MVec3    = MVector{3, Float64}
 
 Basic 3-dimensional vector, stack allocated, mutable.
 """
 const MVec3    = MVector{3, Float64}
-const MMat3    = MMatrix{3, 3, Float64}
+const MMat3    = MMatrix{3, 3, Float64, 9}
 
 """
    const PosVector=Union{MVec3, Vector}
@@ -129,7 +294,7 @@ where `alpha` is the angle of attack, `delta` is trailing edge angle.
 end
 
 """
-   PanelDistribution `LINEAR` `COSINE` `SPLIT_PROVIDED` `UNCHANGED`
+   PanelDistribution `LINEAR` `COSINE` `SPLIT_PROVIDED` `UNCHANGED` `BILLOWING`
 
 Enumeration of the implemented panel distributions.
 
@@ -138,12 +303,14 @@ Enumeration of the implemented panel distributions.
 - COSINE               # Cosine distribution
 - `SPLIT_PROVIDED`     # Split provided sections
 - `UNCHANGED`          # 1:1 copy of unrefined to refined sections (no interpolation)
+- `BILLOWING`          # Split provided + sinusoidal TE billowing between ribs
 """
 @enum PanelDistribution begin
    LINEAR             # Linear distribution
    COSINE             # Cosine distribution
    SPLIT_PROVIDED     # Split provided sections
    UNCHANGED          # 1:1 copy of unrefined to refined sections
+   BILLOWING          # Split provided + sinusoidal TE billowing
 end
 
 """
@@ -181,7 +348,7 @@ Enumeration specifying the method used to solve for circulation distribution.
 """
 @enum SolverType LOOP NONLIN
 
-abstract type AbstractWing end
+abstract type AbstractWing{T} end
 
 """
     AeroData= Union{
@@ -210,9 +377,11 @@ const AeroData = Union{
         Tuple{Vector{Float64}, Vector{Float64}, Matrix{Float64}, Matrix{Float64}, Matrix{Float64}}
     }
 
+const PACKAGE_ROOT = normpath(joinpath(@__DIR__, ".."))
+
 function menu()
    # Load the examples menu using a portable path
-   ex = joinpath(dirname(pathof(@__MODULE__)), "..", "examples", "menu.jl")
+    ex = joinpath(PACKAGE_ROOT, "examples", "menu.jl")
    Base.include(Main, normpath(ex))
 end
 
@@ -227,13 +396,13 @@ function copy_examples()
     if ! isdir(PATH)
         mkdir(PATH)
     end
-    src_path = joinpath(dirname(pathof(@__MODULE__)), "..", PATH)
+    src_path = joinpath(PACKAGE_ROOT, PATH)
     copy_files(PATH, readdir(src_path))
 end
 
 function install_examples(add_packages=true)
     copy_examples()
-    pkg_root = joinpath(dirname(pathof(@__MODULE__)), "..")
+    pkg_root = PACKAGE_ROOT
     src = joinpath(pkg_root, "data")
     isdir(src) && cp(src, "data"; force=true)
     if add_packages
@@ -249,7 +418,7 @@ function copy_files(relpath, files)
     if ! isdir(relpath) 
         mkdir(relpath)
     end
-    src_path = joinpath(dirname(pathof(@__MODULE__)), "..", relpath)
+    src_path = joinpath(PACKAGE_ROOT, relpath)
     for file in files
         cp(joinpath(src_path, file), joinpath(relpath, file), force=true)
         chmod(joinpath(relpath, file), 0o774)
@@ -262,7 +431,7 @@ function help(url)
         io = IOBuffer()
         run(pipeline(`xdg-open $url`, stderr = io))
         # ignore any error messages
-        out_data = String(take!(io)) 
+        _ = take!(io)
     else
         DefaultApplication.open(url)
     end
@@ -287,6 +456,7 @@ include("neuralfoil.jl")
 include("obj_slice.jl")
 include("polar_generation.jl")
 
+include("plotting_helpers.jl")
 include("precompile.jl")
 
 

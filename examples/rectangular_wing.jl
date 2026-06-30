@@ -1,9 +1,10 @@
 using LinearAlgebra
-using GLMakie
 using VortexStepMethod
 
 PLOT = true
+SAVE_ALL = false
 USE_TEX = false
+OUTPUT_DIR = joinpath(dirname(@__DIR__), "output")
 
 # Step 1: Define wing parameters
 n_panels = 20          # Number of panels
@@ -43,9 +44,9 @@ vsm_solver = Solver(body_aero; aerodynamic_model_type=VSM)
 
 # Step 5: Solve using both methods
 results_llt = solve(llt_solver, body_aero)
-@time results_llt = solve(llt_solver, body_aero)
 results_vsm = solve(vsm_solver, body_aero)
-@time results_vsm = solve(vsm_solver, body_aero)
+@time solve(llt_solver, body_aero)
+@time solve(vsm_solver, body_aero)
 
 # Print results comparison
 println("\nLifting Line Theory Results:")
@@ -56,18 +57,41 @@ println("CL = $(round(results_vsm["cl"], digits=4))")
 println("CD = $(round(results_vsm["cd"], digits=4))")
 println("Projected area = $(round(results_vsm["projected_area"], digits=4)) m²")
 
-# Step 6: Plot combined analysis
+# Step 6: Plot geometry
+PLOT && plot_geometry(
+      body_aero,
+      "Rectangular wing geometry";
+      save_path=OUTPUT_DIR,
+      is_save=false || SAVE_ALL,
+      is_show=true,
+      use_tex=USE_TEX
+)
+
+# Step 7: Plot spanwise distributions
+y_coordinates = [panel.aero_center[2] for panel in body_aero.panels]
+
+PLOT && plot_distribution(
+    [y_coordinates, y_coordinates],
+    [results_vsm, results_llt],
+    ["VSM", "LLT"],
+    title="Spanwise Distributions",
+    save_path=OUTPUT_DIR,
+    is_save=false || SAVE_ALL,
+    use_tex=USE_TEX
+)
+
+# Step 8: Plot polar curves
 angle_range = range(0, 20, 20)
-PLOT && plot_combined_analysis(
+PLOT && plot_polars(
     [llt_solver, vsm_solver],
     [body_aero, body_aero],
-    [results_llt, results_vsm];
-    solver_label=["LLT", "VSM"],
-    angle_range=angle_range,
+    ["LLT", "VSM"];
+    angle_range,
     angle_type="angle_of_attack",
-    v_a=v_a,
-    title="Rectangular Wing",
-    is_show=true,
+    v_a,
+    title="Rectangular Wing Polars",
+    save_path=OUTPUT_DIR,
+    is_save=false || SAVE_ALL,
     use_tex=USE_TEX
 )
 nothing

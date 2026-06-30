@@ -4,14 +4,11 @@ using Test, VortexStepMethod
 cd(@__DIR__)  # ensure we're in test/ no matter how tests are launched
 include("test_data_utils.jl")
 
-# ControlPlots must run in a separate single-threaded process
-const _plot_controlplots = "plot-controlplots" in ARGS
-
 # Filter special args from pattern matching
 const test_patterns = filter(a -> a != "plot-controlplots", ARGS)
 
 println("Running tests...")
-if _plot_controlplots
+if "plot-controlplots" in ARGS
     println("Running plotting tests with ControlPlots backend")
 elseif !isempty(test_patterns)
     println("Filtering tests matching: ", test_patterns)
@@ -36,8 +33,8 @@ const build_is_production_build = let v = get(ENV, build_is_production_build_env
     v == "true"
 end::Bool
 
-@testset verbose = true "Testing VortexStepMethod..." begin
-    if _plot_controlplots
+function include_selected_tests()
+    if "plot-controlplots" in ARGS
         include("plotting/test_plotting.jl")
     else
         if build_is_production_build && should_run_test("bench")
@@ -50,17 +47,24 @@ end::Bool
         should_run_test("filament/test_semi_infinite_filament.jl") && include("filament/test_semi_infinite_filament.jl")
         should_run_test("panel/test_panel.jl") && include("panel/test_panel.jl")
         should_run_test("plotting/test_plotting.jl") && include("plotting/test_plotting.jl")
+        should_run_test("plotting/test_backend_coexistence.jl") && include("plotting/test_backend_coexistence.jl")
         should_run_test("polars/test_polars.jl") && include("polars/test_polars.jl")
         should_run_test("ram_geometry/test_kite_geometry.jl") && include("ram_geometry/test_kite_geometry.jl")
         should_run_test("settings/test_settings.jl") && include("settings/test_settings.jl")
         should_run_test("solver/test_solver.jl") && include("solver/test_solver.jl")
+        should_run_test("solver/test_forwarddiff.jl") && include("solver/test_forwarddiff.jl")
         should_run_test("solver/test_unrefined_dist.jl") && include("solver/test_unrefined_dist.jl")
         should_run_test("VortexStepMethod/test_VortexStepMethod.jl") && include("VortexStepMethod/test_VortexStepMethod.jl")
         should_run_test("wake/test_wake.jl") && include("wake/test_wake.jl")
         should_run_test("wing_geometry/test_wing_geometry.jl") && include("wing_geometry/test_wing_geometry.jl")
+        should_run_test("wing_geometry/test_billowing.jl") && include("wing_geometry/test_billowing.jl")
         should_run_test("yaml_geometry/test_yaml_geometry.jl") && include("yaml_geometry/test_yaml_geometry.jl")
         should_run_test("Aqua.jl") && include("Aqua.jl")
     end
+end
+
+@testset verbose = true "Testing VortexStepMethod..." begin
+    include_selected_tests()
 end
 
 nothing

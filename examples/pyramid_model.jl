@@ -1,8 +1,5 @@
 using LinearAlgebra
 using VortexStepMethod
-using GLMakie
-
-project_dir = dirname(dirname(pathof(VortexStepMethod)))  # Go up one level from src to project root
 
 # Load VSM vsm_settings from YAML configuration file
 vsm_settings = VSMSettings("pyramid_model/vsm_settings.yaml")
@@ -27,20 +24,49 @@ results = VortexStepMethod.solve(solver, body_aero; log=true)
 
 # Using plotting modules, to create more comprehensive plots
 PLOT = true
+SAVE_ALL = false
 USE_TEX = false
+OUTPUT_DIR = joinpath(dirname(@__DIR__), "output")
 
-# Plotting combined analysis
-PLOT && plot_combined_analysis(
-    solver,
-    body_aero,
-    results;
-    solver_label="VSM",
+# Plotting polars
+PLOT && plot_polars(
+    [solver],
+    [body_aero],
+    ["VSM Pyramid Model"],
     angle_range=range(-5, 25, length=30),
     angle_type="angle_of_attack",
     angle_of_attack=angle_of_attack_deg,
     side_slip=sideslip_deg,
     v_a=wind_speed,
-    title="Pyramid Model",
+    title="$(wing.n_panels)_panels_$(wing.spanwise_distribution)_pyramid_model",
+    save_path=OUTPUT_DIR,
+    is_save=false || SAVE_ALL,
+    is_show=true,
+    use_tex=USE_TEX
+)
+
+# Plotting geometry
+PLOT && plot_geometry(
+    body_aero,
+    "Pyramid model geometry";
+    save_path=OUTPUT_DIR,
+    is_save=false || SAVE_ALL,
+    is_show=true,
+    view_elevation=15,
+    view_azimuth=-120,
+    use_tex=USE_TEX
+)
+
+# Plotting spanwise distributions
+body_y_coordinates = [panel.aero_center[2] for panel in body_aero.panels]
+
+PLOT && plot_distribution(
+    [body_y_coordinates],
+    [results],
+    ["VSM"];
+    title="pyramid_spanwise_distributions_alpha_$(round(angle_of_attack_deg, digits=1))_delta_$(round(sideslip_deg, digits=1))_yaw_$(round(yaw_rate, digits=1))_v_a_$(round(wind_speed, digits=1))",
+    save_path=OUTPUT_DIR,
+    is_save=false || SAVE_ALL,
     is_show=true,
     use_tex=USE_TEX
 )

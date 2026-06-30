@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -eu
 
 if [[ $(basename $(pwd)) == "bin" ]]; then
     cd ..
@@ -6,4 +6,20 @@ fi
 
 export JULIA_PKG_SERVER_REGISTRY_PREFERENCE=eager
 
-julia --project
+# If any local project preferences file disables CondaPkg, forward that as an
+# env var so that Julia reads it at runtime even when activating a subproject
+# interactively (where @load_preference may have a stale baked-in value).
+for _lp in LocalPreferences.toml examples_cp/LocalPreferences.toml test/LocalPreferences.toml; do
+    if grep -q 'backend = "Null"' "$_lp" 2>/dev/null; then
+        export JULIA_CONDAPKG_BACKEND=Null
+        break
+    fi
+done
+
+if [[ $# -gt 0 ]]; then
+    JULIA_ARGS=("$@")
+else
+    JULIA_ARGS=()
+fi
+
+julia --project "${JULIA_ARGS[@]}"

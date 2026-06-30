@@ -76,11 +76,11 @@ function find_circle_center_and_radius(vertices)
         end
     end
 
-    function r_diff!(du, u, p)
-        z = u[1]
+    function r_diff!(du, u, _)
+        z_local = u[1]
         r .= Inf
-        r[1] = sqrt(v_min[2]^2 + (v_min[3] - z)^2)
-        r[2] = sqrt(v_tip[2]^2 + (v_tip[3] - z)^2)
+        r[1] = sqrt(v_min[2]^2 + (v_min[3] - z_local)^2)
+        r[2] = sqrt(v_tip[2]^2 + (v_tip[3] - z_local)^2)
         du[1] = r[1] - r[2]
         return nothing
     end
@@ -88,12 +88,12 @@ function find_circle_center_and_radius(vertices)
     prob = NonlinearProblem(r_diff!, [v_min[3]-0.1], nothing)
     result = NonlinearSolve.solve(prob, NewtonRaphson(; autodiff=AutoFiniteDiff(; relstep = 1e-3, absstep = 1e-3)); abstol = 1e-2)
     r_diff!(zeros(1), result, nothing)
-    z = result[1]
+    z_center = result[1]
 
-    gamma_tip = atan(-v_tip[2], (v_tip[3] - z))
+    gamma_tip = atan(-v_tip[2], (v_tip[3] - z_center))
     @assert gamma_tip > 0.0
 
-    return z, r[1], gamma_tip
+    return z_center, r[1], gamma_tip
 end
 
 """
@@ -246,7 +246,7 @@ This method enables deformation support for OBJ wings by:
 # Effects
 Updates wing.refined_sections and wing.non_deformed_sections in-place.
 """
-function refine_obj_wing!(wing::AbstractWing; recompute_mapping=true)
+function refine_obj_wing!(wing::AbstractWing{T}; recompute_mapping=true) where {T}
     n_unrefined = wing.n_unrefined_sections
     n_refined = wing.n_panels + 1
 
@@ -274,7 +274,7 @@ function refine_obj_wing!(wing::AbstractWing; recompute_mapping=true)
     # 4. Create refined sections with interpolated deltas
     refined_gammas = range(-wing.gamma_tip, wing.gamma_tip, n_refined)
     if isempty(wing.refined_sections)
-        wing.refined_sections = [Section() for _ in 1:n_refined]
+        wing.refined_sections = [Section{T}() for _ in 1:n_refined]
     end
 
     for (idx, gamma) in enumerate(refined_gammas)
@@ -309,7 +309,10 @@ function refine_obj_wing!(wing::AbstractWing; recompute_mapping=true)
     end
 
     # 5. Compute panel mapping and update non_deformed_sections
-    recompute_mapping && VortexStepMethod.compute_refined_panel_mapping!(wing)
+    if recompute_mapping
+        VortexStepMethod.compute_refined_panel_mapping!(wing)
+        VortexStepMethod.compute_refined_section_interpolation!(wing)
+    end
     VortexStepMethod.update_non_deformed_sections!(wing)
 
     return nothing
@@ -529,9 +532,9 @@ function ObjWing(
     # Load or create polars
     (!endswith(dat_path, ".dat")) && (dat_path *= ".dat")
     (!isfile(dat_path)) && error("DAT file not found: $dat_path")
-    cl_polar_path = dat_path[1:end-4] * "_cl_polar.csv"
-    cd_polar_path = dat_path[1:end-4] * "_cd_polar.csv"
-    cm_polar_path = dat_path[1:end-4] * "_cm_polar.csv"
+    cl_polar_path = string(dat_path[1:end-4], "_cl_polar.csv")
+    cd_polar_path = string(dat_path[1:end-4], "_cd_polar.csv")
+    cm_polar_path = string(dat_path[1:end-4], "_cm_polar.csv")
 
     (!endswith(obj_path, ".obj")) && (obj_path *= ".obj")
     (!isfile(obj_path)) && error("OBJ file not found: $obj_path")
@@ -558,9 +561,9 @@ function ObjWing(
                 area, width, crease_frac, alpha_range, delta_range, remove_nan)
         end
 
-        cl_matrix, _, _ = read_aero_matrix(cl_polar_path)
-        cd_matrix, _, _ = read_aero_matrix(cd_polar_path)
-        cm_matrix, alpha_range, delta_range = read_aero_matrix(cm_polar_path)
+        cl_matrix, _, _ = read_aero_matrix(String(cl_polar_path))
+        cd_matrix, _, _ = read_aero_matrix(String(cd_polar_path))
+        cm_matrix, alpha_range, delta_range = read_aero_matrix(String(cm_polar_path))
 
         if remove_nan
             any(isnan.(cl_matrix)) && interpolate_matrix_nans!(cl_matrix; prn)
@@ -569,7 +572,7 @@ function ObjWing(
         end
 
         # Create unrefined sections (evenly spaced including both tips)
-        sections = Section[]
+        sections = Section{Float64}[]
 
         if !isnothing(polars_dir)
             # Use per-section polars from directory (POLAR_VECTORS)
@@ -599,14 +602,19 @@ function ObjWing(
             end
         end
 
-        panel_props = PanelProperties{n_panels}()
+        panel_props = PanelProperties{n_panels, Float64}()
         cache = [PreallocationTools.LazyBufferCache()]
 
-        wing = Wing(n_panels, Int16(n_unrefined_sections), spanwise_distribution, panel_props, MVec3(spanwise_direction),
-            sections, Section[], remove_nan, use_prior_polar,  # refined_sections empty
+        wing = Wing{n_panels, Float64}(
+            Int16(n_panels), Int16(n_unrefined_sections), spanwise_distribution, panel_props,
+            MVector{3, Float64}(spanwise_direction),
+            sections, Section{Float64}[], remove_nan, use_prior_polar, 0.0,  # billowing_percentage
             Int16[],  # refined_panel_mapping empty
-            Section[], zeros(n_panels), zeros(n_panels),  # non_deformed, theta, delta
-            mass, gamma_tip, inertia_tensor, T_cad_body, R_cad_body, radius,
+            Int16[], Float64[],  # refined_section interpolation cache empty
+            Section{Float64}[], zeros(Float64, n_panels), zeros(Float64, n_panels),
+            Float64(mass), Float64(gamma_tip), Matrix{Float64}(inertia_tensor),
+            MVector{3, Float64}(T_cad_body), MMatrix{3, 3, Float64, 9}(R_cad_body),
+            Float64(radius),
             le_interp, te_interp, area_interp, cache)
 
         # Auto-refine for backward compatibility

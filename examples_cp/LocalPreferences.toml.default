@@ -1,0 +1,5 @@
+[CondaPkg]
+backend = "Null"
+
+[ENV]
+MPLBACKEND = "qtagg"

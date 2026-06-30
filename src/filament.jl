@@ -20,15 +20,15 @@ Represents a bound vortex filament defined by two points.
 - r0::MVec3=zeros(MVec3): Vector from x1 to x2
 - initialized::Bool = false
 """
-@with_kw mutable struct BoundFilament <: Filament
-    x1::MVec3         = zeros(MVec3)
-    x2::MVec3         = zeros(MVec3)
-    length::Float64   = zero(Float64)
-    r0::MVec3         = zeros(MVec3)
-    initialized::Bool = false
+@with_kw mutable struct BoundFilament{T} <: Filament
+    x1::MVector{3, T}   = zeros(MVector{3, T})
+    x2::MVector{3, T}   = zeros(MVector{3, T})
+    length::T           = zero(T)
+    r0::MVector{3, T}   = zeros(MVector{3, T})
+    initialized::Bool   = false
 end
 
-function reinit!(filament::BoundFilament, x1, x2, vec=zeros(MVec3))
+function reinit!(filament::BoundFilament{T}, x1, x2, vec=zeros(MVector{3, T})) where {T}
     filament.x1 .= x1
     filament.x2 .= x2
     vec .= x2 .- x1
@@ -84,17 +84,19 @@ function velocity_3D_bound_vortex!(
         @debug "inside core radius"
         @debug "distance from control point to filament: $(nr1Xr0 / nr0)"
 
-        # Project onto core radius
-        cross3!(r2Xr0, r2, r0)
         nr0sq = nr0 * nr0
-        nr2Xr0 = norm3(r2Xr0)
         d_r1_r0 = dot3(r1, r0)
         d_r2_r0 = dot3(r2, r0)
+        r_rad = r1Xr0
+        @inbounds for k in 1:3
+            r_rad[k] = r1[k] - d_r1_r0 * r0[k] / nr0sq
+        end
+        nr_rad = norm3(r_rad)
         @inbounds for k in 1:3
             r1_proj[k] = d_r1_r0 * r0[k] / nr0sq +
-                         epsilon * r1Xr0[k] / nr1Xr0
+                         epsilon * r_rad[k] / nr_rad
             r2_proj[k] = d_r2_r0 * r0[k] / nr0sq +
-                         epsilon * r2Xr0[k] / nr2Xr0
+                         epsilon * r_rad[k] / nr_rad
         end
         cross3!(r1_projXr2_proj, r1_proj, r2_proj)
 
@@ -229,15 +231,15 @@ Represents a semi-infinite vortex filament.
 - `filament_direction`::Int64=0   : Direction indicator (-1 or 1)
 - initialized::Bool=false
 """
-@with_kw mutable struct SemiInfiniteFilament <: Filament
-    x1::MVec3 = zeros(MVec3)
-    direction::MVec3 = zeros(MVec3)
-    vel_mag::Float64 = zero(Float64)
+@with_kw mutable struct SemiInfiniteFilament{T} <: Filament
+    x1::MVector{3, T} = zeros(MVector{3, T})
+    direction::MVector{3, T} = zeros(MVector{3, T})
+    vel_mag::T = zero(T)
     filament_direction::Int64 = zero(Int64)
     initialized::Bool = false
 end
 
-function reinit!(filament::SemiInfiniteFilament, x1::PosVector, direction::PosVector, vel_mag::Real, filament_direction::Real)
+function reinit!(filament::SemiInfiniteFilament{T}, x1::AbstractVector, direction::AbstractVector, vel_mag::Real, filament_direction::Real) where T
     filament.x1 .= x1
     filament.direction .= direction
     filament.vel_mag = vel_mag
@@ -289,13 +291,13 @@ function velocity_3D_trailing_vortex_semiinfinite!(
     else
         r1_proj = work_vectors[4]
         cross_tmp = work_vectors[5]
-        # temp = r1/nr1 - Vf
+        nVfsq = nVf * nVf
         @inbounds for k in 1:3
-            cross_tmp[k] = r1[k]/nr1 - Vf[k]
+            cross_tmp[k] = r1[k] - d_r1_Vf * Vf[k] / nVfsq
         end
         n_tmp = norm3(cross_tmp)
         @inbounds for k in 1:3
-            r1_proj[k] = d_r1_Vf * Vf[k] +
+            r1_proj[k] = d_r1_Vf * Vf[k] / nVfsq +
                          epsilon * cross_tmp[k] / n_tmp
         end
         cross3!(cross_tmp, r1_proj, Vf)
