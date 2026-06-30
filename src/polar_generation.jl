@@ -164,28 +164,7 @@ function generate_polar_from_dat(dat_path::String, output_path::String;
         error("DAT file not found: $dat_path")
     end
 
-    # Read .dat file (simple two-column format)
-    x = Float64[]
-    y = Float64[]
-
-    open(dat_path) do io
-        for line in eachline(io)
-            line = strip(line)
-            if isempty(line) || !isdigit(line[1]) && line[1] != '-' && line[1] != '.'
-                continue  # Skip header/comments
-            end
-
-            parts = split(line)
-            if length(parts) >= 2
-                try
-                    push!(x, parse(Float64, parts[1]))
-                    push!(y, parse(Float64, parts[2]))
-                catch
-                    continue
-                end
-            end
-        end
-    end
+    x, y = read_dat_coordinates(dat_path)
 
     if isempty(x)
         error("No valid coordinates found in $dat_path")

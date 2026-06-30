@@ -8,6 +8,53 @@ geometry YAML referencing them. After conversion everything follows the standard
 using Printf: @sprintf
 
 """
+    read_dat_coordinates(path) -> (x, y)
+
+Read airfoil coordinates from a `.dat` file, skipping header and comment lines.
+"""
+function read_dat_coordinates(path::String)
+    x = Float64[]
+    y = Float64[]
+    for line in eachline(path)
+        s = strip(line)
+        (isempty(s) || !(isdigit(s[1]) || s[1] == '-' || s[1] == '.')) && continue
+        parts = split(s)
+        length(parts) >= 2 || continue
+        xp = tryparse(Float64, parts[1])
+        yp = tryparse(Float64, parts[2])
+        (xp === nothing || yp === nothing) && continue
+        push!(x, xp)
+        push!(y, yp)
+    end
+    return x, y
+end
+
+"""
+    airfoils_from_yaml(geometry_file) -> Vector of (airfoil_id, x, y)
+
+Read each airfoil's coordinates from the `.dat` files referenced by a YAML
+geometry's `wing_airfoils`. Relative `dat_file` paths resolve against the
+geometry file's directory.
+"""
+function airfoils_from_yaml(geometry_file::String)
+    data = YAML.load_file(geometry_file)
+    airfoils = data["wing_airfoils"]
+    headers = airfoils["headers"]
+    out = Tuple{Int, Vector{Float64}, Vector{Float64}}[]
+    for row in airfoils["data"]
+        d = Dict(zip(headers, row))
+        dat_rel = get(d["info_dict"], "dat_file", "")
+        isempty(dat_rel) && continue
+        dat_path = isabspath(dat_rel) ? dat_rel :
+                   joinpath(dirname(geometry_file), dat_rel)
+        isfile(dat_path) || continue
+        x, y = read_dat_coordinates(dat_path)
+        push!(out, (Int(d["airfoil_id"]), x, y))
+    end
+    return out
+end
+
+"""
     slice_obj_section(vertices, faces, y)
 
 Slice a mesh at spanwise position `y` and return
@@ -126,16 +173,35 @@ function obj_to_yaml(obj_path::String, output_dir::String;
 
     isempty(section_rows) && error("No valid sections sliced from $obj_path")
 
-    doc = Dict(
-        "wing_sections" => Dict(
-            "headers" => ["airfoil_id", "LE_x", "LE_y", "LE_z", "TE_x", "TE_y", "TE_z"],
-            "data" => section_rows),
-        "wing_airfoils" => Dict(
-            "headers" => ["airfoil_id", "type", "info_dict"],
-            "data" => airfoil_rows),
-    )
     yaml_path = joinpath(output_dir, "geometry.yaml")
-    YAML.write_file(yaml_path, doc)
+    write_geometry_yaml(yaml_path, section_rows, airfoil_rows)
     verbose && @info "Wrote geometry to $yaml_path ($(length(section_rows)) sections)"
     return yaml_path
+end
+
+"""
+    write_geometry_yaml(path, section_rows, airfoil_rows)
+
+Write a geometry YAML in compact flow style: one-line headers and one line per
+data row. `section_rows` are `[airfoil_id, LE_x, LE_y, LE_z, TE_x, TE_y, TE_z]`;
+`airfoil_rows` are `[airfoil_id, type, Dict("dat_file"=>..., "csv_file_path"=>...)]`.
+"""
+function write_geometry_yaml(path::String, section_rows, airfoil_rows)
+    open(path, "w") do io
+        println(io, "wing_sections:")
+        println(io, "  headers: [airfoil_id, LE_x, LE_y, LE_z, TE_x, TE_y, TE_z]")
+        println(io, "  data:")
+        for row in section_rows
+            println(io, "    - [", join(string.(row), ", "), "]")
+        end
+        println(io, "wing_airfoils:")
+        println(io, "  headers: [airfoil_id, type, info_dict]")
+        println(io, "  data:")
+        for (id, type, info) in airfoil_rows
+            inline = "{dat_file: \"$(info["dat_file"])\", " *
+                     "csv_file_path: \"$(info["csv_file_path"])\"}"
+            println(io, "    - [", id, ", ", type, ", ", inline, "]")
+        end
+    end
+    return path
 end
