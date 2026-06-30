@@ -45,7 +45,8 @@ export LOOP, NONLIN, SolverType
 export load_polar_data
 
 # NeuralFoil exports
-export KulfanParameters, fit_kulfan_parameters, kulfan_to_coordinates
+export KulfanParameters, KulfanFitMethod, LeastSquaresFit, EnvelopeFit,
+    fit_kulfan_parameters, kulfan_to_coordinates
 export NeuralFoilModel, NeuralFoilResult, load_neuralfoil_model, neuralfoil_aero
 export slice_obj_wing, slice_obj_at_positions
 export generate_neuralfoil_polars, generate_polar_from_coordinates, generate_polar_from_dat

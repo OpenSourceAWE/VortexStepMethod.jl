@@ -4,6 +4,11 @@ NeuralFoil adapter, then load and solve it like any other YAML wing.
 
 The adapter slices the mesh, fits each section to Kulfan parameters, evaluates
 NeuralFoil, and writes `airfoils/*.dat`, `polars/*.csv`, and a `geometry.yaml`.
+
+This example fits each section with `EnvelopeFit`, which wraps tightly around the
+slice points with clearance `min_distance` instead of least-squaring through
+them. The envelope is robust to the noisy interior-structure points (ribs, spars)
+of a ram-air kite slice that otherwise pull the default `LeastSquaresFit` inward.
 """
 
 using Pkg
@@ -24,7 +29,8 @@ output_dir = joinpath(project_dir, "output", "ram_air_kite_converted")
 # --- Convert the .obj mesh to the YAML route ---
 println("Converting $(basename(obj_path)) to YAML...")
 geometry_file = obj_to_yaml(obj_path, output_dir;
-    n_sections=10, Re=5e5, alpha_range=-20:1:20, model_size="xlarge")
+    n_sections=10, Re=5e5, alpha_range=-20:1:20, model_size="xlarge",
+    fit_method=EnvelopeFit(min_distance=0.0001))
 
 # --- Everything below is the standard YAML wing route ---
 wing = Wing(geometry_file; n_panels=20, spanwise_distribution=LINEAR)

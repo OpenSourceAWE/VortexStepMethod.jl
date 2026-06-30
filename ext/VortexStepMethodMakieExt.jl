@@ -1495,10 +1495,12 @@ function VortexStepMethod.plot_airfoils(geometry_file::String,
     fig = Figure(size=(380 * ncol, 320 * nrow))
     Label(fig[0, :], "Airfoils: $(basename(geometry_file))", fontsize=16)
 
-    for (i, (id, x, y)) in enumerate(airfoils)
+    for (i, af) in enumerate(airfoils)
         ax = Axis(fig[div(i - 1, ncol) + 1, mod1(i, ncol)];
-            title="Airfoil $id", xlabel="x/c", ylabel="y/c", aspect=DataAspect())
-        lines!(ax, x, y; color=:black)
+            title="Airfoil $(af.id)", xlabel="x/c", ylabel="y/c", aspect=DataAspect())
+        isempty(af.x_raw) ||
+            scatter!(ax, af.x_raw, af.y_raw; color=(:gray, 0.5), markersize=4)
+        lines!(ax, af.x, af.y; color=:black)
     end
 
     if is_save && !isnothing(save_path)

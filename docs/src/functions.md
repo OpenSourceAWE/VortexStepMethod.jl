@@ -9,6 +9,10 @@ calculate_span
 calculate_projected_area
 load_polar_data
 obj_to_yaml
+fit_kulfan_parameters
+KulfanFitMethod
+LeastSquaresFit
+EnvelopeFit
 ```
 
 ## Setting the inflow conditions and solving

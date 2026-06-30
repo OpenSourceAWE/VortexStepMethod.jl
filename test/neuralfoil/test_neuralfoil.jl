@@ -1,7 +1,9 @@
 using Test
 using VortexStepMethod
-using VortexStepMethod: KulfanParameters, fit_kulfan_parameters, kulfan_to_coordinates,
-                       neuralfoil_aero
+using VortexStepMethod: KulfanParameters, LeastSquaresFit, EnvelopeFit,
+                       fit_kulfan_parameters, kulfan_to_coordinates, neuralfoil_aero,
+                       class_function, bernstein_basis, leading_edge_basis,
+                       normalize_airfoil, inset_airfoil, fit_clearance
 
 read_dat_coords(path) = begin
     x = Float64[]; y = Float64[]
@@ -41,6 +43,36 @@ end
         @test maximum(abs.(params.lower_weights .- ref_lower)) < 1e-9
         @test abs(params.leading_edge_weight - 0.9180525576877088) < 1e-9
         @test params.TE_thickness ≈ 0.0 atol = 1e-12
+    end
+
+    @testset "Envelope fit encloses points with clearance" begin
+        # Measure clearance in the fit's own frame: the points are inset by the
+        # method's clearance before fitting (see inset_airfoil).
+        function min_clearance(method)
+            params = fit_kulfan_parameters(xr, yr, method)
+            xi, yi = inset_airfoil(xr, yr, fit_clearance(method))
+            xc = clamp.(xi, 0.0, 1.0)
+            mid = (xi .> 0.05) .& (xi .< 0.95)
+            n = length(params.upper_weights)
+            shape = class_function(xc) .* (bernstein_basis(xc, n - 1) *
+                    params.upper_weights) .+ params.leading_edge_weight .*
+                    leading_edge_basis(xc, n)
+            upper = shape .+ xc .* (params.TE_thickness / 2)
+            lower = class_function(xc) .* (bernstein_basis(xc, n - 1) *
+                    params.lower_weights) .+ params.leading_edge_weight .*
+                    leading_edge_basis(xc, n) .- xc .* (params.TE_thickness / 2)
+            return minimum((upper .- yi)[mid]), minimum((yi .- lower)[mid])
+        end
+
+        env_upper, env_lower = min_clearance(EnvelopeFit(min_distance=0.005))
+        @test env_upper > 0.0035
+        @test env_lower > 0.0035
+
+        lsq_upper, _ = min_clearance(LeastSquaresFit())
+        @test lsq_upper < env_upper
+
+        wide_upper, _ = min_clearance(EnvelopeFit(min_distance=0.02))
+        @test wide_upper > env_upper
     end
 
     @testset "NeuralFoil matches Python neuralfoil (xlarge)" begin

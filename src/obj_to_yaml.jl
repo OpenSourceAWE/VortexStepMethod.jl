@@ -30,26 +30,31 @@ function read_dat_coordinates(path::String)
 end
 
 """
-    airfoils_from_yaml(geometry_file) -> Vector of (airfoil_id, x, y)
+    airfoils_from_yaml(geometry_file) -> Vector of (; id, x, y, x_raw, y_raw)
 
 Read each airfoil's coordinates from the `.dat` files referenced by a YAML
-geometry's `wing_airfoils`. Relative `dat_file` paths resolve against the
-geometry file's directory.
+geometry's `wing_airfoils`. `x, y` come from `dat_file` (the fitted airfoil);
+`x_raw, y_raw` come from `raw_dat_file` if present (the raw sliced points), and
+are empty otherwise. Relative paths resolve against the geometry file's directory.
 """
 function airfoils_from_yaml(geometry_file::String)
     data = YAML.load_file(geometry_file)
     airfoils = data["wing_airfoils"]
     headers = airfoils["headers"]
-    out = Tuple{Int, Vector{Float64}, Vector{Float64}}[]
+    base = dirname(geometry_file)
+    resolve(rel) = isabspath(rel) ? rel : joinpath(base, rel)
+    out = NamedTuple[]
     for row in airfoils["data"]
         d = Dict(zip(headers, row))
         dat_rel = get(d["info_dict"], "dat_file", "")
-        isempty(dat_rel) && continue
-        dat_path = isabspath(dat_rel) ? dat_rel :
-                   joinpath(dirname(geometry_file), dat_rel)
-        isfile(dat_path) || continue
-        x, y = read_dat_coordinates(dat_path)
-        push!(out, (Int(d["airfoil_id"]), x, y))
+        (isempty(dat_rel) || !isfile(resolve(dat_rel))) && continue
+        x, y = read_dat_coordinates(resolve(dat_rel))
+        x_raw, y_raw = Float64[], Float64[]
+        raw_rel = get(d["info_dict"], "raw_dat_file", "")
+        if !isempty(raw_rel) && isfile(resolve(raw_rel))
+            x_raw, y_raw = read_dat_coordinates(resolve(raw_rel))
+        end
+        push!(out, (id=Int(d["airfoil_id"]), x=x, y=y, x_raw=x_raw, y_raw=y_raw))
     end
     return out
 end
@@ -101,6 +106,7 @@ end
 """
     obj_to_yaml(obj_path, output_dir; n_sections, Re, alpha_range=-180:1:180,
                 model_size="xlarge", weights_dir=nothing, n_crit=9.0,
+                fit_method=LeastSquaresFit(),
                 spanwise_direction=[0.0, 1.0, 0.0], verbose=true)
 
 Convert a 3D wing `.obj` mesh to the native YAML geometry route.
@@ -109,9 +115,15 @@ Slices the mesh at `n_sections` spanwise stations; for each station the
 leading-/trailing-edge points come from the slice itself (min-x / max-x), and
 the airfoil shape is fitted to Kulfan parameters and evaluated with NeuralFoil.
 
+`fit_method` selects the Kulfan fit (see [`fit_kulfan_parameters`](@ref)). Pass
+an [`EnvelopeFit`](@ref) to wrap each section tightly *around* the slice points;
+this is robust to the noisy interior-structure points of a ram-air kite slice
+(ribs, spars) that otherwise pull the default [`LeastSquaresFit`](@ref) inward.
+
 # Output
 Writes into `output_dir`:
-- `airfoils/{i}.dat`  — section airfoil coordinates
+- `airfoils/{i}.dat`     — fitted Kulfan airfoil coordinates (matches the polar)
+- `airfoils/{i}_raw.dat` — raw sliced section points (the fit is wrapped around these)
 - `polars/{i}.csv`    — NeuralFoil polar (alpha, Cd, Cs, Cl, Cm)
 - `geometry.yaml`     — `wing_sections` + `wing_airfoils` referencing the above
 
@@ -122,7 +134,8 @@ function obj_to_yaml(obj_path::String, output_dir::String;
                      n_sections::Int, Re::Real,
                      alpha_range=-180:1:180,
                      model_size::String="xlarge", weights_dir=nothing,
-                     n_crit=9.0, spanwise_direction=[0.0, 1.0, 0.0],
+                     n_crit=9.0, fit_method::KulfanFitMethod=LeastSquaresFit(),
+                     spanwise_direction=[0.0, 1.0, 0.0],
                      verbose::Bool=true)
     (!endswith(obj_path, ".obj")) && (obj_path *= ".obj")
     isfile(obj_path) || error("OBJ file not found: $obj_path")
@@ -156,10 +169,15 @@ function obj_to_yaml(obj_path::String, output_dir::String;
         LE_point, TE_point, xa, ya = slice
 
         dat_rel = joinpath("airfoils", "$i.dat")
+        raw_rel = joinpath("airfoils", "$(i)_raw.dat")
         csv_rel = joinpath("polars", "$i.csv")
-        write_dat(joinpath(output_dir, dat_rel), "section_$i", xa, ya)
 
-        params = fit_kulfan_parameters(xa, ya)
+        params = fit_kulfan_parameters(xa, ya, fit_method)
+        x_fit, y_fit = kulfan_to_coordinates(params)
+        x_raw, y_raw = inset_airfoil(xa, ya, fit_clearance(fit_method))
+        write_dat(joinpath(output_dir, dat_rel), "section_$i", x_fit, y_fit)
+        write_dat(joinpath(output_dir, raw_rel), "section_$(i)_raw", x_raw, y_raw)
+
         result = neuralfoil_aero(params, alphas, Float64(Re);
                                  model_size, weights_dir, n_crit)
         write_polar_csv(joinpath(output_dir, csv_rel), result)
@@ -167,7 +185,8 @@ function obj_to_yaml(obj_path::String, output_dir::String;
         push!(section_rows, Any[i, LE_point[1], LE_point[2], LE_point[3],
                                 TE_point[1], TE_point[2], TE_point[3]])
         push!(airfoil_rows, Any[i, "polar_vectors",
-                                Dict("dat_file" => dat_rel, "csv_file_path" => csv_rel)])
+                                Dict("dat_file" => dat_rel, "raw_dat_file" => raw_rel,
+                                     "csv_file_path" => csv_rel)])
         verbose && println("done (CL_max=$(round(maximum(result.CL), digits=2)))")
     end
 
@@ -184,7 +203,8 @@ end
 
 Write a geometry YAML in compact flow style: one-line headers and one line per
 data row. `section_rows` are `[airfoil_id, LE_x, LE_y, LE_z, TE_x, TE_y, TE_z]`;
-`airfoil_rows` are `[airfoil_id, type, Dict("dat_file"=>..., "csv_file_path"=>...)]`.
+`airfoil_rows` are `[airfoil_id, type, info_dict]` where `info_dict` holds
+`dat_file`, `csv_file_path`, and optionally `raw_dat_file`.
 """
 function write_geometry_yaml(path::String, section_rows, airfoil_rows)
     open(path, "w") do io
@@ -192,14 +212,16 @@ function write_geometry_yaml(path::String, section_rows, airfoil_rows)
         println(io, "  headers: [airfoil_id, LE_x, LE_y, LE_z, TE_x, TE_y, TE_z]")
         println(io, "  data:")
         for row in section_rows
-            println(io, "    - [", join(string.(row), ", "), "]")
+            vals = [v isa Integer ? string(v) : string(round(v; digits=3)) for v in row]
+            println(io, "    - [", join(vals, ", "), "]")
         end
         println(io, "wing_airfoils:")
         println(io, "  headers: [airfoil_id, type, info_dict]")
         println(io, "  data:")
         for (id, type, info) in airfoil_rows
-            inline = "{dat_file: \"$(info["dat_file"])\", " *
-                     "csv_file_path: \"$(info["csv_file_path"])\"}"
+            keys_ordered = ["dat_file", "raw_dat_file", "csv_file_path"]
+            parts = ["$k: \"$(info[k])\"" for k in keys_ordered if haskey(info, k)]
+            inline = "{" * join(parts, ", ") * "}"
             println(io, "    - [", id, ", ", type, ", ", inline, "]")
         end
     end
