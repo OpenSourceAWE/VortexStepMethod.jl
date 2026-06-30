@@ -13,21 +13,16 @@ module FakeMakieReturnsOtherModule
     import Base
     current_backend() = Base
 end
-backend = if "plot-controlplots" in ARGS
-    using ControlPlots
-    import ControlPlots: plt
-    using PythonCall: pyconvert
-    "ControlPlots"
-else
-    using CairoMakie
-    "Makie"
-end
+using CairoMakie
+using MakieControlPlots
+# MakieControlPlots activates GLMakie on load; force CairoMakie so headless
+# figure saving uses the software backend.
+CairoMakie.activate!()
 
 using VortexStepMethod
 using Test
 
-const makie_ext = backend == "Makie" ?
-    Base.get_extension(VortexStepMethod, :VortexStepMethodMakieExt) : nothing
+const makie_ext = Base.get_extension(VortexStepMethod, :VortexStepMethodMakieExt)
 
 # Resolve repo data directory for ram air kite assets
 _ram_data_dir = joinpath(dirname(dirname(@__DIR__)),
@@ -88,7 +83,7 @@ function create_body_aero()
     body_aero
 end
 
-@testset "Plotting ($backend)" begin
+@testset "Plotting (Makie)" begin
     save_dir = tempdir()
     body_aero = create_body_aero()
 
@@ -99,21 +94,11 @@ end
         save_path=save_dir,
         is_save=true,
         is_show=false)
-    if backend == "Makie"
-        @test fig isa Figure
-    else
-        @test fig !== nothing
-    end
+    @test fig isa Figure
 
-    if backend == "Makie"
-        @test hasmethod(VortexStepMethod.show_plot, Tuple{Figure})
-        @test_throws MethodError VortexStepMethod.show_plot(nothing)
-        @test_nowarn VortexStepMethod.show_plot(fig)
-    else
-        FigType = plt.Figure
-        @test hasmethod(VortexStepMethod.show_plot, Tuple{FigType})
-        @test_throws MethodError VortexStepMethod.show_plot(nothing)
-    end
+    @test hasmethod(VortexStepMethod.show_plot, Tuple{Figure})
+    @test_throws MethodError VortexStepMethod.show_plot(nothing)
+    @test_nowarn VortexStepMethod.show_plot(fig)
 
     @test isfile(joinpath(save_dir,
                           "Rectangular_wing_geometry_angled_view.png"))
@@ -151,11 +136,7 @@ end
         title="Spanwise Distributions",
         is_show=false
     )
-    if backend == "Makie"
-        @test fig isa Figure
-    else
-        @test fig !== nothing
-    end
+    @test fig isa Figure
 
     # Plot polar curves
     v_a = 20.0
@@ -173,11 +154,7 @@ end
         is_save=true,
         is_show=false
     )
-    if backend == "Makie"
-        @test fig isa Figure
-    else
-        @test fig !== nothing
-    end
+    @test fig isa Figure
     @test isfile(joinpath(save_dir, "Rectangular_Wing_Polars.png"))
     safe_rm(joinpath(save_dir, "Rectangular_Wing_Polars.png"))
 
@@ -194,11 +171,7 @@ end
         is_show=false,
         cl_over_cd=false
     )
-    if backend == "Makie"
-        @test fig isa Figure
-    else
-        @test fig !== nothing
-    end
+    @test fig isa Figure
 
     # Plot combined analysis with cl_over_cd
     fig = plot_combined_analysis(
@@ -212,11 +185,7 @@ end
         is_show=false,
         cl_over_cd=true
     )
-    if backend == "Makie"
-        @test fig isa Figure
-    else
-        @test fig !== nothing
-    end
+    @test fig isa Figure
 
     # Plot combined analysis with cl_over_cd=false
     fig = plot_combined_analysis(
@@ -230,30 +199,18 @@ end
         is_show=false,
         cl_over_cd=false
     )
-    if backend == "Makie"
-        @test fig isa Figure
-    else
-        @test fig !== nothing
-    end
+    @test fig isa Figure
 
     # Test polar data plotting
     body_aero = BodyAerodynamics([ram_wing])
     fig = plot_polar_data(body_aero; is_show=false)
-    if backend == "Makie"
-        @test fig isa Figure
-    else
-        @test fig !== nothing
-    end
+    @test fig isa Figure
 
     fig_rect = plot_polar_data(body_aero;
         alphas=collect(deg2rad.(-5:1.0:15)),
         delta_tes=collect(deg2rad.(-3:1.0:5)),
         is_show=false)
-    if backend == "Makie"
-        @test fig_rect isa Figure
-    else
-        @test fig_rect !== nothing
-    end
+    @test fig_rect isa Figure
 
     # Tests for both backends
     body_aero_empty = create_body_aero()
@@ -302,25 +259,7 @@ end
         safe_rm(literature_csv)
     end
 
-    # CP-specific tests (DPI, matplotlib internals)
-    if backend == "ControlPlots"
-        # `get_dpi()` returns a Python float; convert to a Julia Float64 so the
-        # comparisons below evaluate to a Julia `Bool` rather than a `Py` object.
-        get_dpi(fig) = pyconvert(Float64, fig.get_dpi())
-
-        fig_dpi = plt.figure()
-        default_dpi = get_dpi(fig_dpi)
-        @test default_dpi != 173
-
-        show_plot(fig_dpi; dpi=173)
-        @test get_dpi(fig_dpi) == 173
-
-        show_plot(fig_dpi)
-        @test get_dpi(fig_dpi) == 130
-        plt.close(fig_dpi)
-    end
-
-    # Unit tests for shared extract_literature_polar_data (both backends)
+    # Unit tests for shared extract_literature_polar_data
     using DelimitedFiles
 
     # Tuple parsing branch (e.g. readdlm(...; header=true) shape)
@@ -458,8 +397,7 @@ end
     safe_rm(no_cm_path)
 
     # Tests for save_plot function
-    if backend == "Makie"
-        @testset "_active_backend_prefers_vector_output" begin
+    @testset "_active_backend_prefers_vector_output" begin
             @test makie_ext !== nothing
 
             active_backend_prefers_vector_output =
@@ -538,6 +476,43 @@ end
 
         # Test 8: save_plot raises error when save_path is nothing
         @test_throws ArgumentError VortexStepMethod.save_plot(fig, nothing, "test_title", data_type=".png")
+end
+
+@testset "plot_section_polars and plot_airfoils" begin
+    # Build a wing with POLAR_VECTORS sections for plot_section_polars
+    alpha = deg2rad.(collect(-5.0:1.0:15.0))
+    cl = 0.1 .* rad2deg.(alpha)
+    cd = fill(0.02, length(alpha))
+    cm = fill(-0.05, length(alpha))
+    aero_data = (alpha, cl, cd, cm)
+    sec_wing = Wing(4, spanwise_distribution=LINEAR)
+    add_section!(sec_wing, [0.0, 1.0, 0.0], [1.0, 1.0, 0.0], POLAR_VECTORS, aero_data)
+    add_section!(sec_wing, [0.0, -1.0, 0.0], [1.0, -1.0, 0.0], POLAR_VECTORS, aero_data)
+    refine!(sec_wing)
+    sec_body = BodyAerodynamics([sec_wing])
+
+    plt = plot_section_polars(sec_body, :cl; is_show=false)
+    @test plt !== nothing
+    @test_throws ArgumentError plot_section_polars(sec_body, :bad; is_show=false)
+
+    body_inviscid = create_body_aero()
+    @test_throws Exception plot_section_polars(body_inviscid; is_show=false)
+
+    # plot_airfoils from a YAML referencing a .dat file
+    foil = joinpath(tempdir(), "ram_air_kite_foil.dat")
+    cp(joinpath(_ram_data_dir, "ram_air_kite_foil.dat"), foil; force=true)
+    yaml_path = joinpath(tempdir(), "airfoils_test.yaml")
+    open(yaml_path, "w") do io
+        write(io, """
+        wing_airfoils:
+          headers: [airfoil_id, info_dict]
+          data:
+            - [1, {dat_file: "$foil"}]
+            - [2, {dat_file: "$foil"}]
+        """)
     end
+    fig_af = plot_airfoils(yaml_path; is_show=false)
+    @test fig_af isa Figure
+    safe_rm(yaml_path)
 end
 nothing

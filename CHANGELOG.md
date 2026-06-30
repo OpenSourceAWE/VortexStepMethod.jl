@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased
+
+### Removed
+- The `ControlPlots` plotting backend and its extension
+  `VortexStepMethodControlPlotsExt`, together with the `PythonCall`/Matplotlib
+  setup it required. Plotting is now Makie-only.
+- The plot-backend dispatch machinery: `PlotBackend`, `MakieBackend`,
+  `ControlPlotsBackend`, and `set_plot_backend!`. Plotting functions work as
+  soon as a Makie backend and `MakieControlPlots` are loaded.
+- `plot_circulation_distribution` (an exported stub that was never implemented).
+- The `examples_cp/` directory and the `menu_cp()` ControlPlots example menu.
+
+### Changed
+- The Makie extension now also loads when `MakieControlPlots` is present and uses
+  it for `plot_section_polars`. Examples load `GLMakie`/`CairoMakie` together
+  with `MakieControlPlots`.
+
 ## VortexStepMethod v3.3.6 2026-06-13
 
 ### Added

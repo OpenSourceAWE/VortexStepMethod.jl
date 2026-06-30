@@ -3,10 +3,9 @@ Pkg.activate(@__DIR__)
 
 using GLMakie
 using CairoMakie
+using MakieControlPlots
 using VortexStepMethod
 using REPL.TerminalMenus
-
-set_plot_backend!(MakieBackend())
 
 url = "https://opensourceawe.github.io/VortexStepMethod.jl/dev"
 

@@ -82,12 +82,6 @@ Then you can display a menu with the available examples using the GLMakie librar
 menu()
 ```
 
-or using the ControlPlots library (faster time-to-first-plot):
-
-```julia
-menu_cp()
-```
-
 To browse the code, it is suggested to use
 [VSCode](https://code.visualstudio.com/) with the Julia plugin.
 

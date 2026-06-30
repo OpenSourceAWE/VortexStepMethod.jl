@@ -58,7 +58,7 @@ fi
 for f in bench.jl rectangular_wing.jl V3_kite.jl \
          pyramid_model.jl ram_air_kite.jl stall_model.jl; do
     if ! grep -q "using GLMakie" "examples/$f" && \
-       ! grep -q "using ControlPlots" "examples/$f"; then
+       ! grep -q "using MakieControlPlots" "examples/$f"; then
         pass "$f is backend-agnostic"
     else
         fail "$f is backend-agnostic"

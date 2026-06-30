@@ -9,9 +9,6 @@ fi
 
 echo -e "\033[1mInstalling dependencies...\033[0m"
 julia --project=examples -e 'using Pkg; Pkg.instantiate()'
-julia --project=examples_cp -e 'using Pkg; Pkg.instantiate()'
 echo -e "\033[1mChecking examples with jetls...\033[0m"
 jetls check --root=. examples/*.jl
-echo -e "\033[1mChecking examples_cp with jetls...\033[0m"
-jetls -t 1,0 -- check --root=. examples_cp/*.jl
 echo
