@@ -7,11 +7,12 @@ speed benchmark (https://github.com/peterdsharpe/NeuralFoil): a single-case run
 and a vectorized batch of 100_000 cases, reported per model size. The
 interpolation timing evaluates the linear `Interpolations.jl` lookups that the
 VSM solver actually uses at runtime (built exactly as in `panel.jl`).
-
-Run with the test environment (it provides BenchmarkTools):
-    julia --project=test examples/neuralfoil_benchmark.jl
 """
 
+using Pkg
+if Base.active_project() != joinpath(@__DIR__, "Project.toml")
+    Pkg.activate(@__DIR__)
+end
 using VortexStepMethod
 using VortexStepMethod: load_neuralfoil_model, neuralfoil_aero, fit_kulfan_parameters,
                         prepare_inputs, nn_forward

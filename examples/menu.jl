@@ -16,6 +16,7 @@ example_files = [
     "pyramid_model.jl",
     "rectangular_wing.jl",
     "ram_air_kite.jl",
+    "obj_to_yaml_kite.jl",
     "stall_model.jl",
     "bench.jl",
     "linearize_check.jl",

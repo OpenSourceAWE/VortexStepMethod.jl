@@ -1,3 +1,7 @@
+using Pkg
+if Base.active_project() \!= joinpath(@__DIR__, "Project.toml")
+    Pkg.activate(@__DIR__)
+end
 # Delete the generated polars.
 # Useful if you want to benchmark the polar generation or if you have changed parameters.
 
