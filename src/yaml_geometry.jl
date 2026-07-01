@@ -222,7 +222,6 @@ function Wing(
     # Load YAML file following Uwe's suggestion
     data = YAML.load_file(geometry_file)
 
-    # Convert YAML data to our struct format
     # Convert wing sections
     wing_sections_data = data["wing_sections"]
     sections = WingSectionData[]
@@ -283,8 +282,7 @@ function Wing(
         end
     end
     
-    # Create Wing using the standard constructor
-    # n_unrefined_sections will be set automatically after sections are added
+    # n_unrefined_sections is set automatically as sections are added
     wing = Wing(n_panels;
         spanwise_distribution=spanwise_distribution,
         spanwise_direction=MVec3(spanwise_direction),
@@ -302,10 +300,7 @@ function Wing(
         base_dir = dirname(geometry_file)
         resolve(p) = (!isempty(p) && !isabspath(p)) ? joinpath(base_dir, p) : p
 
-        # Resolve the airfoil to a core aero model. awesIO "type" is a solver/
-        # generation concept (AirfoilAero); core only accepts resolved forms —
-        # poly coeffs, polar vector/matrix CSVs, or inviscid. Unresolved rich types
-        # (neuralfoil/breukels_regression/masure_regression) must be resolved first.
+        # Core accepts only resolved forms (poly/polars/inviscid); rich types resolve in AirfoilAero.
         airfoil_type = get(airfoil_type_map, section.airfoil_id, "")
         if haskey(airfoil_poly_map, section.airfoil_id)
             aero_data = airfoil_poly_map[section.airfoil_id]

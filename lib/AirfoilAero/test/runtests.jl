@@ -27,7 +27,7 @@ end
         @test abs(fit.TE_thickness) < 1e-10
     end
 
-    dat = joinpath(@__DIR__, "..", "..", "data", "ram_air_kite", "ram_air_kite_foil.dat")
+    dat = joinpath(@__DIR__, "data", "test_airfoil.dat")
     xr, yr = read_dat_coords(dat)
     params = fit_kulfan_parameters(xr, yr)
 
