@@ -3,6 +3,9 @@
     csv_file_path::String
     dat_file::String = ""
     cp_file_path::String = ""
+    cl_file_path::String = ""
+    cd_file_path::String = ""
+    cm_file_path::String = ""
 end
 
 @with_kw struct WingSectionData
@@ -151,6 +154,20 @@ function load_polar_data(csv_file_path::String)
 end
 
 """
+    load_matrix_polar_data(cl_path, cd_path, cm_path) -> (aero_data, POLAR_MATRICES)
+
+Read the three `(alpha × delta)` coefficient matrices (see [`read_aero_matrix`](@ref))
+and assemble the `POLAR_MATRICES` `aero_data = (alpha, delta, cl, cd, cm)`.
+"""
+function load_matrix_polar_data(cl_path::String, cd_path::String, cm_path::String)
+    cl_matrix, alpha, delta = read_aero_matrix(cl_path)
+    cd_matrix, _, _ = read_aero_matrix(cd_path)
+    cm_matrix, _, _ = read_aero_matrix(cm_path)
+    return (collect(alpha), collect(delta), cl_matrix, cd_matrix, cm_matrix),
+        POLAR_MATRICES
+end
+
+"""
     Wing(geometry_file::String; n_panels=20, spanwise_distribution=LINEAR,
          spanwise_direction=[0.0, 1.0, 0.0], remove_nan=true,
          use_prior_polar=false, billowing_percentage=0.0, prn=false)
@@ -233,19 +250,27 @@ function Wing(
             info_dict = WingAirfoilInfo(
                 csv_file_path = get(airfoil_dict["info_dict"], "csv_file_path", ""),
                 dat_file = get(airfoil_dict["info_dict"], "dat_file", ""),
-                cp_file_path = get(airfoil_dict["info_dict"], "cp_file_path", ""))
+                cp_file_path = get(airfoil_dict["info_dict"], "cp_file_path", ""),
+                cl_file_path = get(airfoil_dict["info_dict"], "cl_file_path", ""),
+                cd_file_path = get(airfoil_dict["info_dict"], "cd_file_path", ""),
+                cm_file_path = get(airfoil_dict["info_dict"], "cm_file_path", ""))
         ))
     end
 
     # Create CSV file mapping from airfoils
     airfoil_csv_map = Dict{Int64, String}()
     airfoil_cp_map = Dict{Int64, String}()
+    airfoil_matrix_map = Dict{Int64, NTuple{3, String}}()
     for airfoil in airfoils
         if !isempty(airfoil.info_dict.csv_file_path)
             airfoil_csv_map[airfoil.airfoil_id] = airfoil.info_dict.csv_file_path
         end
         if !isempty(airfoil.info_dict.cp_file_path)
             airfoil_cp_map[airfoil.airfoil_id] = airfoil.info_dict.cp_file_path
+        end
+        if !isempty(airfoil.info_dict.cl_file_path)
+            airfoil_matrix_map[airfoil.airfoil_id] = (airfoil.info_dict.cl_file_path,
+                airfoil.info_dict.cd_file_path, airfoil.info_dict.cm_file_path)
         end
     end
     
@@ -265,20 +290,21 @@ function Wing(
         le_coord = [section.LE_x, section.LE_y, section.LE_z]
         te_coord = [section.TE_x, section.TE_y, section.TE_z]
 
-        # Load polar data and create section
-        csv_file_path = get(airfoil_csv_map, section.airfoil_id, "")
-        if !isempty(csv_file_path) && !isabspath(csv_file_path)
-            # NOTE: The spanwise direction is currently restricted to [0.0, 1.0, 0.0] (the global Y axis).
-            # This is required because downstream geometry and panel generation code assumes the spanwise axis is aligned with Y.
-            # If you need to support arbitrary spanwise directions, refactor the geometry logic accordingly.
-            csv_file_path = joinpath(dirname(geometry_file), csv_file_path)
-        end
-        aero_data, aero_model = load_polar_data(csv_file_path)
+        base_dir = dirname(geometry_file)
+        resolve(p) = (!isempty(p) && !isabspath(p)) ? joinpath(base_dir, p) : p
 
-        cp_file_path = get(airfoil_cp_map, section.airfoil_id, "")
-        if !isempty(cp_file_path) && !isabspath(cp_file_path)
-            cp_file_path = joinpath(dirname(geometry_file), cp_file_path)
+        # Load polar data and create section. Matrix (alpha, delta) polars take
+        # precedence over single-alpha vector polars when both are provided.
+        if haskey(airfoil_matrix_map, section.airfoil_id)
+            cl_p, cd_p, cm_p = airfoil_matrix_map[section.airfoil_id]
+            aero_data, aero_model = load_matrix_polar_data(
+                resolve(cl_p), resolve(cd_p), resolve(cm_p))
+        else
+            csv_file_path = resolve(get(airfoil_csv_map, section.airfoil_id, ""))
+            aero_data, aero_model = load_polar_data(csv_file_path)
         end
+
+        cp_file_path = resolve(get(airfoil_cp_map, section.airfoil_id, ""))
         cp_data = isempty(cp_file_path) ? nothing : read_cp_data(cp_file_path)
 
         prn && println("Section airfoil_id $(section.airfoil_id): Using $aero_model model")

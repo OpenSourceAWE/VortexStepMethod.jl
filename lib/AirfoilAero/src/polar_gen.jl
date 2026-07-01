@@ -189,7 +189,6 @@ function create_polars(; dat_path, cl_polar_path, cd_polar_path, cm_polar_path, 
     width, crease_frac, alpha_range, delta_range, remove_nan=true
 )
     @info "Creating polars. This can take several minutes."
-    tic()
 
     cl_matrix = zeros(length(alpha_range), length(delta_range))
     cd_matrix = zeros(length(alpha_range), length(delta_range))
@@ -252,6 +251,5 @@ function create_polars(; dat_path, cl_polar_path, cd_polar_path, cm_polar_path, 
     write_aero_matrix(cl_polar_path, cl_matrix, alpha_range, delta_range, "C_l")
     write_aero_matrix(cd_polar_path, cd_matrix, alpha_range, delta_range, "C_d")
     write_aero_matrix(cm_polar_path, cm_matrix, alpha_range, delta_range, "C_m")
-        
-    toc()
+    return nothing
 end

@@ -150,6 +150,56 @@ function obj_to_yaml(obj_path::String, output_dir::String;
 end
 
 """
+    obj_to_matrix_yaml(obj_path, foil_dat, output_dir; n_sections, wind_vel,
+                       alpha_range, delta_range, crease_frac=0.2, remove_nan=true,
+                       verbose=true) -> yaml_path
+
+Convert an `.obj` wing mesh plus a single airfoil `.dat` into a standard geometry YAML
+backed by one shared XFoil `(alpha, delta)` `POLAR_MATRICES`. Section leading/trailing
+edges come from perpendicular mesh slices ([`perpendicular_sections`](@ref)); the
+airfoil's cl/cd/cm matrices are generated once with [`create_polars`](@ref) and
+referenced by every section. Load the result with `Wing(yaml_path; n_panels)`. This
+replaces the old live `ObjWing` route with convert-then-load.
+"""
+function obj_to_matrix_yaml(obj_path::String, foil_dat::String, output_dir::String;
+        n_sections::Int, wind_vel::Real, alpha_range, delta_range,
+        crease_frac=0.2, remove_nan=true, verbose=true)
+    isfile(obj_path) || error("OBJ file not found: $obj_path")
+    isfile(foil_dat) || error("DAT file not found: $foil_dat")
+    polar_dir = joinpath(output_dir, "polars")
+    airfoil_dir = joinpath(output_dir, "airfoils")
+    mkpath(polar_dir)
+    mkpath(airfoil_dir)
+
+    vertices, faces = read_faces(obj_path)
+    secs = perpendicular_sections(vertices, faces, n_sections)
+    isempty(secs) && error("No valid sections sliced from $obj_path")
+
+    mean_chord = sum(norm(s.TE_point .- s.LE_point) for s in secs) / length(secs)
+
+    cl_path = joinpath(polar_dir, "cl.csv")
+    cd_path = joinpath(polar_dir, "cd.csv")
+    cm_path = joinpath(polar_dir, "cm.csv")
+    x, y = read_dat_coordinates(foil_dat)
+    write_dat(joinpath(output_dir, "airfoils", "1.dat"), "airfoil_1", x, y)
+    create_polars(; dat_path=foil_dat, cl_polar_path=cl_path, cd_polar_path=cd_path,
+        cm_polar_path=cm_path, wind_vel=Float64(wind_vel), area=mean_chord, width=1.0,
+        crease_frac, alpha_range, delta_range, remove_nan)
+
+    section_rows = [Any[1, s.LE_point[1], s.LE_point[2], s.LE_point[3],
+                        s.TE_point[1], s.TE_point[2], s.TE_point[3]] for s in secs]
+    airfoil_rows = [Any[1, "polar_matrices", Dict(
+        "dat_file" => joinpath("airfoils", "1.dat"),
+        "cl_file_path" => joinpath("polars", "cl.csv"),
+        "cd_file_path" => joinpath("polars", "cd.csv"),
+        "cm_file_path" => joinpath("polars", "cm.csv"))]]
+    yaml_path = joinpath(output_dir, "geometry.yaml")
+    write_geometry_yaml(yaml_path, section_rows, airfoil_rows)
+    verbose && @info "Wrote $yaml_path ($(length(section_rows)) sections, POLAR_MATRICES)"
+    return yaml_path
+end
+
+"""
     write_geometry_yaml(path, section_rows, airfoil_rows)
 
 Write a geometry YAML in compact flow style: one-line headers and one line per
@@ -170,7 +220,8 @@ function write_geometry_yaml(path::String, section_rows, airfoil_rows)
         println(io, "  headers: [airfoil_id, type, info_dict]")
         println(io, "  data:")
         for (id, type, info) in airfoil_rows
-            keys_ordered = ["dat_file", "raw_dat_file", "csv_file_path"]
+            keys_ordered = ["dat_file", "raw_dat_file", "csv_file_path",
+                            "cl_file_path", "cd_file_path", "cm_file_path"]
             parts = ["$k: \"$(info[k])\"" for k in keys_ordered if haskey(info, k)]
             inline = "{" * join(parts, ", ") * "}"
             println(io, "    - [", id, ", ", type, ", ", inline, "]")
