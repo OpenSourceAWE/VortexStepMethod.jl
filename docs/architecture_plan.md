@@ -147,6 +147,26 @@ core.
 5. **Tests/examples.** Repoint `ObjWing`/generation callers to the sub-packages;
    move generator tests under each `lib/*/test`.
 
+## Align to awesIO (external standard)
+
+`github.com/awegroup/awesIO` (IEA Wind Task 48) already specifies the AWE geometry
+YAML — `aero_geometry.yaml` matches our `wing_sections`/`wing_airfoils` `headers`/
+`data` layout, and its `wing_airfoils` `type` taxonomy maps onto this architecture:
+
+| awesIO `type` | resolves to | who |
+|---|---|---|
+| `polars` (csv: α[rad],cl,cd,cm) | core `POLAR_VECTORS` | core reads |
+| `breukels_regression` (`t`, `kappa`) | core `POLY` | AirfoilAero `lei_poly_coeffs` |
+| `neuralfoil` (`dat_file_path`, `model_size`, `n_crit`, `xtr_*`) | polars csv | AirfoilAero `.dat`→polar |
+| `masure_regression` (`t,eta,kappa,delta,lambda,phi`) | future | AirfoilAero (future) |
+| `inviscid` | core `INVISCID` | core |
+
+awesIO's rich yaml = converter input; core reads the resolved (`polars`/`poly`) form
+— exactly this split. Also adds a per-section **VUP** up-vector (section orientation)
+and top-level `alpha_range`/`reynolds`. **Adopt this format** rather than a parallel
+one: add VUP to `wing_sections`, the `type` taxonomy to `wing_airfoils`, and have
+ObjAdapter emit / AirfoilAero resolve it. See memory `awesio-standard-format`.
+
 ## Open risks
 
 - **obj→yaml completeness.** `obj_to_yaml` must emit a YAML the core loader fully
