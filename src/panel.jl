@@ -135,8 +135,14 @@ function init_aero!(
         throw(ArgumentError("Both sections must have the same aero model, not $(panel.aero_model) and $aero_model_2"))
     end
     
-    if panel.aero_model == LEI_AIRFOIL_BREUKELS
-        panel.cl_coeffs, panel.cd_coeffs, panel.cm_coeffs = compute_lei_coeffs(section_1, section_2)
+    if panel.aero_model == POLY
+        c1 = section_1.aero_data
+        c2 = section_2.aero_data
+        (c1 isa NTuple{3, Vector{Float64}} && c2 isa NTuple{3, Vector{Float64}}) ||
+            throw(ArgumentError("POLY requires aero_data = (cl_coeffs, cd_coeffs, cm_coeffs)."))
+        panel.cl_coeffs = (c1[1] .+ c2[1]) ./ 2
+        panel.cd_coeffs = (c1[2] .+ c2[2]) ./ 2
+        panel.cm_coeffs = (c1[3] .+ c2[3]) ./ 2
 
     elseif panel.aero_model in (POLAR_VECTORS, POLAR_MATRICES)
         if remove_nan
@@ -289,76 +295,6 @@ function calculate_relative_alpha_and_relative_velocity(
 end
 
 """
-    compute_lei_coeffs(section_1::Section, section_2::Section)
-
-Compute lift, drag and moment coefficients for Lei airfoil using Breukels model.
-"""
-function compute_lei_coeffs(section_1::Section, section_2::Section)
-    section_1.aero_data isa NTuple{2, Float64} ||
-        throw(ArgumentError("LEI_AIRFOIL_BREUKELS requires aero_data = (tube_diameter, camber)."))
-    section_2.aero_data isa NTuple{2, Float64} ||
-        throw(ArgumentError("LEI_AIRFOIL_BREUKELS requires aero_data = (tube_diameter, camber)."))
-
-    # Average tube diameter and camber from both sections
-    t1, k1 = section_1.aero_data::NTuple{2, Float64}
-    t2, k2 = section_2.aero_data::NTuple{2, Float64}
-    t = (t1 + t2) / 2
-    k = (k1 + k2) / 2
-
-    # Lift coefficient constants
-    C = Dict(
-        20 => -0.008011, 21 => -0.000336, 22 => 0.000992,
-        23 => 0.013936, 24 => -0.003838, 25 => -0.000161,
-        26 => 0.001243, 27 => -0.009288, 28 => -0.002124,
-        29 => 0.012267, 30 => -0.002398, 31 => -0.000274,
-        32 => 0.0, 33 => 0.0, 34 => 0.0,
-        35 => -3.371000, 36 => 0.858039, 37 => 0.141600,
-        38 => 7.201140, 39 => -0.676007, 40 => 0.806629,
-        41 => 0.170454, 42 => -0.390563, 43 => 0.101966
-    )
-
-    # Compute S values
-    S = Dict{Int64,Float64}()
-    S[9] = C[20]*t^2 + C[21]*t + C[22]
-    S[10] = C[23]*t^2 + C[24]*t + C[25]
-    S[11] = C[26]*t^2 + C[27]*t + C[28]
-    S[12] = C[29]*t^2 + C[30]*t + C[31]
-    S[13] = C[32]*t^2 + C[33]*t + C[34]
-    S[14] = C[35]*t^2 + C[36]*t + C[37]
-    S[15] = C[38]*t^2 + C[39]*t + C[40]
-    S[16] = C[41]*t^2 + C[42]*t + C[43]
-
-    # Compute lambda values for cl
-    λ = [
-        S[9]*k + S[10],
-        S[11]*k + S[12],
-        S[13]*k + S[14],
-        S[15]*k + S[16]
-    ]
-
-    # Drag coefficient constants and computation
-    cd_coeffs = [
-        ((0.546094*t + 0.022247)*k^2 + 
-         (-0.071462*t - 0.006527)*k + 
-         (0.002733*t + 0.000686)),
-        0.0,
-        ((0.123685*t + 0.143755)*k + 
-         (0.495159*t^2 - 0.105362*t + 0.033468))
-    ]
-
-    # Moment coefficient constants and computation
-    cm_coeffs = [
-        ((-0.284793*t - 0.026199)*k + 
-         (-0.024060*t + 0.000559)),
-        0.0,
-        ((-1.787703*t + 0.352443)*k + 
-         (-0.839323*t + 0.137932))
-    ]
-
-    return λ, cd_coeffs, cm_coeffs
-end
-
-"""
     calculate_relative_alpha_and_velocity(panel::Panel, induced_velocity)
 
 Calculate relative angle of attack and relative velocity of the panel.
@@ -386,7 +322,7 @@ Calculate lift coefficient for given angle of attack.
 function calculate_cl(panel::Panel{Tp}, alpha::Ta) where {Tp, Ta}
     R = promote_type(Tp, Ta)
     isnan(alpha) && return R(NaN)
-    if panel.aero_model == LEI_AIRFOIL_BREUKELS
+    if panel.aero_model == POLY
         cl = evalpoly(rad2deg(alpha), reverse(panel.cl_coeffs))
         if abs(alpha) > (π/9)
             cl = 2 * cos(alpha) * sin(alpha)^2
@@ -416,7 +352,7 @@ Calculate the drag coefficient for the given angle of attack.
 function calculate_cd(panel::Panel{Tp}, alpha::Ta) where {Tp, Ta}
     R = promote_type(Tp, Ta)
     isnan(alpha) && return R(NaN)
-    if panel.aero_model == LEI_AIRFOIL_BREUKELS
+    if panel.aero_model == POLY
         if abs(alpha) > (π/9)  # Outside ±20 degrees
             return R(2 * sin(alpha)^3)
         end
@@ -443,7 +379,7 @@ Calculate the pitching-moment coefficient for the given angle of attack.
 function calculate_cm(panel::Panel{Tp}, alpha::Ta) where {Tp, Ta}
     R = promote_type(Tp, Ta)
     isnan(alpha) && return R(NaN)
-    if panel.aero_model == LEI_AIRFOIL_BREUKELS
+    if panel.aero_model == POLY
         return R(evalpoly(rad2deg(alpha), reverse(panel.cm_coeffs)))
     elseif panel.aero_model == POLAR_VECTORS
         cm_interp = panel.cm_interp

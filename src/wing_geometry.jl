@@ -1249,26 +1249,17 @@ function calculate_new_aero_data(aero_model,
         
         return (alpha_left, delta_left, CL_data, CD_data, CM_data)
 
-    elseif isequal(model_type, LEI_AIRFOIL_BREUKELS)
+    elseif isequal(model_type, POLY)
         data_left = aero_data[section_index]
         data_right = aero_data[section_index + 1]
-        (data_left isa NTuple{2, Float64}) ||
-            throw(ArgumentError("Provide LEI aero data as (tube_diameter, chamber_height)."))
-        (data_right isa NTuple{2, Float64}) ||
-            throw(ArgumentError("Provide LEI aero data as (tube_diameter, chamber_height)."))
-
-        tube_diameter_left = data_left[1]
-        tube_diameter_right = data_right[1]
-        tube_diameter_i = tube_diameter_left * left_weight + tube_diameter_right * right_weight
-        
-        chamber_height_left = data_left[2]
-        chamber_height_right = data_right[2]
-        chamber_height_i = chamber_height_left * left_weight + chamber_height_right * right_weight
-        
-        @debug "Interpolation weights" left_weight right_weight
-        @debug "Interpolated parameters" tube_diameter_i chamber_height_i
-        
-        return (tube_diameter_i, chamber_height_i)
+        (data_left isa NTuple{3, Vector{Float64}} &&
+         data_right isa NTuple{3, Vector{Float64}}) ||
+            throw(ArgumentError("POLY requires aero_data = (cl_coeffs, cd_coeffs, cm_coeffs)."))
+        return (
+            data_left[1] .* left_weight .+ data_right[1] .* right_weight,
+            data_left[2] .* left_weight .+ data_right[2] .* right_weight,
+            data_left[3] .* left_weight .+ data_right[3] .* right_weight,
+        )
     else
         throw(ArgumentError("Unsupported aero model: $(model_type)"))
     end

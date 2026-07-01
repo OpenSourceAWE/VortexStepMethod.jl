@@ -35,7 +35,7 @@ export calculate_projected_area, calculate_span
 export MVec3
 
 export LLT, Model, VSM
-export AeroModel, INVISCID, LEI_AIRFOIL_BREUKELS, POLAR_MATRICES, POLAR_VECTORS
+export AeroModel, INVISCID, POLY, LEI_AIRFOIL_BREUKELS, POLAR_MATRICES, POLAR_VECTORS
 export BILLOWING, COSINE, LINEAR, PanelDistribution, SPLIT_PROVIDED, UNCHANGED
 export ELLIPTIC, InitialGammaDistribution, ZEROS
 export FAILURE, FEASIBLE, INFEASIBLE, SolverStatus
@@ -316,24 +316,36 @@ Enumeration of the implemented wing types.
 @enum WingType  RECTANGULAR CURVED ELLIPTICAL
 
 """
-   AeroModel `LEI_AIRFOIL_BREUKELS` `POLAR_VECTORS` `POLAR_MATRICES` `INVISCID`
+   AeroModel `POLY` `POLAR_VECTORS` `POLAR_MATRICES` `INVISCID`
 
 Enumeration of the implemented aerodynamic models. See also: [AeroData](@ref)
 
 # Elements
-- `LEI_AIRFOIL_BREUKELS`: Polynom approximation for leading edge inflatable kites
+- `POLY`: α-polynomial coefficients for cl/cd/cm (e.g. Breukels LEI coeffs, generated
+  by the `AirfoilAero` package). Core only evaluates the polynomial.
 - `POLAR_VECTORS`: Polar vectors as function of alpha (lookup tables with interpolation)
 - `POLAR_MATRICES`: Polar matrices as function of alpha and delta (lookup tables with interpolation)
 - INVISCID
 
+`LEI_AIRFOIL_BREUKELS` is a deprecated alias of `POLY`.
+
 where `alpha` is the angle of attack, `delta` is trailing edge angle.
 """
 @enum AeroModel begin
-   LEI_AIRFOIL_BREUKELS
+   POLY
    POLAR_VECTORS
    POLAR_MATRICES
    INVISCID
 end
+
+"""
+    LEI_AIRFOIL_BREUKELS
+
+Deprecated alias of [`POLY`](@ref). The Breukels `(tube_diameter, camber)` → coeff
+derivation now lives in `AirfoilAero.lei_poly_coeffs`; sections carry the resulting
+`(cl_coeffs, cd_coeffs, cm_coeffs)`.
+"""
+const LEI_AIRFOIL_BREUKELS = POLY
 
 """
    PanelDistribution `LINEAR` `COSINE` `SPLIT_PROVIDED` `UNCHANGED` `BILLOWING`
@@ -395,16 +407,16 @@ abstract type AbstractWing{T} end
 """
     AeroData= Union{
         Nothing,
-        NTuple{2, Float64},
+        Tuple{Vector{Float64}, Vector{Float64}, Vector{Float64}},
         Tuple{Vector{Float64}, Vector{Float64}, Vector{Float64}, Vector{Float64}},
         Tuple{Vector{Float64}, Vector{Float64}, Matrix{Float64}, Matrix{Float64}, Matrix{Float64}}
     }
 
 Union of different definitions of the aerodynamic properties of a wing section. See also: [AeroModel](@ref)
   - nothing for INVISCID
-  - (`tube_diameter`, camber) for `LEI_AIRFOIL_BREUKELS`
+  - (`cl_coeffs`, `cd_coeffs`, `cm_coeffs`) α-polynomial coefficients for `POLY`
   - (`alpha_range`, `cl_vector`, `cd_vector`, `cm_vector`) for `POLAR_VECTORS`
-  - (`alpha_range`, `delta_range`, `cl_matrix`, `cd_matrix`, `cm_matrix`) for `POLAR_MATRICES` 
+  - (`alpha_range`, `delta_range`, `cl_matrix`, `cd_matrix`, `cm_matrix`) for `POLAR_MATRICES`
 
 where `alpha` is the angle of attack [rad], `delta` is trailing edge angle [rad], `cl` the lift coefficient,
 `cd` the drag coefficient and `cm` the pitching moment coefficient. The camber of a kite refers to 
@@ -414,7 +426,7 @@ and the chord line of the airfoil.
 """
 const AeroData = Union{
         Nothing,
-        NTuple{2, Float64},
+        Tuple{Vector{Float64}, Vector{Float64}, Vector{Float64}},
         Tuple{Vector{Float64}, Vector{Float64}, Vector{Float64}, Vector{Float64}},
         Tuple{Vector{Float64}, Vector{Float64}, Matrix{Float64}, Matrix{Float64}, Matrix{Float64}}
     }
