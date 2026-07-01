@@ -8,17 +8,19 @@ Represents a wing section with leading edge, trailing edge, and aerodynamic prop
 - `TE_point::MVector{3, T}`: Trailing edge point coordinates
 - `aero_model::AeroModel`: [AeroModel](@ref)
 - `aero_data::AeroData`: See: [AeroData](@ref)
+- `cp_data::Union{Nothing, CpData}`: optional surface-pressure table, see [CpData](@ref)
 """
 mutable struct Section{T}
     LE_point::MVector{3, T}
     TE_point::MVector{3, T}
     aero_model::AeroModel
     aero_data::AeroData
+    cp_data::Union{Nothing, CpData}
 end
 
 Section{T}(; LE_point=zeros(MVector{3, T}), TE_point=zeros(MVector{3, T}),
-           aero_model=INVISCID, aero_data=nothing) where {T} =
-    Section{T}(LE_point, TE_point, aero_model, aero_data)
+           aero_model=INVISCID, aero_data=nothing, cp_data=nothing) where {T} =
+    Section{T}(LE_point, TE_point, aero_model, aero_data, cp_data)
 
 Section() = Section{Float64}()
 
@@ -37,11 +39,13 @@ and aerodynamic model.
 - `Section`: A new section with the specified parameters and no aerodynamic data
 """
 function Section(LE_point, TE_point, aero_model)
-    return Section{Float64}(MVector{3,Float64}(LE_point), MVector{3,Float64}(TE_point), aero_model, nothing)
+    return Section{Float64}(MVector{3,Float64}(LE_point), MVector{3,Float64}(TE_point),
+                            aero_model, nothing, nothing)
 end
 
-function Section(LE_point, TE_point, aero_model, aero_data)
-    return Section{Float64}(MVector{3,Float64}(LE_point), MVector{3,Float64}(TE_point), aero_model, aero_data)
+function Section(LE_point, TE_point, aero_model, aero_data, cp_data=nothing)
+    return Section{Float64}(MVector{3,Float64}(LE_point), MVector{3,Float64}(TE_point),
+                            aero_model, aero_data, cp_data)
 end
 
 """
@@ -51,7 +55,8 @@ Function to update a [Section](@ref) in place.
 """
 @inline _section_sort_key(s::Section) = s.LE_point[2]
 
-function reinit!(section::Section, LE_point, TE_point, aero_model=nothing, aero_data=nothing)
+function reinit!(section::Section, LE_point, TE_point, aero_model=nothing,
+                aero_data=nothing, cp_data=nothing)
     section.LE_point .= LE_point
     section.TE_point .= TE_point
     (!isnothing(aero_model)) && (section.aero_model = aero_model)
@@ -64,6 +69,7 @@ function reinit!(section::Section, LE_point, TE_point, aero_model=nothing, aero_
             section.aero_data .= aero_data
         end
     end
+    (!isnothing(cp_data)) && (section.cp_data = cp_data)
     nothing
 end
 
@@ -74,7 +80,29 @@ function reinit!(refined_section::Section{Tr}, section::Section) where {Tr}
         section.TE_point,
         section.aero_model,
         section.aero_data,
+        section.cp_data,
     )
+end
+
+"""
+    validate_cp_sections(sections)
+
+Enforce the all-or-none Cp rule and a uniform chord resolution: either every section
+in `sections` carries [`CpData`](@ref) or none does, and all present tables share the
+same `chord_x` slices. Throws `ArgumentError` on a violation.
+"""
+function validate_cp_sections(sections)
+    have = [!isnothing(s.cp_data) for s in sections]
+    all(have) || !any(have) || throw(ArgumentError(
+        "Cp data must be present on all sections or none " *
+        "(found $(count(have))/$(length(have)))."))
+    any(have) || return nothing
+    reference = sections[findfirst(have)].cp_data.chord_x
+    for s in sections
+        s.cp_data.chord_x == reference ||
+            throw(ArgumentError("All sections must share the same Cp chord_x slices."))
+    end
+    return nothing
 end
 
 """
@@ -673,8 +701,8 @@ end
     throw(ArgumentError("POLAR_MATRICES requires aero_data = (alpha, delta, cl, cd, cm)."))
 
 """
-    add_section!(wing::Wing, LE_point::PosVector, TE_point::PosVector, 
-                 aero_model, aero_data::AeroData=nothing)
+    add_section!(wing::Wing, LE_point::PosVector, TE_point::PosVector,
+                 aero_model, aero_data::AeroData=nothing, cp_data=nothing)
 
 Add a new section to the wing.
 
@@ -683,16 +711,19 @@ Add a new section to the wing.
 - LE_point::PosVector: [PosVector](@ref) of the point on the side of the leading edge
 - TE_point::PosVector: [PosVector](@ref) of the point on the side of the trailing edge
 - `aero_model`::AeroModel: [AeroModel](@ref)
-- `aero_data`::AeroData: See [AeroData](@ref)  
+- `aero_data`::AeroData: See [AeroData](@ref)
+- `cp_data`::Union{Nothing, CpData}: optional surface-pressure table, see [CpData](@ref)
 """
-function add_section!(wing::Wing{P, T}, LE_point,
-                     TE_point, aero_model::AeroModel, aero_data::AeroData=nothing) where {P, T}
+function add_section!(wing::Wing{P, T}, LE_point, TE_point, aero_model::AeroModel,
+                     aero_data::AeroData=nothing,
+                     cp_data::Union{Nothing, CpData}=nothing) where {P, T}
     if aero_model == POLAR_VECTORS && wing.remove_nan
         aero_data = remove_vector_nans(aero_data)
     elseif aero_model == POLAR_MATRICES && wing.remove_nan
         interpolate_polar_matrix_nans!(aero_data)
     end
-    push!(wing.unrefined_sections, Section{T}(MVector{3,T}(LE_point), MVector{3,T}(TE_point), aero_model, aero_data))
+    push!(wing.unrefined_sections, Section{T}(MVector{3,T}(LE_point),
+        MVector{3,T}(TE_point), aero_model, aero_data, cp_data))
     wing.n_unrefined_sections = Int16(length(wing.unrefined_sections))
     return nothing
 end
@@ -1095,6 +1126,31 @@ function compute_refined_section_interpolation!(wing::AbstractWing{T}) where {T}
     wing.refined_section_left_idx[n_sections] = Int16(n_unref - 1)
     wing.refined_section_weight[n_sections] = zero(T)
 
+    interpolate_cp_to_refined!(wing)
+    return nothing
+end
+
+"""
+    interpolate_cp_to_refined!(wing)
+
+Set each refined section's [`CpData`](@ref) by spanwise-interpolating the unrefined
+sections' Cp tables using the refined→unrefined mapping (`refined_section_left_idx`,
+`refined_section_weight`). No-op when the unrefined sections carry no Cp.
+"""
+function interpolate_cp_to_refined!(wing::AbstractWing)
+    unref = wing.unrefined_sections
+    all(s -> isnothing(s.cp_data), unref) && return nothing
+    for i in eachindex(wing.refined_sections)
+        left = Int(wing.refined_section_left_idx[i])
+        weight = Float64(wing.refined_section_weight[i])
+        cp_l = unref[left].cp_data
+        cp_r = unref[left + 1].cp_data
+        (isnothing(cp_l) || isnothing(cp_r)) && continue
+        cp_up = weight .* cp_l.cp_upper .+ (1 - weight) .* cp_r.cp_upper
+        cp_low = weight .* cp_l.cp_lower .+ (1 - weight) .* cp_r.cp_lower
+        wing.refined_sections[i].cp_data = CpData(cp_l.n_chord, cp_l.chord_x,
+            cp_l.alpha_range, cp_l.delta_range, cp_up, cp_low)
+    end
     return nothing
 end
 

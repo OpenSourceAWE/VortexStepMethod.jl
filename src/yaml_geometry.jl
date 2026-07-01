@@ -2,6 +2,7 @@
 @with_kw struct WingAirfoilInfo
     csv_file_path::String
     dat_file::String = ""
+    cp_file_path::String = ""
 end
 
 @with_kw struct WingSectionData
@@ -231,15 +232,20 @@ function Wing(
             type = airfoil_dict["type"],
             info_dict = WingAirfoilInfo(
                 csv_file_path = get(airfoil_dict["info_dict"], "csv_file_path", ""),
-                dat_file = get(airfoil_dict["info_dict"], "dat_file", ""))
+                dat_file = get(airfoil_dict["info_dict"], "dat_file", ""),
+                cp_file_path = get(airfoil_dict["info_dict"], "cp_file_path", ""))
         ))
     end
-    
+
     # Create CSV file mapping from airfoils
     airfoil_csv_map = Dict{Int64, String}()
+    airfoil_cp_map = Dict{Int64, String}()
     for airfoil in airfoils
         if !isempty(airfoil.info_dict.csv_file_path)
             airfoil_csv_map[airfoil.airfoil_id] = airfoil.info_dict.csv_file_path
+        end
+        if !isempty(airfoil.info_dict.cp_file_path)
+            airfoil_cp_map[airfoil.airfoil_id] = airfoil.info_dict.cp_file_path
         end
     end
     
@@ -269,9 +275,15 @@ function Wing(
         end
         aero_data, aero_model = load_polar_data(csv_file_path)
 
+        cp_file_path = get(airfoil_cp_map, section.airfoil_id, "")
+        if !isempty(cp_file_path) && !isabspath(cp_file_path)
+            cp_file_path = joinpath(dirname(geometry_file), cp_file_path)
+        end
+        cp_data = isempty(cp_file_path) ? nothing : read_cp_data(cp_file_path)
+
         prn && println("Section airfoil_id $(section.airfoil_id): Using $aero_model model")
 
-        add_section!(wing, le_coord, te_coord, aero_model, aero_data)
+        add_section!(wing, le_coord, te_coord, aero_model, aero_data, cp_data)
     end
 
     refine!(wing; sort_sections)
@@ -345,16 +357,10 @@ function Wing(settings::VSMSettings; sort_sections::Bool=true)
             sort_sections
         )
     elseif has_obj && has_dat
-        # Use ObjWing constructor (ObjWing doesn't sort sections internally)
-        ObjWing(
-            wing_settings.obj_file,
-            wing_settings.dat_file;
-            n_panels=wing_settings.n_panels,
-            spanwise_distribution=wing_settings.spanwise_panel_distribution,
-            spanwise_direction=wing_settings.spanwise_direction,
-            remove_nan=wing_settings.remove_nan,
-            use_prior_polar=wing_settings.use_prior_polar
-        )
+        throw(ArgumentError(
+            "OBJ/DAT geometry is handled by the ObjAdapter package: convert to a " *
+            "standard YAML with ObjAdapter first, then load it via geometry_file."
+        ))
     else
         throw(ArgumentError(
             "WingSettings must specify either geometry_file or " *

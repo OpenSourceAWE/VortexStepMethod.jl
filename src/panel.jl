@@ -28,6 +28,7 @@ Represents a panel in a vortex step method simulation. All points and vectors ar
 - cl_interp::Union{Nothing, I1, I2} = nothing
 - cd_interp::Union{Nothing, I1, I2} = nothing
 - cm_interp::Union{Nothing, I1, I2} = nothing
+- cp_polar::Union{Nothing, CpPolar{I6}} = nothing: optional surface-pressure table, see [CpPolar](@ref)
 - `control_point`::Vector{MVec3}: Panel control point
 - `bound_point_1`::Vector{MVec3}: First bound point
 - `bound_point_2`::Vector{MVec3}: Second bound point
@@ -58,6 +59,7 @@ Represents a panel in a vortex step method simulation. All points and vectors ar
     cl_interp::Union{Nothing, I1, I2, I3, I4} = nothing
     cd_interp::Union{Nothing, I1, I2, I3, I4, I5, I6} = nothing
     cm_interp::Union{Nothing, I1, I2, I3, I4} = nothing
+    cp_polar::Union{Nothing, CpPolar{I6}} = nothing
     aero_center::MVector{3, T} = zeros(MVector{3, T})
     control_point::MVector{3, T} = zeros(MVector{3, T})
     bound_point_1::MVector{3, T} = zeros(MVector{3, T})
@@ -221,6 +223,17 @@ function init_aero!(
 
     elseif !(panel.aero_model == INVISCID)
         throw(ArgumentError("Unsupported aero model: $(panel.aero_model)"))
+    end
+
+    if section_1.cp_data !== nothing
+        cp_1 = section_1.cp_data
+        cp_2 = section_2.cp_data
+        cp_up = (cp_1.cp_upper .+ cp_2.cp_upper) ./ 2
+        cp_low = (cp_1.cp_lower .+ cp_2.cp_lower) ./ 2
+        panel.cp_polar = CpPolar(CpData(cp_1.n_chord, cp_1.chord_x,
+            cp_1.alpha_range, cp_1.delta_range, cp_up, cp_low))
+    else
+        panel.cp_polar = nothing
     end
 end
 

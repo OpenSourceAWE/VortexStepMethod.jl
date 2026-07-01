@@ -11,7 +11,7 @@ evaluate airfoil aerodynamics from Kulfan CST parameters.
 using NPZ
 
 # Path to NeuralFoil weights (relative to this package)
-const NEURALFOIL_WEIGHTS_DIR = joinpath(@__DIR__, "..", "data", "neuralfoil_weights")
+const NEURALFOIL_WEIGHTS_DIR = joinpath(@__DIR__, "..", "data")
 
 # Global cache for loaded weights
 const _NN_CACHE = Dict{String, Any}()
@@ -252,22 +252,36 @@ Flip outputs back after evaluating with flipped inputs.
 """
 function flip_outputs(y::AbstractMatrix{T}) where T
     y_flip = copy(y)
+    N = (size(y, 1) - 6) ÷ 6
 
-    # CL (index 2) flips sign
+    # CL (row 2) and CM (row 4) flip sign
     y_flip[2, :] .= -y[2, :]
-
-    # CM (index 4) flips sign
     y_flip[4, :] .= -y[4, :]
 
-    # Transition locations swap (indices 5, 6)
+    # Transition locations swap (rows 5, 6)
     y_flip[5, :] .= y[6, :]
     y_flip[6, :] .= y[5, :]
 
-    # Boundary layer data swaps (we don't use these for polars)
-    # Indices 7:198 contain BL data that would need swapping
-    # For simplicity, we skip this as we only need CL, CD, CM
+    if N > 0
+        # Swap upper/lower theta+H blocks (rows 7:6+2N ↔ 7+3N:6+5N)
+        y_flip[7:(6+2N), :] .= y[(7+3N):(6+5N), :]
+        y_flip[(7+3N):(6+5N), :] .= y[7:(6+2N), :]
+        # Swap upper/lower ue/vinf blocks with sign flip (velocity mirrors)
+        y_flip[(7+2N):(6+3N), :] .= -1 .* y[(7+5N):(6+6N), :]
+        y_flip[(7+5N):(6+6N), :] .= -1 .* y[(7+2N):(6+3N), :]
+    end
 
     return y_flip
+end
+
+"""
+    compute_optimal_x_points(n) -> Vector{Float64}
+
+NeuralFoil's boundary-layer station x/c: midpoints of a uniform [0,1] grid.
+"""
+function compute_optimal_x_points(n)
+    s = range(0, 1, n + 1)
+    return [(s[i] + s[i+1]) / 2 for i in 1:n]
 end
 
 """
@@ -307,48 +321,70 @@ Compute aerodynamic coefficients using NeuralFoil.
 function neuralfoil_aero(params::KulfanParameters, alpha, Re;
                          model_size::String="xlarge", weights_dir=nothing,
                          n_crit=9.0, xtr_upper=1.0, xtr_lower=1.0)
-    # Load model
-    model = load_neuralfoil_model(model_size; weights_dir)
-
-    # Prepare inputs
-    x = prepare_inputs(params, alpha, Re; n_crit, xtr_upper, xtr_lower)
-    n_cases = size(x, 2)
-
-    # Forward pass
-    y = nn_forward(x, model)
-
-    # Compute Mahalanobis penalty for confidence
-    mahal_dist = squared_mahalanobis_distance(x, model)
-    mahal_penalty = mahal_dist ./ (2 * model.n_inputs)
-
-    # Apply penalty to confidence logit (first output)
-    y[1, :] .-= mahal_penalty
-
-    # Flip inputs, evaluate, flip outputs back (symmetry embedding)
-    x_flip = flip_inputs(x)
-    y_flip = nn_forward(x_flip, model)
-
-    mahal_dist_flip = squared_mahalanobis_distance(x_flip, model)
-    y_flip[1, :] .-= mahal_dist_flip ./ (2 * model.n_inputs)
-
-    y_unflip = flip_outputs(y_flip)
-
-    # Average outputs for symmetry
-    y_fused = (y .+ y_unflip) ./ 2
-
-    # Post-process outputs
-    analysis_confidence = sigmoid.(y_fused[1, :])
-    CL = y_fused[2, :] ./ 2
-    CD = exp.((y_fused[3, :] .- 2) .* 2)
-    CM = y_fused[4, :] ./ 20
-
-    # Clamp drag to reasonable values
-    CD = clamp.(CD, 0.0, 1.0)
+    y = neuralfoil_fused_output(params, alpha, Re; model_size, weights_dir,
+                                n_crit, xtr_upper, xtr_lower)
+    analysis_confidence = sigmoid.(y[1, :])
+    CL = y[2, :] ./ 2
+    CD = clamp.(exp.((y[3, :] .- 2) .* 2), 0.0, 1.0)
+    CM = y[4, :] ./ 20
 
     alpha_vec = alpha isa Number ? [Float64(alpha)] : Float64.(collect(alpha))
 
     return NeuralFoilResult(alpha_vec, Vector{Float64}(CL), Vector{Float64}(CD),
                            Vector{Float64}(CM), Vector{Float64}(analysis_confidence))
+end
+
+"""
+    neuralfoil_fused_output(params, alpha, Re; model_size, weights_dir,
+                            n_crit, xtr_upper, xtr_lower) -> Matrix
+
+Forward pass with the symmetry embedding: evaluate the network, evaluate the
+top/bottom-flipped case, flip its outputs back, and average. Returns the fused
+output matrix (`n_outputs × n_cases`), with the Mahalanobis penalty already
+applied to the confidence logit (row 1).
+"""
+function neuralfoil_fused_output(params::KulfanParameters, alpha, Re;
+                                 model_size::String="xlarge", weights_dir=nothing,
+                                 n_crit=9.0, xtr_upper=1.0, xtr_lower=1.0)
+    model = load_neuralfoil_model(model_size; weights_dir)
+    x = prepare_inputs(params, alpha, Re; n_crit, xtr_upper, xtr_lower)
+    y = nn_forward(x, model)
+    y[1, :] .-= squared_mahalanobis_distance(x, model) ./ (2 * model.n_inputs)
+
+    x_flip = flip_inputs(x)
+    y_flip = nn_forward(x_flip, model)
+    y_flip[1, :] .-= squared_mahalanobis_distance(x_flip, model) ./ (2 * model.n_inputs)
+
+    return (y .+ flip_outputs(y_flip)) ./ 2
+end
+
+"""
+    neuralfoil_section(params, alpha, Re; kwargs...) -> NamedTuple
+
+Full NeuralFoil evaluation returning integrated coefficients and the surface
+pressure distribution reconstructed from the predicted edge-velocity ratios
+(`Cp = 1 - (ue/vinf)^2`) at NeuralFoil's `N` fixed station x/c.
+
+Returns `(; alpha, cl, cd, cm, confidence, x, cp_upper, cp_lower)`, with `x` of
+length `N` and `cp_upper`/`cp_lower` sized `N × n_alpha`.
+"""
+function neuralfoil_section(params::KulfanParameters, alpha, Re;
+                            model_size::String="large", weights_dir=nothing,
+                            n_crit=9.0, xtr_upper=1.0, xtr_lower=1.0)
+    y = neuralfoil_fused_output(params, alpha, Re; model_size, weights_dir,
+                                n_crit, xtr_upper, xtr_lower)
+    N = (size(y, 1) - 6) ÷ 6
+    upper_ue = y[(7 + 2N):(6 + 3N), :]
+    lower_ue = y[(7 + 5N):(6 + 6N), :]
+    alpha_vec = alpha isa Number ? [Float64(alpha)] : Float64.(collect(alpha))
+    return (; alpha = alpha_vec,
+            cl = Vector{Float64}(y[2, :] ./ 2),
+            cd = Vector{Float64}(clamp.(exp.((y[3, :] .- 2) .* 2), 0.0, 1.0)),
+            cm = Vector{Float64}(y[4, :] ./ 20),
+            confidence = Vector{Float64}(sigmoid.(y[1, :])),
+            x = compute_optimal_x_points(N),
+            cp_upper = Matrix{Float64}(1 .- upper_ue .^ 2),
+            cp_lower = Matrix{Float64}(1 .- lower_ue .^ 2))
 end
 
 """

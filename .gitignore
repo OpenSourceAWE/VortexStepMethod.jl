@@ -40,3 +40,7 @@ output/
 output_cairo/
 .CondaPkg/
 LocalPreferences.toml
+
+# Pipeline-generated polars/dat/cp (regenerate via AirfoilAero/ObjAdapter)
+data/**/polars_neuralfoil/
+data/**/polars_CFD_NF_combined/

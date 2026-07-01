@@ -18,9 +18,21 @@ EnvelopeFit
 
 ## Surface-pressure (Cp) tables
 ```@docs
+AbstractAirfoilSolver
+XFoilSolver
+NeuralFoilSolver
+SectionSolution
+DeformedSection
+deform_section
+analyze_section
+analyze_sweep
+CpData
 CpPolar
 generate_cp_polar
+read_cp_data
+write_cp_data
 cp_distribution
+delta_cp
 ```
 
 ## Setting the inflow conditions and solving

@@ -247,6 +247,7 @@ function reinit!(body_aero::BodyAerodynamics{P, W, T};
     vec = zeros(MVector{3, T})
     for wing in body_aero.wings
         reinit!(wing)
+        validate_cp_sections(wing.refined_sections)
         panel_props = wing.panel_props
         wing_init_aero = init_aero && !_can_skip_panel_aero_reinit(wing, body_aero.panels, idx)
         

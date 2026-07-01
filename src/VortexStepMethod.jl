@@ -23,12 +23,10 @@ using DifferentiationInterface
 using ForwardDiff
 import YAML
 using StructMapping
-using Xfoil
-using NPZ
 
 # Export public interface
 export SolverSettings, VSMSettings, WingSettings
-export ObjWing, Section, Wing, refine!, reinit!
+export Section, Wing, refine!, reinit!
 export BodyAerodynamics
 export Solver, VSMSolution, linearize, solve, solve!, solve_base!, calc_forces!
 export calculate_results
@@ -44,14 +42,9 @@ export FAILURE, FEASIBLE, INFEASIBLE, SolverStatus
 export LOOP, NONLIN, SolverType
 export load_polar_data
 
-# NeuralFoil exports
-export KulfanParameters, KulfanFitMethod, LeastSquaresFit, EnvelopeFit,
-    fit_kulfan_parameters, kulfan_to_coordinates
-export NeuralFoilModel, NeuralFoilResult, load_neuralfoil_model, neuralfoil_aero
-export slice_obj_wing, slice_obj_at_positions
-export generate_neuralfoil_polars, generate_polar_from_coordinates, generate_polar_from_dat
-export obj_to_yaml
-export CpPolar, generate_cp_polar, cp_distribution
+# Surface-pressure (Cp) table types + IO (generation lives in AirfoilAero)
+export CpData, CpPolar, cp_distribution, delta_cp
+export read_cp_data, write_cp_data
 
 export plot_airfoil_slices, plot_airfoils, plot_circulation_distribution,
     plot_combined_analysis, plot_distribution, plot_geometry, plot_polar_data,
@@ -489,22 +482,15 @@ end
 
 # Include core functionality
 include("settings.jl")
+include("cp_types.jl")
 include("wing_geometry.jl")
 include("polars.jl")
-include("obj_geometry.jl")
 include("yaml_geometry.jl")
 include("filament.jl")
 include("panel.jl")
 include("body_aerodynamics.jl")
 include("wake.jl")
 include("solver.jl")
-
-# NeuralFoil integration
-include("kulfan.jl")
-include("neuralfoil.jl")
-include("obj_slice.jl")
-include("polar_generation.jl")
-include("obj_to_yaml.jl")
 include("cp_polars.jl")
 
 include("plotting_helpers.jl")

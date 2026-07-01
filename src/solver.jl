@@ -49,6 +49,9 @@ Struct for storing the solution of the [solve!](@ref) function. Must contain all
     cl_dist::Vector{T} = zeros(T, P)
     cd_dist::Vector{T} = zeros(T, P)
     cm_dist::Vector{T} = zeros(T, P)
+    cp_chord_x::Vector{T} = T[]
+    cp_upper_dist::Matrix{T} = zeros(T, 0, P)
+    cp_lower_dist::Matrix{T} = zeros(T, 0, P)
     lift_dist::Vector{T} = zeros(T, P)
     drag_dist::Vector{T} = zeros(T, P)
     panel_moment_dist::Vector{T} = zeros(T, P)
@@ -243,6 +246,41 @@ function solve!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics, gamma_dist
 end
 
 """
+    prepare_cp_output!(sol::VSMSolution, panels)
+
+Size and reset the surface-pressure output of `sol` for the current `panels`. When any
+panel carries a `cp_polar`, allocate `n_chord × n_panels` matrices filled with `NaN`
+and copy the chord slices; otherwise leave the Cp output empty.
+"""
+function prepare_cp_output!(sol::VSMSolution{P, U, T}, panels) where {P, U, T}
+    idx = findfirst(p -> p.cp_polar !== nothing, panels)
+    if idx === nothing
+        isempty(sol.cp_chord_x) || (sol.cp_chord_x = T[])
+        size(sol.cp_upper_dist, 1) == 0 ||
+            (sol.cp_upper_dist = zeros(T, 0, P); sol.cp_lower_dist = zeros(T, 0, P))
+        return nothing
+    end
+    n_chord = panels[idx].cp_polar.data.n_chord
+    if size(sol.cp_upper_dist) != (n_chord, P)
+        sol.cp_upper_dist = fill(T(NaN), n_chord, P)
+        sol.cp_lower_dist = fill(T(NaN), n_chord, P)
+    else
+        fill!(sol.cp_upper_dist, T(NaN))
+        fill!(sol.cp_lower_dist, T(NaN))
+    end
+    sol.cp_chord_x = T.(panels[idx].cp_polar.data.chord_x)
+    return nothing
+end
+
+"""
+    delta_cp(sol::VSMSolution) -> Matrix
+
+Chordwise load `ΔCp = Cp_lower - Cp_upper` per chord slice (rows) and panel (columns)
+from the last [`solve!`](@ref). Empty when the wing carried no Cp table.
+"""
+delta_cp(sol::VSMSolution) = sol.cp_lower_dist .- sol.cp_upper_dist
+
+"""
     calc_forces!(solver::Solver, body_aero::BodyAerodynamics;
                  reference_point=solver.reference_point, moment_frac=0.1)
 
@@ -272,11 +310,18 @@ function calc_forces!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics;
     density = solver.density
     aerodynamic_model_type = solver.aerodynamic_model_type
 
+    prepare_cp_output!(solver.sol, panels)
+
     # Calculate coefficients for each panel
     for (i, panel) in enumerate(panels)                                               # zero bytes
         cl_dist[i] = calculate_cl(panel, alpha_dist[i])
         cd_dist[i], cm_dist[i] = calculate_cd_cm(panel, alpha_dist[i])
         width_dist[i] = panel.width
+        if panel.cp_polar !== nothing
+            up, low = cp_distribution(panel.cp_polar, alpha_dist[i], panel.delta)
+            solver.sol.cp_upper_dist[:, i] .= up
+            solver.sol.cp_lower_dist[:, i] .= low
+        end
 
         # Geometric AoA using panel-local axes and prescribed
         # freestream — scalar ops to avoid allocations
@@ -1024,6 +1069,7 @@ function _section_with_eltype(section::Section, ::Type{TD}) where TD
         MVector{3, TD}(section.TE_point),
         section.aero_model,
         section.aero_data,
+        section.cp_data,
     )
 end
 
