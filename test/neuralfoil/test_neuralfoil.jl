@@ -1,6 +1,6 @@
 using Test
-using VortexStepMethod
-using VortexStepMethod: KulfanParameters, LeastSquaresFit, EnvelopeFit,
+using AirfoilAero
+using AirfoilAero: KulfanParameters, LeastSquaresFit, EnvelopeFit,
                        fit_kulfan_parameters, kulfan_to_coordinates, neuralfoil_aero,
                        class_function, bernstein_basis, leading_edge_basis,
                        normalize_airfoil

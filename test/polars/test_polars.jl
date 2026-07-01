@@ -1,4 +1,5 @@
 using VortexStepMethod
+using AirfoilAero
 using Test
 using DelimitedFiles
 
@@ -18,7 +19,7 @@ using DelimitedFiles
     alpha_range = deg2rad.(-2:1:2)
     delta_range = deg2rad.(-1:1:1)
 
-    VortexStepMethod.create_polars(;
+    AirfoilAero.create_polars(;
         dat_path=foil_path,
         cl_polar_path=cl_path,
         cd_polar_path=cd_path,
