@@ -9,10 +9,18 @@ calculate_span
 calculate_projected_area
 load_polar_data
 obj_to_yaml
+perpendicular_sections
 fit_kulfan_parameters
 KulfanFitMethod
 LeastSquaresFit
 EnvelopeFit
+```
+
+## Surface-pressure (Cp) tables
+```@docs
+CpPolar
+generate_cp_polar
+cp_distribution
 ```
 
 ## Setting the inflow conditions and solving
