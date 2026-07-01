@@ -6,11 +6,13 @@ using Statistics
 using Interpolations
 using NPZ
 using Xfoil
+using Printf: @sprintf
 using VortexStepMethod: CpData, CpPolar, interpolate_matrix_nans!, write_aero_matrix
 
 include("kulfan.jl")
 include("neuralfoil.jl")
 include("poly.jl")
+include("airfoil_io.jl")
 include("polar_gen.jl")
 include("airfoil_solvers/common.jl")
 include("airfoil_solvers/xfoil_solver.jl")
@@ -25,5 +27,7 @@ export AbstractAirfoilSolver, XFoilSolver, NeuralFoilSolver
 export SectionSolution, DeformedSection, deform_section, analyze_section, analyze_sweep
 export create_polars, generate_cp_polar, lei_poly_coeffs
 export turn_trailing_edge!, get_lower_upper
+export read_dat_coordinates, write_dat, write_polar_csv
+export generate_polar_from_coordinates, generate_polar_from_dat
 
 end

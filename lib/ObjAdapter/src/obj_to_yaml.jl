@@ -5,30 +5,6 @@ geometry YAML referencing them. After conversion everything follows the standard
 `Wing(geometry_file)` path.
 """
 
-using Printf: @sprintf
-
-"""
-    read_dat_coordinates(path) -> (x, y)
-
-Read airfoil coordinates from a `.dat` file, skipping header and comment lines.
-"""
-function read_dat_coordinates(path::String)
-    x = Float64[]
-    y = Float64[]
-    for line in eachline(path)
-        s = strip(line)
-        (isempty(s) || !(isdigit(s[1]) || s[1] == '-' || s[1] == '.')) && continue
-        parts = split(s)
-        length(parts) >= 2 || continue
-        xp = tryparse(Float64, parts[1])
-        yp = tryparse(Float64, parts[2])
-        (xp === nothing || yp === nothing) && continue
-        push!(x, xp)
-        push!(y, yp)
-    end
-    return x, y
-end
-
 """
     airfoils_from_yaml(geometry_file) -> Vector of (; id, x, y, x_raw, y_raw)
 
@@ -57,21 +33,6 @@ function airfoils_from_yaml(geometry_file::String)
         push!(out, (id=Int(d["airfoil_id"]), x=x, y=y, x_raw=x_raw, y_raw=y_raw))
     end
     return out
-end
-
-"""
-    write_dat(filepath, name, x, y)
-
-Write airfoil coordinates to a Selig-format `.dat` file.
-"""
-function write_dat(filepath::String, name::String, x::Vector, y::Vector)
-    open(filepath, "w") do io
-        println(io, name)
-        for i in eachindex(x)
-            println(io, @sprintf("%.8f %.8f", x[i], y[i]))
-        end
-    end
-    return filepath
 end
 
 """
@@ -166,11 +127,11 @@ function obj_to_yaml(obj_path::String, output_dir::String;
         dat_rel = joinpath("airfoils", "$j.dat")
         raw_rel = joinpath("airfoils", "$(j)_raw.dat")
         csv_rel = joinpath("polars", "$j.csv")
-        write_dat(joinpath(output_dir, dat_rel), "section_$j", s.x_fit, s.y_fit)
+        dat_abs = joinpath(output_dir, dat_rel)
+        write_dat(dat_abs, "section_$j", s.x_fit, s.y_fit)
         write_dat(joinpath(output_dir, raw_rel), "section_$(j)_raw", s.xa, s.ya)
-        result = neuralfoil_aero(s.params, alphas, Float64(Re);
-                                 model_size, weights_dir, n_crit)
-        write_polar_csv(joinpath(output_dir, csv_rel), result)
+        result = generate_polar_from_dat(dat_abs, joinpath(output_dir, csv_rel);
+            Re=Float64(Re), alpha_range=alphas, model_size, weights_dir, n_crit)
         push!(airfoil_rows, Any[j, "polar_vectors",
                                 Dict("dat_file" => dat_rel, "raw_dat_file" => raw_rel,
                                      "csv_file_path" => csv_rel)])

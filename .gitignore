@@ -44,3 +44,6 @@ LocalPreferences.toml
 # Pipeline-generated polars/dat/cp (regenerate via AirfoilAero/ObjAdapter)
 data/**/polars_neuralfoil/
 data/**/polars_CFD_NF_combined/
+
+# Sub-package manifests (env-specific)
+lib/**/Manifest.toml
