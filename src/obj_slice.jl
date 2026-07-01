@@ -315,6 +315,137 @@ function reorder_airfoil_selig(x::Vector{T}, y::Vector{T}) where T
 end
 
 """
+    slice_mesh_at_plane(vertices, faces, point, normal; tol=1e-6)
+
+Slice a mesh with the plane through `point` with unit `normal`, returning the 3D
+segments `(p1, p2)` where the surface crosses it. The plane may have any
+orientation, so the cut can follow a curved or swept span.
+"""
+function slice_mesh_at_plane(vertices, faces, point, normal; tol=1e-6)
+    n = normalize(normal)
+    p0 = Float64.(point)
+    segments = Tuple{Vector{Float64}, Vector{Float64}}[]
+    for face in faces
+        v1, v2, v3 = vertices[face[1]], vertices[face[2]], vertices[face[3]]
+        pts = Vector{Float64}[]
+        for (va, vb) in ((v1, v2), (v2, v3), (v3, v1))
+            da = dot(va - p0, n)
+            db = dot(vb - p0, n)
+            if da * db < 0
+                t = da / (da - db)
+                push!(pts, va .+ t .* (vb .- va))
+            elseif abs(da) < tol
+                push!(pts, Float64.(va))
+            end
+        end
+        unique_pts = Vector{Float64}[]
+        for p in pts
+            any(norm(p - q) < tol for q in unique_pts) || push!(unique_pts, p)
+        end
+        length(unique_pts) == 2 && push!(segments, (unique_pts[1], unique_pts[2]))
+    end
+    return segments
+end
+
+"""
+    span_edge_curves(vertices; n_samples=60) -> (arc_length, leading, trailing)
+
+Build leading-/trailing-edge polylines by splitting the vertices into `n_samples`
+constant-`y` slabs and taking the most forward (min `x`) and most aft (max `x`)
+point in each. Returns the cumulative leading-edge arc length and the `3 × N` edge
+matrices, ordered by `y`.
+"""
+function span_edge_curves(vertices; n_samples=60)
+    ys = [v[2] for v in vertices]
+    y_min, y_max = extrema(ys)
+    centers = range(y_min, y_max, n_samples)
+    half = (y_max - y_min) / n_samples
+    le = Vector{Float64}[]
+    te = Vector{Float64}[]
+    for yc in centers
+        in_slab = [v for v in vertices if yc - half ≤ v[2] ≤ yc + half]
+        isempty(in_slab) && continue
+        push!(le, Float64.(argmin(v -> v[1], in_slab)))
+        push!(te, Float64.(argmax(v -> v[1], in_slab)))
+    end
+    leading = reduce(hcat, le)
+    trailing = reduce(hcat, te)
+    arc_length = zeros(size(leading, 2))
+    for i in 2:length(arc_length)
+        arc_length[i] = arc_length[i-1] + norm(leading[:, i] - leading[:, i-1])
+    end
+    return arc_length, leading, trailing
+end
+
+"""
+    plane_contour_to_airfoil(contour3d, LE_point, TE_point, span_dir)
+
+Project a 3D slice contour into the local chord (`TE_point - LE_point`) /
+thickness (`span_dir × chord`, +z up) plane and return normalized Selig airfoil
+coordinates `(x, y)`. Returns `nothing` for a degenerate slice.
+"""
+function plane_contour_to_airfoil(contour3d, LE_point, TE_point, span_dir)
+    chord = TE_point - LE_point
+    chord .-= dot(chord, span_dir) .* span_dir
+    chord_len = norm(chord)
+    chord_len < 1e-9 && return nothing
+    chord ./= chord_len
+    up = cross(span_dir, chord)
+    norm(up) < 1e-12 && return nothing
+    up ./= norm(up)
+    up[3] < 0 && (up = -up)
+    projected = [[dot(p - LE_point, chord), dot(p - LE_point, up)] for p in contour3d]
+    x, y = contour_to_airfoil(projected)
+    isempty(x) && return nothing
+    return reorder_airfoil_selig(x, y)
+end
+
+"""
+    perpendicular_sections(vertices, faces, n_sections; n_samples=60)
+
+Extract `n_sections` airfoil cross-sections following a curved or swept span.
+Stations are spaced at equal leading-edge arc-length intervals (panel centers);
+each is sliced with a plane perpendicular to the local span and projected into the
+chord/thickness plane, keeping the airfoil undistorted near curved tips. Returns
+`(; LE_point, TE_point, x_airfoil, y_airfoil)` NamedTuples with un-normalized 3D
+edge points.
+"""
+function perpendicular_sections(vertices, faces, n_sections; n_samples=60)
+    arc_length, leading, trailing = span_edge_curves(vertices; n_samples)
+    keep = [1; [i for i in 2:length(arc_length)
+                if arc_length[i] > arc_length[i-1] + 1e-12]]
+    arc_length, leading, trailing = arc_length[keep], leading[:, keep], trailing[:, keep]
+    total = arc_length[end]
+    total < 1e-9 && error("Degenerate span: leading-edge length ≈ 0")
+    le_interp = ntuple(i -> linear_interpolation(arc_length, leading[i, :],
+                       extrapolation_bc=Line()), 3)
+    te_interp = ntuple(i -> linear_interpolation(arc_length, trailing[i, :],
+                       extrapolation_bc=Line()), 3)
+    delta = total / n_sections
+    arc_step = total * 1e-3
+    sections = NamedTuple[]
+    for k in 1:n_sections
+        sk = delta / 2 + (k - 1) * delta
+        LE_point = [le_interp[i](sk) for i in 1:3]
+        TE_point = [te_interp[i](sk) for i in 1:3]
+        sp = min(sk + arc_step, total)
+        sm = max(sk - arc_step, 0.0)
+        span_dir = [le_interp[i](sp) - le_interp[i](sm) for i in 1:3]
+        norm(span_dir) < 1e-12 && continue
+        span_dir ./= norm(span_dir)
+        segments = slice_mesh_at_plane(vertices, faces, LE_point, span_dir)
+        isempty(segments) && continue
+        contour3d = order_segments_to_contour(segments)
+        length(contour3d) < 5 && continue
+        airfoil = plane_contour_to_airfoil(contour3d, LE_point, TE_point, span_dir)
+        airfoil === nothing && continue
+        push!(sections, (; LE_point, TE_point,
+                         x_airfoil=airfoil[1], y_airfoil=airfoil[2]))
+    end
+    return sections
+end
+
+"""
     slice_obj_at_positions(obj_path::String, y_positions::Vector)
 
 Slice an OBJ mesh at multiple spanwise positions.

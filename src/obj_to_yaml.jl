@@ -60,35 +60,6 @@ function airfoils_from_yaml(geometry_file::String)
 end
 
 """
-    slice_obj_section(vertices, faces, y)
-
-Slice a mesh at spanwise position `y` and return
-`(LE_point, TE_point, x_airfoil, y_airfoil)`:
-the un-normalized 3D leading- and trailing-edge points (min-x and max-x of the
-slice) and the normalized Selig airfoil coordinates. Returns `nothing` if the
-slice is degenerate.
-"""
-function slice_obj_section(vertices, faces, y)
-    segments = slice_mesh_at_y(vertices, faces, Float64(y))
-    isempty(segments) && return nothing
-
-    contour = order_segments_to_contour(segments)
-    length(contour) < 5 && return nothing
-
-    xs = [p[1] for p in contour]
-    le_idx = argmin(xs)
-    te_idx = argmax(xs)
-    LE_point = [contour[le_idx][1], Float64(y), contour[le_idx][2]]
-    TE_point = [contour[te_idx][1], Float64(y), contour[te_idx][2]]
-
-    x_airfoil, y_airfoil = contour_to_airfoil(contour)
-    isempty(x_airfoil) && return nothing
-    x_airfoil, y_airfoil = reorder_airfoil_selig(x_airfoil, y_airfoil)
-
-    return LE_point, TE_point, x_airfoil, y_airfoil
-end
-
-"""
     write_dat(filepath, name, x, y)
 
 Write airfoil coordinates to a Selig-format `.dat` file.
@@ -111,9 +82,10 @@ end
 
 Convert a 3D wing `.obj` mesh to the native YAML geometry route.
 
-Slices the mesh at `n_sections` spanwise stations; for each station the
-leading-/trailing-edge points come from the slice itself (min-x / max-x), and
-the airfoil shape is fitted to Kulfan parameters and evaluated with NeuralFoil.
+Stations are placed at equal leading-edge arc-length intervals and sliced
+perpendicular to the local span (see [`perpendicular_sections`](@ref)), which
+keeps the airfoil undistorted near curved tips; each shape is then fitted to
+Kulfan parameters and evaluated with NeuralFoil.
 
 `fit_method` selects the Kulfan fit (see [`fit_kulfan_parameters`](@ref)). Pass
 an [`EnvelopeFit`](@ref) to wrap each section tightly *around* the slice points;
@@ -159,31 +131,22 @@ function obj_to_yaml(obj_path::String, output_dir::String;
     mkpath(polar_dir)
 
     vertices, faces = read_faces(obj_path)
-    y_coords = [v[2] for v in vertices]
-    y_min, y_max = minimum(y_coords), maximum(y_coords)
-    delta = (y_max - y_min) / n_sections
-    y_positions = [y_min + delta / 2 + (i - 1) * delta for i in 1:n_sections]
-
     alphas = collect(Float64, alpha_range)
     load_neuralfoil_model(model_size; weights_dir)
 
+    raw_sections = perpendicular_sections(vertices, faces, n_sections)
+    isempty(raw_sections) && error("No valid sections sliced from $obj_path")
+
     stations = NamedTuple[]
-    for (i, y) in enumerate(y_positions)
-        verbose && print("  Section $i (y=$(round(y, digits=3)))... ")
-        slice = slice_obj_section(vertices, faces, y)
-        if slice === nothing
-            verbose && println("empty slice, skipped")
-            continue
-        end
-        LE_point, TE_point, xa, ya = slice
-        params = fit_kulfan_parameters(xa, ya, fit_method)
+    for (i, sec) in enumerate(raw_sections)
+        verbose && print("  Section $i (y=$(round(sec.LE_point[2], digits=3)))... ")
+        params = fit_kulfan_parameters(sec.x_airfoil, sec.y_airfoil, fit_method)
         x_fit, y_fit = kulfan_to_coordinates(params)
         thickness = maximum(abs, y_fit)
         verbose && println("fitted (thickness=$(round(thickness, digits=3)))")
-        push!(stations, (; LE_point, TE_point, xa, ya, params, x_fit, y_fit,
-                         thickness))
+        push!(stations, (; sec.LE_point, sec.TE_point, xa=sec.x_airfoil,
+                         ya=sec.y_airfoil, params, x_fit, y_fit, thickness))
     end
-    isempty(stations) && error("No valid sections sliced from $obj_path")
 
     n = length(stations)
     thickness_limit = max_thickness_ratio * median(s.thickness for s in stations)
