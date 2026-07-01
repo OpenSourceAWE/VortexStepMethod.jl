@@ -1,8 +1,9 @@
 
 using Test
 using VortexStepMethod
-using VortexStepMethod: create_interpolations, find_circle_center_and_radius, calculate_inertia_tensor, 
-    center_to_com!, read_faces, calc_inertia_y_rotation, write_aero_matrix, read_aero_matrix
+using VortexStepMethod: write_aero_matrix, read_aero_matrix
+using ObjAdapter: create_interpolations, find_circle_center_and_radius,
+    calculate_inertia_tensor, center_to_com!, read_faces, calc_inertia_y_rotation
 using LinearAlgebra
 using Interpolations
 using Serialization
@@ -164,101 +165,15 @@ using Serialization
         @test inertia_tensor_p ≈ inertia_tensor_p2
         @test R_b_p2 ≈ I(3)
     end
-    
-    @testset "ObjWing Construction" begin
-        wing = ObjWing(test_obj_path, test_dat_path; remove_nan=true)
 
-        @test wing.n_panels == 56  # Default value
-        @test wing.spanwise_distribution == UNCHANGED
-        @test wing.spanwise_direction ≈ [0.0, 1.0, 0.0]
-        @test length(wing.unrefined_sections) > 0  # Should have sections now
-        @test wing.mass ≈ 1.0
-        @test wing.radius ≈ r rtol=1e-2
-        @test wing.gamma_tip ≈ π/4 rtol=1e-2
-        @test !isnan(wing.unrefined_sections[1].aero_data[3][end])
-        @test !isnan(wing.unrefined_sections[1].aero_data[4][end])
-        @test !isnan(wing.unrefined_sections[1].aero_data[5][end])
-
-        wing = ObjWing(test_obj_path, test_dat_path; remove_nan=false)
-        @test isnan(wing.unrefined_sections[1].aero_data[3][end])
-        @test isnan(wing.unrefined_sections[1].aero_data[4][end])
-        @test isnan(wing.unrefined_sections[1].aero_data[5][end])
+    @testset "Converted-wing construction and deformation" begin
+        # TODO: redesign. These previously tested ObjWing internals (radius,
+        # gamma_tip, UNCHANGED distribution, obj deform\!) that were dropped when
+        # ObjWing was replaced by convert-then-load (obj_to_matrix_yaml -> Wing).
+        # Rebuild against ram_air_matrix_wing() geometry once its numerics are set.
+        @test_skip false
     end
 
-    @testset "Wing Deformation" begin
-        # Create an ObjWing for testing (no refine! needed - fully complete)
-        wing = ObjWing(test_obj_path, test_dat_path; remove_nan=true)
-        body_aero = BodyAerodynamics([wing])
-
-        # Sample the apex panel: with even n_panels, refined section (n_panels/2 + 1)
-        # sits exactly at γ=0, so panels[n_panels/2 + 1].TE_point_1 is the apex TE
-        # where the LE tangent is purely along y and twist preserves y exactly.
-        @test iseven(wing.n_panels)
-        i = wing.n_panels ÷ 2 + 1
-        original_te_point = copy(body_aero.panels[i].TE_point_1)
-
-        theta_dist = fill(deg2rad(30.0), wing.n_panels)
-        delta_dist = fill(deg2rad(5.0), wing.n_panels)
-
-        VortexStepMethod.deform!(wing, theta_dist, delta_dist)
-        VortexStepMethod.reinit!(body_aero)
-
-        deformed_te_point = copy(body_aero.panels[i].TE_point_1)
-        @test !isapprox(original_te_point, deformed_te_point, atol=1e-2)
-        @test deformed_te_point[3] < original_te_point[3] # right hand rule
-        @test deformed_te_point[2] ≈ original_te_point[2] atol=1e-5 # right hand rule
-        @test deformed_te_point[1] < original_te_point[1] # right hand rule
-        @test body_aero.panels[i].delta ≈ deg2rad(5.0)
-
-        # Reset deformation with zero angles
-        zero_theta_dist = zeros(wing.n_panels)
-        zero_delta_dist = zeros(wing.n_panels)
-
-        VortexStepMethod.deform!(wing, zero_theta_dist, zero_delta_dist)
-        VortexStepMethod.reinit!(body_aero)
-
-        # Check if TE point returned to original position
-        reset_te_point = copy(body_aero.panels[i].TE_point_1)
-        @test original_te_point ≈ reset_te_point atol=1e-4
-    end
-
-    @testset "First and Last Section Deformation with unrefined_deform!" begin
-        # Create an ObjWing with a small number of panels and unrefined sections
-        wing = ObjWing(test_obj_path, test_dat_path;
-            n_panels=4, n_unrefined_sections=2, remove_nan=true)
-
-        # Store original TE points from all refined_sections
-        # Wing has n_panels+1 sections (5 sections for 4 panels)
-        n_sections = wing.n_panels + 1
-        original_te_points = [copy(wing.refined_sections[i].TE_point)
-            for i in 1:n_sections]
-
-        # Apply unrefined_deform! with non-zero angles (2 groups, each controlling 2 panels)
-        theta_angles = [deg2rad(15.0), deg2rad(20.0)]
-        delta_angles = [deg2rad(5.0), deg2rad(10.0)]
-
-        VortexStepMethod.unrefined_deform!(wing, theta_angles, delta_angles; smooth=false)
-
-        # Check that all sections' TE points have been deformed
-        for i in 1:n_sections
-            deformed_te = wing.refined_sections[i].TE_point
-            original_te = original_te_points[i]
-
-            if i == 1
-                # First section should be deformed
-                @test !isapprox(original_te, deformed_te, atol=1e-6)
-                @info "Section 1 (first): original=$original_te, deformed=$deformed_te"
-            elseif i == n_sections
-                # Last section (n_panels+1) should be deformed
-                @test !isapprox(original_te, deformed_te, atol=1e-6)
-                @info "Section $(n_sections) (last): original=$original_te, deformed=$deformed_te"
-            else
-                # Intermediate sections should also be deformed
-                @test !isapprox(original_te, deformed_te, atol=1e-6)
-            end
-        end
-    end
-    
     rm(test_obj_path)
     rm(test_dat_path)
 end

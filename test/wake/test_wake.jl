@@ -19,9 +19,8 @@ using VortexStepMethod
             cp(foil_src, foil_path; force=true)
             
             try
-                # Create wing and body aerodynamics with known good geometry
-                # ObjWing is fully complete - no refine! needed
-                wing = ObjWing(body_path, foil_path; n_panels=56)  # Use default panels
+                # Create wing via convert-then-load (obj+foil -> POLAR_MATRICES yaml)
+                wing = ram_air_matrix_wing(; n_panels=56)
                 body_aero = BodyAerodynamics([wing])
                 
                 # Test that frozen_wake! doesn't throw errors

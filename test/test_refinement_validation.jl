@@ -44,15 +44,8 @@ using Test
         @test_nowarn VortexStepMethod.unrefined_deform!(wing, [0.1, 0.2], nothing)
     end
 
-    @testset "ObjWing deformation support" begin
-        data_dir = joinpath(dirname(@__DIR__), "data", "ram_air_kite")
-        wing = ObjWing(
-            joinpath(data_dir, "ram_air_kite_body.obj"),
-            joinpath(data_dir, "ram_air_kite_foil.dat");
-            n_panels=20,
-            n_unrefined_sections=2,
-            prn=false
-        )
+    @testset "Converted-wing deformation support" begin
+        wing = ram_air_matrix_wing(; n_panels=20, n_sections=2)
 
         # ObjWing creates non_deformed_sections in constructor (no refine! needed)
         @test !isempty(wing.non_deformed_sections)

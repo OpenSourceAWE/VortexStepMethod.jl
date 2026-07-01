@@ -4,6 +4,26 @@
 using YAML
 using Random: randstring
 using Logging
+using ObjAdapter: obj_to_matrix_yaml
+
+"""
+    ram_air_matrix_wing(; n_panels, n_sections=4, wind_vel=15.0,
+                        alpha_range=deg2rad.(-5:1:15), delta_range=deg2rad.(-3:1:5))
+
+Build a ram-air-kite `Wing` via convert-then-load: the obj mesh plus the single foil
+`.dat` are converted to a standard geometry YAML backed by shared XFoil
+`POLAR_MATRICES` (`ObjAdapter.obj_to_matrix_yaml`), then loaded with `Wing(yaml)`.
+Replaces the removed live `ObjWing` route in tests.
+"""
+function ram_air_matrix_wing(; n_panels, n_sections=4, wind_vel=15.0,
+        alpha_range=deg2rad.(-5:1:15), delta_range=deg2rad.(-3:1:5))
+    data_dir = joinpath(dirname(@__DIR__), "data", "ram_air_kite")
+    obj = joinpath(data_dir, "ram_air_kite_body.obj")
+    foil = joinpath(data_dir, "ram_air_kite_foil.dat")
+    yaml = obj_to_matrix_yaml(obj, foil, mktempdir(); n_sections, wind_vel,
+        alpha_range, delta_range, verbose=false)
+    return Wing(yaml; n_panels)
+end
 
 """
     suppress_warnings(f)
