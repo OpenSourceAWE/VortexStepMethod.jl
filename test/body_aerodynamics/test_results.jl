@@ -36,8 +36,8 @@ if !@isdefined ram_wing_results
     end
 
     ram_wing = ram_air_matrix_wing(; n_panels=8, n_sections=4,
-        alpha_range=deg2rad.(-5:1:15),
-        delta_range=deg2rad.(-3:1:5),
+        alpha_range=deg2rad.(-5:5:15),
+        delta_range=deg2rad.(-3:3:3),
     )
 end
 

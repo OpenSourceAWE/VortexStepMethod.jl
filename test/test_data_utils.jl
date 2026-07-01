@@ -16,7 +16,7 @@ Build a ram-air-kite `Wing` via convert-then-load: the obj mesh plus the single 
 Replaces the removed live `ObjWing` route in tests.
 """
 function ram_air_matrix_wing(; n_panels, n_sections=4, wind_vel=15.0,
-        alpha_range=deg2rad.(-5:1:15), delta_range=deg2rad.(-3:1:5))
+        alpha_range=deg2rad.(-5:5:15), delta_range=deg2rad.(-3:3:3))
     data_dir = joinpath(dirname(@__DIR__), "data", "ram_air_kite")
     obj = joinpath(data_dir, "ram_air_kite_body.obj")
     foil = joinpath(data_dir, "ram_air_kite_foil.dat")
