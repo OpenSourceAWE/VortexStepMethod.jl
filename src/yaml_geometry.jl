@@ -242,8 +242,17 @@ function Wing(
     # Convert wing airfoils
     wing_airfoils_data = data["wing_airfoils"]
     airfoils = WingAirfoilData[]
+    airfoil_poly_map = Dict{Int64, NTuple{3, Vector{Float64}}}()
+    airfoil_type_map = Dict{Int64, String}()
     for row in wing_airfoils_data["data"]
         airfoil_dict = Dict(zip(wing_airfoils_data["headers"], row))
+        airfoil_type_map[airfoil_dict["airfoil_id"]] = String(airfoil_dict["type"])
+        info = airfoil_dict["info_dict"]
+        if haskey(info, "cl_coeffs")
+            airfoil_poly_map[airfoil_dict["airfoil_id"]] = (
+                Float64.(info["cl_coeffs"]), Float64.(info["cd_coeffs"]),
+                Float64.(info["cm_coeffs"]))
+        end
         push!(airfoils, WingAirfoilData(
             airfoil_id = airfoil_dict["airfoil_id"],
             type = airfoil_dict["type"],
@@ -293,12 +302,22 @@ function Wing(
         base_dir = dirname(geometry_file)
         resolve(p) = (!isempty(p) && !isabspath(p)) ? joinpath(base_dir, p) : p
 
-        # Load polar data and create section. Matrix (alpha, delta) polars take
-        # precedence over single-alpha vector polars when both are provided.
-        if haskey(airfoil_matrix_map, section.airfoil_id)
+        # Resolve the airfoil to a core aero model. awesIO "type" is a solver/
+        # generation concept (AirfoilAero); core only accepts resolved forms —
+        # poly coeffs, polar vector/matrix CSVs, or inviscid. Unresolved rich types
+        # (neuralfoil/breukels_regression/masure_regression) must be resolved first.
+        airfoil_type = get(airfoil_type_map, section.airfoil_id, "")
+        if haskey(airfoil_poly_map, section.airfoil_id)
+            aero_data = airfoil_poly_map[section.airfoil_id]
+            aero_model = POLY
+        elseif haskey(airfoil_matrix_map, section.airfoil_id)
             cl_p, cd_p, cm_p = airfoil_matrix_map[section.airfoil_id]
             aero_data, aero_model = load_matrix_polar_data(
                 resolve(cl_p), resolve(cd_p), resolve(cm_p))
+        elseif airfoil_type in ("neuralfoil", "breukels_regression", "masure_regression")
+            throw(ArgumentError("airfoil_id $(section.airfoil_id) has unresolved " *
+                "type \"$airfoil_type\"; resolve it with AirfoilAero " *
+                "(resolve_aero_geometry) into polars/poly before loading."))
         else
             csv_file_path = resolve(get(airfoil_csv_map, section.airfoil_id, ""))
             aero_data, aero_model = load_polar_data(csv_file_path)

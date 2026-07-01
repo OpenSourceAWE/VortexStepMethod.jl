@@ -200,6 +200,47 @@ function obj_to_matrix_yaml(obj_path::String, foil_dat::String, output_dir::Stri
 end
 
 """
+    resolve_aero_geometry(yaml_in, out_dir; verbose=true) -> yaml_out
+
+Read an awesIO-style geometry YAML and resolve every `wing_airfoils` entry to a
+core-loadable form via [`resolve_airfoil`](@ref) (`breukels_regression` → `poly`,
+`neuralfoil` → `polars` CSV, others pass through), writing generated CSVs and a
+resolved `geometry.yaml` under `out_dir`. `wing_sections` (incl. any `VUP` up-vectors)
+pass through unchanged. Load the result with `Wing(yaml_out)`.
+"""
+function resolve_aero_geometry(yaml_in::String, out_dir::String; verbose=true)
+    mkpath(out_dir)
+    polar_dir = joinpath(out_dir, "polars")
+    mkpath(polar_dir)
+    data = YAML.load_file(yaml_in)
+    wa = data["wing_airfoils"]
+    headers = wa["headers"]
+    col(name) = findfirst(==(name), headers)
+    ti, ii, idi = col("type"), col("info_dict"), col("airfoil_id")
+    aspec = get(wa, "alpha_range", [-180, 180, 1.0])
+    Re = Float64(get(wa, "reynolds", 1.0e6))
+    alpha_range = Float64(aspec[1]):Float64(aspec[3]):Float64(aspec[2])
+    base = dirname(abspath(yaml_in))
+    for row in wa["data"]
+        info = Dict{String,Any}(row[ii])
+        for k in ("dat_file_path", "csv_file_path", "cl_file_path",
+                  "cd_file_path", "cm_file_path")
+            if haskey(info, k) && !isabspath(String(info[k]))
+                info[k] = abspath(joinpath(base, String(info[k])))
+            end
+        end
+        new_type, new_info = resolve_airfoil(String(row[ti]), info, polar_dir,
+                                             row[idi]; Re, alpha_range)
+        row[ti] = new_type
+        row[ii] = new_info
+    end
+    yaml_out = joinpath(out_dir, "geometry.yaml")
+    YAML.write_file(yaml_out, data)
+    verbose && @info "Resolved geometry -> $yaml_out"
+    return yaml_out
+end
+
+"""
     write_geometry_yaml(path, section_rows, airfoil_rows)
 
 Write a geometry YAML in compact flow style: one-line headers and one line per

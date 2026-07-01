@@ -28,6 +28,6 @@ export SectionSolution, DeformedSection, deform_section, analyze_section, analyz
 export create_polars, generate_cp_polar, lei_poly_coeffs
 export turn_trailing_edge!, get_lower_upper
 export read_dat_coordinates, write_dat, write_polar_csv
-export generate_polar_from_coordinates, generate_polar_from_dat
+export generate_polar_from_coordinates, generate_polar_from_dat, resolve_airfoil
 
 end

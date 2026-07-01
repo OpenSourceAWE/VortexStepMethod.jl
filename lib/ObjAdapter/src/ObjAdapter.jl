@@ -15,7 +15,8 @@ include("obj_slice.jl")
 include("polar_generation.jl")
 include("obj_to_yaml.jl")
 
-export obj_to_yaml, obj_to_matrix_yaml, write_geometry_yaml, airfoils_from_yaml
+export obj_to_yaml, obj_to_matrix_yaml, resolve_aero_geometry
+export write_geometry_yaml, airfoils_from_yaml
 export slice_obj_wing, slice_obj_at_positions, perpendicular_sections
 export generate_neuralfoil_polars
 export read_faces, center_to_com!, calculate_inertia_tensor, calc_inertia_y_rotation

@@ -70,6 +70,37 @@ function generate_polar_from_coordinates(x::Vector, y::Vector, output_path::Stri
 end
 
 """
+    resolve_airfoil(type, info, out_dir, id; Re, alpha_range) -> (new_type, new_info)
+
+Resolve one awesIO `wing_airfoils` entry to a core-loadable form. `breukels_regression`
+`(t, kappa)` → `poly` coeffs (via [`lei_poly_coeffs`](@ref)); `neuralfoil`
+`(dat_file_path, …)` → a `polars` CSV (via [`generate_polar_from_dat`](@ref)) written
+under `out_dir`; `polars`/`poly`/`inviscid` pass through. `masure_regression` is not
+yet supported. `info` file paths should already be absolute.
+"""
+function resolve_airfoil(type::AbstractString, info::AbstractDict, out_dir, id;
+                         Re, alpha_range)
+    if type == "breukels_regression"
+        cl, cd, cm = lei_poly_coeffs(Float64(info["t"]), Float64(info["kappa"]))
+        return "poly", Dict{String,Any}("cl_coeffs" => cl, "cd_coeffs" => cd,
+                                        "cm_coeffs" => cm)
+    elseif type == "neuralfoil"
+        csv = joinpath(out_dir, "$(id).csv")
+        generate_polar_from_dat(String(info["dat_file_path"]), csv; Re,
+            alpha_range=collect(alpha_range),
+            model_size=String(get(info, "model_size", "large")),
+            n_crit=Float64(get(info, "n_crit", 9.0)))
+        return "polars", Dict{String,Any}("csv_file_path" => csv)
+    elseif type in ("polars", "poly", "inviscid")
+        return String(type), info
+    elseif type == "masure_regression"
+        error("masure_regression airfoils are not yet supported by AirfoilAero.")
+    else
+        error("Unknown airfoil type: $type")
+    end
+end
+
+"""
     generate_polar_from_dat(dat_path, output_path; Re, kwargs...)
 
 Read a `.dat` airfoil and generate its polar CSV via

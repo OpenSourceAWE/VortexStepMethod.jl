@@ -43,7 +43,11 @@ LocalPreferences.toml
 
 # Pipeline-generated polars/dat/cp (regenerate via AirfoilAero/ObjAdapter)
 data/**/polars_neuralfoil/
-data/**/polars_CFD_NF_combined/
+
+# Local planning docs (not tracked)
+docs/architecture_plan.md
+docs/awesio_alignment_plan.md
+docs/awesio_cp_issue_proposal.md
 
 # Sub-package manifests (env-specific)
 lib/**/Manifest.toml
