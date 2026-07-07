@@ -53,6 +53,7 @@ CurrentModule = ObjAdapter
 ```
 ```@docs
 obj_to_yaml
+write_yaml
 perpendicular_sections
 auto_rotation
 plot_airfoils

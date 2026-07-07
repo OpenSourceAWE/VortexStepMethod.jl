@@ -82,11 +82,13 @@ function ObjAdapter.plot_slices_3d(obj_path::String; n_slices::Int=10, rotation=
 
     sel = Observable(1)
     title2 = @lift("slice $($sel)  (y = $(round(secs[$sel].LE_point[2], digits=2)))")
-    ax2 = Axis(fig[1, 2]; title=title2, xlabel="x/c", ylabel="y/c", aspect=DataAspect())
+    gl2 = GridLayout(fig[1, 2])
+    ax2 = Axis(gl2[2, 1]; title=title2, xlabel="x/c", ylabel="y/c", aspect=DataAspect())
     colsize!(fig.layout, 1, Relative(0.6))
-    scatter!(ax2, @lift(data2d[$sel].raw); color=:seagreen, markersize=6, label="slice")
-    lines!(ax2, @lift(data2d[$sel].fit); color=:crimson, linewidth=2, label="fit")
-    axislegend(ax2; position=:rt)
+    raw2 = scatter!(ax2, @lift(data2d[$sel].raw); color=:seagreen, markersize=6)
+    fit2 = lines!(ax2, @lift(data2d[$sel].fit); color=:crimson, linewidth=2)
+    Legend(gl2[1, 1], [raw2, fit2], ["slice", "fit"];
+           orientation=:horizontal, framevisible=false)
 
     on(events(ax.scene).mouseposition) do mp
         best, best_d = 1, Inf

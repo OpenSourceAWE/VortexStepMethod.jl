@@ -57,12 +57,13 @@ hugging them as `tightness` asks. Robust to noisy interior points that pull
 # Fields
 - `min_distance`: clearance each surface keeps outside every point
 - `distance_penalty`: weight of the hard clearance constraint
-- `tightness`: weight of the hug objective — pulls the upper surface down and the lower
-  surface up onto the points, traded off against a fixed arc-length (smoothing) term
-- `tightness_upper`, `tightness_lower`: chordwise distributions scaling `tightness` per
-  surface, sampled at equal `x/c` and linearly interpolated. Lower a surface over a zone
-  to fair smoothly instead of hugging — e.g. the lower surface over a kite's LE tube; the
-  clearance constraint still encloses it. Default `ones(n_grid)`.
+- `tightness`: weight of the hug objective — pulls the surfaces together (minimising
+  thickness), each held out by the clearance constraint; traded off against a fixed
+  arc-length (smoothing) term
+- `tightness_dist`: chordwise distribution scaling `tightness`, sampled at equal `x/c`
+  and linearly interpolated. Lower it over a zone to fair smoothly instead of hugging —
+  e.g. over a kite's LE tube, where the clearance constraint pins the upper surface to
+  the tube crown so the lower surface floats out and fairs. Default `ones(n_grid)`.
 - `n_weights`: weights per surface (NeuralFoil uses 8)
 - `n_grid`: chordwise stations for the distributions and the perimeter
 - `n_iter`, `tol`: iteration controls; `regularization`: Tikhonov weight toward the LSQ fit
@@ -73,8 +74,7 @@ hugging them as `tightness` asks. Robust to noisy interior points that pull
     tightness::Float64 = 1.0
     distance_penalty::Float64 = 1e4
     n_grid::Int = 80
-    tightness_upper::Vector{Float64} = ones(n_grid)
-    tightness_lower::Vector{Float64} = ones(n_grid)
+    tightness_dist::Vector{Float64} = ones(n_grid)
     n_iter::Int = 30
     regularization::Float64 = 1e-6
     tol::Float64 = 1e-10
@@ -224,14 +224,15 @@ points (unlike [`LeastSquaresFit`](@ref), which fits *through* them). `min_dista
 also sets the minimum thickness where the surfaces nearly coincide, preventing
 collapse to zero. LE and TE are pinned at the extreme points by the CST class function.
 
-Solved as "minimise `tightness`·Σ(surface − point)² + (arc length) subject to
+Solved as "minimise `tightness`·Σ(upper − lower)² + (arc length) subject to
 `upper(xᵢ) ≥ yᵢ + min_distance` and `lower(xᵢ) ≤ yᵢ - min_distance`" by iteratively
-reweighted active-set least-squares. Each iteration stacks four blocks: the per-surface
-hug (scaled by `tightness`·`tightness_{upper,lower}(xᵢ)`), a penalty row per violated
-clearance constraint (`distance_penalty`), arc-length rows over `n_grid` chordwise
-segments reweighted by inverse length, and a Tikhonov term toward the least-squares
-seed (`regularization`). Only the ratio of `tightness` to the unit arc-length weight
-matters, so the arc-length weight is fixed at 1.
+reweighted active-set least-squares. Each iteration stacks four blocks: the thickness
+objective scaled by `tightness`·`tightness_dist(xᵢ)` (a two-surface quantity, so it
+targets 0 and never references the point `y` values — interior points cannot erode the
+clearance); a penalty row per violated clearance constraint (`distance_penalty`);
+arc-length rows over `n_grid` chordwise segments reweighted by inverse length; and a
+Tikhonov term toward the least-squares seed (`regularization`). Only the ratio of
+`tightness` to the unit arc-length weight matters, so the arc-length weight is fixed at 1.
 
 # Returns
 - `KulfanParameters`: fitted parameters
@@ -264,10 +265,9 @@ function fit_kulfan_parameters(x::Vector{T}, y::Vector{T},
                                    T.(dist); extrapolation_bc=Flat())
         [itp(x) for x in xs]
     end
-    tight_u = sqrt.(T(method.tightness) .* sample_dist(method.tightness_upper, xv))
-    tight_l = sqrt.(T(method.tightness) .* sample_dist(method.tightness_lower, xv))
-    hug_rows = vcat(tight_u .* upper_pts, tight_l .* lower_pts)
-    hug_rhs = vcat(tight_u .* y_norm, tight_l .* y_norm)
+    tight_dist = sample_dist(method.tightness_dist, xv)
+    thickness_rows = sqrt.(T(method.tightness) .* tight_dist) .* (upper_pts .- lower_pts)
+    thickness_rhs = zeros(T, m)
 
     grid = (one(T) .- cos.(range(zero(T), T(pi), method.n_grid))) ./ 2
     upper_grid, lower_grid = surface_design(grid)
@@ -292,9 +292,9 @@ function fit_kulfan_parameters(x::Vector{T}, y::Vector{T},
         distance_weight = sqrt.(T(method.distance_penalty) .* ((A * theta .- b) .< 0))
         segment_length = sqrt.(dx2 .+ (perimeter_rows * theta) .^ 2)
         arclength_weight = sqrt.(one(T) ./ segment_length)
-        M = vcat(hug_rows, distance_weight .* A,
+        M = vcat(thickness_rows, distance_weight .* A,
                  arclength_weight .* perimeter_rows, reg_rows)
-        rhs = vcat(hug_rhs, distance_weight .* b,
+        rhs = vcat(thickness_rhs, distance_weight .* b,
                    zeros(T, length(arclength_weight)), reg_rhs)
         theta_new = M \ rhs
         converged = maximum(abs.(theta_new .- theta)) < T(method.tol)

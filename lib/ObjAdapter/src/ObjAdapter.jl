@@ -46,7 +46,7 @@ how the slicer cuts a mesh. Implemented in `ObjAdapterMakieExt` (load `Makie`/`G
 function plot_slices_3d end
 
 export obj_to_yaml, obj_to_matrix_yaml, resolve_aero_geometry
-export write_geometry_yaml, airfoils_from_yaml
+export write_geometry_yaml, write_yaml, airfoils_from_yaml
 export perpendicular_sections, auto_rotation
 export generate_neuralfoil_polars
 export read_faces, center_to_com!, calculate_inertia_tensor, calc_inertia_y_rotation

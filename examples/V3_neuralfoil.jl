@@ -25,10 +25,10 @@ N_BINS = 100
 # (x ≈ 0.05–0.35c) so the fit fairs smoothly over the tube instead of hugging the
 # concave recirculation. The arc-length term keeps the rest of the airfoil smooth.
 n_grid = 100
-tightness_lower = ones(n_grid)
-tightness_lower[5:35] .= 0.05
+tightness_dist = ones(n_grid)
+# tightness_dist[5:35] .= 0.5
 FIT_METHOD = EnvelopeFit(min_distance=0.005, tightness=10.0,
-                         tightness_lower=tightness_lower)
+                         tightness_dist=tightness_dist)
 
 # 3D slice diagnostic: mesh + LE/TE curves + section contours and their fits.
 # Hover a slice to inspect its 2D airfoil (raw points + the envelope fit).
@@ -82,7 +82,7 @@ end
 # and load it as a normal YAML wing — a uniform POLAR_VECTORS geometry, so no
 # manual section surgery is needed.
 temp_yaml = joinpath("data", "TUDELFT_V3_KITE", "aero_geometry_neuralfoil.yaml")
-YAML.write_file(temp_yaml, geom)
+write_yaml(temp_yaml, geom)
 
 wing_nf = Wing(temp_yaml; n_panels=50, spanwise_distribution=LINEAR)
 refine!(wing_nf)
