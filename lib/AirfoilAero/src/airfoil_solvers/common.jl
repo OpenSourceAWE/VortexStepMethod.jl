@@ -30,6 +30,25 @@ struct SectionSolution
 end
 
 """
+    write_polar_csv(filepath, sols::Vector{SectionSolution})
+
+Write a solver sweep (from any [`AbstractAirfoilSolver`](@ref)) to a `POLAR_VECTORS`
+CSV (`alpha, Cd, Cs, Cl, Cm`; alpha in degrees). Non-converged angles (`NaN`) are
+skipped, so this works for both NeuralFoil and XFoil sweeps.
+"""
+function write_polar_csv(filepath::String, sols::Vector{SectionSolution})
+    open(filepath, "w") do io
+        println(io, "alpha,Cd,Cs,Cl,Cm")
+        for s in sols
+            isnan(s.cl) && continue
+            row = (rad2deg(s.alpha), s.cd, 0.0, s.cl, s.cm)
+            println(io, join((@sprintf("%.16g", v) for v in row), ","))
+        end
+    end
+    return filepath
+end
+
+"""
     DeformedSection
 
 A section deformed by a trailing-edge deflection: the `EnvelopeFit` `kulfan`

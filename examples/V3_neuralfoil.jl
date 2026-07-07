@@ -4,6 +4,8 @@ if Base.active_project() != joinpath(@__DIR__, "Project.toml")
 end
 using GLMakie
 using VortexStepMethod
+using ObjAdapter
+using AirfoilAero: EnvelopeFit
 using LinearAlgebra
 
 # Configuration
@@ -12,23 +14,42 @@ POLARS_DIR = joinpath("data", "TUDELFT_V3_KITE", "polars_neuralfoil")
 N_SLICES = 19  # Match number of CFD polars
 RE = 1e6
 
-# Generate NeuralFoil polars if they don't exist
-if !isdir(POLARS_DIR) || length(readdir(POLARS_DIR)) < N_SLICES
+# Reorient the mesh to the slicer's chord/span/up convention from its extents.
+ROTATION = :auto
+
+# Marched leading-edge stations across the span (finer => smoother edge trace).
+N_BINS = 100
+
+# The V3 canopy has an inflatable LE tube whose lower surface recirculates. The
+# wrapping-distance constraint always encloses the tube; loosen tightness over it
+# (x ≈ 0.05–0.35c) so the fit fairs smoothly over the tube instead of hugging the
+# concave recirculation. The arc-length term keeps the rest of the airfoil smooth.
+n_grid = 100
+tightness_lower = ones(n_grid)
+tightness_lower[5:35] .= 0.05
+FIT_METHOD = EnvelopeFit(min_distance=0.005, tightness=10.0,
+                         tightness_lower=tightness_lower)
+
+# 3D slice diagnostic: mesh + LE/TE curves + section contours and their fits.
+# Hover a slice to inspect its 2D airfoil (raw points + the envelope fit).
+fig_slices_3d = plot_slices_3d(OBJ_PATH; n_slices=N_SLICES, rotation=ROTATION,
+                               n_bins=N_BINS, fit_method=FIT_METHOD)
+save("V3_slices_3d.png", fig_slices_3d)
+
+# # Generate NeuralFoil polars if they don't exist
+# if !isdir(POLARS_DIR) || length(readdir(POLARS_DIR)) < N_SLICES
     println("Generating NeuralFoil polars from OBJ mesh...")
-
-    # Plot airfoil slices to verify
-    fig_slices = plot_airfoil_slices(OBJ_PATH; n_slices=N_SLICES, is_show=false)
-    save("V3_slices.png", fig_slices)
-    println("Saved V3_slices.png")
-
     generate_neuralfoil_polars(
         OBJ_PATH,
         POLARS_DIR;
         n_slices=N_SLICES,
         Re=RE,
+        rotation=ROTATION,
+        n_bins=N_BINS,
+        fit_method=FIT_METHOD,
         verbose=true
     )
-end
+# end
 
 # Flight conditions
 v_a = 10.0
@@ -57,28 +78,17 @@ for (i, airfoil) in enumerate(geom["wing_airfoils"]["data"])
     airfoil[3] = Dict("csv_file_path" => "polars_neuralfoil/$i.csv")
 end
 
-# Write temporary modified geometry
+# Write the NeuralFoil geometry (every airfoil now points at a NeuralFoil polar)
+# and load it as a normal YAML wing — a uniform POLAR_VECTORS geometry, so no
+# manual section surgery is needed.
 temp_yaml = joinpath("data", "TUDELFT_V3_KITE", "aero_geometry_neuralfoil.yaml")
 YAML.write_file(temp_yaml, geom)
 
-# Create settings pointing to modified geometry
-settings_nf = VSMSettings("TUDELFT_V3_KITE/vsm_settings.yaml")
-# Manually update the geometry file reference in the wing
-wing_nf = Wing(settings_nf)
-# Replace sections with NeuralFoil polars
-for (i, section) in enumerate(wing_nf.unrefined_sections)
-    polar_path = joinpath(POLARS_DIR, "$i.csv")
-    if isfile(polar_path)
-        aero_data, _ = load_polar_data(polar_path)
-        wing_nf.unrefined_sections[i] = Section(
-            section.LE_point, section.TE_point, POLAR_VECTORS, aero_data
-        )
-    end
-end
+wing_nf = Wing(temp_yaml; n_panels=50, spanwise_distribution=LINEAR)
 refine!(wing_nf)
 body_nf = BodyAerodynamics([wing_nf])
 VortexStepMethod.reinit!(body_nf)
-solver_nf = Solver(body_nf, settings_nf)
+solver_nf = Solver(body_nf, settings_cfd)
 
 # Compute polars
 function compute_polar(solver, body_aero, angle_range; v_a=10.0)

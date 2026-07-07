@@ -17,6 +17,8 @@ if Base.active_project() != joinpath(@__DIR__, "Project.toml")
 end
 using GLMakie
 using VortexStepMethod
+using ObjAdapter
+using AirfoilAero: EnvelopeFit
 using LinearAlgebra
 
 PLOT = true
@@ -56,7 +58,7 @@ function max_outside(x_fit, y_fit, x_raw, y_raw)
 end
 
 println("Per-section fit error (max raw point outside the fitted envelope):")
-for af in VortexStepMethod.airfoils_from_yaml(geometry_file)
+for af in airfoils_from_yaml(geometry_file)
     err = max_outside(af.x, af.y, af.x_raw, af.y_raw)
     println("  Airfoil $(af.id): max_outside=$(round(err, digits=4))" *
             (err > 0.01 ? "  <-- poor fit" : ""))

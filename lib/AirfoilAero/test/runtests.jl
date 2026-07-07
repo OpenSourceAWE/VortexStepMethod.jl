@@ -1,5 +1,6 @@
 using Test
 using AirfoilAero
+import VortexStepMethod
 using AirfoilAero: KulfanParameters, LeastSquaresFit, EnvelopeFit,
                        fit_kulfan_parameters, kulfan_to_coordinates, neuralfoil_aero,
                        class_function, bernstein_basis, leading_edge_basis,
@@ -86,5 +87,35 @@ end
         @test res.CL[6] ≈ -0.091 atol = 1e-3
         @test res.CL[14] ≈ 1.4226 atol = 1e-3
         @test maximum(abs.(round.(res.CL; digits=4) .- ref_CL)) < 2e-3
+    end
+end
+
+@testset "Polar matrix generation (create_2d_polars)" begin
+    dat = joinpath(@__DIR__, "data", "test_airfoil.dat")
+    alpha_range = deg2rad.(-2:1:2)
+    delta_range = deg2rad.(-1:1:1)
+
+    @testset "$name backend" for (name, solver) in (
+            ("NeuralFoil", NeuralFoilSolver(model_size="xlarge")),
+            ("XFoil", XFoilSolver()))
+        work = mktempdir()
+        cl_path = joinpath(work, "cl.csv")
+        cd_path = joinpath(work, "cd.csv")
+        cm_path = joinpath(work, "cm.csv")
+        create_2d_polars(; dat_path=dat, cl_polar_path=cl_path, cd_polar_path=cd_path,
+            cm_polar_path=cm_path, wind_vel=15.0, area=20.0, width=8.0,
+            crease_frac=0.75, alpha_range, delta_range, solver)
+
+        cl, a, d = VortexStepMethod.read_aero_matrix(cl_path)
+        @test size(cl) == (length(alpha_range), length(delta_range))
+        @test a ≈ collect(alpha_range)
+        @test d ≈ collect(delta_range)
+        @test all(isfinite, cl)
+
+        cd, _, _ = VortexStepMethod.read_aero_matrix(cd_path)
+        @test all(x -> x > 0, cd)
+
+        cm, _, _ = VortexStepMethod.read_aero_matrix(cm_path)
+        @test size(cm) == (length(alpha_range), length(delta_range))
     end
 end

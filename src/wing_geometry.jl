@@ -427,8 +427,7 @@ function unrefined_deform!(wing::Wing, theta_angles=nothing, delta_angles=nothin
     if !can_deform
         throw(ArgumentError(
             "This Wing has no non_deformed_sections to deform from. " *
-            "Call refine!(wing) (manual/YAML wings) or construct via ObjWing() " *
-            "before calling unrefined_deform!."))
+            "Call refine!(wing) before calling unrefined_deform!."))
     end
 
     n_unref = wing.n_unrefined_sections
@@ -839,7 +838,7 @@ enables deformation support via `unrefined_deform!`.
 # Required Workflow
 Must be called after wing construction and before creating `BodyAerodynamics`:
 ```julia
-wing = Wing("wing.yaml"; n_panels=40)  # or ObjWing(...) or manual Wing
+wing = Wing("wing.yaml"; n_panels=40)  # or a manually built Wing
 refine!(wing)                          # Refine mesh
 body_aero = BodyAerodynamics([wing])   # Create aerodynamics
 ```

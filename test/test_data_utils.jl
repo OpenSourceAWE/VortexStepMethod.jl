@@ -8,19 +8,26 @@ using ObjAdapter: obj_to_matrix_yaml
 
 """
     ram_air_matrix_wing(; n_panels, n_sections=4, wind_vel=15.0,
-                        alpha_range=deg2rad.(-5:1:15), delta_range=deg2rad.(-3:1:5))
+                        alpha_range=deg2rad.(-5:5:15), delta_range=deg2rad.(-3:3:3))
 
-Build a ram-air-kite `Wing` via convert-then-load: the obj mesh plus the single foil
-`.dat` are converted to a standard geometry YAML backed by shared XFoil
-`POLAR_MATRICES` (`ObjAdapter.obj_to_matrix_yaml`), then loaded with `Wing(yaml)`.
-Replaces the removed live `ObjWing` route in tests.
+Build a ram-air-kite `Wing` via convert-then-load: the obj mesh is converted to a
+standard geometry YAML backed by shared NeuralFoil `(alpha, delta)` `POLAR_MATRICES`
+(`ObjAdapter.obj_to_matrix_yaml` auto-slices a representative section from the mesh),
+then loaded with `Wing(yaml)`. Replaces the removed live `ObjWing` route in tests.
+
+The expensive conversion (mesh slicing + NeuralFoil matrix generation) is written once
+into `test/generated/` (gitignored), keyed by `(n_sections, wind_vel, alpha_range,
+delta_range)`; if that geometry already exists it is reused, so it is generated only
+once per configuration across all runs. Each call still reloads a fresh `Wing`.
 """
 function ram_air_matrix_wing(; n_panels, n_sections=4, wind_vel=15.0,
         alpha_range=deg2rad.(-5:5:15), delta_range=deg2rad.(-3:3:3))
     data_dir = joinpath(dirname(@__DIR__), "data", "ram_air_kite")
     obj = joinpath(data_dir, "ram_air_kite_body.obj")
-    foil = joinpath(data_dir, "ram_air_kite_foil.dat")
-    yaml = obj_to_matrix_yaml(obj, foil, mktempdir(); n_sections, wind_vel,
+    key = (n_sections, wind_vel, collect(alpha_range), collect(delta_range))
+    gen_dir = joinpath(@__DIR__, "generated", "ram_matrix_$(string(hash(key); base=16))")
+    yaml = joinpath(gen_dir, "geometry.yaml")
+    isfile(yaml) || obj_to_matrix_yaml(obj, gen_dir; n_sections, wind_vel,
         alpha_range, delta_range, verbose=false)
     return Wing(yaml; n_panels)
 end

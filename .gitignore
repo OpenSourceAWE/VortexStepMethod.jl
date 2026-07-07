@@ -53,3 +53,6 @@ docs/awesio_cp_issue_proposal.md
 
 # Sub-package manifests (env-specific)
 lib/**/Manifest.toml
+
+# Generated test geometries (regenerated on demand by ram_air_matrix_wing)
+test/generated/

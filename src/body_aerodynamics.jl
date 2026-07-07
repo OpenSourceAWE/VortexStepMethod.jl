@@ -64,7 +64,7 @@ aerodynamic properties, returning a fully initialized structure ready for simula
 
 # Example
 ```julia
-wing = ObjWing("body.obj", "foil.dat")
+wing = Wing("wing.yaml"; n_panels=40); refine!(wing)
 body_aero = BodyAerodynamics([wing], va=[15.0, 0.0, 0.0], omega=zeros(3))
 ```
 """

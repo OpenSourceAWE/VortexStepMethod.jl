@@ -7,6 +7,7 @@ using GLMakie
 using DifferentiationInterface
 using LinearAlgebra
 using VortexStepMethod
+using ObjAdapter
 using VortexStepMethod: linearize, unrefined_deform!, reinit!
 
 # Sweep each linearize input around the operating point and overlay the
@@ -14,12 +15,12 @@ using VortexStepMethod: linearize, unrefined_deform!, reinit!
 
 n_unrefined = 4
 
-wing = ObjWing(
-    joinpath("data", "ram_air_kite", "ram_air_kite_body.obj"),
-    joinpath("data", "ram_air_kite", "ram_air_kite_foil.dat");
-    n_unrefined_sections=n_unrefined,
-    prn=false,
-)
+# Convert-then-load: obj mesh -> shared NeuralFoil (alpha, delta) POLAR_MATRICES.
+yaml = obj_to_matrix_yaml(
+    joinpath("data", "ram_air_kite", "ram_air_kite_body.obj"), mktempdir();
+    n_sections=n_unrefined, wind_vel=15.0,
+    alpha_range=deg2rad.(-10:2:20), delta_range=deg2rad.(-5:5:5), verbose=false)
+wing = Wing(yaml; n_panels=16)
 body_aero = BodyAerodynamics([wing])
 
 solver = Solver(body_aero;

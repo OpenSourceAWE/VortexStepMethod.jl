@@ -8,16 +8,31 @@ refine!
 calculate_span
 calculate_projected_area
 load_polar_data
-obj_to_yaml
-perpendicular_sections
+```
+
+## Surface-pressure (Cp) tables
+The Cp table types and IO live in the core package; the generation of Cp tables
+(from XFoil/NeuralFoil) lives in `AirfoilAero`.
+```@docs
+CpData
+CpPolar
+read_cp_data
+write_cp_data
+cp_distribution
+delta_cp
+```
+
+## Airfoil aerodynamics (AirfoilAero)
+These live in the `AirfoilAero` sub-package (`lib/AirfoilAero`), which converts
+airfoil coordinates to polars and Cp tables. Load it with `using AirfoilAero`.
+```@meta
+CurrentModule = AirfoilAero
+```
+```@docs
 fit_kulfan_parameters
 KulfanFitMethod
 LeastSquaresFit
 EnvelopeFit
-```
-
-## Surface-pressure (Cp) tables
-```@docs
 AbstractAirfoilSolver
 XFoilSolver
 NeuralFoilSolver
@@ -26,13 +41,25 @@ DeformedSection
 deform_section
 analyze_section
 analyze_sweep
-CpData
-CpPolar
 generate_cp_polar
-read_cp_data
-write_cp_data
-cp_distribution
-delta_cp
+```
+
+## OBJ mesh conversion (ObjAdapter)
+These live in the `ObjAdapter` sub-package (`lib/ObjAdapter`), which converts a
+3D wing `.obj` mesh to the native YAML/CSV geometry format. Load it with
+`using ObjAdapter`.
+```@meta
+CurrentModule = ObjAdapter
+```
+```@docs
+obj_to_yaml
+perpendicular_sections
+auto_rotation
+plot_airfoils
+plot_slices_3d
+```
+```@meta
+CurrentModule = VortexStepMethod
 ```
 
 ## Setting the inflow conditions and solving
@@ -53,7 +80,6 @@ plot_distribution
 plot_polars
 plot_polar_data
 plot_combined_analysis
-plot_airfoils
 plot_section_polars
 ```
 

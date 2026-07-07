@@ -54,16 +54,21 @@ function write_polar_csv(filepath::String, result::NeuralFoilResult)
 end
 
 """
-    generate_polar_from_coordinates(x, y, output_path; Re, alpha_range=-180:1:180, kwargs...)
+    generate_polar_from_coordinates(x, y, output_path; Re, alpha_range=-180:1:180,
+                                    fit_method=LeastSquaresFit(), kwargs...)
 
-Fit Kulfan parameters to `(x, y)`, evaluate NeuralFoil over `alpha_range` (degrees),
-and write the polar CSV. Extra `kwargs` pass to [`neuralfoil_aero`](@ref). Returns
-the `NeuralFoilResult`.
+Fit Kulfan parameters to `(x, y)` with `fit_method`, evaluate NeuralFoil over
+`alpha_range` (degrees), and write the polar CSV. Pass an [`EnvelopeFit`](@ref) with
+a small `min_distance` to wrap an open single-membrane slice (a kite canopy) into a
+thin closed airfoil. Extra `kwargs` pass to [`neuralfoil_aero`](@ref). Returns the
+`NeuralFoilResult`.
 """
 function generate_polar_from_coordinates(x::Vector, y::Vector, output_path::String;
-                                         Re::Real, alpha_range=-180:1:180, kwargs...)
+                                         Re::Real, alpha_range=-180:1:180,
+                                         fit_method::KulfanFitMethod=LeastSquaresFit(),
+                                         kwargs...)
     alphas = collect(Float64, alpha_range)
-    params = fit_kulfan_parameters(x, y)
+    params = fit_kulfan_parameters(x, y, fit_method)
     result = neuralfoil_aero(params, alphas, Float64(Re); kwargs...)
     write_polar_csv(output_path, result)
     return result

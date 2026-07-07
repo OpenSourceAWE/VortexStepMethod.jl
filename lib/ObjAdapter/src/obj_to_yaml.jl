@@ -37,8 +37,8 @@ end
 
 """
     obj_to_yaml(obj_path, output_dir; n_sections, Re, alpha_range=-180:1:180,
-                model_size="xlarge", weights_dir=nothing, n_crit=9.0,
-                fit_method=LeastSquaresFit(),
+                aero_solver=NeuralFoilSolver(...), model_size="xlarge",
+                weights_dir=nothing, n_crit=9.0, fit_method=LeastSquaresFit(),
                 spanwise_direction=[0.0, 1.0, 0.0], verbose=true)
 
 Convert a 3D wing `.obj` mesh to the native YAML geometry route.
@@ -46,7 +46,12 @@ Convert a 3D wing `.obj` mesh to the native YAML geometry route.
 Stations are placed at equal leading-edge arc-length intervals and sliced
 perpendicular to the local span (see [`perpendicular_sections`](@ref)), which
 keeps the airfoil undistorted near curved tips; each shape is then fitted to
-Kulfan parameters and evaluated with NeuralFoil.
+Kulfan parameters and evaluated with `aero_solver`.
+
+`aero_solver` selects the 2D-airfoil backend: [`NeuralFoilSolver`](@ref) (default,
+fast) or [`XFoilSolver`](@ref) (viscous panel code). The default solver is built
+from `model_size`, `n_crit`, and `weights_dir`; pass `aero_solver=XFoilSolver()`
+to use XFoil instead. Each section's polar is written as `POLAR_VECTORS`.
 
 `fit_method` selects the Kulfan fit (see [`fit_kulfan_parameters`](@ref)). Pass
 an [`EnvelopeFit`](@ref) to wrap each section tightly *around* the slice points;
@@ -76,10 +81,12 @@ share a neighbour's id):
 function obj_to_yaml(obj_path::String, output_dir::String;
                      n_sections::Int, Re::Real,
                      alpha_range=-180:1:180,
-                     model_size::String="xlarge", weights_dir=nothing,
-                     n_crit=9.0, fit_method::KulfanFitMethod=LeastSquaresFit(),
+                     model_size::String="xlarge", weights_dir=nothing, n_crit=9.0,
+                     aero_solver::AbstractAirfoilSolver=NeuralFoilSolver(;
+                         model_size, n_crit, weights_dir),
+                     fit_method::KulfanFitMethod=LeastSquaresFit(),
                      reuse_valid_airfoils::Bool=true, max_thickness_ratio::Real=2.0,
-                     spanwise_direction=[0.0, 1.0, 0.0],
+                     spanwise_direction=[0.0, 1.0, 0.0], rotation=I,
                      verbose::Bool=true)
     (!endswith(obj_path, ".obj")) && (obj_path *= ".obj")
     isfile(obj_path) || error("OBJ file not found: $obj_path")
@@ -93,9 +100,10 @@ function obj_to_yaml(obj_path::String, output_dir::String;
 
     vertices, faces = read_faces(obj_path)
     alphas = collect(Float64, alpha_range)
-    load_neuralfoil_model(model_size; weights_dir)
+    aero_solver isa NeuralFoilSolver &&
+        load_neuralfoil_model(aero_solver.model_size; weights_dir=aero_solver.weights_dir)
 
-    raw_sections = perpendicular_sections(vertices, faces, n_sections)
+    raw_sections = perpendicular_sections(vertices, faces, n_sections; rotation)
     isempty(raw_sections) && error("No valid sections sliced from $obj_path")
 
     stations = NamedTuple[]
@@ -130,12 +138,14 @@ function obj_to_yaml(obj_path::String, output_dir::String;
         dat_abs = joinpath(output_dir, dat_rel)
         write_dat(dat_abs, "section_$j", s.x_fit, s.y_fit)
         write_dat(joinpath(output_dir, raw_rel), "section_$(j)_raw", s.xa, s.ya)
-        result = generate_polar_from_dat(dat_abs, joinpath(output_dir, csv_rel);
-            Re=Float64(Re), alpha_range=alphas, model_size, weights_dir, n_crit)
+        def = DeformedSection(s.params, s.x_fit, s.y_fit)
+        sols = analyze_sweep(aero_solver, def, deg2rad.(alphas), Float64(Re))
+        write_polar_csv(joinpath(output_dir, csv_rel), sols)
         push!(airfoil_rows, Any[j, "polar_vectors",
                                 Dict("dat_file" => dat_rel, "raw_dat_file" => raw_rel,
                                      "csv_file_path" => csv_rel)])
-        verbose && println("  Airfoil $j: CL_max=$(round(maximum(result.CL), digits=2))")
+        cl_max = maximum((sol.cl for sol in sols if !isnan(sol.cl)); init=NaN)
+        verbose && println("  Airfoil $j: CL_max=$(round(cl_max, digits=2))")
     end
     for k in 1:n
         s = stations[k]
@@ -150,41 +160,55 @@ function obj_to_yaml(obj_path::String, output_dir::String;
 end
 
 """
-    obj_to_matrix_yaml(obj_path, foil_dat, output_dir; n_sections, wind_vel,
-                       alpha_range, delta_range, crease_frac=0.2, remove_nan=true,
-                       verbose=true) -> yaml_path
+    obj_to_matrix_yaml(obj_path, output_dir; n_sections, wind_vel, alpha_range,
+                       delta_range, foil_dat=nothing, solver=NeuralFoilSolver(),
+                       crease_frac=0.2, remove_nan=true, verbose=true) -> yaml_path
 
-Convert an `.obj` wing mesh plus a single airfoil `.dat` into a standard geometry YAML
-backed by one shared XFoil `(alpha, delta)` `POLAR_MATRICES`. Section leading/trailing
-edges come from perpendicular mesh slices ([`perpendicular_sections`](@ref)); the
-airfoil's cl/cd/cm matrices are generated once with [`create_polars`](@ref) and
-referenced by every section. Load the result with `Wing(yaml_path; n_panels)`. This
-replaces the old live `ObjWing` route with convert-then-load.
+Convert an `.obj` wing mesh into a standard geometry YAML backed by one shared
+`(alpha, delta)` `POLAR_MATRICES`. Section leading/trailing edges come from
+perpendicular mesh slices ([`perpendicular_sections`](@ref)); the shared airfoil's
+cl/cd/cm matrices are generated once with [`create_2d_polars`](@ref) and referenced by
+every section. Load the result with `Wing(yaml_path; n_panels)`. This replaces the
+old live `ObjWing` route with convert-then-load.
+
+The shared airfoil is, by default, the mesh's median-chord slice (a representative
+interior section, not the midspan). Pass `foil_dat` to override it with an explicit
+`.dat`. `solver` selects the 2D backend: [`NeuralFoilSolver`](@ref) (default) or
+[`XFoilSolver`](@ref).
 """
-function obj_to_matrix_yaml(obj_path::String, foil_dat::String, output_dir::String;
+function obj_to_matrix_yaml(obj_path::String, output_dir::String;
         n_sections::Int, wind_vel::Real, alpha_range, delta_range,
-        crease_frac=0.2, remove_nan=true, verbose=true)
+        foil_dat=nothing, solver::AbstractAirfoilSolver=NeuralFoilSolver(),
+        crease_frac=0.2, remove_nan=true, rotation=I, verbose=true)
     isfile(obj_path) || error("OBJ file not found: $obj_path")
-    isfile(foil_dat) || error("DAT file not found: $foil_dat")
     polar_dir = joinpath(output_dir, "polars")
     airfoil_dir = joinpath(output_dir, "airfoils")
     mkpath(polar_dir)
     mkpath(airfoil_dir)
 
     vertices, faces = read_faces(obj_path)
-    secs = perpendicular_sections(vertices, faces, n_sections)
+    secs = perpendicular_sections(vertices, faces, n_sections; rotation)
     isempty(secs) && error("No valid sections sliced from $obj_path")
 
     mean_chord = sum(norm(s.TE_point .- s.LE_point) for s in secs) / length(secs)
 
+    if foil_dat === nothing
+        chords = [norm(s.TE_point .- s.LE_point) for s in secs]
+        rep = secs[argmin(abs.(chords .- median(chords)))]
+        x, y = rep.x_airfoil, rep.y_airfoil
+    else
+        isfile(foil_dat) || error("DAT file not found: $foil_dat")
+        x, y = read_dat_coordinates(foil_dat)
+    end
+    dat_abs = joinpath(airfoil_dir, "1.dat")
+    write_dat(dat_abs, "airfoil_1", x, y)
+
     cl_path = joinpath(polar_dir, "cl.csv")
     cd_path = joinpath(polar_dir, "cd.csv")
     cm_path = joinpath(polar_dir, "cm.csv")
-    x, y = read_dat_coordinates(foil_dat)
-    write_dat(joinpath(output_dir, "airfoils", "1.dat"), "airfoil_1", x, y)
-    create_polars(; dat_path=foil_dat, cl_polar_path=cl_path, cd_polar_path=cd_path,
+    create_2d_polars(; dat_path=dat_abs, cl_polar_path=cl_path, cd_polar_path=cd_path,
         cm_polar_path=cm_path, wind_vel=Float64(wind_vel), area=mean_chord, width=1.0,
-        crease_frac, alpha_range, delta_range, remove_nan)
+        crease_frac, alpha_range, delta_range, solver, remove_nan)
 
     section_rows = [Any[1, s.LE_point[1], s.LE_point[2], s.LE_point[3],
                         s.TE_point[1], s.TE_point[2], s.TE_point[3]] for s in secs]

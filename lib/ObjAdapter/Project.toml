@@ -19,13 +19,26 @@ YAML = "ddb6d928-2868-570f-bddf-ab3f9cf99eb6"
 VortexStepMethod = {path = "../.."}
 AirfoilAero = {path = "../AirfoilAero"}
 
+[weakdeps]
+Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
+
+[extensions]
+ObjAdapterMakieExt = "Makie"
+
 [compat]
 DelimitedFiles = "1"
 Interpolations = "0.15, 0.16"
 LinearAlgebra = "1"
+Makie = "0.24.6"
 NonlinearSolve = "4.8.0"
 Printf = "1"
 StaticArrays = "1"
 Statistics = "1"
 YAML = "0.4.13"
 julia = "1.10, 1.11"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]

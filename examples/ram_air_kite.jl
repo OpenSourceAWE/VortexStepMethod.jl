@@ -4,37 +4,34 @@ if Base.active_project() != joinpath(@__DIR__, "Project.toml")
 end
 using GLMakie
 using VortexStepMethod
+using ObjAdapter
+using AirfoilAero: XFoilSolver, NeuralFoilSolver
 using LinearAlgebra
 
 PLOT = true
-PRN = false
 USE_TEX = false
-DEFORM = true
 v_a = 15.0
 
-# Create wing with XFoil polars
+# Convert-then-load: the .obj mesh is sliced, a representative section is picked,
+# and one shared (alpha, delta) POLAR_MATRICES is generated with the chosen solver.
+obj_path = joinpath("data", "ram_air_kite", "ram_air_kite_body.obj")
+alpha_range = deg2rad.(-8:2:26)
+delta_range = deg2rad.(-5:5:5)
+
+function matrix_wing(solver; n_panels=40, n_sections=10)
+    yaml = obj_to_matrix_yaml(obj_path, mktempdir();
+        n_sections, wind_vel=v_a, alpha_range, delta_range, solver, verbose=false)
+    return Wing(yaml; n_panels)
+end
+
 println("Creating XFoil wing...")
-wing_xfoil = ObjWing(
-    joinpath("data", "ram_air_kite", "ram_air_kite_body.obj"),
-    joinpath("data", "ram_air_kite", "ram_air_kite_foil.dat");
-    n_unrefined_sections=10,
-    prn=PRN
-)
+wing_xfoil = matrix_wing(XFoilSolver())
 body_xfoil = BodyAerodynamics([wing_xfoil])
-VortexStepMethod.reinit!(body_xfoil)
 solver_xfoil = Solver(body_xfoil; aerodynamic_model_type=VSM, rtol=1e-5, solver_type=NONLIN)
 
-# Create wing with NeuralFoil polars
 println("Creating NeuralFoil wing...")
-wing_nf = ObjWing(
-    joinpath("data", "ram_air_kite", "ram_air_kite_body.obj"),
-    joinpath("data", "ram_air_kite", "ram_air_kite_foil.dat");
-    n_unrefined_sections=10,
-    polars_dir=joinpath("data", "ram_air_kite", "polars_neuralfoil"),
-    prn=PRN
-)
+wing_nf = matrix_wing(NeuralFoilSolver())
 body_nf = BodyAerodynamics([wing_nf])
-VortexStepMethod.reinit!(body_nf)
 solver_nf = Solver(body_nf; aerodynamic_model_type=VSM, rtol=1e-5, solver_type=NONLIN)
 
 # Compare using plot_polars

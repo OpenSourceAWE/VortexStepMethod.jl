@@ -41,10 +41,6 @@ Section(LE_point, TE_point, aero_model)
 Wing
 Wing(n_panels::Int; spanwise_distribution::PanelDistribution=LINEAR,
      spanwise_direction::PosVector=MVec3([0.0, 1.0, 0.0]))
-ObjWing
-ObjWing(obj_path, dat_path; alpha=0.0, crease_frac=0.75, wind_vel=10., mass=1.0,
-         n_panels=54, n_sections=n_panels+1, spanwise_distribution=UNCHANGED,
-         spanwise_direction=[0.0, 1.0, 0.0])
 BodyAerodynamics
 ```
 

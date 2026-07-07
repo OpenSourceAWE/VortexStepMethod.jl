@@ -46,39 +46,35 @@ use [`EnvelopeFit`](@ref) for those.
 end
 
 """
-    EnvelopeFit(; min_distance=0.0, n_weights=8, tightness=1.0,
-                perimeter_weight=1.0, penalty=1e4, n_grid=80, n_iter=30,
-                regularization=1e-6, tol=1e-10)
+    EnvelopeFit(; min_distance=0.0, tightness=1.0, distance_penalty=1e4,
+                n_grid=80, n_weights=8, ...)
 
-Enclosing Kulfan fit: wraps the airfoil tightly *around* the point cloud,
-keeping every point at least `min_distance` inside the surfaces. Robust to noisy
-interior points (e.g. the internal structure of a ram-air kite slice) that pull
-[`LeastSquaresFit`](@ref) inward. See [`fit_kulfan_parameters`](@ref) for the
-method and algorithm.
-
-Two knobs trade off the fit:
-- `tightness` pulls the surfaces onto the outermost points (minimises enclosed
-  area); raise it to follow concave detail more closely.
-- `perimeter_weight` minimises the surfaces' arc length (a shrink-wrap); raise it
-  for a smoother, shorter perimeter at the cost of some tightness.
+Enclosing Kulfan fit: an outer envelope that keeps every point at least `min_distance`
+inside the surfaces (a hard constraint, so the fit always encloses the geometry) while
+hugging them as `tightness` asks. Robust to noisy interior points that pull
+[`LeastSquaresFit`](@ref) inward. See [`fit_kulfan_parameters`](@ref) for the algorithm.
 
 # Fields
-- `min_distance`: required clearance between each surface and the points
+- `min_distance`: clearance each surface keeps outside every point
+- `distance_penalty`: weight of the hard clearance constraint
+- `tightness`: weight of the hug objective — pulls the upper surface down and the lower
+  surface up onto the points, traded off against a fixed arc-length (smoothing) term
+- `tightness_upper`, `tightness_lower`: chordwise distributions scaling `tightness` per
+  surface, sampled at equal `x/c` and linearly interpolated. Lower a surface over a zone
+  to fair smoothly instead of hugging — e.g. the lower surface over a kite's LE tube; the
+  clearance constraint still encloses it. Default `ones(n_grid)`.
 - `n_weights`: weights per surface (NeuralFoil uses 8)
-- `tightness`: weight of the enclosed-area objective (hug the points)
-- `perimeter_weight`: weight of the arc-length objective (smooth, short perimeter)
-- `penalty`: weight of each active clearance-constraint row
-- `n_grid`: number of chordwise stations used to measure perimeter
-- `n_iter`, `tol`: active-set / reweighting iteration controls
-- `regularization`: Tikhonov weight toward the least-squares fit
+- `n_grid`: chordwise stations for the distributions and the perimeter
+- `n_iter`, `tol`: iteration controls; `regularization`: Tikhonov weight toward the LSQ fit
 """
 @with_kw struct EnvelopeFit <: KulfanFitMethod
     min_distance::Float64 = 0.0
     n_weights::Int = 8
     tightness::Float64 = 1.0
-    perimeter_weight::Float64 = 1.0
-    penalty::Float64 = 1e4
+    distance_penalty::Float64 = 1e4
     n_grid::Int = 80
+    tightness_upper::Vector{Float64} = ones(n_grid)
+    tightness_lower::Vector{Float64} = ones(n_grid)
     n_iter::Int = 30
     regularization::Float64 = 1e-6
     tol::Float64 = 1e-10
@@ -221,35 +217,21 @@ end
 """
     fit_kulfan_parameters(x, y, method::EnvelopeFit)
 
-Fit Kulfan CST parameters so the airfoil *encloses* the point cloud `(x, y)` as
-tightly as possible while keeping every point at least `method.min_distance`
-inside the surfaces.
+Fit Kulfan CST parameters to an outer envelope of the point cloud `(x, y)`: each
+surface hugs the points but a hard constraint keeps it at least `min_distance`
+outside every one of them, so the fit encloses the geometry even with noisy interior
+points (unlike [`LeastSquaresFit`](@ref), which fits *through* them). `min_distance`
+also sets the minimum thickness where the surfaces nearly coincide, preventing
+collapse to zero. LE and TE are pinned at the extreme points by the CST class function.
 
-Unlike [`LeastSquaresFit`](@ref), which fits *through* the points and is pulled
-around by noisy interior points (e.g. the internal structure of a ram-air kite
-slice), this fits a tight outer envelope: the upper surface stays above every
-point and the lower surface below it, so only the outermost points are active and
-interior points are ignored. For flat/thin sections where the surfaces nearly
-coincide, `min_distance` sets the minimum clearance between each surface and the
-points, preventing the envelope from collapsing to zero thickness. The leading and
-trailing edges are pinned at the extreme points (the CST class function ties both
-surfaces to the chord there), so the clearance applies between the points and the
-upper/lower surfaces, not chordwise at the nose and tail.
-
-It approximates the program "minimise `tightness`·(enclosed area) +
-`perimeter_weight`·(surface arc length) subject to
-`upper(xᵢ) ≥ yᵢ + min_distance` and `lower(xᵢ) ≤ yᵢ - min_distance`" by an
-iteratively reweighted active-set least-squares. Each iteration solves one
-stacked least-squares (QR via `\\`) of four blocks: a squared-thickness objective
-(`tightness`), a penalty row per currently-violated clearance constraint
-(`penalty`), arc-length rows over an `n_grid`-station chordwise grid whose
-segments are reweighted by inverse length each iteration so the quadratic descends
-the true perimeter (`perimeter_weight`), and a Tikhonov term toward the
-least-squares fit (`regularization`). Because the objective is area and perimeter
-rather than distance to each point, interior points exert no inward pull, the
-perimeter term keeps the surfaces smooth without a non-representable uniform
-offset, and the method degrades gracefully when `min_distance` is too large for
-the section to satisfy.
+Solved as "minimise `tightness`·Σ(surface − point)² + (arc length) subject to
+`upper(xᵢ) ≥ yᵢ + min_distance` and `lower(xᵢ) ≤ yᵢ - min_distance`" by iteratively
+reweighted active-set least-squares. Each iteration stacks four blocks: the per-surface
+hug (scaled by `tightness`·`tightness_{upper,lower}(xᵢ)`), a penalty row per violated
+clearance constraint (`distance_penalty`), arc-length rows over `n_grid` chordwise
+segments reweighted by inverse length, and a Tikhonov term toward the least-squares
+seed (`regularization`). Only the ratio of `tightness` to the unit arc-length weight
+matters, so the arc-length weight is fixed at 1.
 
 # Returns
 - `KulfanParameters`: fitted parameters
@@ -277,8 +259,15 @@ function fit_kulfan_parameters(x::Vector{T}, y::Vector{T},
     A = vcat(upper_pts, .-lower_pts)
     b = vcat(y_norm .+ d, d .- y_norm)
 
-    thickness_rows = sqrt(T(method.tightness)) .* (upper_pts .- lower_pts)
-    thickness_rhs = zeros(T, m)
+    sample_dist(dist, xs) = begin
+        itp = linear_interpolation(range(zero(T), one(T), length(dist)),
+                                   T.(dist); extrapolation_bc=Flat())
+        [itp(x) for x in xs]
+    end
+    tight_u = sqrt.(T(method.tightness) .* sample_dist(method.tightness_upper, xv))
+    tight_l = sqrt.(T(method.tightness) .* sample_dist(method.tightness_lower, xv))
+    hug_rows = vcat(tight_u .* upper_pts, tight_l .* lower_pts)
+    hug_rhs = vcat(tight_u .* y_norm, tight_l .* y_norm)
 
     grid = (one(T) .- cos.(range(zero(T), T(pi), method.n_grid))) ./ 2
     upper_grid, lower_grid = surface_design(grid)
@@ -291,17 +280,22 @@ function fit_kulfan_parameters(x::Vector{T}, y::Vector{T},
     p0 = fit_kulfan_parameters(x, y; n_weights)
     theta0 = vcat(p0.lower_weights, p0.upper_weights, p0.leading_edge_weight,
                   p0.TE_thickness)
+    # A near-zero-thickness point set (e.g. an open single-membrane slice) makes the
+    # least-squares seed blow up; fall back to a thin flat seed so the envelope
+    # constraints (min_distance) shape a clean thin airfoil instead.
+    (all(isfinite, theta0) && maximum(abs, theta0) ≤ 10) ||
+        (theta0 = vcat(zeros(T, 2n_weights + 1), 2d))
     reg_rhs = sqrt(T(method.regularization)) .* theta0
 
     theta = copy(theta0)
     for _ in 1:method.n_iter
-        clearance_weight = sqrt.(T(method.penalty) .* ((A * theta .- b) .< 0))
+        distance_weight = sqrt.(T(method.distance_penalty) .* ((A * theta .- b) .< 0))
         segment_length = sqrt.(dx2 .+ (perimeter_rows * theta) .^ 2)
-        perimeter_weight = sqrt.(T(method.perimeter_weight) ./ segment_length)
-        M = vcat(thickness_rows, clearance_weight .* A,
-                 perimeter_weight .* perimeter_rows, reg_rows)
-        rhs = vcat(thickness_rhs, clearance_weight .* b,
-                   zeros(T, length(perimeter_weight)), reg_rhs)
+        arclength_weight = sqrt.(one(T) ./ segment_length)
+        M = vcat(hug_rows, distance_weight .* A,
+                 arclength_weight .* perimeter_rows, reg_rows)
+        rhs = vcat(hug_rhs, distance_weight .* b,
+                   zeros(T, length(arclength_weight)), reg_rhs)
         theta_new = M \ rhs
         converged = maximum(abs.(theta_new .- theta)) < T(method.tol)
         theta = theta_new

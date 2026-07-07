@@ -6,84 +6,6 @@ positions to extract 2D airfoil profiles.
 """
 
 """
-    slice_mesh_at_y(vertices::Vector, faces::Vector, y_pos::Real; tol=1e-6)
-
-Slice a triangulated mesh at a constant y-position.
-
-# Arguments
-- `vertices`: Vector of 3D vertex coordinates [x, y, z]
-- `faces`: Vector of face indices (triangles)
-- `y_pos`: Y-coordinate of the slice plane
-
-# Returns
-- Vector of line segments [(p1, p2), ...] where p1, p2 are [x, z] coordinates
-"""
-function slice_mesh_at_y(vertices::Vector, faces::Vector, y_pos::Real; tol=1e-6)
-    segments = Tuple{Vector{Float64}, Vector{Float64}}[]
-
-    for face in faces
-        v1 = vertices[face[1]]
-        v2 = vertices[face[2]]
-        v3 = vertices[face[3]]
-
-        # Find intersection points of triangle with y = y_pos plane
-        points = find_triangle_plane_intersection(v1, v2, v3, y_pos; tol)
-
-        if length(points) == 2
-            # Valid intersection - two points form a line segment
-            push!(segments, (points[1], points[2]))
-        end
-    end
-
-    return segments
-end
-
-"""
-    find_triangle_plane_intersection(v1, v2, v3, y_pos; tol=1e-6)
-
-Find intersection points of a triangle with the plane y = y_pos.
-
-Returns 0, 1, or 2 points in [x, z] format.
-"""
-function find_triangle_plane_intersection(v1, v2, v3, y_pos; tol=1e-6)
-    points = Vector{Float64}[]
-
-    # Check each edge
-    for (va, vb) in [(v1, v2), (v2, v3), (v3, v1)]
-        y1, y2 = va[2], vb[2]
-
-        # Check if edge crosses the plane
-        if (y1 - y_pos) * (y2 - y_pos) < 0
-            # Linear interpolation to find crossing point
-            t = (y_pos - y1) / (y2 - y1)
-            x = va[1] + t * (vb[1] - va[1])
-            z = va[3] + t * (vb[3] - va[3])
-            push!(points, [x, z])
-        elseif abs(y1 - y_pos) < tol
-            # Vertex on plane
-            push!(points, [va[1], va[3]])
-        end
-    end
-
-    # Remove duplicates
-    unique_points = Vector{Float64}[]
-    for p in points
-        is_dup = false
-        for up in unique_points
-            if norm(p - up) < tol
-                is_dup = true
-                break
-            end
-        end
-        if !is_dup
-            push!(unique_points, p)
-        end
-    end
-
-    return unique_points
-end
-
-"""
     order_segments_to_contour(segments; tol=1e-4)
 
 Order line segments into a continuous contour.
@@ -348,176 +270,190 @@ function slice_mesh_at_plane(vertices, faces, point, normal; tol=1e-6)
 end
 
 """
-    span_edge_curves(vertices; n_samples=60) -> (arc_length, leading, trailing)
+    march_edges(vertices, faces; step) -> (; le, te, point, tangent, arclen)
 
-Build leading-/trailing-edge polylines by splitting the vertices into `n_samples`
-constant-`y` slabs and taking the most forward (min `x`) and most aft (max `x`)
-point in each. Returns the cumulative leading-edge arc length and the `3 × N` edge
-matrices, ordered by `y`.
+March the leading edge outward from mid-span in both directions in steps of arc
+length `step`. Each cut is a plane whose normal is the running LE tangent with its
+chordwise component dropped, so it tilts to follow a tip that curls downward. Cuts
+sample mesh *edges*, so the picks are robust to vertex density. Returns, ordered along
+the span, the LE/TE points, each cut's plane origin and tangent, and the cumulative LE
+arc length. Build the airfoil for a chosen station with [`build_section`](@ref).
 """
-function span_edge_curves(vertices; n_samples=60)
+function march_edges(vertices, faces; step)
     ys = [v[2] for v in vertices]
     y_min, y_max = extrema(ys)
-    centers = range(y_min, y_max, n_samples)
-    half = (y_max - y_min) / n_samples
-    le = Vector{Float64}[]
-    te = Vector{Float64}[]
-    for yc in centers
-        in_slab = [v for v in vertices if yc - half ≤ v[2] ≤ yc + half]
-        isempty(in_slab) && continue
-        push!(le, Float64.(argmin(v -> v[1], in_slab)))
-        push!(te, Float64.(argmax(v -> v[1], in_slab)))
+    y_mid = (y_min + y_max) / 2
+
+    cut(point, tangent) = begin
+        segs = slice_mesh_at_plane(vertices, faces, point,
+                                   normalize([0.0, tangent[2], tangent[3]]))
+        isempty(segs) && return nothing
+        pts = Vector{Float64}[]
+        for (a, b) in segs
+            push!(pts, a)
+            push!(pts, b)
+        end
+        return argmin(p -> p[1], pts), argmax(p -> p[1], pts)
     end
-    leading = reduce(hcat, le)
-    trailing = reduce(hcat, te)
-    arc_length = zeros(size(leading, 2))
-    for i in 2:length(arc_length)
-        arc_length[i] = arc_length[i-1] + norm(leading[:, i] - leading[:, i-1])
+
+    c0 = cut([0.0, y_mid, 0.0], [0.0, 1.0, 0.0])
+    c0 === nothing && error("Could not slice mid-span; check mesh / rotation.")
+
+    march(dir) = begin
+        rows = NamedTuple[]
+        prev_le = c0[1]
+        tangent = [0.0, dir, 0.0]
+        for _ in 1:10_000
+            point = prev_le .+ step .* tangent
+            lt = cut(point, tangent)
+            if lt === nothing
+                # Bisect the last step to land the tip station on the outermost cut
+                # that still yields a valid (non-degenerate) airfoil section.
+                lo, hi, tip = 0.0, step, nothing
+                for _ in 1:24
+                    mid = (lo + hi) / 2
+                    p = prev_le .+ mid .* tangent
+                    c = cut(p, tangent)
+                    ok = c !== nothing &&
+                         build_section(vertices, faces, c[1], c[2], p, tangent) !== nothing
+                    ok ? (lo = mid; tip = (c, p)) : (hi = mid)
+                end
+                tip === nothing ||
+                    push!(rows, (; le=tip[1][1], te=tip[1][2], point=tip[2], tangent))
+                break
+            end
+            new_tan = lt[1] .- prev_le
+            (norm(new_tan) < 1e-9 || dot(normalize(new_tan), tangent) < 0.0) && break
+            push!(rows, (; le=lt[1], te=lt[2], point, tangent))
+            tangent = normalize(new_tan)
+            prev_le = lt[1]
+        end
+        return rows
     end
-    return arc_length, leading, trailing
+
+    center = (; le=c0[1], te=c0[2], point=[0.0, y_mid, 0.0], tangent=[0.0, 1.0, 0.0])
+    rows = vcat(reverse(march(-1.0)), [center], march(1.0))
+    arclen = zeros(length(rows))
+    for i in 2:length(rows)
+        arclen[i] = arclen[i-1] + norm(rows[i].le - rows[i-1].le)
+    end
+    return (; le=[r.le for r in rows], te=[r.te for r in rows],
+            point=[r.point for r in rows], tangent=[r.tangent for r in rows], arclen)
 end
 
 """
-    plane_contour_to_airfoil(contour3d, LE_point, TE_point, span_dir)
+    build_section(vertices, faces, le, te, point, tangent) -> section or nothing
 
-Project a 3D slice contour into the local chord (`TE_point - LE_point`) /
-thickness (`span_dir × chord`, +z up) plane and return normalized Selig airfoil
-coordinates `(x, y)`. Returns `nothing` for a degenerate slice.
+Slice the mesh at one marched station ([`airfoil_frame`](@ref) drops the chordwise
+tilt) and project it, producing the full
+`(; LE_point, TE_point, span_dir, contour3d, x_airfoil, y_airfoil)`, or `nothing`.
 """
-function plane_contour_to_airfoil(contour3d, LE_point, TE_point, span_dir)
-    chord = TE_point - LE_point
-    chord .-= dot(chord, span_dir) .* span_dir
-    chord_len = norm(chord)
-    chord_len < 1e-9 && return nothing
-    chord ./= chord_len
-    up = cross(span_dir, chord)
-    norm(up) < 1e-12 && return nothing
-    up ./= norm(up)
-    up[3] < 0 && (up = -up)
-    projected = [[dot(p - LE_point, chord), dot(p - LE_point, up)] for p in contour3d]
+function build_section(vertices, faces, le, te, point, tangent)
+    frame = airfoil_frame(le, te, tangent)
+    frame === nothing && return nothing
+    x_af, y_af, z_af = frame
+    segments = slice_mesh_at_plane(vertices, faces, point, y_af)
+    isempty(segments) && return nothing
+    contour = order_segments_to_contour(segments)
+    length(contour) < 5 && return nothing
+    af = plane_contour_to_airfoil(contour, le, x_af, z_af)
+    af === nothing && return nothing
+    return (; LE_point=le, TE_point=te, span_dir=y_af, contour3d=contour,
+            x_airfoil=af[1], y_airfoil=af[2])
+end
+
+"""
+    airfoil_frame(LE_point, TE_point, span_tangent) -> (x_af, y_af, z_af)
+
+Local airfoil axes for a slice, built so the slice plane contains the chord. With
+`x̂ = [1,0,0]` and the LE `span_tangent`: `ẑ = x̂ × span` (up), `ŷ = ẑ × x̂` (spanwise
+slice normal — the span projected into the `y`-`z` plane), `x̂_c = ŷ × ẑ` (chord,
+oriented LE → TE). Slice the mesh with `y_af`. Returns `nothing` if the span is
+parallel to global-x.
+"""
+function airfoil_frame(LE_point, TE_point, span_tangent)
+    xg = [1.0, 0.0, 0.0]
+    z_af = cross(xg, span_tangent)
+    norm(z_af) < 1e-9 && return nothing
+    z_af = normalize(z_af)
+    z_af[3] < 0 && (z_af = -z_af)
+    y_af = normalize(cross(z_af, xg))
+    x_af = normalize(cross(y_af, z_af))
+    dot(x_af, TE_point .- LE_point) < 0 && (x_af = -x_af)
+    return x_af, y_af, z_af
+end
+
+"""
+    plane_contour_to_airfoil(contour3d, LE_point, x_af, z_af)
+
+Project a 3D slice contour into the local airfoil frame (chord axis `x_af`, up axis
+`z_af`) and return normalized Selig coordinates `(x, y)`, or `nothing` if degenerate.
+"""
+function plane_contour_to_airfoil(contour3d, LE_point, x_af, z_af)
+    projected = [[dot(p .- LE_point, x_af), dot(p .- LE_point, z_af)] for p in contour3d]
     x, y = contour_to_airfoil(projected)
     isempty(x) && return nothing
     return reorder_airfoil_selig(x, y)
 end
 
 """
-    perpendicular_sections(vertices, faces, n_sections; n_samples=60)
+    auto_rotation(vertices) -> 3×3 rotation
 
-Extract `n_sections` airfoil cross-sections following a curved or swept span.
-Stations are spaced at equal leading-edge arc-length intervals (panel centers);
-each is sliced with a plane perpendicular to the local span and projected into the
-chord/thickness plane, keeping the airfoil undistorted near curved tips. Returns
-`(; LE_point, TE_point, x_airfoil, y_airfoil)` NamedTuples with un-normalized 3D
-edge points.
+Guess the reorientation rotation from the mesh bounding-box extents, assuming the
+**span** is the largest extent, the **height** (up) the middle, and the **chord**
+the smallest. Maps the mesh onto the slicer's `x`=chord, `y`=span, `z`=up
+convention (a proper rotation, det = +1). Returns identity when the mesh already
+matches that ordering.
 """
-function perpendicular_sections(vertices, faces, n_sections; n_samples=60)
-    arc_length, leading, trailing = span_edge_curves(vertices; n_samples)
-    keep = [1; [i for i in 2:length(arc_length)
-                if arc_length[i] > arc_length[i-1] + 1e-12]]
-    arc_length, leading, trailing = arc_length[keep], leading[:, keep], trailing[:, keep]
-    total = arc_length[end]
-    total < 1e-9 && error("Degenerate span: leading-edge length ≈ 0")
-    le_interp = ntuple(i -> linear_interpolation(arc_length, leading[i, :],
-                       extrapolation_bc=Line()), 3)
-    te_interp = ntuple(i -> linear_interpolation(arc_length, trailing[i, :],
-                       extrapolation_bc=Line()), 3)
-    delta = total / n_sections
-    arc_step = total * 1e-3
-    sections = NamedTuple[]
-    for k in 1:n_sections
-        sk = delta / 2 + (k - 1) * delta
-        LE_point = [le_interp[i](sk) for i in 1:3]
-        TE_point = [te_interp[i](sk) for i in 1:3]
-        sp = min(sk + arc_step, total)
-        sm = max(sk - arc_step, 0.0)
-        span_dir = [le_interp[i](sp) - le_interp[i](sm) for i in 1:3]
-        norm(span_dir) < 1e-12 && continue
-        span_dir ./= norm(span_dir)
-        segments = slice_mesh_at_plane(vertices, faces, LE_point, span_dir)
-        isempty(segments) && continue
-        contour3d = order_segments_to_contour(segments)
-        length(contour3d) < 5 && continue
-        airfoil = plane_contour_to_airfoil(contour3d, LE_point, TE_point, span_dir)
-        airfoil === nothing && continue
-        push!(sections, (; LE_point, TE_point,
-                         x_airfoil=airfoil[1], y_airfoil=airfoil[2]))
-    end
-    return sections
+function auto_rotation(vertices)
+    ext = [maximum(v[i] for v in vertices) - minimum(v[i] for v in vertices)
+           for i in 1:3]
+    chord_ax, height_ax, span_ax = sortperm(ext)
+    R = zeros(3, 3)
+    R[1, chord_ax] = 1.0
+    R[2, span_ax] = 1.0
+    R[3, height_ax] = 1.0
+    det(R) < 0 && (R[2, :] .*= -1)
+    return R
 end
 
 """
-    slice_obj_at_positions(obj_path::String, y_positions::Vector)
+    perpendicular_sections(vertices, faces, n_sections; n_bins=60, rotation=I)
 
-Slice an OBJ mesh at multiple spanwise positions.
+Extract `n_sections` airfoil cross-sections following a curved or swept span. The
+leading edge is marched into `n_bins` stations ([`march_edges`](@ref)); the airfoil is
+built ([`build_section`](@ref)) at the marched station nearest each equal
+**leading-edge arc-length** target. Each section is
+`(; LE_point, TE_point, span_dir, contour3d, x_airfoil, y_airfoil)`.
 
-# Arguments
-- `obj_path`: Path to .obj file
-- `y_positions`: Vector of y-coordinates for slicing
-
-# Returns
-- Vector of (x, y) tuples, one per slice, with normalized airfoil coordinates
+The slicer assumes the mesh convention `x` = chordwise, `y` = spanwise, `z` = up.
+Pass a `3×3` `rotation` matrix to reorient a mesh stored in another convention
+before slicing (e.g. `[0 1 0; -1 0 0; 0 0 1]` maps a `[y, -x, z]` mesh back to
+`[x, y, z]`), or `rotation=:auto` to infer it from the bounding-box extents (see
+[`auto_rotation`](@ref)).
 """
-function slice_obj_at_positions(obj_path::String, y_positions::Vector{T}) where T
-    # Load mesh
-    vertices, faces = read_faces(obj_path)
-
-    # Slice at each position
-    airfoils = Tuple{Vector{Float64}, Vector{Float64}}[]
-
-    for y_pos in y_positions
-        segments = slice_mesh_at_y(vertices, faces, Float64(y_pos))
-
-        if isempty(segments)
-            @warn "No intersection at y = $y_pos"
-            push!(airfoils, (Float64[], Float64[]))
-            continue
-        end
-
-        contour = order_segments_to_contour(segments)
-        x, y = contour_to_airfoil(contour)
-
-        if !isempty(x)
-            x, y = reorder_airfoil_selig(x, y)
-        end
-
-        push!(airfoils, (x, y))
+function perpendicular_sections(vertices, faces, n_sections; n_bins=60, rotation=I)
+    rotation === :auto && (rotation = auto_rotation(vertices))
+    rotation === I || (vertices = [rotation * v for v in vertices])
+    ys = [v[2] for v in vertices]
+    m = march_edges(vertices, faces; step=(maximum(ys) - minimum(ys)) / n_bins)
+    out = NamedTuple[]
+    for i in station_indices(m.arclen, n_sections)
+        sec = build_section(vertices, faces, m.le[i], m.te[i], m.point[i], m.tangent[i])
+        sec === nothing || push!(out, sec)
     end
-
-    return airfoils
+    return out
 end
 
 """
-    slice_obj_wing(obj_path::String, n_slices::Int)
+    station_indices(arclen, n) -> Vector{Int}
 
-Slice an OBJ wing mesh into n_slices evenly spaced airfoil sections.
-
-Slices are positioned at panel centers: with n_slices panels, the positions are
-at γ = δ/2, 3δ/2, 5δ/2, ... where δ = 1/n_slices. This avoids degenerate
-tip profiles.
-
-# Arguments
-- `obj_path`: Path to .obj file
-- `n_slices`: Number of slices (panels)
-
-# Returns
-- Vector of (x, y) tuples with normalized airfoil coordinates
-- Vector of y_positions where slices were taken
+Indices of the marched stations nearest `n` targets spread over the leading-edge arc
+length, with the first and last targets **on the tips** (arc lengths `0` and
+`arclen[end]`) so the tip sections sit exactly at the wingtips.
 """
-function slice_obj_wing(obj_path::String, n_slices::Int)
-    # Load mesh to find bounds
-    vertices, faces = read_faces(obj_path)
-
-    # Find y-extent of mesh
-    y_coords = [v[2] for v in vertices]
-    y_min, y_max = minimum(y_coords), maximum(y_coords)
-
-    # Slice at panel centers: δ/2, 3δ/2, 5δ/2, ... (n_slices-1/2)δ
-    # where δ = span / n_slices
-    span = y_max - y_min
-    delta = span / n_slices
-    y_positions = [y_min + delta/2 + i*delta for i in 0:(n_slices-1)]
-
-    airfoils = slice_obj_at_positions(obj_path, y_positions)
-
-    return airfoils, y_positions
+function station_indices(arclen, n)
+    total = arclen[end]
+    fracs = n == 1 ? [0.5] : range(0.0, 1.0, n)
+    return [argmin(abs.(arclen .- total * f)) for f in fracs]
 end
