@@ -1,7 +1,7 @@
 using Test
-using AirfoilAero
+using VortexStepMethod.AirfoilAero
 import VortexStepMethod
-using AirfoilAero: KulfanParameters, LeastSquaresFit, EnvelopeFit,
+using VortexStepMethod.AirfoilAero: KulfanParameters, LeastSquaresFit, EnvelopeFit,
                        fit_kulfan_parameters, kulfan_to_coordinates, neuralfoil_aero,
                        class_function, bernstein_basis, leading_edge_basis,
                        normalize_airfoil

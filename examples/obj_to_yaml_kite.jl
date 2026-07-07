@@ -17,8 +17,8 @@ if Base.active_project() != joinpath(@__DIR__, "Project.toml")
 end
 using GLMakie
 using VortexStepMethod
-using ObjAdapter
-using AirfoilAero: EnvelopeFit
+using VortexStepMethod.ObjAdapter
+using VortexStepMethod.AirfoilAero: EnvelopeFit
 using LinearAlgebra
 
 PLOT = true

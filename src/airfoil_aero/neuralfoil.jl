@@ -11,7 +11,7 @@ evaluate airfoil aerodynamics from Kulfan CST parameters.
 using NPZ
 
 # Path to NeuralFoil weights (relative to this package)
-const NEURALFOIL_WEIGHTS_DIR = joinpath(@__DIR__, "..", "data")
+const NEURALFOIL_WEIGHTS_DIR = joinpath(@__DIR__, "data")
 
 # Global cache for loaded weights
 const _NN_CACHE = Dict{String, Any}()

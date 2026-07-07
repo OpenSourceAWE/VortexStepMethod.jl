@@ -4,7 +4,7 @@ if Base.active_project() != joinpath(@__DIR__, "Project.toml")
 end
 using LinearAlgebra
 using VortexStepMethod
-using ObjAdapter
+using VortexStepMethod.ObjAdapter
 using VortexStepMethod: solve_base!
 
 

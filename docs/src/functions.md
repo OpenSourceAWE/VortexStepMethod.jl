@@ -23,10 +23,11 @@ delta_cp
 ```
 
 ## Airfoil aerodynamics (AirfoilAero)
-These live in the `AirfoilAero` sub-package (`lib/AirfoilAero`), which converts
-airfoil coordinates to polars and Cp tables. Load it with `using AirfoilAero`.
+These live in the `AirfoilAero` submodule of `VortexStepMethod`, which converts
+airfoil coordinates to polars and Cp tables. Load it with
+`using VortexStepMethod.AirfoilAero`.
 ```@meta
-CurrentModule = AirfoilAero
+CurrentModule = VortexStepMethod.AirfoilAero
 ```
 ```@docs
 fit_kulfan_parameters
@@ -45,11 +46,11 @@ generate_cp_polar
 ```
 
 ## OBJ mesh conversion (ObjAdapter)
-These live in the `ObjAdapter` sub-package (`lib/ObjAdapter`), which converts a
+These live in the `ObjAdapter` submodule of `VortexStepMethod`, which converts a
 3D wing `.obj` mesh to the native YAML/CSV geometry format. Load it with
-`using ObjAdapter`.
+`using VortexStepMethod.ObjAdapter`.
 ```@meta
-CurrentModule = ObjAdapter
+CurrentModule = VortexStepMethod.ObjAdapter
 ```
 ```@docs
 obj_to_yaml

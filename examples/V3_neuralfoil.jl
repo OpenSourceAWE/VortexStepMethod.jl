@@ -4,14 +4,14 @@ if Base.active_project() != joinpath(@__DIR__, "Project.toml")
 end
 using GLMakie
 using VortexStepMethod
-using ObjAdapter
-using AirfoilAero: EnvelopeFit
+using VortexStepMethod.ObjAdapter
+using VortexStepMethod.AirfoilAero: EnvelopeFit
 using LinearAlgebra
 
 # Configuration
 OBJ_PATH = joinpath("data", "TUDELFT_V3_KITE", "V3_25.obj")
 POLARS_DIR = joinpath("data", "TUDELFT_V3_KITE", "polars_neuralfoil")
-N_SLICES = 19  # Match number of CFD polars
+N_SLICES = 50
 RE = 1e6
 
 # Reorient the mesh to the slicer's chord/span/up convention from its extents.
@@ -26,8 +26,9 @@ N_BINS = 100
 # concave recirculation. The arc-length term keeps the rest of the airfoil smooth.
 n_grid = 100
 tightness_dist = ones(n_grid)
+tightness_dist[1:5] .= 10.0
 # tightness_dist[5:35] .= 0.5
-FIT_METHOD = EnvelopeFit(min_distance=0.005, tightness=10.0,
+FIT_METHOD = EnvelopeFit(min_distance=0.0, tightness=1.0,
                          tightness_dist=tightness_dist)
 
 # 3D slice diagnostic: mesh + LE/TE curves + section contours and their fits.

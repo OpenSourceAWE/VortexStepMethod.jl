@@ -7,7 +7,7 @@ using GLMakie
 using DifferentiationInterface
 using LinearAlgebra
 using VortexStepMethod
-using ObjAdapter
+using VortexStepMethod.ObjAdapter
 using VortexStepMethod: linearize, unrefined_deform!, reinit!
 
 # Sweep each linearize input around the operating point and overlay the

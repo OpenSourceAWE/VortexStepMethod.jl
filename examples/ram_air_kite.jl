@@ -4,8 +4,8 @@ if Base.active_project() != joinpath(@__DIR__, "Project.toml")
 end
 using GLMakie
 using VortexStepMethod
-using ObjAdapter
-using AirfoilAero: XFoilSolver, NeuralFoilSolver
+using VortexStepMethod.ObjAdapter
+using VortexStepMethod.AirfoilAero: XFoilSolver, NeuralFoilSolver
 using LinearAlgebra
 
 PLOT = true

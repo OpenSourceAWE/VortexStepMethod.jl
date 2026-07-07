@@ -58,6 +58,8 @@ function include_selected_tests()
         should_run_test("wing_geometry/test_wing_geometry.jl") && include("wing_geometry/test_wing_geometry.jl")
         should_run_test("wing_geometry/test_billowing.jl") && include("wing_geometry/test_billowing.jl")
         should_run_test("yaml_geometry/test_yaml_geometry.jl") && include("yaml_geometry/test_yaml_geometry.jl")
+        should_run_test("airfoil_aero/test_airfoil_aero.jl") && include("airfoil_aero/test_airfoil_aero.jl")
+        should_run_test("obj_adapter/test_obj_adapter.jl") && include("obj_adapter/test_obj_adapter.jl")
         should_run_test("Aqua.jl") && include("Aqua.jl")
     end
 end

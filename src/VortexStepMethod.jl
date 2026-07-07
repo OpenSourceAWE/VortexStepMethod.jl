@@ -482,6 +482,13 @@ include("solver.jl")
 include("cp_polars.jl")
 
 include("plotting_helpers.jl")
+
+# Airfoil-polar generation and OBJ-mesh conversion, folded in as internal submodules
+# (formerly the AirfoilAero and ObjAdapter packages). Access as
+# `VortexStepMethod.AirfoilAero` / `.ObjAdapter`, or `using VortexStepMethod.AirfoilAero`.
+include("airfoil_aero/AirfoilAero.jl")
+include("obj_adapter/ObjAdapter.jl")
+
 include("precompile.jl")
 
 

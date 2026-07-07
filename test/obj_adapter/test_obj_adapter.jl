@@ -1,10 +1,10 @@
 using Test
-using ObjAdapter
+using VortexStepMethod.ObjAdapter
 using VortexStepMethod
-using AirfoilAero: NeuralFoilSolver
+using VortexStepMethod.AirfoilAero: NeuralFoilSolver
 using LinearAlgebra
 
-obj_path = normpath(joinpath(@__DIR__, "..", "..", "..",
+obj_path = normpath(joinpath(@__DIR__, "..", "..",
                              "data", "ram_air_kite", "ram_air_kite_body.obj"))
 
 @testset "ObjAdapter" begin

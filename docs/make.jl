@@ -1,7 +1,7 @@
 using Makie
 using VortexStepMethod
-using AirfoilAero
-using ObjAdapter
+using VortexStepMethod.AirfoilAero
+using VortexStepMethod.ObjAdapter
 using Documenter
 
 DocMeta.setdocmeta!(VortexStepMethod, :DocTestSetup, :(using VortexStepMethod); recursive=true)
@@ -9,9 +9,8 @@ DocMeta.setdocmeta!(VortexStepMethod, :DocTestSetup, :(using VortexStepMethod); 
 makedocs(;
     modules=[VortexStepMethod,
              Base.get_extension(VortexStepMethod, :VortexStepMethodMakieExt),
-             AirfoilAero,
-             ObjAdapter,
-             Base.get_extension(ObjAdapter, :ObjAdapterMakieExt)],
+             VortexStepMethod.AirfoilAero,
+             VortexStepMethod.ObjAdapter],
     authors="Uwe Fechner <uwe.fechner.msc@gmail.com>, Bart van de Lint <bart@vandelint.net> and contributors",
     sitename="VortexStepMethod.jl",
     checkdocs=:none,

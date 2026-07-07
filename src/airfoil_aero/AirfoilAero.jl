@@ -7,7 +7,7 @@ using Interpolations
 using NPZ
 using Xfoil
 using Printf: @sprintf
-using VortexStepMethod: CpData, CpPolar, interpolate_matrix_nans!, write_aero_matrix
+using ..VortexStepMethod: CpData, CpPolar, interpolate_matrix_nans!, write_aero_matrix
 
 include("kulfan.jl")
 include("neuralfoil.jl")

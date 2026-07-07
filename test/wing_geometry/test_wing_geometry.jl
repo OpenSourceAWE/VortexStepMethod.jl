@@ -1,7 +1,7 @@
 using Test
 using LinearAlgebra
 using VortexStepMethod
-using AirfoilAero: lei_poly_coeffs
+using VortexStepMethod.AirfoilAero: lei_poly_coeffs
 using VortexStepMethod: Wing, Section, add_section!, refine_mesh_by_splitting_provided_sections!, refine!
 import Base: ==
 

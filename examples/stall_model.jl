@@ -4,7 +4,7 @@ if Base.active_project() != joinpath(@__DIR__, "Project.toml")
 end
 using LinearAlgebra
 using VortexStepMethod
-using AirfoilAero: lei_poly_coeffs
+using VortexStepMethod.AirfoilAero: lei_poly_coeffs
 
 using CSV
 using DataFrames

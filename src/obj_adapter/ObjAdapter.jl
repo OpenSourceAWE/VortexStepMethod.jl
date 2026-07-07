@@ -8,8 +8,8 @@ using Printf
 using DelimitedFiles
 import YAML
 using StaticArrays
-using AirfoilAero
-import VortexStepMethod
+using ..AirfoilAero
+import ..VortexStepMethod
 
 include("obj_geometry.jl")
 include("obj_slice.jl")

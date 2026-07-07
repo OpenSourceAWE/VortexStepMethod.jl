@@ -1,12 +1,8 @@
 [deps]
-AirfoilAero = "028acdb8-af45-4085-83da-edc09f4c5e4d"
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
 LiveServer = "16fef848-5104-11e9-1b77-fb7a48bbb589"
 Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
-ObjAdapter = "55e39422-45f7-4798-8632-36c195bd49aa"
 VortexStepMethod = "ed3cd733-9f0f-46a9-93e0-89b8d4998dd9"
 
 [sources]
-AirfoilAero = {path = "../lib/AirfoilAero"}
-ObjAdapter = {path = "../lib/ObjAdapter"}
 VortexStepMethod = {path = ".."}

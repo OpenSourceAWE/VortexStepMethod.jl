@@ -4,7 +4,7 @@
 using YAML
 using Random: randstring
 using Logging
-using ObjAdapter: obj_to_matrix_yaml
+using VortexStepMethod.ObjAdapter: obj_to_matrix_yaml
 
 """
     ram_air_matrix_wing(; n_panels, n_sections=4, wind_vel=15.0,
