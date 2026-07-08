@@ -788,30 +788,31 @@ function VortexStepMethod.plot_polars(
                 zip(polar_data_list, cm_data_list, labels_with_re))
             marker = i <= n_solvers ? :star5 : :circle
             markersize = i <= n_solvers ? 12 : 8
+            linestyle = i <= n_solvers ? :solid : :dash
             angles = polar_data[1]
             scatterlines!(ax_cl, angles, polar_data[2];
-                label=label, marker=marker, markersize=markersize)
+                label=label, marker=marker, markersize=markersize, linestyle)
             scatterlines!(ax_cd, angles, polar_data[3];
-                label=label, marker=marker, markersize=markersize)
+                label=label, marker=marker, markersize=markersize, linestyle)
             scatterlines!(ax_cs, angles, polar_data[4];
-                label=label, marker=marker, markersize=markersize)
+                label=label, marker=marker, markersize=markersize, linestyle)
             if !all(isnan, cm.cmx)
                 scatterlines!(ax_cmx, angles,
                     Float64.(cm.cmx);
                     label=label, marker=marker,
-                    markersize=markersize)
+                    markersize=markersize, linestyle)
             end
             if !all(isnan, cm.cmy)
                 scatterlines!(ax_cmy, angles,
                     Float64.(cm.cmy);
                     label=label, marker=marker,
-                    markersize=markersize)
+                    markersize=markersize, linestyle)
             end
             if !all(isnan, cm.cmz)
                 scatterlines!(ax_cmz, angles,
                     Float64.(cm.cmz);
                     label=label, marker=marker,
-                    markersize=markersize)
+                    markersize=markersize, linestyle)
             end
         end
         Legend(fig[3, 1:3], ax_cl;
@@ -838,25 +839,26 @@ function VortexStepMethod.plot_polars(
                 zip(polar_data_list, labels_with_re))
             marker = i <= n_solvers ? :star5 : :circle
             markersize = i <= n_solvers ? 12 : 8
+            linestyle = i <= n_solvers ? :solid : :dash
             scatterlines!(ax_cl, polar_data[1], polar_data[2];
                 label=label, marker=marker,
-                markersize=markersize)
+                markersize=markersize, linestyle)
             scatterlines!(ax_cd, polar_data[1], polar_data[3];
                 label=label, marker=marker,
-                markersize=markersize)
+                markersize=markersize, linestyle)
             scatterlines!(ax_cs, polar_data[1], polar_data[4];
                 label=label, marker=marker,
-                markersize=markersize)
+                markersize=markersize, linestyle)
             if cl_over_cd
                 cl_cd = polar_data[2] ./ polar_data[3]
                 scatterlines!(ax_fourth, polar_data[1], cl_cd;
                     label=label, marker=marker,
-                    markersize=markersize)
+                    markersize=markersize, linestyle)
             else
                 scatterlines!(ax_fourth, polar_data[3],
                     polar_data[2];
                     label=label, marker=marker,
-                    markersize=markersize)
+                    markersize=markersize, linestyle)
             end
         end
         Legend(fig[3, :], ax_cl;
@@ -1384,8 +1386,8 @@ slice** updates the 2D airfoil panel on the right (raw slice points + the fit).
 Pass `rotation=:auto` (or a 3×3 matrix) to reorient the mesh first.
 """
 function ObjAdapter.plot_slices_3d(obj_path::String; n_slices::Int=10, rotation=I,
-        n_bins::Int=60, fit_method=AirfoilAero.EnvelopeFit(min_distance=0.01),
-        is_show::Bool=true)
+        n_bins::Int=60, wingtip_distance=0.0,
+        fit_method=AirfoilAero.EnvelopeFit(min_distance=0.01), is_show::Bool=true)
     vertices, faces = ObjAdapter.read_faces(obj_path)
     rotation === :auto && (rotation = ObjAdapter.auto_rotation(vertices))
     rotation === I || (vertices = [rotation * v for v in vertices])
@@ -1404,7 +1406,7 @@ function ObjAdapter.plot_slices_3d(obj_path::String; n_slices::Int=10, rotation=
     lines!(ax, le[1, :], le[2, :], le[3, :]; color=:dodgerblue, linewidth=3, label="LE")
     lines!(ax, te[1, :], te[2, :], te[3, :]; color=:orange, linewidth=3, label="TE")
 
-    idx = ObjAdapter.station_indices(m.arclen, n_slices)
+    idx = ObjAdapter.station_indices(m.arclen, n_slices; wingtip_distance)
     secs = filter(!isnothing, [ObjAdapter.build_section(vertices, faces, m.le[i], m.te[i],
                                                         m.point[i], m.tangent[i]) for i in idx])
     centroids = [Point3f((s.LE_point .+ s.TE_point) ./ 2) for s in secs]
@@ -1431,10 +1433,12 @@ function ObjAdapter.plot_slices_3d(obj_path::String; n_slices::Int=10, rotation=
     colsize!(fig.layout, 1, Relative(0.6))
     raw2 = scatter!(ax2, @lift(data2d[$sel].raw); color=:seagreen, markersize=6)
     fit2 = lines!(ax2, @lift(data2d[$sel].fit); color=:crimson, linewidth=2)
+    ylims!(ax2, -1, 1)   # fixed y/c so airfoil thickness is comparable across slices
     Legend(gl2[1, 1], [raw2, fit2], ["slice", "fit"];
            orientation=:horizontal, framevisible=false)
 
     on(events(ax.scene).mouseposition) do mp
+        is_mouseinside(ax.scene) || return
         best, best_d = 1, Inf
         for (i, ctr) in enumerate(centroids)
             pr = Makie.project(ax.scene, ctr)

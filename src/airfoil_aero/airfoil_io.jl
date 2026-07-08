@@ -55,23 +55,37 @@ end
 
 """
     generate_polar_from_coordinates(x, y, output_path; Re, alpha_range=-180:1:180,
-                                    fit_method=LeastSquaresFit(), kwargs...)
+                                    fit_method=LeastSquaresFit(),
+                                    solver=NeuralFoilSolver(), delta_range=nothing)
 
-Fit Kulfan parameters to `(x, y)` with `fit_method`, evaluate NeuralFoil over
-`alpha_range` (degrees), and write the polar CSV. Pass an [`EnvelopeFit`](@ref) with
-a small `min_distance` to wrap an open single-membrane slice (a kite canopy) into a
-thin closed airfoil. Extra `kwargs` pass to [`neuralfoil_aero`](@ref). Returns the
-`NeuralFoilResult`.
+Fit Kulfan parameters to `(x, y)` with `fit_method`, sweep `solver`, and write the polar
+CSV. Pass an [`EnvelopeFit`](@ref) with a small `min_distance` to wrap an open
+single-membrane slice (a kite canopy) into a thin closed airfoil, and a
+[`NeuralFoilSolver`](@ref) or [`XFoilSolver`](@ref) to pick the backend. With
+`delta_range === nothing` the sweep is over `alpha_range` only and written as a
+`POLAR_VECTORS` CSV (returns the `Vector{SectionSolution}`); pass a `delta_range` of
+trailing-edge deflections to sweep `(alpha, delta)` and write a long-format
+`POLAR_MATRICES` CSV (returns the `(cl, cd, cm)` matrices). Both angle ranges are in
+degrees.
 """
 function generate_polar_from_coordinates(x::Vector, y::Vector, output_path::String;
                                          Re::Real, alpha_range=-180:1:180,
                                          fit_method::KulfanFitMethod=LeastSquaresFit(),
-                                         kwargs...)
-    alphas = collect(Float64, alpha_range)
+                                         solver::AbstractAirfoilSolver=NeuralFoilSolver(),
+                                         delta_range=nothing)
     params = fit_kulfan_parameters(x, y, fit_method)
-    result = neuralfoil_aero(params, alphas, Float64(Re); kwargs...)
-    write_polar_csv(output_path, result)
-    return result
+    alphas = deg2rad.(collect(Float64, alpha_range))
+    if delta_range === nothing
+        def = deform_section(params, 0.0; fit_method)
+        sols = analyze_sweep(solver, def, alphas, Re)
+        write_polar_csv(output_path, sols)
+        return sols
+    end
+    deltas = deg2rad.(collect(Float64, delta_range))
+    cl, cd, cm = generate_aero_matrices(solver, params;
+                                        alpha_range=alphas, delta_range=deltas, Re)
+    write_polar_matrix_csv(output_path, alphas, deltas, cl, cd, cm)
+    return (cl, cd, cm)
 end
 
 """
@@ -91,10 +105,11 @@ function resolve_airfoil(type::AbstractString, info::AbstractDict, out_dir, id;
                                         "cm_coeffs" => cm)
     elseif type == "neuralfoil"
         csv = joinpath(out_dir, "$(id).csv")
-        generate_polar_from_dat(String(info["dat_file_path"]), csv; Re,
-            alpha_range=collect(alpha_range),
+        solver = NeuralFoilSolver(
             model_size=String(get(info, "model_size", "large")),
             n_crit=Float64(get(info, "n_crit", 9.0)))
+        generate_polar_from_dat(String(info["dat_file_path"]), csv; Re,
+            alpha_range=collect(alpha_range), solver)
         return "polars", Dict{String,Any}("csv_file_path" => csv)
     elseif type in ("polars", "poly", "inviscid")
         return String(type), info

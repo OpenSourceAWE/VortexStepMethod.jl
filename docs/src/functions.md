@@ -54,6 +54,7 @@ CurrentModule = VortexStepMethod.ObjAdapter
 ```
 ```@docs
 obj_to_yaml
+generate_section_polars
 write_yaml
 perpendicular_sections
 auto_rotation

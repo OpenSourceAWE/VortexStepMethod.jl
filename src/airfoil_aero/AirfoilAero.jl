@@ -12,11 +12,11 @@ using ..VortexStepMethod: CpData, CpPolar, interpolate_matrix_nans!, write_aero_
 include("kulfan.jl")
 include("neuralfoil.jl")
 include("poly.jl")
-include("airfoil_io.jl")
-include("polar_gen.jl")
 include("airfoil_solvers/common.jl")
 include("airfoil_solvers/xfoil_solver.jl")
 include("airfoil_solvers/neuralfoil_solver.jl")
+include("airfoil_io.jl")
+include("polar_gen.jl")
 include("polar_export.jl")
 include("cp_gen.jl")
 

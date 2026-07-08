@@ -80,14 +80,12 @@ share a neighbour's id):
 """
 function obj_to_yaml(obj_path::String, output_dir::String;
                      n_sections::Int, Re::Real,
-                     alpha_range=-180:1:180,
-                     model_size::String="xlarge", weights_dir=nothing, n_crit=9.0,
-                     aero_solver::AbstractAirfoilSolver=NeuralFoilSolver(;
-                         model_size, n_crit, weights_dir),
+                     alpha_range=-180:1:180, delta_range=nothing,
+                     aero_solver::AbstractAirfoilSolver=NeuralFoilSolver(),
                      fit_method::KulfanFitMethod=LeastSquaresFit(),
                      reuse_valid_airfoils::Bool=true, max_thickness_ratio::Real=2.0,
                      spanwise_direction=[0.0, 1.0, 0.0], rotation=I,
-                     verbose::Bool=true)
+                     wingtip_distance=0.0, verbose::Bool=true)
     (!endswith(obj_path, ".obj")) && (obj_path *= ".obj")
     isfile(obj_path) || error("OBJ file not found: $obj_path")
     !isapprox(spanwise_direction, [0.0, 1.0, 0.0]) &&
@@ -99,11 +97,9 @@ function obj_to_yaml(obj_path::String, output_dir::String;
     mkpath(polar_dir)
 
     vertices, faces = read_faces(obj_path)
-    alphas = collect(Float64, alpha_range)
-    aero_solver isa NeuralFoilSolver &&
-        load_neuralfoil_model(aero_solver.model_size; weights_dir=aero_solver.weights_dir)
 
-    raw_sections = perpendicular_sections(vertices, faces, n_sections; rotation)
+    raw_sections = perpendicular_sections(vertices, faces, n_sections;
+                                          rotation, wingtip_distance)
     isempty(raw_sections) && error("No valid sections sliced from $obj_path")
 
     stations = NamedTuple[]
@@ -124,102 +120,51 @@ function obj_to_yaml(obj_path::String, output_dir::String;
     isempty(valid) && error("All sliced sections are degenerate in $obj_path")
     ids = [degenerate[k] && reuse_valid_airfoils ?
            valid[argmin(abs.(valid .- k))] : k for k in 1:n]
-    reused = [k => ids[k] for k in 1:n if degenerate[k] && ids[k] != k]
-    isempty(reused) || @warn "Degenerate section fits reused the nearest valid " *
-        "airfoil: " * join(["section $k → airfoil $j" for (k, j) in reused], ", ")
-
     section_rows = Vector{Any}[]
     airfoil_rows = Vector{Any}[]
+    ok = Int[]
     for j in unique(ids)
         s = stations[j]
         dat_rel = joinpath("airfoils", "$j.dat")
         raw_rel = joinpath("airfoils", "$(j)_raw.dat")
         csv_rel = joinpath("polars", "$j.csv")
-        dat_abs = joinpath(output_dir, dat_rel)
-        write_dat(dat_abs, "section_$j", s.x_fit, s.y_fit)
-        write_dat(joinpath(output_dir, raw_rel), "section_$(j)_raw", s.xa, s.ya)
-        def = DeformedSection(s.params, s.x_fit, s.y_fit)
-        sols = analyze_sweep(aero_solver, def, deg2rad.(alphas), Float64(Re))
-        write_polar_csv(joinpath(output_dir, csv_rel), sols)
-        push!(airfoil_rows, Any[j, "polar_vectors",
-                                Dict("dat_file" => dat_rel, "raw_dat_file" => raw_rel,
-                                     "csv_file_path" => csv_rel)])
-        cl_max = maximum((sol.cl for sol in sols if !isnan(sol.cl)); init=NaN)
-        verbose && println("  Airfoil $j: CL_max=$(round(cl_max, digits=2))")
+        try
+            res = generate_polar_from_coordinates(s.xa, s.ya,
+                joinpath(output_dir, csv_rel); Re=Float64(Re), alpha_range,
+                fit_method, solver=aero_solver, delta_range)
+            clvals = res isa AbstractVector ? collect(sol.cl for sol in res) : vec(res[1])
+            all(isnan, clvals) && error("solver produced no converged points")
+            write_dat(joinpath(output_dir, dat_rel), "section_$j", s.x_fit, s.y_fit)
+            write_dat(joinpath(output_dir, raw_rel), "section_$(j)_raw", s.xa, s.ya)
+            push!(airfoil_rows, Any[j, "polar_vectors",
+                Dict("dat_file" => dat_rel, "raw_dat_file" => raw_rel,
+                     "csv_file_path" => csv_rel)])
+            push!(ok, j)
+            finite_cl = [v for v in clvals if !isnan(v)]
+            cl_max = isempty(finite_cl) ? NaN : maximum(finite_cl)
+            verbose && println("  Airfoil $j: CL_max=$(round(cl_max, digits=2))")
+        catch e
+            reuse_valid_airfoils ||
+                error("Section $j polar generation failed: $(sprint(showerror, e))")
+        end
     end
+    isempty(ok) && error("No section produced a valid polar in $obj_path")
+
+    # Each section uses its nearest airfoil that actually produced a polar — covering
+    # both too-thick (degenerate) fits and sections the solver could not converge.
+    final_ids = [ok[argmin(abs.(ok .- k))] for k in 1:n]
+    reused = [k => final_ids[k] for k in 1:n if final_ids[k] != k]
+    isempty(reused) || @warn "Reused the nearest valid airfoil for: " *
+        join(["section $k → airfoil $j" for (k, j) in reused], ", ")
     for k in 1:n
         s = stations[k]
-        push!(section_rows, Any[ids[k], s.LE_point[1], s.LE_point[2], s.LE_point[3],
+        push!(section_rows, Any[final_ids[k], s.LE_point[1], s.LE_point[2], s.LE_point[3],
                                 s.TE_point[1], s.TE_point[2], s.TE_point[3]])
     end
 
     yaml_path = joinpath(output_dir, "geometry.yaml")
     write_geometry_yaml(yaml_path, section_rows, airfoil_rows)
     verbose && @info "Wrote geometry to $yaml_path ($(length(section_rows)) sections)"
-    return yaml_path
-end
-
-"""
-    obj_to_matrix_yaml(obj_path, output_dir; n_sections, wind_vel, alpha_range,
-                       delta_range, foil_dat=nothing, solver=NeuralFoilSolver(),
-                       crease_frac=0.2, remove_nan=true, verbose=true) -> yaml_path
-
-Convert an `.obj` wing mesh into a standard geometry YAML backed by one shared
-`(alpha, delta)` `POLAR_MATRICES`. Section leading/trailing edges come from
-perpendicular mesh slices ([`perpendicular_sections`](@ref)); the shared airfoil's
-cl/cd/cm matrices are generated once with [`create_2d_polars`](@ref) and referenced by
-every section. Load the result with `Wing(yaml_path; n_panels)`. This replaces the
-old live `ObjWing` route with convert-then-load.
-
-The shared airfoil is, by default, the mesh's median-chord slice (a representative
-interior section, not the midspan). Pass `foil_dat` to override it with an explicit
-`.dat`. `solver` selects the 2D backend: [`NeuralFoilSolver`](@ref) (default) or
-[`XFoilSolver`](@ref).
-"""
-function obj_to_matrix_yaml(obj_path::String, output_dir::String;
-        n_sections::Int, wind_vel::Real, alpha_range, delta_range,
-        foil_dat=nothing, solver::AbstractAirfoilSolver=NeuralFoilSolver(),
-        crease_frac=0.2, remove_nan=true, rotation=I, verbose=true)
-    isfile(obj_path) || error("OBJ file not found: $obj_path")
-    polar_dir = joinpath(output_dir, "polars")
-    airfoil_dir = joinpath(output_dir, "airfoils")
-    mkpath(polar_dir)
-    mkpath(airfoil_dir)
-
-    vertices, faces = read_faces(obj_path)
-    secs = perpendicular_sections(vertices, faces, n_sections; rotation)
-    isempty(secs) && error("No valid sections sliced from $obj_path")
-
-    mean_chord = sum(norm(s.TE_point .- s.LE_point) for s in secs) / length(secs)
-
-    if foil_dat === nothing
-        chords = [norm(s.TE_point .- s.LE_point) for s in secs]
-        rep = secs[argmin(abs.(chords .- median(chords)))]
-        x, y = rep.x_airfoil, rep.y_airfoil
-    else
-        isfile(foil_dat) || error("DAT file not found: $foil_dat")
-        x, y = read_dat_coordinates(foil_dat)
-    end
-    dat_abs = joinpath(airfoil_dir, "1.dat")
-    write_dat(dat_abs, "airfoil_1", x, y)
-
-    cl_path = joinpath(polar_dir, "cl.csv")
-    cd_path = joinpath(polar_dir, "cd.csv")
-    cm_path = joinpath(polar_dir, "cm.csv")
-    create_2d_polars(; dat_path=dat_abs, cl_polar_path=cl_path, cd_polar_path=cd_path,
-        cm_polar_path=cm_path, wind_vel=Float64(wind_vel), area=mean_chord, width=1.0,
-        crease_frac, alpha_range, delta_range, solver, remove_nan)
-
-    section_rows = [Any[1, s.LE_point[1], s.LE_point[2], s.LE_point[3],
-                        s.TE_point[1], s.TE_point[2], s.TE_point[3]] for s in secs]
-    airfoil_rows = [Any[1, "polar_matrices", Dict(
-        "dat_file" => joinpath("airfoils", "1.dat"),
-        "cl_file_path" => joinpath("polars", "cl.csv"),
-        "cd_file_path" => joinpath("polars", "cd.csv"),
-        "cm_file_path" => joinpath("polars", "cm.csv"))]]
-    yaml_path = joinpath(output_dir, "geometry.yaml")
-    write_geometry_yaml(yaml_path, section_rows, airfoil_rows)
-    verbose && @info "Wrote $yaml_path ($(length(section_rows)) sections, POLAR_MATRICES)"
     return yaml_path
 end
 

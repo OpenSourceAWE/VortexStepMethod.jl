@@ -15,11 +15,10 @@ using VortexStepMethod: linearize, unrefined_deform!, reinit!
 
 n_unrefined = 4
 
-# Convert-then-load: obj mesh -> shared NeuralFoil (alpha, delta) POLAR_MATRICES.
-yaml = obj_to_matrix_yaml(
+# Convert-then-load: obj mesh -> per-section NeuralFoil (alpha, delta) POLAR_MATRICES.
+yaml = obj_to_yaml(
     joinpath("data", "ram_air_kite", "ram_air_kite_body.obj"), mktempdir();
-    n_sections=n_unrefined, wind_vel=15.0,
-    alpha_range=deg2rad.(-10:2:20), delta_range=deg2rad.(-5:5:5), verbose=false)
+    n_sections=n_unrefined, Re=1e6, alpha_range=-10:2:20, delta_range=-5:5:5, verbose=false)
 wing = Wing(yaml; n_panels=16)
 body_aero = BodyAerodynamics([wing])
 

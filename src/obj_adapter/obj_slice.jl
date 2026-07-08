@@ -284,54 +284,61 @@ function march_edges(vertices, faces; step)
     y_min, y_max = extrema(ys)
     y_mid = (y_min + y_max) / 2
 
+    # Slice the mesh with a plane through `point` normal to the span/height projection
+    # of `tangent`; the leading and trailing edges are the min- and max-chord (x) points
+    # of that slice contour. Returns `nothing` if the plane misses the mesh.
     cut(point, tangent) = begin
-        segs = slice_mesh_at_plane(vertices, faces, point,
-                                   normalize([0.0, tangent[2], tangent[3]]))
-        isempty(segs) && return nothing
-        pts = Vector{Float64}[]
-        for (a, b) in segs
-            push!(pts, a)
-            push!(pts, b)
+        segments = slice_mesh_at_plane(vertices, faces, point,
+                                       normalize([0.0, tangent[2], tangent[3]]))
+        isempty(segments) && return nothing
+        crossings = Vector{Float64}[]
+        for (start_point, end_point) in segments
+            push!(crossings, start_point)
+            push!(crossings, end_point)
         end
-        return argmin(p -> p[1], pts), argmax(p -> p[1], pts)
+        return (; le=argmin(pt -> pt[1], crossings), te=argmax(pt -> pt[1], crossings))
     end
 
-    c0 = cut([0.0, y_mid, 0.0], [0.0, 1.0, 0.0])
-    c0 === nothing && error("Could not slice mid-span; check mesh / rotation.")
+    mid_cut = cut([0.0, y_mid, 0.0], [0.0, 1.0, 0.0])
+    mid_cut === nothing && error("Could not slice mid-span; check mesh / rotation.")
 
-    march(dir) = begin
+    march(direction) = begin
         rows = NamedTuple[]
-        prev_le = c0[1]
-        tangent = [0.0, dir, 0.0]
+        prev_le = mid_cut.le
+        tangent = [0.0, direction, 0.0]
         for _ in 1:10_000
-            point = prev_le .+ step .* tangent
-            lt = cut(point, tangent)
-            if lt === nothing
+            probe = prev_le .+ step .* tangent
+            found = cut(probe, tangent)
+            if found === nothing
                 # Bisect the last step to land the tip station on the outermost cut
                 # that still yields a valid (non-degenerate) airfoil section.
                 lo, hi, tip = 0.0, step, nothing
                 for _ in 1:24
                     mid = (lo + hi) / 2
-                    p = prev_le .+ mid .* tangent
-                    c = cut(p, tangent)
-                    ok = c !== nothing &&
-                         build_section(vertices, faces, c[1], c[2], p, tangent) !== nothing
-                    ok ? (lo = mid; tip = (c, p)) : (hi = mid)
+                    probe_mid = prev_le .+ mid .* tangent
+                    here = cut(probe_mid, tangent)
+                    # Reject a near-degenerate tip slice whose min-chord "LE" has jumped
+                    # chordwise (an artifact that would skew the leading-edge arc length).
+                    valid = here !== nothing &&
+                            abs(here.le[1] - prev_le[1]) < step &&
+                            build_section(vertices, faces, here.le, here.te,
+                                          probe_mid, tangent) !== nothing
+                    valid ? (lo = mid; tip = (; here.le, here.te, point=probe_mid)) :
+                            (hi = mid)
                 end
-                tip === nothing ||
-                    push!(rows, (; le=tip[1][1], te=tip[1][2], point=tip[2], tangent))
+                tip === nothing || push!(rows, (; tip.le, tip.te, tip.point, tangent))
                 break
             end
-            new_tan = lt[1] .- prev_le
-            (norm(new_tan) < 1e-9 || dot(normalize(new_tan), tangent) < 0.0) && break
-            push!(rows, (; le=lt[1], te=lt[2], point, tangent))
-            tangent = normalize(new_tan)
-            prev_le = lt[1]
+            le_step = found.le .- prev_le
+            (norm(le_step) < 1e-9 || dot(normalize(le_step), tangent) < 0.0) && break
+            push!(rows, (; found.le, found.te, point=probe, tangent))
+            tangent = normalize(le_step)
+            prev_le = found.le
         end
         return rows
     end
 
-    center = (; le=c0[1], te=c0[2], point=[0.0, y_mid, 0.0], tangent=[0.0, 1.0, 0.0])
+    center = (; mid_cut.le, mid_cut.te, point=[0.0, y_mid, 0.0], tangent=[0.0, 1.0, 0.0])
     rows = vcat(reverse(march(-1.0)), [center], march(1.0))
     arclen = zeros(length(rows))
     for i in 2:length(rows)
@@ -432,13 +439,14 @@ before slicing (e.g. `[0 1 0; -1 0 0; 0 0 1]` maps a `[y, -x, z]` mesh back to
 `[x, y, z]`), or `rotation=:auto` to infer it from the bounding-box extents (see
 [`auto_rotation`](@ref)).
 """
-function perpendicular_sections(vertices, faces, n_sections; n_bins=60, rotation=I)
+function perpendicular_sections(vertices, faces, n_sections; n_bins=60, rotation=I,
+                                wingtip_distance=0.0)
     rotation === :auto && (rotation = auto_rotation(vertices))
     rotation === I || (vertices = [rotation * v for v in vertices])
     ys = [v[2] for v in vertices]
     m = march_edges(vertices, faces; step=(maximum(ys) - minimum(ys)) / n_bins)
     out = NamedTuple[]
-    for i in station_indices(m.arclen, n_sections)
+    for i in station_indices(m.arclen, n_sections; wingtip_distance)
         sec = build_section(vertices, faces, m.le[i], m.te[i], m.point[i], m.tangent[i])
         sec === nothing || push!(out, sec)
     end
@@ -446,14 +454,17 @@ function perpendicular_sections(vertices, faces, n_sections; n_bins=60, rotation
 end
 
 """
-    station_indices(arclen, n) -> Vector{Int}
+    station_indices(arclen, n; wingtip_distance=0.0) -> Vector{Int}
 
 Indices of the marched stations nearest `n` targets spread over the leading-edge arc
-length, with the first and last targets **on the tips** (arc lengths `0` and
-`arclen[end]`) so the tip sections sit exactly at the wingtips.
+length. The first and last targets sit `wingtip_distance` (arc length) in from the
+tips; with the default `0.0` they land exactly on the tips. Inset the tips a little
+(e.g. `0.1` m) to avoid degenerate near-zero-chord tip sections that some solvers
+(XFoil) cannot analyse.
 """
-function station_indices(arclen, n)
+function station_indices(arclen, n; wingtip_distance=0.0)
     total = arclen[end]
-    fracs = n == 1 ? [0.5] : range(0.0, 1.0, n)
-    return [argmin(abs.(arclen .- total * f)) for f in fracs]
+    d = clamp(wingtip_distance, 0.0, total / 2)
+    n == 1 && return [argmin(abs.(arclen .- total / 2))]
+    return [argmin(abs.(arclen .- t)) for t in range(d, total - d, n)]
 end

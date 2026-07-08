@@ -56,6 +56,21 @@ wing = Wing(
 )
 ```
 """
+function assemble_polar_matrix(dv::Dict{String,Vector{Float64}})
+    alphas = sort(unique(dv["alpha"]))
+    deltas = sort(unique(dv["delta"]))
+    ai = Dict(a => i for (i, a) in enumerate(alphas))
+    di = Dict(d => j for (j, d) in enumerate(deltas))
+    cl = fill(NaN, length(alphas), length(deltas))
+    cd = fill(NaN, length(alphas), length(deltas))
+    cm = fill(NaN, length(alphas), length(deltas))
+    for k in eachindex(dv["alpha"])
+        i, j = ai[dv["alpha"][k]], di[dv["delta"][k]]
+        cl[i, j], cd[i, j], cm[i, j] = dv["cl"][k], dv["cd"][k], dv["cm"][k]
+    end
+    return (deg2rad.(alphas), deg2rad.(deltas), cl, cd, cm)
+end
+
 function load_polar_data(csv_file_path::String)
     # Return early for empty path
     if isempty(csv_file_path)
@@ -86,37 +101,30 @@ function load_polar_data(csv_file_path::String)
             return (nothing, INVISCID)
         end
 
-        # Split header and normalize to lowercase
+        # Split header and normalize to lowercase. A `delta` column marks the
+        # long-format `(alpha, delta)` polar, loaded as POLAR_MATRICES.
         header_parts = map(strip ∘ lowercase, split(header_line, ','))
-        
-        # Find column indices for required columns
-        required_cols = ["alpha", "cl", "cd", "cm"]
+        has_delta = "delta" in header_parts
+        wanted = has_delta ? ["alpha", "delta", "cl", "cd", "cm"] :
+                             ["alpha", "cl", "cd", "cm"]
         col_indices = Dict{String, Int}()
-        
         for (i, col_name) in enumerate(header_parts)
-            if col_name in required_cols
-                col_indices[col_name] = i
-            end
+            col_name in wanted && (col_indices[col_name] = i)
         end
-        
-        # Check if all required columns are present
-        missing_cols = setdiff(required_cols, keys(col_indices))
+
+        missing_cols = setdiff(wanted, keys(col_indices))
         if !isempty(missing_cols)
             @warn "CSV file missing required columns: $(join(missing_cols, ", ")) in $csv_file_path"
             return (nothing, INVISCID)
         end
 
         # Parse data rows
-        data_vectors = Dict{String, Vector{Float64}}()
-        for col in required_cols
-            data_vectors[col] = Float64[]
-        end
-
+        data_vectors = Dict(col => Float64[] for col in wanted)
         for line_num in eachindex(lines)
             line_num == firstindex(lines) && continue
             line = strip(lines[line_num])
             isempty(line) && continue  # Skip empty lines
-            
+
             parts = split(line, ',')
             if length(parts) != length(header_parts)
                 @warn "Line $line_num has incorrect number of columns in $csv_file_path"
@@ -124,10 +132,8 @@ function load_polar_data(csv_file_path::String)
             end
 
             try
-                for col in required_cols
-                    value_str = strip(parts[col_indices[col]])
-                    value = parse(Float64, value_str)
-                    push!(data_vectors[col], value)
+                for col in wanted
+                    push!(data_vectors[col], parse(Float64, strip(parts[col_indices[col]])))
                 end
             catch e
                 @warn "Failed to parse line $line_num in $csv_file_path: $e"
@@ -141,10 +147,12 @@ function load_polar_data(csv_file_path::String)
             return (nothing, INVISCID)
         end
 
+        has_delta && return (assemble_polar_matrix(data_vectors), POLAR_MATRICES)
+
         # Convert alpha from degrees to radians and create tuple
         alpha_rad = deg2rad.(data_vectors["alpha"])
         aero_data = (alpha_rad, data_vectors["cl"], data_vectors["cd"], data_vectors["cm"])
-        
+
         return (aero_data, POLAR_VECTORS)
 
     catch e

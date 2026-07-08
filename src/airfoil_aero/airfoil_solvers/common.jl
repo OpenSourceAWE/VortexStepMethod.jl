@@ -42,7 +42,27 @@ function write_polar_csv(filepath::String, sols::Vector{SectionSolution})
         for s in sols
             isnan(s.cl) && continue
             row = (rad2deg(s.alpha), s.cd, 0.0, s.cl, s.cm)
-            println(io, join((@sprintf("%.16g", v) for v in row), ","))
+            println(io, join((@sprintf("%.4f", v) for v in row), ","))
+        end
+    end
+    return filepath
+end
+
+"""
+    write_polar_matrix_csv(filepath, alpha_range, delta_range, cl, cd, cm)
+
+Write an `(alpha × delta)` sweep to a long-format `POLAR_MATRICES` CSV with columns
+`alpha, delta, Cl, Cd, Cm` (both angles in degrees), one row per grid point. The
+`delta` column is what marks the file as a matrix polar to the loader. `alpha_range`
+and `delta_range` are in radians; `cl`/`cd`/`cm` are `length(alpha) × length(delta)`.
+"""
+function write_polar_matrix_csv(filepath::String, alpha_range, delta_range,
+        cl::AbstractMatrix, cd::AbstractMatrix, cm::AbstractMatrix)
+    open(filepath, "w") do io
+        println(io, "alpha,delta,Cl,Cd,Cm")
+        for (j, d) in enumerate(delta_range), (i, a) in enumerate(alpha_range)
+            row = (rad2deg(a), rad2deg(d), cl[i, j], cd[i, j], cm[i, j])
+            println(io, join((@sprintf("%.4f", v) for v in row), ","))
         end
     end
     return filepath

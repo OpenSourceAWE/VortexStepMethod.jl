@@ -57,11 +57,10 @@ println("Rectangular wing, solve!:")
 println("Rectangular wing, solve:")
 @time solve(vsm_solver, body_aero, nothing)
 
-# Create wing geometry (convert-then-load: obj -> shared NeuralFoil POLAR_MATRICES)
-ram_yaml = obj_to_matrix_yaml(
+# Create wing geometry (convert-then-load: obj -> per-section NeuralFoil POLAR_MATRICES)
+ram_yaml = obj_to_yaml(
     joinpath("data", "ram_air_kite", "ram_air_kite_body.obj"), mktempdir();
-    n_sections=10, wind_vel=15.0,
-    alpha_range=deg2rad.(-10:2:20), delta_range=deg2rad.(-5:5:5), verbose=false)
+    n_sections=10, Re=1e6, alpha_range=-10:2:20, delta_range=-5:5:5, verbose=false)
 wing = Wing(ram_yaml; n_panels=40)
 body_aero = BodyAerodynamics([wing])
 

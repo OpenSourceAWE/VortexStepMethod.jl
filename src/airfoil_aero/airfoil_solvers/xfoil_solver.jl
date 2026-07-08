@@ -10,12 +10,14 @@ backends are comparable.
 - `npan`: XFoil panel count (default 160, XFoil's `PANE` default).
 - `max_iter`: viscous iterations per angle (default 100).
 - `xtrip`: forced transition `(upper, lower)` (default `(0.05, 0.05)`).
+- `ncrit`: e^N transition criticality (default 9.0, the standard clean-tunnel value).
 - `mach`: Mach number (default 0.0, incompressible).
 """
 @with_kw struct XFoilSolver <: AbstractAirfoilSolver
     npan::Int = 160
     max_iter::Int = 100
     xtrip::Tuple{Float64,Float64} = (0.05, 0.05)
+    ncrit::Float64 = 9.0
     mach::Float64 = 0.0
 end
 
@@ -36,7 +38,8 @@ function analyze_sweep(solver::XFoilSolver, def::DeformedSection, alpha_range, R
         reinit = true
         for ia in order
             cl, cd, _, cm, converged = Xfoil.solve_alpha(rad2deg(alpha_range[ia]), Re;
-                iter=solver.max_iter, reinit=reinit, mach=solver.mach, xtrip=solver.xtrip)
+                iter=solver.max_iter, reinit=reinit, mach=solver.mach,
+                xtrip=solver.xtrip, ncrit=solver.ncrit)
             reinit = false
             if converged
                 xc, cp = Xfoil.cpdump()

@@ -78,9 +78,9 @@ function write_aero_matrix(filepath::AbstractString, matrix::Matrix{Float64},
         header = string(label, "/delta,", deltas_str)
         println(io, header)
         
-        # Write data rows with alpha values and coefficients
+        # Write data rows with alpha values and coefficients (4 decimals is plenty)
         for i in eachindex(alpha_range)
-            coeffs_str = join(matrix[i,:], ",")
+            coeffs_str = join((round(v; digits=4) for v in matrix[i, :]), ",")
             coeffs_str isa String || throw(ArgumentError("Failed to serialize coefficient row."))
             row = string("α=$(round(rad2deg(alpha_range[i]), digits=1))°,", coeffs_str)
             println(io, row)

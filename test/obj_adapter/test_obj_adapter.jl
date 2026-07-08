@@ -22,15 +22,17 @@ obj_path = normpath(joinpath(@__DIR__, "..", "..",
         end
     end
 
-    @testset "obj_to_matrix_yaml -> loadable Wing (NeuralFoil)" begin
+    @testset "obj_to_yaml (alpha,delta) matrices -> loadable Wing (NeuralFoil)" begin
         out = mktempdir()
-        yaml = obj_to_matrix_yaml(obj_path, out;
-            n_sections=3, wind_vel=15.0,
-            alpha_range=deg2rad.(-4:2:4), delta_range=deg2rad.(-2:2:2),
-            solver=NeuralFoilSolver(), verbose=false)
+        yaml = obj_to_yaml(obj_path, out;
+            n_sections=3, Re=5e5,
+            alpha_range=-4:2:4, delta_range=-2:2:2,
+            aero_solver=NeuralFoilSolver(), verbose=false)
         @test isfile(yaml)
-        @test isfile(joinpath(out, "polars", "cl.csv"))
+        @test isfile(joinpath(out, "polars", "1.csv"))
         @test isfile(joinpath(out, "airfoils", "1.dat"))
+        # a delta column marks the CSV as long-format POLAR_MATRICES
+        @test occursin("delta", lowercase(readline(joinpath(out, "polars", "1.csv"))))
 
         wing = Wing(yaml; n_panels=6)
         body_aero = BodyAerodynamics([wing])
@@ -41,7 +43,7 @@ obj_path = normpath(joinpath(@__DIR__, "..", "..",
         out = mktempdir()
         yaml = obj_to_yaml(obj_path, out;
             n_sections=3, Re=5e5, alpha_range=-6:2:6,
-            model_size="large", verbose=false)
+            aero_solver=NeuralFoilSolver(model_size="large"), verbose=false)
         @test isfile(yaml)
         airfoils = airfoils_from_yaml(yaml)
         @test !isempty(airfoils)
