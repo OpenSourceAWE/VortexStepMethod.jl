@@ -10,6 +10,7 @@ using Printf: @sprintf
 using ..VortexStepMethod: CpData, CpPolar, interpolate_matrix_nans!, write_aero_matrix
 
 include("kulfan.jl")
+include("shrink_wrap.jl")
 include("neuralfoil.jl")
 include("poly.jl")
 include("airfoil_solvers/common.jl")
@@ -20,7 +21,8 @@ include("polar_gen.jl")
 include("polar_export.jl")
 include("cp_gen.jl")
 
-export KulfanParameters, KulfanFitMethod, LeastSquaresFit, EnvelopeFit
+export KulfanParameters, KulfanFitMethod, LeastSquaresFit
+export ShrinkWrap, shrink_wrap
 export fit_kulfan_parameters, kulfan_to_coordinates
 export NeuralFoilModel, NeuralFoilResult, load_neuralfoil_model
 export neuralfoil_aero, neuralfoil_section

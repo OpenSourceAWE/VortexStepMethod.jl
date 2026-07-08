@@ -37,26 +37,23 @@ end
 
 """
     obj_to_yaml(obj_path, output_dir; n_sections, Re, alpha_range=-180:1:180,
-                aero_solver=NeuralFoilSolver(...), model_size="xlarge",
-                weights_dir=nothing, n_crit=9.0, fit_method=LeastSquaresFit(),
+                aero_solver=NeuralFoilSolver(), wrap_method=ShrinkWrap(),
                 spanwise_direction=[0.0, 1.0, 0.0], verbose=true)
 
 Convert a 3D wing `.obj` mesh to the native YAML geometry route.
 
 Stations are placed at equal leading-edge arc-length intervals and sliced
 perpendicular to the local span (see [`perpendicular_sections`](@ref)), which
-keeps the airfoil undistorted near curved tips; each shape is then fitted to
-Kulfan parameters and evaluated with `aero_solver`.
+keeps the airfoil undistorted near curved tips; each shape is then shrink-wrapped
+into a clean airfoil and evaluated with `aero_solver`.
 
 `aero_solver` selects the 2D-airfoil backend: [`NeuralFoilSolver`](@ref) (default,
-fast) or [`XFoilSolver`](@ref) (viscous panel code). The default solver is built
-from `model_size`, `n_crit`, and `weights_dir`; pass `aero_solver=XFoilSolver()`
+fast) or [`XFoilSolver`](@ref) (viscous panel code); pass `aero_solver=XFoilSolver()`
 to use XFoil instead. Each section's polar is written as `POLAR_VECTORS`.
 
-`fit_method` selects the Kulfan fit (see [`fit_kulfan_parameters`](@ref)). Pass
-an [`EnvelopeFit`](@ref) to wrap each section tightly *around* the slice points;
-this is robust to the noisy interior-structure points of a ram-air kite slice
-(ribs, spars) that otherwise pull the default [`LeastSquaresFit`](@ref) inward.
+`wrap_method` ([`ShrinkWrap`](@ref)) wraps each slice's point cloud into a clean closed
+airfoil, robust to the noisy interior-structure points of a ram-air kite slice (ribs,
+spars); NeuralFoil then fits Kulfan parameters to it and XFoil uses it directly.
 
 A slice whose fitted airfoil is implausibly thick relative to the others (e.g. a
 near-vanishing wingtip slice that fits to a blob) is flagged as degenerate: a
@@ -70,8 +67,9 @@ reused. With `reuse_valid_airfoils=false` the degenerate fit is written as is.
 # Output
 Writes into `output_dir`, indexed by source-airfoil id `j` (degenerate sections
 share a neighbour's id):
-- `airfoils/{j}.dat`     — fitted Kulfan airfoil coordinates (matches the polar)
-- `airfoils/{j}_raw.dat` — raw sliced section points (the fit is wrapped around these)
+- `airfoils/{j}.dat`     — shrink-wrapped airfoil coordinates (matches the polar)
+- `airfoils/{j}_raw.dat` — raw sliced section points (the wrap encloses these)
+- `airfoils/{j}_d{deg}.dat` — each trailing-edge-deflected shape (with a `delta_range`)
 - `polars/{j}.csv`    — NeuralFoil polar (alpha, Cd, Cs, Cl, Cm)
 - `geometry.yaml`     — `wing_sections` + `wing_airfoils` referencing the above
 
@@ -82,7 +80,7 @@ function obj_to_yaml(obj_path::String, output_dir::String;
                      n_sections::Int, Re::Real,
                      alpha_range=-180:1:180, delta_range=nothing,
                      aero_solver::AbstractAirfoilSolver=NeuralFoilSolver(),
-                     fit_method::KulfanFitMethod=LeastSquaresFit(),
+                     wrap_method::ShrinkWrap=ShrinkWrap(),
                      reuse_valid_airfoils::Bool=true, max_thickness_ratio::Real=2.0,
                      spanwise_direction=[0.0, 1.0, 0.0], rotation=I,
                      wingtip_distance=0.0, verbose::Bool=true)
@@ -105,12 +103,11 @@ function obj_to_yaml(obj_path::String, output_dir::String;
     stations = NamedTuple[]
     for (i, sec) in enumerate(raw_sections)
         verbose && print("  Section $i (y=$(round(sec.LE_point[2], digits=3)))... ")
-        params = fit_kulfan_parameters(sec.x_airfoil, sec.y_airfoil, fit_method)
-        x_fit, y_fit = kulfan_to_coordinates(params)
+        x_fit, y_fit = shrink_wrap(sec.x_airfoil, sec.y_airfoil, wrap_method)
         thickness = maximum(abs, y_fit)
-        verbose && println("fitted (thickness=$(round(thickness, digits=3)))")
+        verbose && println("wrapped (thickness=$(round(thickness, digits=3)))")
         push!(stations, (; sec.LE_point, sec.TE_point, xa=sec.x_airfoil,
-                         ya=sec.y_airfoil, params, x_fit, y_fit, thickness))
+                         ya=sec.y_airfoil, x_fit, y_fit, thickness))
     end
 
     n = length(stations)
@@ -129,9 +126,10 @@ function obj_to_yaml(obj_path::String, output_dir::String;
         raw_rel = joinpath("airfoils", "$(j)_raw.dat")
         csv_rel = joinpath("polars", "$j.csv")
         try
-            res = generate_polar_from_coordinates(s.xa, s.ya,
+            res = generate_polar_from_coordinates(s.x_fit, s.y_fit,
                 joinpath(output_dir, csv_rel); Re=Float64(Re), alpha_range,
-                fit_method, solver=aero_solver, delta_range)
+                solver=aero_solver, delta_range,
+                dat_prefix=joinpath(output_dir, "airfoils", "$j"))
             clvals = res isa AbstractVector ? collect(sol.cl for sol in res) : vec(res[1])
             all(isnan, clvals) && error("solver produced no converged points")
             write_dat(joinpath(output_dir, dat_rel), "section_$j", s.x_fit, s.y_fit)

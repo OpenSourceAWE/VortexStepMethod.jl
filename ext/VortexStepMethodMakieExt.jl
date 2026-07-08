@@ -1353,13 +1353,30 @@ end
 # --- OBJ mesh / airfoil plotting (formerly ObjAdapterMakieExt) ---
 
 """
-    fitted_airfoil_3d(section, fit_method) -> 3×N matrix or nothing
+    deflect_wrap(xf, yf, delta_rad; crease_frac=0.75) -> (x, y)
 
-Fit a Kulfan airfoil to a section's sliced contour with `fit_method` and map it back
-into 3D through the section's local airfoil frame, for overlaying on the 3D slice
-diagnostic. Returns `nothing` for a degenerate slice or a blown-up fit.
+Geometrically deflect normalized wrap coordinates by a trailing-edge angle (radians),
+folding about the top surface for positive `delta_rad` and the bottom for negative — the
+same pivot as [`deform_section`](@ref) but keeping the shape in its frame (no re-wrap)
+so the deflection is visible.
 """
-function fitted_airfoil_3d(s, fit_method)
+function deflect_wrap(xf, yf, delta_rad; crease_frac=0.75)
+    xd, yd = collect(Float64, xf), collect(Float64, yf)
+    lo, up = AirfoilAero.get_lower_upper(xd, yd, crease_frac)
+    AirfoilAero.turn_trailing_edge!(delta_rad, xd, yd, lo, up, crease_frac;
+                                    thickness_frac=(delta_rad < 0 ? 0.0 : 1.0))
+    return xd, yd
+end
+
+"""
+    fitted_airfoil_3d(section, wrap_method; delta=0.0, crease_frac=0.75) -> 3×N or nothing
+
+Shrink-wrap a section's sliced contour with `wrap_method` and map it back into 3D
+through the section's local airfoil frame, for overlaying on the 3D slice diagnostic.
+A nonzero `delta` (degrees) deflects the trailing edge first ([`deflect_wrap`](@ref)).
+Returns `nothing` for a degenerate slice.
+"""
+function fitted_airfoil_3d(s, wrap_method; delta=0.0, crease_frac=0.75)
     frame = ObjAdapter.airfoil_frame(s.LE_point, s.TE_point, s.span_dir)
     frame === nothing && return nothing
     x_af, _, z_af = frame
@@ -1368,26 +1385,29 @@ function fitted_airfoil_3d(s, fit_method)
     chord = maximum(px) - minimum(px)
     chord < 1e-9 && return nothing
     x0 = minimum(px)
-    params = AirfoilAero.fit_kulfan_parameters(collect((px .- x0) ./ chord),
-                                               collect(pz ./ chord), fit_method)
-    maximum(abs, [params.upper_weights; params.lower_weights]) > 50 && return nothing
-    xf, yf = AirfoilAero.kulfan_to_coordinates(params)
+    xf, yf = AirfoilAero.shrink_wrap(collect((px .- x0) ./ chord),
+                                     collect(pz ./ chord), wrap_method)
+    maximum(abs, yf) > 1.0 && return nothing
+    iszero(delta) || ((xf, yf) = deflect_wrap(xf, yf, deg2rad(delta); crease_frac))
     return reduce(hcat, [s.LE_point .+ x_af .* (x0 + xf[i] * chord) .+ z_af .* (yf[i] * chord)
                          for i in eachindex(xf)])
 end
 
 """
     plot_slices_3d(obj_path; n_slices=10, rotation=I, n_bins=60,
-                   fit_method=EnvelopeFit(min_distance=0.01), is_show=true)
+                   wrap_method=ShrinkWrap(), delta=0.0, crease_frac=0.75, is_show=true)
 
 3D diagnostic: the OBJ surface mesh with the LE/TE edge curves, each station's
-sliced contour (green), and the `fit_method` Kulfan fit (crimson). **Hovering a
-slice** updates the 2D airfoil panel on the right (raw slice points + the fit).
-Pass `rotation=:auto` (or a 3×3 matrix) to reorient the mesh first.
+sliced contour (green), and its `wrap_method` shrink-wrapped airfoil (crimson). A
+nonzero `delta` (degrees) also draws each section's trailing-edge-deflected airfoil
+(purple). **Hovering a slice** updates the 2D airfoil panel on the right (raw slice
+points + the wrap + the deflected wrap). Pass `rotation=:auto` (or a 3×3 matrix) to
+reorient the mesh first.
 """
 function ObjAdapter.plot_slices_3d(obj_path::String; n_slices::Int=10, rotation=I,
         n_bins::Int=60, wingtip_distance=0.0,
-        fit_method=AirfoilAero.EnvelopeFit(min_distance=0.01), is_show::Bool=true)
+        wrap_method=AirfoilAero.ShrinkWrap(), delta=0.0, crease_frac=0.75,
+        is_show::Bool=true)
     vertices, faces = ObjAdapter.read_faces(obj_path)
     rotation === :auto && (rotation = ObjAdapter.auto_rotation(vertices))
     rotation === I || (vertices = [rotation * v for v in vertices])
@@ -1410,19 +1430,25 @@ function ObjAdapter.plot_slices_3d(obj_path::String; n_slices::Int=10, rotation=
     secs = filter(!isnothing, [ObjAdapter.build_section(vertices, faces, m.le[i], m.te[i],
                                                         m.point[i], m.tangent[i]) for i in idx])
     centroids = [Point3f((s.LE_point .+ s.TE_point) ./ 2) for s in secs]
+    show_delta = !iszero(delta)
     fit2d(s) = begin
-        p = AirfoilAero.fit_kulfan_parameters(collect(Float64, s.x_airfoil),
-                                              collect(Float64, s.y_airfoil), fit_method)
-        maximum(abs, [p.upper_weights; p.lower_weights]) > 50 && return Point2f[]
-        Point2f.(AirfoilAero.kulfan_to_coordinates(p)...)
+        xf, yf = AirfoilAero.shrink_wrap(collect(Float64, s.x_airfoil),
+                                         collect(Float64, s.y_airfoil), wrap_method)
+        def = show_delta ? deflect_wrap(xf, yf, deg2rad(delta); crease_frac) : (xf, yf)
+        (; fit=Point2f.(xf, yf), def=Point2f.(def...))
     end
-    data2d = [(; raw=Point2f.(s.x_airfoil, s.y_airfoil), fit=fit2d(s)) for s in secs]
+    data2d = [(; raw=Point2f.(s.x_airfoil, s.y_airfoil), fit2d(s)...) for s in secs]
 
     for s in secs
         c = reduce(hcat, s.contour3d)
         scatter!(ax, c[1, :], c[2, :], c[3, :]; color=:seagreen, markersize=3)
-        f = fitted_airfoil_3d(s, fit_method)
+        f = fitted_airfoil_3d(s, wrap_method)
         f === nothing || lines!(ax, f[1, :], f[2, :], f[3, :]; color=:crimson, linewidth=1.5)
+        if show_delta
+            d = fitted_airfoil_3d(s, wrap_method; delta, crease_frac)
+            d === nothing ||
+                lines!(ax, d[1, :], d[2, :], d[3, :]; color=:purple, linewidth=1.5)
+        end
     end
     axislegend(ax; position=:rt)
 
@@ -1433,9 +1459,13 @@ function ObjAdapter.plot_slices_3d(obj_path::String; n_slices::Int=10, rotation=
     colsize!(fig.layout, 1, Relative(0.6))
     raw2 = scatter!(ax2, @lift(data2d[$sel].raw); color=:seagreen, markersize=6)
     fit2 = lines!(ax2, @lift(data2d[$sel].fit); color=:crimson, linewidth=2)
+    handles, labels = [raw2, fit2], ["slice", "fit"]
+    if show_delta
+        def2 = lines!(ax2, @lift(data2d[$sel].def); color=:purple, linewidth=2)
+        push!(handles, def2); push!(labels, "δ=$(delta)°")
+    end
     ylims!(ax2, -1, 1)   # fixed y/c so airfoil thickness is comparable across slices
-    Legend(gl2[1, 1], [raw2, fit2], ["slice", "fit"];
-           orientation=:horizontal, framevisible=false)
+    Legend(gl2[1, 1], handles, labels; orientation=:horizontal, framevisible=false)
 
     on(events(ax.scene).mouseposition) do mp
         is_mouseinside(ax.scene) || return

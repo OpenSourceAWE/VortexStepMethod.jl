@@ -71,9 +71,9 @@ end
 """
     DeformedSection
 
-A section deformed by a trailing-edge deflection: the `EnvelopeFit` `kulfan`
-parameters and their repaned coordinates `(x, y)`. NeuralFoil consumes `kulfan`,
-XFoil consumes `(x, y)` — both describe the same shape.
+A section deformed by a trailing-edge deflection: its coordinates `(x, y)` and the
+[`LeastSquaresFit`](@ref) `kulfan` parameters fitted to them. XFoil consumes `(x, y)`
+directly, NeuralFoil consumes `kulfan` — both describe the same shape.
 """
 struct DeformedSection
     kulfan::KulfanParameters
@@ -82,31 +82,36 @@ struct DeformedSection
 end
 
 """
-    deform_section(base, delta; crease_frac=0.9, thickness_frac=1.0,
-                   flip_thickness_neg=true, fit_method=EnvelopeFit(),
-                   n_points=120) -> DeformedSection
+    deform_section(x, y, delta; crease_frac=0.9, thickness_frac=1.0,
+                   flip_thickness_neg=true,
+                   wrap_method=ShrinkWrap(clearance=0.0, smoothing=0.3))
+        -> DeformedSection
 
-Deform a base airfoil (Kulfan parameters) by trailing-edge deflection `delta`
-(radians) about the crease axis (`crease_frac` along chord, `thickness_frac`
-through thickness — 1.0 = top surface), then refit with `fit_method` and repane.
-The refit/repane produces a clean, even panel distribution for both backends.
+Deform the airfoil coordinates `(x, y)` by trailing-edge deflection `delta` (radians)
+about the crease at `crease_frac` along the chord (pivoting through thickness at
+`thickness_frac`, 1.0 = top surface), then re-[`shrink_wrap`](@ref) the deflected shape
+into clean cosine panels and fit [`LeastSquaresFit`](@ref) Kulfan parameters to it.
+XFoil consumes the coordinates directly, NeuralFoil the Kulfan parameters.
 
-With `flip_thickness_neg` a negative `delta` mirrors the pivot through thickness
-(`thickness_frac -> 1 - thickness_frac`): a soft membrane wing that folds about its
-top surface for positive deflection rotates about its lower surface for negative.
+`flip_thickness_neg` folds a soft membrane about its lower surface for negative `delta`.
+The re-wrap uses zero clearance (no added thickness) and low `smoothing` so the sharp
+hinge survives; being a single-valued height field it cannot produce the overlapping
+panels that XFoil's own repaneling can hit at the crease. `delta == 0` returns the base
+coordinates unchanged.
 """
-function deform_section(base::KulfanParameters, delta;
-                        crease_frac=0.9, thickness_frac=1.0, flip_thickness_neg=true,
-                        fit_method::KulfanFitMethod=EnvelopeFit(), n_points::Int=120)
-    if flip_thickness_neg && delta < 0
-        thickness_frac = 1 - thickness_frac
+function deform_section(x, y, delta; crease_frac=0.9, thickness_frac=1.0,
+                        flip_thickness_neg=true,
+                        wrap_method::ShrinkWrap=ShrinkWrap(clearance=0.0,
+                                                          smoothing=0.3))
+    xd, yd = collect(float.(x)), collect(float.(y))
+    if !iszero(delta)
+        pivot = flip_thickness_neg && delta < 0 ? 1 - thickness_frac : thickness_frac
+        lower, upper = get_lower_upper(xd, yd, crease_frac)
+        turn_trailing_edge!(delta, xd, yd, lower, upper, crease_frac; thickness_frac=pivot)
+        xd, yd = shrink_wrap(xd, yd, wrap_method)
     end
-    x, y = kulfan_to_coordinates(base; n_points)
-    lower, upper = get_lower_upper(x, y, crease_frac)
-    turn_trailing_edge!(delta, x, y, lower, upper, crease_frac; thickness_frac)
-    kulfan = fit_kulfan_parameters(x, y, fit_method)
-    xr, yr = kulfan_to_coordinates(kulfan; n_points)
-    return DeformedSection(kulfan, xr, yr)
+    kulfan = fit_kulfan_parameters(xd, yd, LeastSquaresFit())
+    return DeformedSection(kulfan, xd, yd)
 end
 
 """

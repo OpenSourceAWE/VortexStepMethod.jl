@@ -31,6 +31,9 @@ obj_path = normpath(joinpath(@__DIR__, "..", "..",
         @test isfile(yaml)
         @test isfile(joinpath(out, "polars", "1.csv"))
         @test isfile(joinpath(out, "airfoils", "1.dat"))
+        # each trailing-edge deflection is stored as its own .dat
+        @test isfile(joinpath(out, "airfoils", "1_d2.dat"))
+        @test isfile(joinpath(out, "airfoils", "1_d-2.dat"))
         # a delta column marks the CSV as long-format POLAR_MATRICES
         @test occursin("delta", lowercase(readline(joinpath(out, "polars", "1.csv"))))
 

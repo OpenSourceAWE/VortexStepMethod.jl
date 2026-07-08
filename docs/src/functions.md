@@ -33,7 +33,8 @@ CurrentModule = VortexStepMethod.AirfoilAero
 fit_kulfan_parameters
 KulfanFitMethod
 LeastSquaresFit
-EnvelopeFit
+ShrinkWrap
+shrink_wrap
 AbstractAirfoilSolver
 XFoilSolver
 NeuralFoilSolver

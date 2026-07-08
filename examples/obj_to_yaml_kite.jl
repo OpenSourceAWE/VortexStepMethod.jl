@@ -2,13 +2,13 @@
 Convert a 3D wing `.obj` mesh to the native YAML geometry route with the
 NeuralFoil adapter, then load and solve it like any other YAML wing.
 
-The adapter slices the mesh, fits each section to Kulfan parameters, evaluates
-NeuralFoil, and writes `airfoils/*.dat`, `polars/*.csv`, and a `geometry.yaml`.
+The adapter slices the mesh, shrink-wraps each section into a clean airfoil,
+evaluates NeuralFoil, and writes `airfoils/*.dat`, `polars/*.csv`, and a
+`geometry.yaml`.
 
-This example fits each section with `EnvelopeFit`, which wraps tightly around the
-slice points with clearance `min_distance` instead of least-squaring through
-them. The envelope is robust to the noisy interior-structure points (ribs, spars)
-of a ram-air kite slice that otherwise pull the default `LeastSquaresFit` inward.
+`ShrinkWrap` wraps each slice's point cloud into a clean closed airfoil with a
+`clearance` gap, robust to the noisy interior-structure points (ribs, spars) of a
+ram-air kite slice that otherwise pull a plain least-squares fit inward.
 """
 
 using Pkg
@@ -18,7 +18,7 @@ end
 using GLMakie
 using VortexStepMethod
 using VortexStepMethod.ObjAdapter
-using VortexStepMethod.AirfoilAero: EnvelopeFit
+using VortexStepMethod.AirfoilAero: ShrinkWrap, NeuralFoilSolver
 using LinearAlgebra
 
 PLOT = true
@@ -31,8 +31,8 @@ output_dir = joinpath(project_dir, "output", "ram_air_kite_converted")
 # --- Convert the .obj mesh to the YAML route ---
 println("Converting $(basename(obj_path)) to YAML...")
 geometry_file = obj_to_yaml(obj_path, output_dir;
-    n_sections=36, Re=5e5, alpha_range=-20:1:20, model_size="xlarge",
-    fit_method=EnvelopeFit(min_distance=0.0001))
+    n_sections=36, Re=5e5, alpha_range=-20:1:20,
+    aero_solver=NeuralFoilSolver(model_size="xlarge"), wrap_method=ShrinkWrap())
 
 # --- Report per-section fit error: how far any raw point sticks OUTSIDE the
 # fitted envelope (interior structure points are ignored by the envelope fit). ---

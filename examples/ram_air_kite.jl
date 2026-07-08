@@ -5,7 +5,7 @@ end
 using GLMakie
 using VortexStepMethod
 using VortexStepMethod.ObjAdapter
-using VortexStepMethod.AirfoilAero: XFoilSolver, NeuralFoilSolver, LeastSquaresFit, EnvelopeFit
+using VortexStepMethod.AirfoilAero: XFoilSolver, NeuralFoilSolver, ShrinkWrap
 using LinearAlgebra
 
 PLOT = true
@@ -43,13 +43,15 @@ N_SECTIONS = 50
 # wingtips, which slice to degenerate airfoils that XFoil cannot analyse.
 WINGTIP_DISTANCE = 0.1
 
-# FIT_METHOD = LeastSquaresFit()
-FIT_METHOD = EnvelopeFit()
+# Shrink-wrap each raw slice into a clean closed airfoil. `clearance` sets the minimum
+# thickness (2*clearance); higher `smoothing` rounds corners and fairs harder.
+WRAP = ShrinkWrap(clearance=0.006, smoothing=1.0)
 
-# 3D slice diagnostic: mesh + LE/TE curves + section contours and their fits.
-# Hover a slice to inspect its 2D airfoil (raw points + the fit).
-fig_slices_3d = plot_slices_3d(obj_path; n_slices=N_SECTIONS, fit_method=FIT_METHOD,
-                               wingtip_distance=WINGTIP_DISTANCE)
+# 3D slice diagnostic: mesh + LE/TE curves + section contours and their wraps. A nonzero
+# `delta` (deg) overlays the trailing-edge-deflected airfoil (purple) for inspection.
+# Hover a slice to inspect its 2D airfoil (raw points + wrap + deflected wrap).
+fig_slices_3d = plot_slices_3d(obj_path; n_slices=N_SECTIONS, wrap_method=WRAP,
+                               wingtip_distance=WINGTIP_DISTANCE, delta=15.0)
 save("ram_air_slices_3d.png", fig_slices_3d)
 
 function matrix_wing(solver, subdir; n_panels=50, n_sections=N_SECTIONS)
@@ -57,7 +59,8 @@ function matrix_wing(solver, subdir; n_panels=50, n_sections=N_SECTIONS)
     yaml = joinpath(out_dir, "geometry.yaml")
     # if !isfile(yaml)
         obj_to_yaml(obj_path, out_dir; n_sections, Re=RE, alpha_range, delta_range,
-            aero_solver=solver, wingtip_distance=WINGTIP_DISTANCE, verbose=false)
+            aero_solver=solver, wrap_method=WRAP, wingtip_distance=WINGTIP_DISTANCE,
+            verbose=false)
     # end
     return Wing(yaml; n_panels)
 end

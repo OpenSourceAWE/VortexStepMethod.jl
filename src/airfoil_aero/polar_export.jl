@@ -1,23 +1,27 @@
 """
-    generate_aero_matrices(solver, base; alpha_range, delta_range, Re,
-                           crease_frac=0.75, remove_nan=true) -> (cl, cd, cm)
+    generate_aero_matrices(solver, x, y; alpha_range, delta_range, Re,
+                           crease_frac=0.75, remove_nan=true, on_deform=nothing)
+        -> (cl, cd, cm)
 
-Build `(alpha × delta)` coefficient matrices for a base airfoil (`KulfanParameters`).
-Each `delta` deflects the trailing edge ([`deform_section`](@ref)); the deflected
-shape is then swept over `alpha_range` (radians) with `solver` — any
+Build `(alpha × delta)` coefficient matrices for a base airfoil given as coordinates
+`(x, y)`. Each `delta` deflects the trailing edge ([`deform_section`](@ref)); the
+deflected shape is then swept over `alpha_range` (radians) with `solver` — any
 [`AbstractAirfoilSolver`](@ref), so this works identically for XFoil and NeuralFoil.
 `Re` is the Reynolds number. With `remove_nan` the (non-converged) `NaN` entries are
-interpolated away.
+interpolated away. `on_deform(delta, x, y)`, if given, is called with each deflected
+shape's coordinates (e.g. to write a per-deflection `.dat`).
 """
-function generate_aero_matrices(solver::AbstractAirfoilSolver, base::KulfanParameters;
-        alpha_range, delta_range, Re, crease_frac=0.75, remove_nan=true)
+function generate_aero_matrices(solver::AbstractAirfoilSolver, x, y;
+        alpha_range, delta_range, Re, crease_frac=0.75, remove_nan=true,
+        on_deform=nothing)
     na, nd = length(alpha_range), length(delta_range)
     cl = fill(NaN, na, nd)
     cd = fill(NaN, na, nd)
     cm = fill(NaN, na, nd)
     alphas = collect(Float64, alpha_range)
     for (j, delta) in enumerate(delta_range)
-        def = deform_section(base, delta; crease_frac)
+        def = deform_section(x, y, delta; crease_frac)
+        on_deform === nothing || on_deform(delta, def.x, def.y)
         sols = analyze_sweep(solver, def, alphas, Re)
         for (i, s) in enumerate(sols)
             cl[i, j] = s.cl
@@ -52,10 +56,9 @@ function create_2d_polars(; dat_path, cl_polar_path, cd_polar_path, cm_polar_pat
         solver::AbstractAirfoilSolver=XFoilSolver(), remove_nan=true)
     x, y = read_dat_coordinates(dat_path)
     isempty(x) && error("No valid coordinates found in $dat_path")
-    base = fit_kulfan_parameters(x, y)
     Re = wind_vel * (area / width) / KINEMATIC_VISCOSITY
     @info "Generating polars with $(nameof(typeof(solver))) at Re=$(round(Re))."
-    cl, cd, cm = generate_aero_matrices(solver, base;
+    cl, cd, cm = generate_aero_matrices(solver, x, y;
         alpha_range, delta_range, Re, crease_frac, remove_nan)
     write_aero_matrix(cl_polar_path, cl, alpha_range, delta_range, "C_l")
     write_aero_matrix(cd_polar_path, cd, alpha_range, delta_range, "C_d")

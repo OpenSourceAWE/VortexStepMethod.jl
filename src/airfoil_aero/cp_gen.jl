@@ -1,27 +1,25 @@
 """
     generate_cp_polar(solver, base; alpha_range, delta_range, n_chord,
-                      reynolds_number, crease_frac=0.9, thickness_frac=1.0,
-                      flip_thickness_neg=true, remove_nan=true) -> CpPolar
+                      reynolds_number, crease_frac=0.9, remove_nan=true) -> CpPolar
 
 Build a chord-slice `Cp(alpha, delta)` table for a base airfoil (Kulfan
 parameters) using the given [`AbstractAirfoilSolver`](@ref). For each `delta` the
-section is deformed and refit ([`deform_section`](@ref)), analysed over
-`alpha_range`, and each surface's `Cp(x/c)` resampled onto the `n_chord` chord
-slices. Non-converged points stay `NaN` and, when `remove_nan`, are filled per
-slice with [`interpolate_matrix_nans!`](@ref). `flip_thickness_neg` flips the
-through-thickness pivot for negative `delta` (see [`deform_section`](@ref)).
+section is deformed ([`deform_section`](@ref)), analysed over `alpha_range`, and each
+surface's `Cp(x/c)` resampled onto the `n_chord` chord slices. Non-converged points
+stay `NaN` and, when `remove_nan`, are filled per slice with
+[`interpolate_matrix_nans!`](@ref).
 """
 function generate_cp_polar(solver::AbstractAirfoilSolver, base::KulfanParameters;
         alpha_range, delta_range, n_chord, reynolds_number,
-        crease_frac=0.9, thickness_frac=1.0, flip_thickness_neg=true, remove_nan=true)
+        crease_frac=0.9, remove_nan=true)
+    x0, y0 = kulfan_to_coordinates(base)
     chord_x = [(i - 0.5) / n_chord for i in 1:n_chord]
     n_alpha, n_delta = length(alpha_range), length(delta_range)
     cp_upper = fill(NaN, n_chord, n_alpha, n_delta)
     cp_lower = fill(NaN, n_chord, n_alpha, n_delta)
 
     for (jd, delta) in enumerate(delta_range)
-        def = deform_section(base, delta; crease_frac, thickness_frac,
-                             flip_thickness_neg)
+        def = deform_section(x0, y0, delta; crease_frac)
         sols = analyze_sweep(solver, def, alpha_range, reynolds_number)
         for (ia, sol) in enumerate(sols)
             isempty(sol.cp_upper) && continue
@@ -42,10 +40,13 @@ end
 """
     generate_cp_polar(solver, x::Vector, y::Vector; kwargs...) -> CpPolar
 
-Convenience: fit base Kulfan parameters from coordinates (via `EnvelopeFit`) first.
+Convenience: [`shrink_wrap`](@ref) the coordinates into a clean airfoil and fit base
+Kulfan parameters ([`LeastSquaresFit`](@ref)) first.
 """
 function generate_cp_polar(solver::AbstractAirfoilSolver, x::Vector, y::Vector; kwargs...)
-    return generate_cp_polar(solver, fit_kulfan_parameters(x, y, EnvelopeFit()); kwargs...)
+    xw, yw = shrink_wrap(x, y, ShrinkWrap())
+    return generate_cp_polar(solver, fit_kulfan_parameters(xw, yw, LeastSquaresFit());
+                             kwargs...)
 end
 
 """

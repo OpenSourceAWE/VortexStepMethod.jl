@@ -1,10 +1,10 @@
 using Test
 using VortexStepMethod.AirfoilAero
 import VortexStepMethod
-using VortexStepMethod.AirfoilAero: KulfanParameters, LeastSquaresFit, EnvelopeFit,
-                       fit_kulfan_parameters, kulfan_to_coordinates, neuralfoil_aero,
-                       class_function, bernstein_basis, leading_edge_basis,
-                       normalize_airfoil
+using VortexStepMethod.AirfoilAero: KulfanParameters, LeastSquaresFit, ShrinkWrap,
+                       shrink_wrap, fit_kulfan_parameters, kulfan_to_coordinates,
+                       neuralfoil_aero, class_function, bernstein_basis,
+                       leading_edge_basis, normalize_airfoil
 
 read_dat_coords(path) = begin
     x = Float64[]; y = Float64[]
@@ -46,32 +46,33 @@ end
         @test params.TE_thickness ≈ 0.0 atol = 1e-12
     end
 
-    @testset "Envelope fit encloses points with clearance" begin
-        xn, yn, _ = normalize_airfoil(xr, yr)
-        xc = clamp.(xn, 0.0, 1.0)
+    @testset "Shrink-wrap encloses points with clearance" begin
+        xn, yn, _ = normalize_airfoil(collect(float.(xr)), collect(float.(yr)))
         mid = (xn .> 0.05) .& (xn .< 0.95)
 
+        interp(xs, ys, px) = begin
+            px <= xs[1] && return ys[1]
+            px >= xs[end] && return ys[end]
+            i = searchsortedlast(xs, px)
+            t = (px - xs[i]) / (xs[i+1] - xs[i])
+            (1 - t) * ys[i] + t * ys[i+1]
+        end
+
         function min_clearance(method)
-            fitted = fit_kulfan_parameters(xr, yr, method)
-            n = length(fitted.upper_weights)
-            shape = class_function(xc) .* (bernstein_basis(xc, n - 1) *
-                    fitted.upper_weights) .+ fitted.leading_edge_weight .*
-                    leading_edge_basis(xc, n)
-            upper = shape .+ xc .* (fitted.TE_thickness / 2)
-            lower = class_function(xc) .* (bernstein_basis(xc, n - 1) *
-                    fitted.lower_weights) .+ fitted.leading_edge_weight .*
-                    leading_edge_basis(xc, n) .- xc .* (fitted.TE_thickness / 2)
+            xw, yw = shrink_wrap(xr, yr, method)
+            le = argmin(xw)
+            xu, yu = reverse(xw[1:le]), reverse(yw[1:le])
+            xl, yl = xw[le:end], yw[le:end]
+            upper = [interp(xu, yu, px) for px in xn]
+            lower = [interp(xl, yl, px) for px in xn]
             return minimum((upper .- yn)[mid]), minimum((yn .- lower)[mid])
         end
 
-        env_upper, env_lower = min_clearance(EnvelopeFit(min_distance=0.005))
-        @test env_upper > 0.0035
-        @test env_lower > 0.0035
+        env_upper, env_lower = min_clearance(ShrinkWrap(clearance=0.005))
+        @test env_upper > 0.004
+        @test env_lower > 0.004
 
-        lsq_upper, _ = min_clearance(LeastSquaresFit())
-        @test lsq_upper < env_upper
-
-        wide_upper, _ = min_clearance(EnvelopeFit(min_distance=0.02))
+        wide_upper, _ = min_clearance(ShrinkWrap(clearance=0.02))
         @test wide_upper > env_upper
     end
 

@@ -1,17 +1,18 @@
 """
     XFoilSolver
 
-XFoil backend. Panels the (repaned) deformed coordinates and reads the pressure
-distribution from `Xfoil.cpdump`. Defaults match NeuralFoil's training runs
-(`xfoil_repanel` default paneling, `max_iter=100`, incompressible) so the two
-backends are comparable.
+XFoil backend. Loads the deformed coordinates (optionally repaneling them) and reads
+the pressure distribution from `Xfoil.cpdump`. Defaults match NeuralFoil's training
+runs (`max_iter=100`, incompressible) so the two backends are comparable.
 
 # Fields
-- `npan`: XFoil panel count (default 160, XFoil's `PANE` default).
+- `npan`: XFoil panel count when repaneling (default 160, XFoil's `PANE` default).
 - `max_iter`: viscous iterations per angle (default 100).
 - `xtrip`: forced transition `(upper, lower)` (default `(0.05, 0.05)`).
 - `ncrit`: e^N transition criticality (default 9.0, the standard clean-tunnel value).
 - `mach`: Mach number (default 0.0, incompressible).
+- `repanel`: repanel the input coordinates with `Xfoil.pane` before solving (default
+  `false`, since [`shrink_wrap`](@ref) already emits a cosine-clustered `.dat`).
 """
 @with_kw struct XFoilSolver <: AbstractAirfoilSolver
     npan::Int = 160
@@ -19,18 +20,20 @@ backends are comparable.
     xtrip::Tuple{Float64,Float64} = (0.05, 0.05)
     ncrit::Float64 = 9.0
     mach::Float64 = 0.0
+    repanel::Bool = false
 end
 
 """
     analyze_sweep(solver::XFoilSolver, def, alpha_range, Re) -> Vector{SectionSolution}
 
-Set the deformed coordinates once, pane, then solve `alpha_range` (radians)
-sweeping negative and positive angles outward from zero with a reinit at each side
-for convergence. Non-converged angles yield empty Cp and `NaN` confidence.
+Set the deformed coordinates once (repaneling if `solver.repanel`), then solve
+`alpha_range` (radians) sweeping negative and positive angles outward from zero with a
+reinit at each side for convergence. Non-converged angles yield empty Cp and `NaN`
+confidence.
 """
 function analyze_sweep(solver::XFoilSolver, def::DeformedSection, alpha_range, Re)
     Xfoil.set_coordinates(def.x, def.y)
-    Xfoil.pane(npan=solver.npan)
+    solver.repanel && Xfoil.pane(npan=solver.npan)
     sols = Vector{SectionSolution}(undef, length(alpha_range))
     neg = sort(findall(<(0.0), alpha_range); rev=true)
     pos = sort(findall(>=(0.0), alpha_range))

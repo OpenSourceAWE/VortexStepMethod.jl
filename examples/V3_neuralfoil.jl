@@ -5,7 +5,7 @@ end
 using GLMakie
 using VortexStepMethod
 using VortexStepMethod.ObjAdapter
-using VortexStepMethod.AirfoilAero: EnvelopeFit, NeuralFoilSolver, XFoilSolver, LeastSquaresFit
+using VortexStepMethod.AirfoilAero: ShrinkWrap, NeuralFoilSolver, XFoilSolver
 using LinearAlgebra
 
 # Configuration
@@ -41,20 +41,14 @@ ROTATION = :auto
 # Marched leading-edge stations across the span (finer => smoother edge trace).
 N_BINS = 100
 
-n_grid = 100
-tightness_dist = ones(n_grid)
-tightness_dist[1:6] .= 10.0
-tightness_dist[90:100] .= 10.0
-# tightness_dist[5:35] .= 0.5
+# Shrink-wrap each raw slice into a clean closed airfoil. `clearance` sets the minimum
+# thickness (2*clearance); higher `smoothing` rounds corners and fairs harder.
+WRAP = ShrinkWrap(clearance=0.0, smoothing=0.2)
 
-FIT_METHOD = EnvelopeFit(min_distance=0.0, tightness=1.0,
-                         tightness_dist=tightness_dist)
-# FIT_METHOD = LeastSquaresFit()
-
-# 3D slice diagnostic: mesh + LE/TE curves + section contours and their fits.
-# Hover a slice to inspect its 2D airfoil (raw points + the envelope fit).
+# 3D slice diagnostic: mesh + LE/TE curves + section contours and their wraps.
+# Hover a slice to inspect its 2D airfoil (raw points + the shrink-wrap).
 fig_slices_3d = plot_slices_3d(OBJ_PATH; n_slices=N_SLICES, rotation=ROTATION,
-                               n_bins=N_BINS, fit_method=FIT_METHOD)
+                               n_bins=N_BINS, wrap_method=WRAP)
 save("V3_slices_3d.png", fig_slices_3d)
 
 # Generate per-slice NeuralFoil polars from the envelope-fitted sections. XFoil is also
@@ -62,7 +56,7 @@ save("V3_slices_3d.png", fig_slices_3d)
 # the V3's thin, tube-nosed membrane airfoils, so NeuralFoil is used here.
 println("Generating NeuralFoil polars from OBJ mesh...")
 generate_section_polars(OBJ_PATH, POLARS_DIR; n_slices=N_SLICES, Re=RE,
-    rotation=ROTATION, n_bins=N_BINS, fit_method=FIT_METHOD,
+    rotation=ROTATION, n_bins=N_BINS, wrap_method=WRAP,
     solver=NF_SOLVER, delta_range=DELTA_RANGE, verbose=true)
 
 # Flight conditions

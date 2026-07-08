@@ -27,9 +27,10 @@ end
 """
     KulfanFitMethod
 
-Abstract supertype for Kulfan-parameter fitting strategies. Concrete methods
-[`LeastSquaresFit`](@ref) and [`EnvelopeFit`](@ref) are passed to
-[`fit_kulfan_parameters`](@ref), which dispatches on them.
+Abstract supertype for Kulfan-parameter fitting strategies. The concrete method
+[`LeastSquaresFit`](@ref) is passed to [`fit_kulfan_parameters`](@ref), which dispatches
+on it. To wrap a noisy or open point cloud into a clean airfoil first, use
+[`shrink_wrap`](@ref) and then fit the result.
 """
 abstract type KulfanFitMethod end
 
@@ -38,46 +39,11 @@ abstract type KulfanFitMethod end
 
 Least-squares Kulfan fit: solves a single system that fits both surfaces
 *through* the points, matching AeroSandbox's `get_kulfan_parameters` (the
-parameterization NeuralFoil was trained on). Sensitive to noisy interior points;
-use [`EnvelopeFit`](@ref) for those.
+parameterization NeuralFoil was trained on). Sensitive to noisy interior points; wrap
+the cloud with [`shrink_wrap`](@ref) first when fitting a raw slice.
 """
 @with_kw struct LeastSquaresFit <: KulfanFitMethod
     n_weights::Int = 8
-end
-
-"""
-    EnvelopeFit(; min_distance=0.0, tightness=1.0, distance_penalty=1e4,
-                n_grid=80, n_weights=8, ...)
-
-Enclosing Kulfan fit: an outer envelope that keeps every point at least `min_distance`
-inside the surfaces (a hard constraint, so the fit always encloses the geometry) while
-hugging them as `tightness` asks. Robust to noisy interior points that pull
-[`LeastSquaresFit`](@ref) inward. See [`fit_kulfan_parameters`](@ref) for the algorithm.
-
-# Fields
-- `min_distance`: clearance each surface keeps outside every point
-- `distance_penalty`: weight of the hard clearance constraint
-- `tightness`: weight of the hug objective — pulls the surfaces together (minimising
-  thickness), each held out by the clearance constraint; traded off against a fixed
-  arc-length (smoothing) term
-- `tightness_dist`: chordwise distribution scaling `tightness`, sampled at equal `x/c`
-  and linearly interpolated. Lower it over a zone to fair smoothly instead of hugging —
-  e.g. over a kite's LE tube, where the clearance constraint pins the upper surface to
-  the tube crown so the lower surface floats out and fairs. Default `ones(n_grid)`.
-- `n_weights`: weights per surface (NeuralFoil uses 8)
-- `n_grid`: chordwise stations for the distributions and the perimeter
-- `n_iter`, `tol`: iteration controls; `regularization`: Tikhonov weight toward the LSQ fit
-"""
-@with_kw struct EnvelopeFit <: KulfanFitMethod
-    min_distance::Float64 = 0.0
-    n_weights::Int = 8
-    tightness::Float64 = 1.0
-    distance_penalty::Float64 = 1e4
-    n_grid::Int = 80
-    tightness_dist::Vector{Float64} = ones(n_grid)
-    n_iter::Int = 30
-    regularization::Float64 = 1e-6
-    tol::Float64 = 1e-10
 end
 
 """
@@ -162,10 +128,9 @@ end
     fit_kulfan_parameters(x::Vector, y::Vector, method::KulfanFitMethod)
     fit_kulfan_parameters(x::Vector, y::Vector; n_weights=8)
 
-Fit Kulfan CST parameters to airfoil coordinates. The `method` selects the
-strategy: [`LeastSquaresFit`](@ref) fits *through* the points (default), while
-[`EnvelopeFit`](@ref) wraps tightly *around* them and is robust to noisy interior
-points. The keyword form is shorthand for `LeastSquaresFit(; n_weights)`.
+Fit Kulfan CST parameters to airfoil coordinates with [`LeastSquaresFit`](@ref), which
+fits *through* the points. The keyword form is shorthand for `LeastSquaresFit(;
+n_weights)`. For a noisy or open point cloud, wrap it with [`shrink_wrap`](@ref) first.
 
 Input coordinates are assumed to be in Selig order (TE upper -> LE -> TE lower).
 
@@ -209,103 +174,6 @@ function fit_kulfan_parameters(x::Vector{T}, y::Vector{T},
     lower_weights = coeffs[1:n_weights]
     upper_weights = coeffs[n_weights+1:2n_weights]
     leading_edge_weight = coeffs[2n_weights+1]
-
-    return KulfanParameters(upper_weights, lower_weights, leading_edge_weight,
-                            TE_thickness)
-end
-
-"""
-    fit_kulfan_parameters(x, y, method::EnvelopeFit)
-
-Fit Kulfan CST parameters to an outer envelope of the point cloud `(x, y)`: each
-surface hugs the points but a hard constraint keeps it at least `min_distance`
-outside every one of them, so the fit encloses the geometry even with noisy interior
-points (unlike [`LeastSquaresFit`](@ref), which fits *through* them). `min_distance`
-also sets the minimum thickness where the surfaces nearly coincide, preventing
-collapse to zero. LE and TE are pinned at the extreme points by the CST class function.
-
-Solved as "minimise `tightness`·Σ(upper − lower)² + (arc length) subject to
-`upper(xᵢ) ≥ yᵢ + min_distance` and `lower(xᵢ) ≤ yᵢ - min_distance`" by iteratively
-reweighted active-set least-squares. Each iteration stacks four blocks: the thickness
-objective scaled by `tightness`·`tightness_dist(xᵢ)` (a two-surface quantity, so it
-targets 0 and never references the point `y` values — interior points cannot erode the
-clearance); a penalty row per violated clearance constraint (`distance_penalty`);
-arc-length rows over `n_grid` chordwise segments reweighted by inverse length; and a
-Tikhonov term toward the least-squares seed (`regularization`). Only the ratio of
-`tightness` to the unit arc-length weight matters, so the arc-length weight is fixed at 1.
-
-# Returns
-- `KulfanParameters`: fitted parameters
-"""
-function fit_kulfan_parameters(x::Vector{T}, y::Vector{T},
-                               method::EnvelopeFit) where T
-    n_weights = method.n_weights
-    d = T(method.min_distance)
-    x_norm, y_norm, _ = normalize_airfoil(x, y)
-    xv = clamp.(x_norm, zero(T), one(T))
-    m = length(xv)
-    n_params = 2n_weights + 2
-
-    surface_design(xs) = begin
-        cs = class_function(xs) .* bernstein_basis(xs, n_weights - 1)
-        leb = leading_edge_basis(xs, n_weights)
-        half = xs ./ 2
-        zb = zeros(T, length(xs), n_weights)
-        upper = hcat(zb, cs, leb, half)
-        lower = hcat(cs, zb, leb, .-half)
-        return upper, lower
-    end
-
-    upper_pts, lower_pts = surface_design(xv)
-    A = vcat(upper_pts, .-lower_pts)
-    b = vcat(y_norm .+ d, d .- y_norm)
-
-    sample_dist(dist, xs) = begin
-        itp = linear_interpolation(range(zero(T), one(T), length(dist)),
-                                   T.(dist); extrapolation_bc=Flat())
-        [itp(x) for x in xs]
-    end
-    tight_dist = sample_dist(method.tightness_dist, xv)
-    thickness_rows = sqrt.(T(method.tightness) .* tight_dist) .* (upper_pts .- lower_pts)
-    thickness_rhs = zeros(T, m)
-
-    grid = (one(T) .- cos.(range(zero(T), T(pi), method.n_grid))) ./ 2
-    upper_grid, lower_grid = surface_design(grid)
-    diff_upper = upper_grid[2:end, :] .- upper_grid[1:end-1, :]
-    diff_lower = lower_grid[2:end, :] .- lower_grid[1:end-1, :]
-    perimeter_rows = vcat(diff_upper, diff_lower)
-    dx2 = repeat((grid[2:end] .- grid[1:end-1]) .^ 2, 2)
-
-    reg_rows = sqrt(T(method.regularization)) .* Matrix{T}(I, n_params, n_params)
-    p0 = fit_kulfan_parameters(x, y; n_weights)
-    theta0 = vcat(p0.lower_weights, p0.upper_weights, p0.leading_edge_weight,
-                  p0.TE_thickness)
-    # A near-zero-thickness point set (e.g. an open single-membrane slice) makes the
-    # least-squares seed blow up; fall back to a thin flat seed so the envelope
-    # constraints (min_distance) shape a clean thin airfoil instead.
-    (all(isfinite, theta0) && maximum(abs, theta0) ≤ 10) ||
-        (theta0 = vcat(zeros(T, 2n_weights + 1), 2d))
-    reg_rhs = sqrt(T(method.regularization)) .* theta0
-
-    theta = copy(theta0)
-    for _ in 1:method.n_iter
-        distance_weight = sqrt.(T(method.distance_penalty) .* ((A * theta .- b) .< 0))
-        segment_length = sqrt.(dx2 .+ (perimeter_rows * theta) .^ 2)
-        arclength_weight = sqrt.(one(T) ./ segment_length)
-        M = vcat(thickness_rows, distance_weight .* A,
-                 arclength_weight .* perimeter_rows, reg_rows)
-        rhs = vcat(thickness_rhs, distance_weight .* b,
-                   zeros(T, length(arclength_weight)), reg_rhs)
-        theta_new = M \ rhs
-        converged = maximum(abs.(theta_new .- theta)) < T(method.tol)
-        theta = theta_new
-        converged && break
-    end
-
-    lower_weights = theta[1:n_weights]
-    upper_weights = theta[n_weights+1:2n_weights]
-    leading_edge_weight = theta[2n_weights+1]
-    TE_thickness = max(theta[2n_weights+2], zero(T))
 
     return KulfanParameters(upper_weights, lower_weights, leading_edge_weight,
                             TE_thickness)
