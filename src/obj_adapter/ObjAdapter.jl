@@ -37,11 +37,12 @@ function plot_airfoils(geometry_file::String; kwargs...)
 end
 
 """
-    plot_slices_3d(obj_path; n_slices=10, rotation=I, is_show=true)
+    plot_slices_3d(path; n_slices=10, rotation=I, delta=0.0, is_show=true)
 
-3D diagnostic: draw the OBJ surface mesh with the interpolated leading-/trailing-edge
-curves and each station's sliced airfoil contour (+ chord line) overlaid, to inspect
-how the slicer cuts a mesh. Implemented in `ObjAdapterMakieExt` (load `Makie`/`GLMakie`).
+3D slice diagnostic with a hover 2D airfoil panel. `path` is either a mesh `.obj`
+(live preview: slice and wrap here) or a generated [`obj_to_yaml`](@ref) output
+directory (audit: plot the written `.dat` airfoils the polar pipeline analysed).
+Implemented in the Makie extension (load `Makie`/`GLMakie`); see it for all options.
 """
 function plot_slices_3d end
 

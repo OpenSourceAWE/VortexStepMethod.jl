@@ -47,9 +47,10 @@ WINGTIP_DISTANCE = 0.1
 # hugs the cloud at `clearance` (floored at one grid `cell_size`) with a round nose.
 WRAP = ShrinkWrap(clearance=0.0)
 
-# 3D slice diagnostic: mesh + LE/TE curves + section contours and their wraps. A nonzero
-# `delta` (deg) overlays the trailing-edge-deflected airfoil (purple) for inspection.
-# Hover a slice to inspect its 2D airfoil (raw points + wrap + deflected wrap).
+# 3D slice diagnostic (live preview): mesh + LE/TE curves + section contours, their
+# wraps and Kulfan fits. A nonzero `delta` (deg) also overlays the deflected
+# re-wrapped airfoil (purple) — the deform_section geometry the solvers consume.
+# Hover a slice to inspect its 2D airfoil.
 fig_slices_3d = plot_slices_3d(obj_path; n_slices=N_SECTIONS, wrap_method=WRAP,
                                wingtip_distance=WINGTIP_DISTANCE, delta=15.0)
 save("ram_air_slices_3d.png", fig_slices_3d)
@@ -67,6 +68,13 @@ end
 
 println("Creating XFoil wing...")
 wing_xfoil = matrix_wing(XF_SOLVER, "polars_xfoil")
+
+# Audit plot: same diagnostic, but read from the generated output directory — the
+# written .dat airfoils the polars were actually computed from (delta must be one
+# of delta_range; nothing is re-sliced or re-wrapped).
+fig_audit = plot_slices_3d(joinpath("data", "ram_air_kite", "polars_xfoil");
+                           delta=1.0, obj_path=obj_path)
+save("ram_air_slices_audit.png", fig_audit)
 body_xfoil = BodyAerodynamics([wing_xfoil])
 solver_xfoil = Solver(body_xfoil; aerodynamic_model_type=VSM, rtol=1e-5, solver_type=NONLIN)
 
