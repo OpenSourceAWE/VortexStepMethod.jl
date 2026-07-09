@@ -41,9 +41,12 @@ ROTATION = :auto
 # Marched leading-edge stations across the span (finer => smoother edge trace).
 N_BINS = 100
 
-# Shrink-wrap each raw slice into a clean closed airfoil. `clearance` sets the minimum
-# thickness (2*clearance); higher `smoothing` rounds corners and fairs harder.
-WRAP = ShrinkWrap(clearance=0.0, smoothing=0.2)
+# Shrink-wrap each raw slice into a clean closed airfoil: the distance-field wrap
+# hugs the cloud at `clearance` (floored at one grid `cell_size`); a single-skin
+# canopy becomes a thin capsule. `min_concave_radius` sets the fillet bridging the
+# concave tube-canopy junction: 0.2 smooths the neck over entirely; the default
+# (0.02) traces it, which NeuralFoil also handles fine.
+WRAP = ShrinkWrap(clearance=0.0, min_concave_radius=0.2)
 
 # 3D slice diagnostic: mesh + LE/TE curves + section contours and their wraps.
 # Hover a slice to inspect its 2D airfoil (raw points + the shrink-wrap).
@@ -51,7 +54,7 @@ fig_slices_3d = plot_slices_3d(OBJ_PATH; n_slices=N_SLICES, rotation=ROTATION,
                                n_bins=N_BINS, wrap_method=WRAP)
 save("V3_slices_3d.png", fig_slices_3d)
 
-# Generate per-slice NeuralFoil polars from the envelope-fitted sections. XFoil is also
+# Generate per-slice NeuralFoil polars from the shrink-wrapped sections. XFoil is also
 # supported (pass `solver=XFoilSolver(...)`) but its panel method does not converge on
 # the V3's thin, tube-nosed membrane airfoils, so NeuralFoil is used here.
 println("Generating NeuralFoil polars from OBJ mesh...")

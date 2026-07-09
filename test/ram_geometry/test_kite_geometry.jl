@@ -133,7 +133,8 @@ using Serialization
         
         # Test reading back the matrices
         cl_read, alphas_read, deltas_read = read_aero_matrix(cl_polar_path)
-        @test cl_read[1:end-1,:] ≈ cl_matrix[1:end-1,:]
+        # write_aero_matrix stores coefficients rounded to 4 decimals
+        @test maximum(abs.(cl_read[1:end-1,:] .- cl_matrix[1:end-1,:])) <= 5e-5
         @test isnan(cl_read[end,end])
         @test alphas_read ≈ deg2rad.(alphas)
         @test deltas_read ≈ deg2rad.(d_trailing_edge_angles)

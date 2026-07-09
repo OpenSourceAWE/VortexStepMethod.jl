@@ -47,33 +47,27 @@ end
     end
 
     @testset "Shrink-wrap encloses points with clearance" begin
+        seg_dist(px, py, ax, ay, bx, by) = begin
+            vx, vy = bx - ax, by - ay
+            t = clamp(((px - ax) * vx + (py - ay) * vy) / max(vx^2 + vy^2, eps()),
+                      0.0, 1.0)
+            hypot(px - (ax + t * vx), py - (ay + t * vy))
+        end
         xn, yn, _ = normalize_airfoil(collect(float.(xr)), collect(float.(yr)))
-        mid = (xn .> 0.05) .& (xn .< 0.95)
+        cloud_to_wrap(xw, yw) = minimum(
+            minimum(seg_dist(xn[p], yn[p], xw[k], yw[k], xw[k+1], yw[k+1])
+                    for k in 1:length(xw)-1) for p in eachindex(xn))
 
-        interp(xs, ys, px) = begin
-            px <= xs[1] && return ys[1]
-            px >= xs[end] && return ys[end]
-            i = searchsortedlast(xs, px)
-            t = (px - xs[i]) / (xs[i+1] - xs[i])
-            (1 - t) * ys[i] + t * ys[i+1]
-        end
+        xw, yw = shrink_wrap(xr, yr, ShrinkWrap(clearance=0.005))
+        @test cloud_to_wrap(xw, yw) > 0.004
+        @test (xw[1], yw[1]) == (xw[end], yw[end])
+        @test minimum(xw) < -0.003
 
-        function min_clearance(method)
-            xw, yw = shrink_wrap(xr, yr, method)
-            le = argmin(xw)
-            xu, yu = reverse(xw[1:le]), reverse(yw[1:le])
-            xl, yl = xw[le:end], yw[le:end]
-            upper = [interp(xu, yu, px) for px in xn]
-            lower = [interp(xl, yl, px) for px in xn]
-            return minimum((upper .- yn)[mid]), minimum((yn .- lower)[mid])
-        end
+        xd, yd = shrink_wrap(xr, yr, ShrinkWrap(clearance=0.02))
+        @test cloud_to_wrap(xd, yd) > 0.016
 
-        env_upper, env_lower = min_clearance(ShrinkWrap(clearance=0.005))
-        @test env_upper > 0.004
-        @test env_lower > 0.004
-
-        wide_upper, _ = min_clearance(ShrinkWrap(clearance=0.02))
-        @test wide_upper > env_upper
+        xt, yt = shrink_wrap(xr, yr, ShrinkWrap(clearance=0.0))
+        @test cloud_to_wrap(xt, yt) < 0.002
     end
 
     @testset "NeuralFoil matches Python neuralfoil (xlarge)" begin

@@ -349,6 +349,26 @@ function march_edges(vertices, faces; step)
 end
 
 """
+    densify_contour(contour, max_edge) -> Vector{Vector{Float64}}
+
+Insert evenly spaced points along contour edges longer than `max_edge`. Coarse mesh
+triangles otherwise leave large hops in the slice cloud, which force the shrink
+wrap's auto-raised rolling ball far up and over-smooth the wrapped airfoil.
+"""
+function densify_contour(contour, max_edge)
+    out = Vector{Float64}[]
+    for i in 1:length(contour)-1
+        p1, p2 = contour[i], contour[i+1]
+        n = clamp(ceil(Int, norm(p2 .- p1) / max_edge), 1, 100)
+        for k in 0:n-1
+            push!(out, p1 .+ (p2 .- p1) .* (k / n))
+        end
+    end
+    push!(out, contour[end])
+    return out
+end
+
+"""
     build_section(vertices, faces, le, te, point, tangent) -> section or nothing
 
 Slice the mesh at one marched station ([`airfoil_frame`](@ref) drops the chordwise
@@ -363,6 +383,7 @@ function build_section(vertices, faces, le, te, point, tangent)
     isempty(segments) && return nothing
     contour = order_segments_to_contour(segments)
     length(contour) < 5 && return nothing
+    contour = densify_contour(contour, 0.005 * norm(te .- le))
     af = plane_contour_to_airfoil(contour, le, x_af, z_af)
     af === nothing && return nothing
     return (; LE_point=le, TE_point=te, span_dir=y_af, contour3d=contour,

@@ -34,18 +34,18 @@ NF_SOLVER = NeuralFoilSolver(model_size=NF_MODEL_SIZE, n_crit=N_CRIT,
 # over (alpha, delta) with the chosen solver, written as long-format POLAR_MATRICES.
 # The result is cached under data/ram_air_kite/<subdir>; delete it to regenerate.
 obj_path = joinpath("data", "ram_air_kite", "ram_air_kite_body.obj")
-# alpha_range = -8:2:26
-alpha_range = -10:5:30
-delta_range = -0:1
-N_SECTIONS = 50
+alpha_range = -8:2:26
+# alpha_range = 0:1
+delta_range = 0:1
+N_SECTIONS = 10
 
 # Inset the tip stations 10 cm along the leading edge so they avoid the near-zero-chord
 # wingtips, which slice to degenerate airfoils that XFoil cannot analyse.
 WINGTIP_DISTANCE = 0.1
 
-# Shrink-wrap each raw slice into a clean closed airfoil. `clearance` sets the minimum
-# thickness (2*clearance); higher `smoothing` rounds corners and fairs harder.
-WRAP = ShrinkWrap(clearance=0.006, smoothing=1.0)
+# Shrink-wrap each raw slice into a clean closed airfoil: the distance-field wrap
+# hugs the cloud at `clearance` (floored at one grid `cell_size`) with a round nose.
+WRAP = ShrinkWrap(clearance=0.0)
 
 # 3D slice diagnostic: mesh + LE/TE curves + section contours and their wraps. A nonzero
 # `delta` (deg) overlays the trailing-edge-deflected airfoil (purple) for inspection.
