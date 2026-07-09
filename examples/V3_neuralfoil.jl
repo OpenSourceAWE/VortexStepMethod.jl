@@ -35,6 +35,10 @@ XF_MACH     = 0.0  # Mach number (0 = incompressible)
 XF_SOLVER = XFoilSolver(npan=XF_NPAN, max_iter=XF_MAX_ITER, ncrit=N_CRIT,
                         xtrip=(XTR_UPPER, XTR_LOWER), mach=XF_MACH)
 
+# VSM solver stability settings.
+RELAXATION         = 0.03   # iteration relaxation factor
+ARTIFICIAL_DAMPING = false   # smooth-circulation stabiliser for difficult cases
+
 # Reorient the mesh to the slicer's chord/span/up convention from its extents.
 ROTATION = :auto
 
@@ -69,6 +73,8 @@ angle_range = range(-5, 25, length=31)
 # Load settings and create wing with CFD polars
 println("\nCreating wing with CFD polars...")
 settings_cfd = VSMSettings("TUDELFT_V3_KITE/vsm_settings.yaml")
+settings_cfd.solver_settings.relaxation_factor = RELAXATION
+settings_cfd.solver_settings.artificial_damping = ARTIFICIAL_DAMPING
 wing_cfd = Wing(settings_cfd)
 refine!(wing_cfd)
 body_cfd = BodyAerodynamics([wing_cfd])
@@ -92,7 +98,8 @@ function build_polar_wing(polars_subdir, out_name)
     refine!(wing)
     body = BodyAerodynamics([wing])
     VortexStepMethod.reinit!(body)
-    return Solver(body, settings_cfd), body
+    s = Solver(body, settings_cfd)
+    return s, body
 end
 
 println("Creating wing with NeuralFoil polars...")

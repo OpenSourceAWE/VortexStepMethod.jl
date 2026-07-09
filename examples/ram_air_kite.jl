@@ -30,6 +30,10 @@ NF_MODEL_SIZE = "large"  # network size: xxsmall … xxxlarge (accuracy vs speed
 NF_SOLVER = NeuralFoilSolver(model_size=NF_MODEL_SIZE, n_crit=N_CRIT,
                              xtr_upper=XTR_UPPER, xtr_lower=XTR_LOWER)
 
+# VSM solver stability settings.
+RELAXATION         = 0.03   # iteration relaxation factor
+ARTIFICIAL_DAMPING = false  # smooth-circulation stabiliser for difficult cases
+
 # Convert-then-load: the .obj mesh is sliced per section, each section fitted and swept
 # over (alpha, delta) with the chosen solver, written as long-format POLAR_MATRICES.
 # The result is cached under data/ram_air_kite/<subdir>; delete it to regenerate.
@@ -76,12 +80,14 @@ fig_audit = plot_slices_3d(joinpath("data", "ram_air_kite", "polars_xfoil");
                            delta=1.0, obj_path=obj_path)
 save("ram_air_slices_audit.png", fig_audit)
 body_xfoil = BodyAerodynamics([wing_xfoil])
-solver_xfoil = Solver(body_xfoil; aerodynamic_model_type=VSM, rtol=1e-5, solver_type=NONLIN)
+solver_xfoil = Solver(body_xfoil; aerodynamic_model_type=VSM, rtol=1e-5, solver_type=NONLIN,
+                      relaxation_factor=RELAXATION, is_with_artificial_damping=ARTIFICIAL_DAMPING)
 
 println("Creating NeuralFoil wing...")
 wing_nf = matrix_wing(NF_SOLVER, "polars_neuralfoil")
 body_nf = BodyAerodynamics([wing_nf])
-solver_nf = Solver(body_nf; aerodynamic_model_type=VSM, rtol=1e-5, solver_type=NONLIN)
+solver_nf = Solver(body_nf; aerodynamic_model_type=VSM, rtol=1e-5, solver_type=NONLIN,
+                   relaxation_factor=RELAXATION, is_with_artificial_damping=ARTIFICIAL_DAMPING)
 
 # Compare using plot_polars
 if PLOT
