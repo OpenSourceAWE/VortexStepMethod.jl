@@ -58,11 +58,11 @@ save("ram_air_slices_3d.png", fig_slices_3d)
 function matrix_wing(solver, subdir; n_panels=50, n_sections=N_SECTIONS)
     out_dir = joinpath("data", "ram_air_kite", subdir)
     yaml = joinpath(out_dir, "geometry.yaml")
-    # if !isfile(yaml)
+    if !isfile(yaml)
         obj_to_yaml(obj_path, out_dir; n_sections, Re=RE, alpha_range, delta_range,
             aero_solver=solver, wrap_method=WRAP, wingtip_distance=WINGTIP_DISTANCE,
             verbose=false)
-    # end
+    end
     return Wing(yaml; n_panels)
 end
 
