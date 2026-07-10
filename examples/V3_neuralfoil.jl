@@ -39,8 +39,8 @@ XF_SOLVER = XFoilSolver(npan=XF_NPAN, max_iter=XF_MAX_ITER, ncrit=N_CRIT,
 RELAXATION         = 0.03   # iteration relaxation factor
 ARTIFICIAL_DAMPING = false   # smooth-circulation stabiliser for difficult cases
 
-# Reorient the mesh to the slicer's chord/span/up convention from its extents.
-ROTATION = :auto
+# V3_25.obj is already in slicer convention (x=chord, y=span, z=up).
+ROTATION = I
 
 # Marched leading-edge stations across the span (finer => smoother edge trace).
 N_BINS = 100

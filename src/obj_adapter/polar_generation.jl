@@ -18,7 +18,7 @@ single-membrane canopy slice (no closed airfoil) into a valid thin cambered airf
 `solver` picks the backend — [`NeuralFoilSolver`](@ref) (full ±180° range) or
 [`XFoilSolver`](@ref) (use a narrow `alpha_range` where XFoil converges). Pass a
 `delta_range` of trailing-edge deflections to write long-format `(alpha, delta)`
-`POLAR_MATRICES` CSVs instead of `POLAR_VECTORS`. Pass `rotation` (or `:auto`) to
+`POLAR_MATRICES` CSVs instead of `POLAR_VECTORS`. Pass a `3×3` `rotation` matrix to
 reorient the mesh first.
 """
 function generate_section_polars(obj_path::String, output_dir::String;

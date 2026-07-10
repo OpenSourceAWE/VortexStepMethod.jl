@@ -1465,7 +1465,7 @@ dashed). **Hovering a slice** updates the 2D panel.
   generated deflection value; pass `obj_path` to also draw the mesh (with the same
   `rotation` used at generation).
 
-Pass `rotation=:auto` (or a 3×3 matrix) to reorient the mesh first.
+Pass a `3×3` rotation matrix to reorient the mesh first.
 """
 function ObjAdapter.plot_slices_3d(path::String; n_slices::Int=10, rotation=I,
         n_bins::Int=60, wingtip_distance=0.0,
@@ -1478,7 +1478,6 @@ function ObjAdapter.plot_slices_3d(path::String; n_slices::Int=10, rotation=I,
     vertices = faces = nothing
     if mesh_path !== nothing
         vertices, faces = ObjAdapter.read_faces(mesh_path)
-        rotation === :auto && (rotation = ObjAdapter.auto_rotation(vertices))
         rotation === I || (vertices = [rotation * v for v in vertices])
     end
 

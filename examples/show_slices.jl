@@ -14,4 +14,4 @@ N_SLICES = 10
 
 println("Slicing: $OBJ_PATH")
 # Hover a slice to inspect its 2D airfoil (raw points + Kulfan/envelope fits).
-fig = plot_slices_3d(OBJ_PATH; n_slices=N_SLICES, rotation=:auto)
+fig = plot_slices_3d(OBJ_PATH; n_slices=N_SLICES)

@@ -425,27 +425,6 @@ function plane_contour_to_airfoil(contour3d, LE_point, x_af, z_af)
 end
 
 """
-    auto_rotation(vertices) -> 3×3 rotation
-
-Guess the reorientation rotation from the mesh bounding-box extents, assuming the
-**span** is the largest extent, the **height** (up) the middle, and the **chord**
-the smallest. Maps the mesh onto the slicer's `x`=chord, `y`=span, `z`=up
-convention (a proper rotation, det = +1). Returns identity when the mesh already
-matches that ordering.
-"""
-function auto_rotation(vertices)
-    ext = [maximum(v[i] for v in vertices) - minimum(v[i] for v in vertices)
-           for i in 1:3]
-    chord_ax, height_ax, span_ax = sortperm(ext)
-    R = zeros(3, 3)
-    R[1, chord_ax] = 1.0
-    R[2, span_ax] = 1.0
-    R[3, height_ax] = 1.0
-    det(R) < 0 && (R[2, :] .*= -1)
-    return R
-end
-
-"""
     perpendicular_sections(vertices, faces, n_sections; n_bins=60, rotation=I)
 
 Extract `n_sections` airfoil cross-sections following a curved or swept span. The
@@ -454,15 +433,11 @@ built ([`build_section`](@ref)) at the marched station nearest each equal
 **leading-edge arc-length** target. Each section is
 `(; LE_point, TE_point, span_dir, contour3d, x_airfoil, y_airfoil)`.
 
-The slicer assumes the mesh convention `x` = chordwise, `y` = spanwise, `z` = up.
-Pass a `3×3` `rotation` matrix to reorient a mesh stored in another convention
-before slicing (e.g. `[0 1 0; -1 0 0; 0 0 1]` maps a `[y, -x, z]` mesh back to
-`[x, y, z]`), or `rotation=:auto` to infer it from the bounding-box extents (see
-[`auto_rotation`](@ref)).
+The slicer assumes `x` = chordwise, `y` = spanwise, `z` = up. Pass a `3×3` rotation
+matrix to reorient a mesh stored in another convention before slicing.
 """
 function perpendicular_sections(vertices, faces, n_sections; n_bins=60, rotation=I,
                                 wingtip_distance=0.0)
-    rotation === :auto && (rotation = auto_rotation(vertices))
     rotation === I || (vertices = [rotation * v for v in vertices])
     ys = [v[2] for v in vertices]
     m = march_edges(vertices, faces; step=(maximum(ys) - minimum(ys)) / n_bins)
