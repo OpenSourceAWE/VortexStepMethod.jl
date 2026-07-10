@@ -12,7 +12,7 @@ airfoil-general `.dat`/coordinate → CSV entry points live in AirfoilAero.
 Slice `obj_path` into `n_slices` airfoils ([`perpendicular_sections`](@ref)),
 [`shrink_wrap`](@ref) each slice's point cloud into a clean airfoil, and write both its
 coordinates (`output_dir/{i}.dat`) and polar CSV (`output_dir/{i}.csv`, via
-[`generate_polar_from_coordinates`](@ref)). With a `delta_range`, each deflected shape
+`generate_polar_from_coordinates`). With a `delta_range`, each deflected shape
 is also written to `output_dir/{i}_d{deg}.dat`. The shrink-wrap wraps an open
 single-membrane canopy slice (no closed airfoil) into a valid thin cambered airfoil.
 `solver` picks the backend — [`NeuralFoilSolver`](@ref) (full ±180° range) or

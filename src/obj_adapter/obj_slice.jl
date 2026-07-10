@@ -277,7 +277,7 @@ length `step`. Each cut is a plane whose normal is the running LE tangent with i
 chordwise component dropped, so it tilts to follow a tip that curls downward. Cuts
 sample mesh *edges*, so the picks are robust to vertex density. Returns, ordered along
 the span, the LE/TE points, each cut's plane origin and tangent, and the cumulative LE
-arc length. Build the airfoil for a chosen station with [`build_section`](@ref).
+arc length. Build the airfoil for a chosen station with `build_section`.
 """
 function march_edges(vertices, faces; step)
     ys = [v[2] for v in vertices]
@@ -428,8 +428,8 @@ end
     perpendicular_sections(vertices, faces, n_sections; n_bins=60, rotation=I)
 
 Extract `n_sections` airfoil cross-sections following a curved or swept span. The
-leading edge is marched into `n_bins` stations ([`march_edges`](@ref)); the airfoil is
-built ([`build_section`](@ref)) at the marched station nearest each equal
+leading edge is marched into `n_bins` stations (`march_edges`); the airfoil is
+built (`build_section`) at the marched station nearest each equal
 **leading-edge arc-length** target. Each section is
 `(; LE_point, TE_point, span_dir, contour3d, x_airfoil, y_airfoil)`.
 

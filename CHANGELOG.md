@@ -1,5 +1,49 @@
 # Changelog
 
+## VortexStepMethod v4.0.0 2026-07-10
+
+### Breaking
+- `ObjWing` polar generation now uses NeuralFoil (via `ObjAdapter.obj_to_yaml`)
+  instead of XFoil + a user-supplied `.dat` file. The constructor signature is
+  backward-compatible (`dat_path` is accepted and silently ignored), but the
+  resulting aerodynamic polars will differ numerically from v3.x outputs.
+  To reproduce old XFoil-based polars pass `aero_solver=XFoilSolver()` to
+  `ObjAdapter.obj_to_yaml` and call `Wing` directly.
+
+### Added
+- `NeuralFoil`-based airfoil polar generation via the new `AirfoilAero` submodule
+  (`NeuralFoilSolver`, `XFoilSolver`, `analyze_section`, `analyze_sweep`,
+  `fit_kulfan_parameters`, `shrink_wrap`, `ShrinkWrap`)
+- `ObjAdapter` submodule: converts a 3D wing `.obj` mesh to the native YAML/CSV
+  geometry format (`obj_to_yaml`, `perpendicular_sections`, `generate_section_polars`,
+  `write_yaml`, `plot_slices_3d`, `plot_airfoils`)
+- `ObjWing(obj_path[, dat_path]; Re, n_panels, aero_solver, remake, ...)` convenience
+  constructor restored for backward compatibility — internally calls
+  `ObjAdapter.obj_to_yaml` then `Wing`; `aero_solver` selects the polar backend
+  (default `NeuralFoilSolver()`; pass `XFoilSolver()` for old behavior);
+  `remake=false` (default) reuses an existing `geometry.yaml` in `output_dir` to skip
+  expensive polar generation when only `n_panels` changes; set `remake=true` to force
+  regeneration
+- Surface-pressure (Cp) tables: `CpData`, `CpPolar`, `read_cp_data`, `write_cp_data`,
+  `cp_distribution`, `delta_cp`; Cp fields propagate through `Section` and `Wing`
+  and are spanwise-interpolated during `refine!`
+- `POLY` aero model for polynomial cl/cd/cm (exported)
+- `examples/V3_neuralfoil.jl` and `examples/obj_to_yaml_kite.jl`
+
+### Changed
+- OBJ-based wings are now built via `ObjAdapter.obj_to_yaml` + `Wing(yaml_path)`
+  instead of the old `ObjWing` pipeline (XFoil + single `.dat` file);
+  `ObjWing` is kept as a shim that accepts but ignores `dat_path`
+- `Section` and `add_section!` accept an optional `cp_data` argument
+
+### Removed
+- `ObjWing` as a standalone pipeline (replaced by `ObjAdapter`); the name is
+  re-exported as a compatibility wrapper
+- `auto_rotation` helper (internal, removed from public API)
+- `PanelGroupingMethod` enum (already removed in v3.0.0 — stale docs entry cleaned up)
+- ControlPlots test run removed from CI (`plot-controlplots` arg) due to
+  a `libraqm`/HarfBuzz symbol conflict in the GitHub Actions environment
+
 ## VortexStepMethod v3.3.6 2026-06-13
 
 ### Added

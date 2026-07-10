@@ -416,3 +416,45 @@ function Wing(settings::VSMSettings; sort_sections::Bool=true)
         ))
     end
 end
+
+"""
+    ObjWing(obj_path[, dat_path]; n_panels, Re, alpha_range, delta_range,
+            n_sections, spanwise_direction, aero_solver, remake, output_dir, verbose) → Wing
+
+Convenience constructor retained for backward compatibility. Converts an OBJ mesh
+to a YAML wing geometry via [`ObjAdapter.obj_to_yaml`](@ref) and returns a [`Wing`](@ref).
+
+`dat_path` is accepted but ignored — airfoil shapes are extracted directly from the
+OBJ geometry. Use `aero_solver=AirfoilAero.XFoilSolver()` to reproduce old XFoil-based
+polars; the default is `AirfoilAero.NeuralFoilSolver()`.
+
+By default (`remake=false`) an existing `geometry.yaml` in `output_dir` is reused,
+skipping the expensive polar generation. Set `remake=true` to force regeneration.
+"""
+function ObjWing(obj_path, dat_path=nothing;
+                 n_panels::Int=56,
+                 Re::Real=1e6,
+                 alpha_range=deg2rad.(-5:1:20),
+                 delta_range=deg2rad.(-5:1:20),
+                 n_sections::Union{Nothing, Int}=nothing,
+                 spanwise_direction=[0.0, 1.0, 0.0],
+                 spanwise_distribution=UNCHANGED,
+                 remove_nan::Bool=true,
+                 aero_solver=AirfoilAero.NeuralFoilSolver(),
+                 remake::Bool=false,
+                 output_dir::String=mktempdir(),
+                 verbose::Bool=false)
+    yaml_path = joinpath(output_dir, "geometry.yaml")
+    if remake || !isfile(yaml_path)
+        n_sec = isnothing(n_sections) ? n_panels + 1 : n_sections
+        yaml_path = ObjAdapter.obj_to_yaml(obj_path, output_dir;
+                                           n_sections=n_sec,
+                                           Re,
+                                           alpha_range,
+                                           delta_range,
+                                           aero_solver,
+                                           spanwise_direction,
+                                           verbose)
+    end
+    return Wing(yaml_path; n_panels, spanwise_distribution, spanwise_direction, remove_nan)
+end

@@ -6,6 +6,5 @@ CurrentModule = VortexStepMethod
 ```@docs
 calculate_AIC_matrices!
 update_panel_properties!
-calculate_inertia_tensor
 unrefined_deform!
 ```

@@ -7,7 +7,6 @@ Model
 WingType
 AeroModel
 PanelDistribution
-PanelGroupingMethod
 InitialGammaDistribution
 SolverType
 SolverStatus
@@ -41,6 +40,7 @@ Section(LE_point, TE_point, aero_model)
 Wing
 Wing(n_panels::Int; spanwise_distribution::PanelDistribution=LINEAR,
      spanwise_direction::PosVector=MVec3([0.0, 1.0, 0.0]))
+ObjWing
 BodyAerodynamics
 ```
 

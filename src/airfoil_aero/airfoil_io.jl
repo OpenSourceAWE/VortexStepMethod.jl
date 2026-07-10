@@ -130,7 +130,7 @@ end
     generate_polar_from_dat(dat_path, output_path; Re, kwargs...)
 
 Read a `.dat` airfoil and generate its polar CSV via
-[`generate_polar_from_coordinates`](@ref). This is AirfoilAero's `.dat` → CSV entry
+`generate_polar_from_coordinates`. This is AirfoilAero's `.dat` → CSV entry
 point.
 """
 function generate_polar_from_dat(dat_path::String, output_path::String;

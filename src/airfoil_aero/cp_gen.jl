@@ -7,7 +7,7 @@ parameters) using the given [`AbstractAirfoilSolver`](@ref). For each `delta` th
 section is deformed ([`deform_section`](@ref)), analysed over `alpha_range`, and each
 surface's `Cp(x/c)` resampled onto the `n_chord` chord slices. Non-converged points
 stay `NaN` and, when `remove_nan`, are filled per slice with
-[`interpolate_matrix_nans!`](@ref).
+`interpolate_matrix_nans!`.
 """
 function generate_cp_polar(solver::AbstractAirfoilSolver, base::KulfanParameters;
         alpha_range, delta_range, n_chord, reynolds_number,
@@ -53,7 +53,7 @@ end
     fill_slice_nans!(grid)
 
 Fill `NaN`s in each chord slice's `(alpha, delta)` matrix with
-[`interpolate_matrix_nans!`](@ref); all-`NaN` slices are left untouched.
+`interpolate_matrix_nans!`; all-`NaN` slices are left untouched.
 """
 function fill_slice_nans!(grid)
     for i in axes(grid, 1)

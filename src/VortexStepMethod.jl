@@ -26,7 +26,7 @@ using StructMapping
 
 # Export public interface
 export SolverSettings, VSMSettings, WingSettings
-export Section, Wing, refine!, reinit!
+export ObjWing, Section, Wing, refine!, reinit!
 export BodyAerodynamics
 export Solver, VSMSolution, linearize, solve, solve!, solve_base!, calc_forces!
 export calculate_results

@@ -7,7 +7,6 @@ add_section!
 refine!
 calculate_span
 calculate_projected_area
-load_polar_data
 ```
 
 ## Surface-pressure (Cp) tables
@@ -58,7 +57,6 @@ obj_to_yaml
 generate_section_polars
 write_yaml
 perpendicular_sections
-auto_rotation
 plot_airfoils
 plot_slices_3d
 ```
