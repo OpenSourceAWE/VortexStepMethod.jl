@@ -4,21 +4,9 @@
 #   (2) set_plot_backend! correctly switches which backend the no-backend wrappers route to.
 
 using CairoMakie
-
-cp_available = try
-    @eval using ControlPlots
-    true
-catch e
-    @warn "ControlPlots unavailable, skipping coexistence tests: $e"
-    false
-end
+using ControlPlots
 
 @testset "Backend coexistence (Makie + ControlPlots)" begin
-    if !cp_available
-        @test_skip "ControlPlots failed to load"
-        return
-    end
-
     backend_before = VortexStepMethod._PLOT_BACKEND[]
     try
         # (1) Both extensions must be loaded without errors when both packages are in scope.
