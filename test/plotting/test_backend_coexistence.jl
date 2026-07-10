@@ -4,9 +4,21 @@
 #   (2) set_plot_backend! correctly switches which backend the no-backend wrappers route to.
 
 using CairoMakie
-using ControlPlots
+
+cp_available = try
+    @eval using ControlPlots
+    true
+catch e
+    @warn "ControlPlots unavailable, skipping coexistence tests: $e"
+    false
+end
 
 @testset "Backend coexistence (Makie + ControlPlots)" begin
+    if !cp_available
+        @test_skip "ControlPlots failed to load"
+        return
+    end
+
     backend_before = VortexStepMethod._PLOT_BACKEND[]
     try
         # (1) Both extensions must be loaded without errors when both packages are in scope.
@@ -15,10 +27,6 @@ using ControlPlots
         cp_ext    = Base.get_extension(VortexStepMethod, :VortexStepMethodControlPlotsExt)
         @test makie_ext !== nothing
 
-        # The ControlPlots extension depends on PythonCall/matplotlib, which can
-        # fail to load (e.g. segfault during precompilation) on some platforms
-        # such as macOS-aarch64. Skip the ControlPlots-specific checks when the
-        # extension is unavailable rather than failing the whole suite.
         if cp_ext === nothing
             @test_skip "VortexStepMethodControlPlotsExt unavailable (ControlPlots failed to load)"
             return
