@@ -230,7 +230,7 @@ end
 yaml_scalar(x::Bool) = string(x)
 yaml_scalar(x::Integer) = string(x)
 yaml_scalar(x::Real) = string(round(Float64(x); digits=3))
-yaml_scalar(x::AbstractString) = "\"$x\""
+yaml_scalar(x::AbstractString) = "\"$(replace(x, '\\' => '/'))\""
 yaml_scalar(::Nothing) = "null"
 yaml_scalar(x) = string(x)
 
