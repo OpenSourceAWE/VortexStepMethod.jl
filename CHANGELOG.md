@@ -1,6 +1,6 @@
 # Changelog
 
-## VortexStepMethod v4.0.0 2026-07-10
+## Unreleased (v4.0.0)
 
 ### Breaking
 - `ObjWing` polar generation now uses NeuralFoil (via `ObjAdapter.obj_to_yaml`)
