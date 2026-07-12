@@ -3,16 +3,21 @@
 
 XFoil backend. Loads the deformed coordinates (optionally repaneling them) and reads
 the pressure distribution from `Xfoil.cpdump`. Defaults match NeuralFoil's training
-runs (`max_iter=100`, incompressible) so the two backends are comparable.
+runs (`ncrit=9`, `max_iter=100`, incompressible) so the two backends are comparable.
 
 # Fields
 - `npan`: XFoil panel count when repaneling (default 160, XFoil's `PANE` default).
 - `max_iter`: viscous iterations per angle (default 100).
-- `xtrip`: forced transition `(upper, lower)` (default `(0.05, 0.05)`).
+- `xtrip`: forced transition `(upper, lower)` as `x/c` (default `(0.05, 0.05)`). Tripping
+  near the leading edge is a valid NeuralFoil transition input and, unlike free
+  transition, converges on the shrink-wrapped hinge of a deflected section.
 - `ncrit`: e^N transition criticality (default 9.0, the standard clean-tunnel value).
 - `mach`: Mach number (default 0.0, incompressible).
 - `repanel`: repanel the input coordinates with `Xfoil.pane` before solving (default
-  `false`, since [`shrink_wrap`](@ref) already emits a cosine-clustered `.dat`).
+  `false`). The [`shrink_wrap`](@ref) already emits smoothed cosine panels, and XFoil's
+  own curvature-attracted repaneling re-clusters a deflected section's hinge crease —
+  which NeuralFoil (analysing the smooth Kulfan fit) never sees — so `false` tracks
+  NeuralFoil more closely. Set `true` to let XFoil repanel anyway.
 """
 @with_kw struct XFoilSolver <: AbstractAirfoilSolver
     npan::Int = 160

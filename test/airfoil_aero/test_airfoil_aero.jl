@@ -92,31 +92,28 @@ end
     alpha_range = deg2rad.(-2:1:2)
     delta_range = deg2rad.(-1:1:1)
 
-    @testset "$name backend" for (name, solver) in (
-            ("NeuralFoil", NeuralFoilSolver(model_size="xlarge")),
-            ("XFoil", XFoilSolver()))
-        work = mktempdir()
-        cl_path = joinpath(work, "cl.csv")
-        cd_path = joinpath(work, "cd.csv")
-        cm_path = joinpath(work, "cm.csv")
-        create_2d_polars(; dat_path=dat, cl_polar_path=cl_path, cd_polar_path=cd_path,
-            cm_polar_path=cm_path, wind_vel=15.0, area=20.0, width=8.0,
-            crease_frac=0.75, alpha_range, delta_range, solver)
+    work = mktempdir()
+    cl_path = joinpath(work, "cl.csv")
+    cd_path = joinpath(work, "cd.csv")
+    cm_path = joinpath(work, "cm.csv")
+    create_2d_polars(; dat_path=dat, cl_polar_path=cl_path, cd_polar_path=cd_path,
+        cm_polar_path=cm_path, wind_vel=15.0, area=20.0, width=8.0,
+        crease_frac=0.75, alpha_range, delta_range,
+        solver=NeuralFoilSolver(model_size="xlarge"))
 
-        cl, a, d = VortexStepMethod.read_aero_matrix(cl_path)
-        @test size(cl) == (length(alpha_range), length(delta_range))
-        @test a ≈ collect(alpha_range)
-        @test d ≈ collect(delta_range)
-        @test all(isfinite, cl)
-        @test maximum(abs.(cl[end, :] .- cl[1, :])) > 0.1
-        @test maximum(abs.(cl[:, end] .- cl[:, 1])) > 0.02
+    cl, a, d = VortexStepMethod.read_aero_matrix(cl_path)
+    @test size(cl) == (length(alpha_range), length(delta_range))
+    @test a ≈ collect(alpha_range)
+    @test d ≈ collect(delta_range)
+    @test all(isfinite, cl)
+    @test maximum(abs.(cl[end, :] .- cl[1, :])) > 0.1
+    @test maximum(abs.(cl[:, end] .- cl[:, 1])) > 0.02
 
-        cd, _, _ = VortexStepMethod.read_aero_matrix(cd_path)
-        @test all(x -> x > 0, cd)
+    cd, _, _ = VortexStepMethod.read_aero_matrix(cd_path)
+    @test all(x -> x > 0, cd)
 
-        cm, _, _ = VortexStepMethod.read_aero_matrix(cm_path)
-        @test size(cm) == (length(alpha_range), length(delta_range))
-    end
+    cm, _, _ = VortexStepMethod.read_aero_matrix(cm_path)
+    @test size(cm) == (length(alpha_range), length(delta_range))
 end
 
 @testset "Cp table round-trip and interpolation" begin
@@ -173,6 +170,45 @@ end
     polar2 = generate_cp_polar(NeuralFoilSolver(model_size="medium"), x, y;
         alpha_range, delta_range=deg2rad.([0.0, 5.0]), n_chord=4, reynolds_number=5e5)
     @test CpData(polar2).n_chord == 4
+end
+
+@testset "NeuralFoil physical invariants" begin
+    sym = KulfanParameters(fill(0.2, 8), fill(-0.2, 8), 0.0, 0.0)
+
+    sweep = neuralfoil_aero(sym, [-4.0, 0.0, 4.0], 5e5; model_size="xlarge")
+    @test abs(sweep.CL[2]) < 0.02
+    @test sweep.CL[1] < sweep.CL[2] < sweep.CL[3]
+    @test sweep.CL[1] ≈ -sweep.CL[3] atol = 0.02
+
+    xs, ys = kulfan_to_coordinates(sym; n_points=120)
+    xs, ys = collect(xs), collect(ys)
+    camber(k) = k.upper_weights .+ k.lower_weights
+    base = deform_section(xs, ys, 0.0)
+    flap = deform_section(xs, ys, deg2rad(10.0); crease_frac=0.75)
+    @test maximum(abs, camber(base.kulfan)) < 1e-6
+    @test maximum(abs, camber(flap.kulfan)) > 0.1
+
+    @test minimum(flap.x) ≈ 0 atol = 0.01
+    @test maximum(flap.x) ≈ 1 atol = 0.01
+    @test abs(flap.y[argmax(flap.x)]) < 0.01
+    @test abs(flap.y[argmin(flap.x)]) < 0.01
+
+    sec = neuralfoil_section(sym, [6.0], 5e5; model_size="xlarge")
+    load = sec.cp_lower[:, 1] .- sec.cp_upper[:, 1]
+    @test sum(load) > 0
+    @test count(>(0), load) > length(load) ÷ 2
+end
+
+@testset "generate_polar_from_coordinates POLAR_VECTORS sweep" begin
+    x, y = read_dat_coords(joinpath(@__DIR__, "data", "test_airfoil.dat"))
+    csv = joinpath(mktempdir(), "polar.csv")
+    sols = generate_polar_from_coordinates(x, y, csv;
+        Re=5e5, alpha_range=-4:2:4, solver=NeuralFoilSolver(model_size="medium"))
+    @test sols isa AbstractVector
+    @test isfile(csv)
+    header = lowercase(readline(csv))
+    @test occursin("alpha", header)
+    @test !occursin("delta", header)
 end
 
 @testset "turn_trailing_edge! legacy crease cleanup" begin

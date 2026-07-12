@@ -243,6 +243,31 @@ function largest_linking_gap(x, y)
 end
 
 """
+    smooth_turning!(turn) -> turn
+
+Diffuse the per-node turning-angle density along the contour (in place). A sharp
+corner — e.g. a deflected section's hinge, rounded to `clearance` — otherwise dumps
+its whole turn into one node, and the curvature-weighted resampling then collapses a
+few panels to near-zero length, which XFoil's viscous solver cannot handle. Spreading
+the turn over a short band refines a group of panels gradually instead, the way
+XFoil's `PANGEN` bunches panels on a *smoothed* curvature. The total turn is
+conserved, so leading-edge clustering is preserved.
+"""
+function smooth_turning!(turn)
+    m = length(turn)
+    m < 3 && return turn
+    for _ in 1:40
+        prev = turn[1]
+        for k in 2:m-1
+            cur = turn[k]
+            turn[k] = 0.25 * prev + 0.5 * cur + 0.25 * turn[k+1]
+            prev = cur
+        end
+    end
+    return turn
+end
+
+"""
     resample_arc(ax, ay, n, curvature_weight) -> (x, y)
 
 Resample the polyline `(ax, ay)` at `n` stations cosine-clustered in a measure that
@@ -258,6 +283,7 @@ function resample_arc(ax, ay, n, curvature_weight)
         b = atan(ay[k+1] - ay[k], ax[k+1] - ax[k])
         turn[k] = abs(rem(b - a, 2pi, RoundNearest))
     end
+    smooth_turning!(turn)
     w = zeros(m)
     for k in 2:m
         w[k] = w[k-1] + hypot(ax[k] - ax[k-1], ay[k] - ay[k-1]) +

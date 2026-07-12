@@ -24,6 +24,22 @@ configuration across all runs. Each call still reloads a fresh `Wing`.
 """
 function ram_air_matrix_wing(; n_panels, n_sections=4,
         alpha_range=deg2rad.(-5:5:15), delta_range=deg2rad.(-3:3:3))
+    _, yaml = ram_air_matrix_dir(; n_sections, alpha_range, delta_range)
+    return Wing(yaml; n_panels)
+end
+
+"""
+    ram_air_matrix_dir(; n_sections=4, alpha_range=deg2rad.(-5:5:15),
+                       delta_range=deg2rad.(-3:3:3)) -> (gen_dir, yaml)
+
+The generated-geometry directory and its `geometry.yaml` backing
+[`ram_air_matrix_wing`](@ref). Converts the ram-air obj mesh once per configuration
+into `test/generated/` (gitignored, stable path keyed by the config) and reuses an
+existing conversion, so the slow NeuralFoil sweep runs only once across the whole
+suite. Use this when a test needs the generated files themselves, not just the `Wing`.
+"""
+function ram_air_matrix_dir(; n_sections=4,
+        alpha_range=deg2rad.(-5:5:15), delta_range=deg2rad.(-3:3:3))
     data_dir = joinpath(dirname(@__DIR__), "data", "ram_air_kite")
     obj = joinpath(data_dir, "ram_air_kite_body.obj")
     key = (n_sections, collect(alpha_range), collect(delta_range))
@@ -32,7 +48,7 @@ function ram_air_matrix_wing(; n_panels, n_sections=4,
     isfile(yaml) || obj_to_yaml(obj, gen_dir; n_sections, Re=1e6,
         alpha_range=rad2deg.(alpha_range), delta_range=rad2deg.(delta_range),
         aero_solver=NeuralFoilSolver(), verbose=false)
-    return Wing(yaml; n_panels)
+    return gen_dir, yaml
 end
 
 """

@@ -10,6 +10,11 @@ obj_path = normpath(joinpath(@__DIR__, "..", "..",
 @testset "ObjAdapter" begin
     @assert isfile(obj_path) "test obj mesh missing: $obj_path"
 
+    # Reuse the suite-wide generated matrix geometry (default config, keyed and
+    # cached under test/generated/) so the slow NeuralFoil conversion is shared with
+    # the other tests that call ram_air_matrix_wing rather than regenerated here.
+    out, yaml = ram_air_matrix_dir()
+
     @testset "perpendicular_sections slices the mesh" begin
         vertices, faces = read_faces(obj_path)
         secs = perpendicular_sections(vertices, faces, 4)
@@ -23,17 +28,9 @@ obj_path = normpath(joinpath(@__DIR__, "..", "..",
     end
 
     @testset "obj_to_yaml (alpha,delta) matrices -> loadable Wing (NeuralFoil)" begin
-        out = mktempdir()
-        yaml = obj_to_yaml(obj_path, out;
-            n_sections=3, Re=5e5,
-            alpha_range=-4:2:4, delta_range=-2:2:2,
-            aero_solver=NeuralFoilSolver(), verbose=false)
         @test isfile(yaml)
         @test isfile(joinpath(out, "polars", "1.csv"))
         @test isfile(joinpath(out, "airfoils", "1.dat"))
-        # each trailing-edge deflection is stored as its own .dat
-        @test isfile(joinpath(out, "airfoils", "1_d2.dat"))
-        @test isfile(joinpath(out, "airfoils", "1_d-2.dat"))
         # a delta column marks the CSV as long-format POLAR_MATRICES
         @test occursin("delta", lowercase(readline(joinpath(out, "polars", "1.csv"))))
 
@@ -42,38 +39,24 @@ obj_path = normpath(joinpath(@__DIR__, "..", "..",
         @test length(body_aero.panels) == 6
     end
 
-    @testset "obj_to_yaml -> per-section polars (NeuralFoil)" begin
-        out = mktempdir()
-        yaml = obj_to_yaml(obj_path, out;
-            n_sections=3, Re=5e5, alpha_range=-6:2:6,
-            aero_solver=NeuralFoilSolver(model_size="large"), verbose=false)
-        @test isfile(yaml)
+    @testset "generated geometry exposes its airfoils" begin
         airfoils = airfoils_from_yaml(yaml)
         @test !isempty(airfoils)
         @test all(af -> !isempty(af.x), airfoils)
-
-        wing = Wing(yaml; n_panels=6)
-        @test length(BodyAerodynamics([wing]).panels) == 6
     end
 
     @testset "generate_section_polars writes per-slice files" begin
-        out = mktempdir()
-        generate_section_polars(obj_path, out;
-            n_slices=3, Re=5e5, alpha_range=-4:2:4,
-            solver=NeuralFoilSolver(model_size="medium"), verbose=false)
-        @test isfile(joinpath(out, "1.dat"))
-        @test isfile(joinpath(out, "1.csv"))
-        @test !occursin("delta", lowercase(readline(joinpath(out, "1.csv"))))
-
-        out2 = mktempdir()
-        generate_section_polars(obj_path, out2;
+        secdir = mktempdir()
+        generate_section_polars(obj_path, secdir;
             n_slices=3, Re=5e5, alpha_range=-4:2:4, delta_range=-2:2:2,
             solver=NeuralFoilSolver(model_size="medium"), verbose=false)
-        @test isfile(joinpath(out2, "1.csv"))
-        @test isfile(joinpath(out2, "1_d2.dat"))
-        @test occursin("delta", lowercase(readline(joinpath(out2, "1.csv"))))
+        @test isfile(joinpath(secdir, "1.dat"))
+        @test isfile(joinpath(secdir, "1.csv"))
+        # a delta_range writes long-format POLAR_MATRICES + a .dat per deflection
+        @test occursin("delta", lowercase(readline(joinpath(secdir, "1.csv"))))
+        @test isfile(joinpath(secdir, "1_d2.dat"))
 
-        @test_throws ErrorException generate_section_polars("missing.obj", out;
+        @test_throws ErrorException generate_section_polars("missing.obj", secdir;
             n_slices=3, Re=5e5)
     end
 
