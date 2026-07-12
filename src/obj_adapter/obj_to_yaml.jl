@@ -52,8 +52,10 @@ fast) or [`XFoilSolver`](@ref) (viscous panel code); pass `aero_solver=XFoilSolv
 to use XFoil instead. Each section's polar is written as `POLAR_VECTORS`.
 
 `wrap_method` ([`ShrinkWrap`](@ref)) wraps each slice's point cloud into a clean closed
-airfoil, robust to the noisy interior-structure points of a ram-air kite slice (ribs,
-spars); NeuralFoil then fits Kulfan parameters to it and XFoil uses it directly.
+airfoil, robust both to the noisy interior-structure points (ribs, spars) of a ram-air
+kite slice that otherwise pull a plain least-squares fit inward, and to the complex,
+harsh corners of an LEI kite slice; NeuralFoil then fits Kulfan parameters to it and
+XFoil uses it directly.
 
 A slice whose fitted airfoil is implausibly thick relative to the others (e.g. a
 near-vanishing wingtip slice that fits to a blob) is flagged as degenerate: a

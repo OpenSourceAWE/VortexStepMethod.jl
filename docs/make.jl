@@ -13,11 +13,12 @@ makedocs(;
              VortexStepMethod.ObjAdapter],
     authors="Uwe Fechner <uwe.fechner.msc@gmail.com>, Bart van de Lint <bart@vandelint.net> and contributors",
     sitename="VortexStepMethod.jl",
-    checkdocs=:none,
+    warnonly=[:cross_references],
     format = Documenter.HTML(prettyurls = haskey(ENV, "CI")),
     pages=[
         "Home" => "index.md",
         "How it works" => "explanation.md",
+        "CAD mesh to model" => "airfoil_pipeline.md",
         "Examples" => "examples.md",
         "Exported Functions" => "functions.md",
         "Exported Types" => "types.md",

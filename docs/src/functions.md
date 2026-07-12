@@ -30,6 +30,7 @@ CurrentModule = VortexStepMethod.AirfoilAero
 ```
 ```@docs
 fit_kulfan_parameters
+kulfan_to_coordinates
 KulfanFitMethod
 LeastSquaresFit
 ShrinkWrap
@@ -42,6 +43,10 @@ DeformedSection
 deform_section
 analyze_section
 analyze_sweep
+neuralfoil_aero
+generate_aero_matrices
+generate_polar_from_coordinates
+generate_polar_from_dat
 generate_cp_polar
 ```
 

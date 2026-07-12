@@ -7,8 +7,9 @@ evaluates NeuralFoil, and writes `airfoils/*.dat`, `polars/*.csv`, and a
 `geometry.yaml`.
 
 `ShrinkWrap` wraps each slice's point cloud into a clean closed airfoil with a
-`clearance` gap, robust to the noisy interior-structure points (ribs, spars) of a
-ram-air kite slice that otherwise pull a plain least-squares fit inward.
+`clearance` gap, robust both to the noisy interior-structure points (ribs, spars)
+of a ram-air kite slice that otherwise pull a plain least-squares fit inward, and
+to the complex, harsh corners of an LEI kite slice.
 """
 
 using Pkg
