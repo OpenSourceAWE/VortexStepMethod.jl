@@ -55,4 +55,43 @@ obj_path = normpath(joinpath(@__DIR__, "..", "..",
         wing = Wing(yaml; n_panels=6)
         @test length(BodyAerodynamics([wing]).panels) == 6
     end
+
+    @testset "generate_section_polars writes per-slice files" begin
+        out = mktempdir()
+        generate_section_polars(obj_path, out;
+            n_slices=3, Re=5e5, alpha_range=-4:2:4,
+            solver=NeuralFoilSolver(model_size="medium"), verbose=false)
+        @test isfile(joinpath(out, "1.dat"))
+        @test isfile(joinpath(out, "1.csv"))
+        @test !occursin("delta", lowercase(readline(joinpath(out, "1.csv"))))
+
+        out2 = mktempdir()
+        generate_section_polars(obj_path, out2;
+            n_slices=3, Re=5e5, alpha_range=-4:2:4, delta_range=-2:2:2,
+            solver=NeuralFoilSolver(model_size="medium"), verbose=false)
+        @test isfile(joinpath(out2, "1.csv"))
+        @test isfile(joinpath(out2, "1_d2.dat"))
+        @test occursin("delta", lowercase(readline(joinpath(out2, "1.csv"))))
+
+        @test_throws ErrorException generate_section_polars("missing.obj", out;
+            n_slices=3, Re=5e5)
+    end
+
+    @testset "center_to_com! rejects non-triangular faces" begin
+        verts = [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [1.0, 1.0, 0.0]]
+        @test_throws ArgumentError center_to_com!(verts, [[1, 2, 3, 4]]; prn=false)
+    end
+
+    @testset "write_yaml emits nested and scalar values" begin
+        dir = mktempdir()
+        nested = joinpath(dir, "nested.yaml")
+        write_yaml(nested, Dict("a" => [Dict("b" => Dict("c" => [1.0, 2.0]))]))
+        text = read(nested, String)
+        @test occursin("a:", text)
+        @test occursin("c:", text)
+
+        scalar = joinpath(dir, "scalar.yaml")
+        write_yaml(scalar, 42.0)
+        @test occursin("42", read(scalar, String))
+    end
 end

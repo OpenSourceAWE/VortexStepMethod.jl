@@ -5,6 +5,8 @@ using VortexStepMethod.AirfoilAero: KulfanParameters, LeastSquaresFit, ShrinkWra
                        shrink_wrap, fit_kulfan_parameters, kulfan_to_coordinates,
                        neuralfoil_aero, class_function, bernstein_basis,
                        leading_edge_basis, normalize_airfoil
+using VortexStepMethod: CpData, CpPolar, read_cp_data, write_cp_data,
+                        cp_distribution, delta_cp
 
 read_dat_coords(path) = begin
     x = Float64[]; y = Float64[]
@@ -106,6 +108,8 @@ end
         @test a ≈ collect(alpha_range)
         @test d ≈ collect(delta_range)
         @test all(isfinite, cl)
+        @test maximum(abs.(cl[end, :] .- cl[1, :])) > 0.1
+        @test maximum(abs.(cl[:, end] .- cl[:, 1])) > 0.02
 
         cd, _, _ = VortexStepMethod.read_aero_matrix(cd_path)
         @test all(x -> x > 0, cd)
@@ -113,4 +117,84 @@ end
         cm, _, _ = VortexStepMethod.read_aero_matrix(cm_path)
         @test size(cm) == (length(alpha_range), length(delta_range))
     end
+end
+
+@testset "Cp table round-trip and interpolation" begin
+    n_chord = 5
+    chord_x = [0.1, 0.3, 0.5, 0.7, 0.9]
+    alpha_range = deg2rad.([-5.0, 0.0, 5.0, 10.0])
+    delta_range = deg2rad.([-3.0, 0.0, 3.0])
+    val(i, ia, jd) = 100i + 10ia + jd
+    cp_upper = [float(val(i, ia, jd)) for i in 1:n_chord,
+                ia in eachindex(alpha_range), jd in eachindex(delta_range)]
+    cp_lower = -cp_upper
+    data = CpData(n_chord, chord_x, alpha_range, delta_range, cp_upper, cp_lower)
+
+    path = joinpath(mktempdir(), "cp.csv")
+    write_cp_data(path, data)
+    back = read_cp_data(path)
+    @test back.n_chord == n_chord
+    @test back.chord_x ≈ chord_x
+    @test back.alpha_range ≈ alpha_range
+    @test back.delta_range ≈ delta_range
+    @test back.cp_upper ≈ cp_upper
+    @test back.cp_lower ≈ cp_lower
+    @test read_cp_data(joinpath(@__DIR__, "does_not_exist.csv")) === nothing
+
+    polar = CpPolar(data)
+    @test CpData(polar) === data
+    up, lo = cp_distribution(polar, alpha_range[2], delta_range[1])
+    @test up ≈ cp_upper[:, 2, 1]
+    @test lo ≈ cp_lower[:, 2, 1]
+    @test delta_cp(polar, alpha_range[3], delta_range[2]) ≈
+        cp_lower[:, 3, 2] .- cp_upper[:, 3, 2]
+end
+
+@testset "generate_cp_polar builds a Cp table" begin
+    truth = KulfanParameters(fill(0.15, 8), fill(-0.15, 8), 0.1, 0.0)
+    alpha_range = deg2rad.(-4.0:2.0:4.0)
+    delta_range = deg2rad.([0.0, 5.0])
+    polar = generate_cp_polar(NeuralFoilSolver(model_size="medium"), truth;
+        alpha_range, delta_range, n_chord=6, reynolds_number=5e5)
+    @test polar isa CpPolar
+    @test CpData(polar).n_chord == 6
+    up, lo = cp_distribution(polar, alpha_range[2], delta_range[1])
+    @test length(up) == 6
+    @test all(isfinite, up) && all(isfinite, lo)
+    @test all(isfinite, delta_cp(polar, alpha_range[end], delta_range[end]))
+
+    up_lo_a, _ = cp_distribution(polar, alpha_range[1], delta_range[1])
+    up_hi_a, _ = cp_distribution(polar, alpha_range[end], delta_range[1])
+    @test maximum(abs.(up_lo_a .- up_hi_a)) > 0.1
+    up_hi_d, _ = cp_distribution(polar, alpha_range[2], delta_range[end])
+    @test maximum(abs.(up .- up_hi_d)) > 0.005
+
+    x, y = read_dat_coords(joinpath(@__DIR__, "data", "test_airfoil.dat"))
+    polar2 = generate_cp_polar(NeuralFoilSolver(model_size="medium"), x, y;
+        alpha_range, delta_range=deg2rad.([0.0, 5.0]), n_chord=4, reynolds_number=5e5)
+    @test CpData(polar2).n_chord == 4
+end
+
+@testset "turn_trailing_edge! legacy crease cleanup" begin
+    x, y = read_dat_coords(joinpath(@__DIR__, "data", "test_airfoil.dat"))
+    crease_frac = 0.7
+    for angle in (deg2rad(10.0), deg2rad(-10.0))
+        xd, yd = collect(float.(x)), collect(float.(y))
+        lower, upper = get_lower_upper(xd, yd, crease_frac)
+        @test lower < upper
+        n0 = length(xd)
+        turn_trailing_edge!(angle, xd, yd, lower, upper, crease_frac)
+        @test length(xd) == length(yd)
+        @test length(xd) <= n0
+        @test all(isfinite, xd) && all(isfinite, yd)
+    end
+end
+
+@testset "load_neuralfoil_model missing weights errors" begin
+    @test_throws ErrorException load_neuralfoil_model("nonexistent_size")
+
+    weights_dir = joinpath(dirname(pathof(VortexStepMethod)), "airfoil_aero", "data")
+    partial = mktempdir()
+    cp(joinpath(weights_dir, "nn-medium.npz"), joinpath(partial, "nn-medium.npz"))
+    @test_throws ErrorException load_neuralfoil_model("medium"; weights_dir=partial)
 end
