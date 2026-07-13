@@ -35,6 +35,9 @@
   instead of the old `ObjWing` pipeline (XFoil + single `.dat` file);
   `ObjWing` is kept as a shim that accepts but ignores `dat_path`
 - `Section` and `add_section!` accept an optional `cp_data` argument
+- plotting is now Makie-only; the `VortexStepMethodMakieExt` extension loads once a
+  Makie backend and [`MakieControlPlots`](https://github.com/OpenSourceAWE/MakieControlPlots.jl)
+  are available, and `plot_section_polars` is rendered through `MakieControlPlots`
 
 ### Removed
 - `ObjWing` as a standalone pipeline (replaced by `ObjAdapter`); the name is
@@ -43,6 +46,11 @@
 - `PanelGroupingMethod` enum (already removed in v3.0.0 — stale docs entry cleaned up)
 - ControlPlots test run removed from CI (`plot-controlplots` arg) due to
   a `libraqm`/HarfBuzz symbol conflict in the GitHub Actions environment
+- the `ControlPlots` plotting extension, `examples_cp/`, and the `PythonCall`/Matplotlib
+  setup (`bin/install_controlplots`, CondaPkg `LocalPreferences` defaults)
+- the `PlotBackend`/`MakieBackend`/`ControlPlotsBackend` types and `set_plot_backend!`;
+  plotting works as soon as a Makie backend and `MakieControlPlots` are loaded
+- the never-implemented `plot_circulation_distribution`
 
 ## VortexStepMethod v3.3.6 2026-06-13
 

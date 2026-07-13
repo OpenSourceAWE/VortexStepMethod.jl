@@ -1,4 +1,5 @@
 using Makie
+using MakieControlPlots
 using VortexStepMethod
 using VortexStepMethod.AirfoilAero
 using VortexStepMethod.ObjAdapter

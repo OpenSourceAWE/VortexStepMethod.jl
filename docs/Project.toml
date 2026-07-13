@@ -2,6 +2,7 @@
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
 LiveServer = "16fef848-5104-11e9-1b77-fb7a48bbb589"
 Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
+MakieControlPlots = "6d616b69-6563-4f6e-8472-6f6c706c6f74"
 VortexStepMethod = "ed3cd733-9f0f-46a9-93e0-89b8d4998dd9"
 
 [sources]
