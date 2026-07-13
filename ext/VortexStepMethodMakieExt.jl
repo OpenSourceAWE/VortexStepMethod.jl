@@ -1,17 +1,12 @@
 module VortexStepMethodMakieExt
 using Makie, VortexStepMethod, LinearAlgebra, Statistics, DelimitedFiles
+import MakieControlPlots
 import VortexStepMethod: calculate_filaments_for_plotting
 import VortexStepMethod: ObjAdapter, AirfoilAero
 
 export plot_geometry, plot_distribution, plot_polars, save_plot, show_plot,
     plot_polar_data, plot_combined_analysis,
     plot_section_polars
-
-# Set this extension as the active plotting backend when loaded (only if not already set)
-function __init__()
-    isnothing(VortexStepMethod._PLOT_BACKEND[]) &&
-        (VortexStepMethod._PLOT_BACKEND[] = VortexStepMethod.MakieBackend())
-end
 
 # Global storage for panel mesh observables (for dynamic plotting)
 const PANEL_MESH_OBSERVABLES = Ref{Union{Nothing,Dict}}(nothing)
@@ -467,12 +462,12 @@ function create_geometry_plot_makie(body_aero::BodyAerodynamics, title,
 end
 
 """
-    plot_geometry(body_aero::BodyAerodynamics, title, ::MakieBackend;
+    plot_geometry(body_aero::BodyAerodynamics, title;
                   data_type=nothing, save_path=nothing,
                   is_save=false, is_show=false,
                   view_elevation=15, view_azimuth=-120, use_tex=false)
 
-Makie backend implementation of [`plot_geometry`](@ref).
+Makie implementation of [`plot_geometry`](@ref).
 
 # Arguments:
 - `body_aero`: the BodyAerodynamics to plot
@@ -487,8 +482,7 @@ Makie backend implementation of [`plot_geometry`](@ref).
 - `view_azimuth`: View azimuth angle in degrees (default: -120)
 - `use_tex`: Ignored for Makie (default: false)
 """
-function VortexStepMethod.plot_geometry(body_aero::BodyAerodynamics, title,
-    ::VortexStepMethod.MakieBackend;
+function VortexStepMethod.plot_geometry(body_aero::BodyAerodynamics, title;
     data_type=nothing,
     save_path=nothing,
     is_save=false,
@@ -525,11 +519,11 @@ function VortexStepMethod.plot_geometry(body_aero::BodyAerodynamics, title,
 end
 
 """
-    plot_distribution(y_coordinates_list, results_list, label_list, ::MakieBackend;
+    plot_distribution(y_coordinates_list, results_list, label_list;
                       title="spanwise_distribution", data_type=nothing,
                       save_path=nothing, is_save=false, is_show=true, use_tex=false)
 
-Makie backend implementation of [`plot_distribution`](@ref).
+Makie implementation of [`plot_distribution`](@ref).
 
 # Arguments
 - `y_coordinates_list`: List of spanwise coordinates
@@ -544,8 +538,7 @@ Makie backend implementation of [`plot_distribution`](@ref).
 - `is_show`: Whether to display (default: true)
 - `use_tex`: Ignored for Makie (default: false)
 """
-function VortexStepMethod.plot_distribution(y_coordinates_list, results_list, label_list,
-    ::VortexStepMethod.MakieBackend;
+function VortexStepMethod.plot_distribution(y_coordinates_list, results_list, label_list;
     title="spanwise_distribution",
     data_type=nothing,
     save_path=nothing,
@@ -678,14 +671,14 @@ Generate polar data for aerodynamic analysis over a range of angles.
 """
 
 """
-    plot_polars(solver_list, body_aero_list, label_list, ::MakieBackend;
+    plot_polars(solver_list, body_aero_list, label_list;
                 literature_path_list=String[],
                 angle_range=range(0, 20, 2), angle_type="angle_of_attack",
                 angle_of_attack=0.0, side_slip=0.0, v_a=10.0,
                 title="polar", data_type=nothing, save_path=nothing,
                 is_save=true, is_show=true, use_tex=false)
 
-Makie backend implementation of [`plot_polars`](@ref).
+Makie implementation of [`plot_polars`](@ref).
 
 # Arguments
 - `solver_list`: List of aerodynamic solvers
@@ -710,8 +703,7 @@ Makie backend implementation of [`plot_polars`](@ref).
 function VortexStepMethod.plot_polars(
     solver_list,
     body_aero_list,
-    label_list,
-    ::VortexStepMethod.MakieBackend;
+    label_list;
     literature_path_list=String[],
     angle_range=range(0, 20, 2),
     angle_type="angle_of_attack",
@@ -879,12 +871,12 @@ function VortexStepMethod.plot_polars(
 end
 
 """
-    plot_polar_data(body_aero::BodyAerodynamics, ::MakieBackend;
+    plot_polar_data(body_aero::BodyAerodynamics;
                     alphas=collect(deg2rad.(-5:0.3:25)),
                     delta_tes=collect(deg2rad.(-5:0.3:25)),
                     is_show=true, use_tex=false)
 
-Makie backend implementation of [`plot_polar_data`](@ref).
+Makie implementation of [`plot_polar_data`](@ref).
 
 # Arguments
 - `body_aero`: Wing aerodynamics struct
@@ -895,8 +887,7 @@ Makie backend implementation of [`plot_polar_data`](@ref).
 - `is_show`: Whether to display (default: true)
 - `use_tex`: Ignored for Makie (default: false)
 """
-function VortexStepMethod.plot_polar_data(body_aero::BodyAerodynamics,
-    ::VortexStepMethod.MakieBackend;
+function VortexStepMethod.plot_polar_data(body_aero::BodyAerodynamics;
     alphas=collect(deg2rad.(-5:0.3:25)),
     delta_tes=collect(deg2rad.(-5:0.3:25)),
     is_show=true,
@@ -943,7 +934,7 @@ function VortexStepMethod.plot_polar_data(body_aero::BodyAerodynamics,
 end
 
 """
-    plot_combined_analysis(solver, body_aero, results, ::MakieBackend;
+    plot_combined_analysis(solver, body_aero, results;
                           solver_label="VSM",
                           angle_range=range(0,20,length=20),
                           angle_type="angle_of_attack",
@@ -954,7 +945,7 @@ end
                           literature_path_list=String[],
                           data_type=".png", save_path=nothing, is_save=false)
 
-Makie backend implementation of [`plot_combined_analysis`](@ref).
+Makie implementation of [`plot_combined_analysis`](@ref).
 
 # Arguments
 - `solver`: Aerodynamic solver
@@ -986,8 +977,7 @@ Makie backend implementation of [`plot_combined_analysis`](@ref).
 function VortexStepMethod.plot_combined_analysis(
     solver,
     body_aero,
-    results,
-    ::VortexStepMethod.MakieBackend;
+    results;
     solver_label="VSM",
     labels=nothing,
     angle_range=range(0, 20, length=20),
@@ -1312,14 +1302,13 @@ function VortexStepMethod.plot_combined_analysis(
 end
 
 """
-    plot_section_polars(body_aero, coefficient, ::MakieBackend; is_show=true,
+    plot_section_polars(body_aero, coefficient=:cl; is_show=true,
                         is_save=false, save_path=nothing, data_type=".png")
 
-Makie backend implementation of [`plot_section_polars`](@ref).
+Implementation of [`plot_section_polars`](@ref); rendered through `MakieControlPlots`.
 """
 function VortexStepMethod.plot_section_polars(body_aero::BodyAerodynamics,
-    coefficient::Symbol, ::VortexStepMethod.MakieBackend;
-    is_show::Bool=true, is_save::Bool=false,
+    coefficient::Symbol=:cl; is_show::Bool=true, is_save::Bool=false,
     save_path=nothing, data_type::String=".png")
 
     coefficient in (:cl, :cd, :cm) ||
@@ -1327,27 +1316,36 @@ function VortexStepMethod.plot_section_polars(body_aero::BodyAerodynamics,
     idx = coefficient === :cl ? 2 : coefficient === :cd ? 3 : 4
     label = uppercasefirst(string(coefficient))
 
-    fig = Figure(size=(900, 600))
-    ax = Axis(fig[1, 1]; title="$label per section", xlabel="α [deg]", ylabel=label)
-
-    n_sections = 0
+    alphas_deg = nothing
+    series = Vector{Float64}[]
+    labels = String[]
     for wing in body_aero.wings
         for (s, section) in enumerate(wing.unrefined_sections)
             section.aero_model == POLAR_VECTORS || continue
             aero = section.aero_data
             aero === nothing && continue
-            lines!(ax, rad2deg.(aero[1]), aero[idx]; label="section $s")
-            n_sections += 1
+            section_alphas = rad2deg.(aero[1])
+            if isnothing(alphas_deg)
+                alphas_deg = collect(section_alphas)
+            elseif length(section_alphas) != length(alphas_deg)
+                @warn "section $s has a different α grid; plotting against the first section's α"
+            end
+            push!(series, Float64.(aero[idx]))
+            push!(labels, "section $s")
         end
     end
-    n_sections == 0 && error("No POLAR_VECTORS sections found in body")
-    n_sections <= 12 && axislegend(ax; position=:rt, framevisible=false)
+    isempty(series) && error("No POLAR_VECTORS sections found in body")
+
+    plt = MakieControlPlots.plot(alphas_deg, series;
+        xlabel="α [deg]", ylabel=label, title="$label per section",
+        labels=labels, disp=(is_show || is_save))
 
     if is_save && !isnothing(save_path)
-        VortexStepMethod.save_plot(fig, save_path, "section_polars_$coefficient"; data_type)
+        isdir(save_path) || mkpath(save_path)
+        MakieControlPlots.savefig(
+            joinpath(save_path, "section_polars_$(coefficient)$(data_type)"))
     end
-    is_show && display(fig)
-    return fig
+    return plt
 end
 
 # --- OBJ mesh / airfoil plotting (formerly ObjAdapterMakieExt) ---
@@ -1622,11 +1620,11 @@ function ObjAdapter.plot_airfoil_fit(x::Vector, y::Vector; title::String="Airfoi
 end
 
 """
-    plot_airfoils(geometry_file, ::MakieBackend; overlay=nothing, symmetric=false,
+    plot_airfoils(geometry_file; overlay=nothing, symmetric=false,
                   idxs=nothing, n_cols=3, is_show=true, is_save=false,
                   save_path=nothing, data_type=".png")
 
-Makie backend implementation of [`plot_airfoils`](@ref).
+Makie implementation of [`plot_airfoils`](@ref).
 
 With `overlay=false` each airfoil gets its own subplot; with `overlay=true` all
 airfoils are drawn on one axis coloured by section. By default (`overlay=nothing`)
@@ -1636,8 +1634,7 @@ the fitted airfoil as a line. Pass `idxs` (e.g. `idxs=[1]`) to plot only those
 airfoils by position; otherwise `symmetric=true` shows just the first half of the
 sections (the wing is mirror-symmetric, so the other half is redundant).
 """
-function ObjAdapter.plot_airfoils(geometry_file::String,
-    ::VortexStepMethod.MakieBackend;
+function ObjAdapter.plot_airfoils(geometry_file::String;
     overlay=nothing, symmetric::Bool=false, idxs=nothing, n_cols::Int=3,
     is_show::Bool=true, is_save::Bool=false, save_path=nothing,
     data_type::String=".png")

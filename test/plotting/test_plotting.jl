@@ -13,21 +13,16 @@ module FakeMakieReturnsOtherModule
     import Base
     current_backend() = Base
 end
-backend = if "plot-controlplots" in ARGS
-    using ControlPlots
-    import ControlPlots: plt
-    using PythonCall: pyconvert
-    "ControlPlots"
-else
-    using CairoMakie
-    "Makie"
-end
+using CairoMakie
+using MakieControlPlots
+# MakieControlPlots activates GLMakie on load; force CairoMakie so headless
+# figure saving uses the software backend.
+CairoMakie.activate!()
 
 using VortexStepMethod
 using Test
 
-const makie_ext = backend == "Makie" ?
-    Base.get_extension(VortexStepMethod, :VortexStepMethodMakieExt) : nothing
+const makie_ext = Base.get_extension(VortexStepMethod, :VortexStepMethodMakieExt)
 
 # Helper to robustly delete files on platforms with occasional file locks
 safe_rm(path) = begin
@@ -76,7 +71,7 @@ function create_body_aero()
     body_aero
 end
 
-@testset "Plotting ($backend)" begin
+@testset "Plotting (Makie)" begin
     save_dir = tempdir()
     body_aero = create_body_aero()
 
@@ -87,21 +82,11 @@ end
         save_path=save_dir,
         is_save=true,
         is_show=false)
-    if backend == "Makie"
-        @test fig isa Figure
-    else
-        @test fig !== nothing
-    end
+    @test fig isa Figure
 
-    if backend == "Makie"
-        @test hasmethod(VortexStepMethod.show_plot, Tuple{Figure})
-        @test_throws MethodError VortexStepMethod.show_plot(nothing)
-        @test_nowarn VortexStepMethod.show_plot(fig)
-    else
-        FigType = plt.Figure
-        @test hasmethod(VortexStepMethod.show_plot, Tuple{FigType})
-        @test_throws MethodError VortexStepMethod.show_plot(nothing)
-    end
+    @test hasmethod(VortexStepMethod.show_plot, Tuple{Figure})
+    @test_throws MethodError VortexStepMethod.show_plot(nothing)
+    @test_nowarn VortexStepMethod.show_plot(fig)
 
     @test isfile(joinpath(save_dir,
                           "Rectangular_wing_geometry_angled_view.png"))
@@ -139,11 +124,7 @@ end
         title="Spanwise Distributions",
         is_show=false
     )
-    if backend == "Makie"
-        @test fig isa Figure
-    else
-        @test fig !== nothing
-    end
+    @test fig isa Figure
 
     # Plot polar curves
     v_a = 20.0
@@ -161,11 +142,7 @@ end
         is_save=true,
         is_show=false
     )
-    if backend == "Makie"
-        @test fig isa Figure
-    else
-        @test fig !== nothing
-    end
+    @test fig isa Figure
     @test isfile(joinpath(save_dir, "Rectangular_Wing_Polars.png"))
     safe_rm(joinpath(save_dir, "Rectangular_Wing_Polars.png"))
 
@@ -182,11 +159,7 @@ end
         is_show=false,
         cl_over_cd=false
     )
-    if backend == "Makie"
-        @test fig isa Figure
-    else
-        @test fig !== nothing
-    end
+    @test fig isa Figure
 
     # Plot combined analysis with cl_over_cd
     fig = plot_combined_analysis(
@@ -200,11 +173,7 @@ end
         is_show=false,
         cl_over_cd=true
     )
-    if backend == "Makie"
-        @test fig isa Figure
-    else
-        @test fig !== nothing
-    end
+    @test fig isa Figure
 
     # Plot combined analysis with cl_over_cd=false
     fig = plot_combined_analysis(
@@ -218,32 +187,20 @@ end
         is_show=false,
         cl_over_cd=false
     )
-    if backend == "Makie"
-        @test fig isa Figure
-    else
-        @test fig !== nothing
-    end
+    @test fig isa Figure
 
     # Test polar data plotting
     body_aero = BodyAerodynamics([ram_wing])
     fig = plot_polar_data(body_aero; is_show=false)
-    if backend == "Makie"
-        @test fig isa Figure
-    else
-        @test fig !== nothing
-    end
+    @test fig isa Figure
 
     fig_rect = plot_polar_data(body_aero;
         alphas=collect(deg2rad.(-5:1.0:15)),
         delta_tes=collect(deg2rad.(-3:1.0:5)),
         is_show=false)
-    if backend == "Makie"
-        @test fig_rect isa Figure
-    else
-        @test fig_rect !== nothing
-    end
+    @test fig_rect isa Figure
 
-    # Tests for both backends
+    # Edge cases: empty panels and distributed apparent wind
     body_aero_empty = create_body_aero()
     empty!(body_aero_empty.panels)
     @test_throws Exception plot_geometry(
@@ -290,25 +247,7 @@ end
         safe_rm(literature_csv)
     end
 
-    # CP-specific tests (DPI, matplotlib internals)
-    if backend == "ControlPlots"
-        # `get_dpi()` returns a Python float; convert to a Julia Float64 so the
-        # comparisons below evaluate to a Julia `Bool` rather than a `Py` object.
-        get_dpi(fig) = pyconvert(Float64, fig.get_dpi())
-
-        fig_dpi = plt.figure()
-        default_dpi = get_dpi(fig_dpi)
-        @test default_dpi != 173
-
-        show_plot(fig_dpi; dpi=173)
-        @test get_dpi(fig_dpi) == 173
-
-        show_plot(fig_dpi)
-        @test get_dpi(fig_dpi) == 130
-        plt.close(fig_dpi)
-    end
-
-    # Unit tests for shared extract_literature_polar_data (both backends)
+    # Unit tests for shared extract_literature_polar_data
     using DelimitedFiles
 
     # Tuple parsing branch (e.g. readdlm(...; header=true) shape)
@@ -406,7 +345,7 @@ end
     )
     safe_rm(lit_bad_path)
 
-    # Test show_moments=true with literature data (both backends)
+    # Test show_moments=true with literature data
     cm_lit_path = tempname() * "_lit_moments.csv"
     open(cm_lit_path, "w") do io_cm_lit
         write(io_cm_lit,
@@ -446,59 +385,57 @@ end
     safe_rm(no_cm_path)
 
     # Tests for save_plot function
-    if backend == "Makie"
-        @testset "_active_backend_prefers_vector_output" begin
-            @test makie_ext !== nothing
-
-            active_backend_prefers_vector_output =
-                getfield(makie_ext, :_active_backend_prefers_vector_output)
-
-
-            @test active_backend_prefers_vector_output(FakeMakieNoCurrentBackend) == false
-            @test active_backend_prefers_vector_output(FakeMakieCurrentBackendThrows) == false
-
-            @test active_backend_prefers_vector_output(FakeMakieReturnsCairoModule) == true
-            @test active_backend_prefers_vector_output(FakeMakieReturnsOtherModule) == false
-        end
-
-        body_aero = create_body_aero()
-        fig = plot_geometry(
-            body_aero,
-            "save_plot_test";
-            is_save=false,
-            is_show=false)
-        @test fig isa Figure
+    @testset "_active_backend_prefers_vector_output" begin
+        @test makie_ext !== nothing
 
         active_backend_prefers_vector_output =
             getfield(makie_ext, :_active_backend_prefers_vector_output)
 
-        save_test_dir = tempdir()
-        
-        # Test 1: save_plot with explicit data_type (".png")
-        VortexStepMethod.save_plot(fig, save_test_dir, "test_explicit_png", data_type=".png")
-        @test isfile(joinpath(save_test_dir, "test_explicit_png.png"))
-        safe_rm(joinpath(save_test_dir, "test_explicit_png.png"))
 
-        # Test 2: save_plot with explicit data_type (".pdf")
-        VortexStepMethod.save_plot(fig, save_test_dir, "test_explicit_pdf", data_type=".pdf")
-        @test isfile(joinpath(save_test_dir, "test_explicit_pdf.pdf"))
-        safe_rm(joinpath(save_test_dir, "test_explicit_pdf.pdf"))
+        @test active_backend_prefers_vector_output(FakeMakieNoCurrentBackend) == false
+        @test active_backend_prefers_vector_output(FakeMakieCurrentBackendThrows) == false
 
-        # Test 3: save_plot with data_type=nothing (backend-aware detection)
-        backend_aware_dir = mktempdir()
-        try
-            VortexStepMethod.save_plot(fig, backend_aware_dir, "test_backend_aware", data_type=nothing)
-            pdf_path = joinpath(backend_aware_dir, "test_backend_aware.pdf")
-            png_path = joinpath(backend_aware_dir, "test_backend_aware.png")
-            expected_ext = active_backend_prefers_vector_output(Makie) ? ".pdf" : ".png"
+        @test active_backend_prefers_vector_output(FakeMakieReturnsCairoModule) == true
+        @test active_backend_prefers_vector_output(FakeMakieReturnsOtherModule) == false
+    end
 
-            @test xor(isfile(pdf_path), isfile(png_path))
-            @test isfile(joinpath(backend_aware_dir, "test_backend_aware" * expected_ext))
-        finally
-            safe_rm(joinpath(backend_aware_dir, "test_backend_aware.pdf"))
-            safe_rm(joinpath(backend_aware_dir, "test_backend_aware.png"))
-            rm(backend_aware_dir; force=true, recursive=true)
-        end
+    body_aero = create_body_aero()
+    fig = plot_geometry(
+        body_aero,
+        "save_plot_test";
+        is_save=false,
+        is_show=false)
+    @test fig isa Figure
+
+    active_backend_prefers_vector_output =
+        getfield(makie_ext, :_active_backend_prefers_vector_output)
+
+    save_test_dir = tempdir()
+    
+    # Test 1: save_plot with explicit data_type (".png")
+    VortexStepMethod.save_plot(fig, save_test_dir, "test_explicit_png", data_type=".png")
+    @test isfile(joinpath(save_test_dir, "test_explicit_png.png"))
+    safe_rm(joinpath(save_test_dir, "test_explicit_png.png"))
+
+    # Test 2: save_plot with explicit data_type (".pdf")
+    VortexStepMethod.save_plot(fig, save_test_dir, "test_explicit_pdf", data_type=".pdf")
+    @test isfile(joinpath(save_test_dir, "test_explicit_pdf.pdf"))
+    safe_rm(joinpath(save_test_dir, "test_explicit_pdf.pdf"))
+
+    # Test 3: save_plot with data_type=nothing (backend-aware detection)
+    backend_aware_dir = mktempdir()
+    try
+        VortexStepMethod.save_plot(fig, backend_aware_dir, "test_backend_aware", data_type=nothing)
+        pdf_path = joinpath(backend_aware_dir, "test_backend_aware.pdf")
+        png_path = joinpath(backend_aware_dir, "test_backend_aware.png")
+        expected_ext = active_backend_prefers_vector_output(Makie) ? ".pdf" : ".png"
+
+        @test xor(isfile(pdf_path), isfile(png_path))
+        @test isfile(joinpath(backend_aware_dir, "test_backend_aware" * expected_ext))
+    finally
+        safe_rm(joinpath(backend_aware_dir, "test_backend_aware.pdf"))
+        safe_rm(joinpath(backend_aware_dir, "test_backend_aware.png"))
+        rm(backend_aware_dir; force=true, recursive=true)
 
         # Test 4: save_plot with title containing spaces (should be sanitized to underscores)
         VortexStepMethod.save_plot(fig, save_test_dir, "test with spaces", data_type=".png")

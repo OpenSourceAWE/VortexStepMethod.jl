@@ -85,10 +85,9 @@ prepare_cp_output!
 validate_cp_sections
 ```
 
-### Examples and plotting backend
+### Examples
 ```@docs
 copy_examples
-set_plot_backend!
 ```
 
 ## Airfoil aerodynamics (AirfoilAero)

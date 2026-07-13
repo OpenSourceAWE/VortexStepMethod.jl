@@ -74,13 +74,13 @@ CurrentModule = VortexStepMethod
 set_va!
 solve
 solve!
-reinit!(body_aero::BodyAerodynamics)
+reinit!(body_aero::BodyAerodynamics{P, W, T}) where {P, W, T}
 linearize
 calculate_results
 ```
 
 ## Main Plotting Functions
-The plotting functions are implemented as [package extensions](https://pkgdocs.julialang.org/v1.11/creating-packages/#Conditional-loading-of-code-in-packages-(Extensions)). They are available when `GLMakie` (or `ControlPlots`) is loaded before `VortexStepMethod`. The examples use `GLMakie`.
+The plotting functions are implemented as [package extensions](https://pkgdocs.julialang.org/v1.11/creating-packages/#Conditional-loading-of-code-in-packages-(Extensions)). They are available once a Makie backend (`GLMakie` or `CairoMakie`) and `MakieControlPlots` are loaded before `VortexStepMethod`. The examples use `GLMakie`.
 ```@docs
 plot_geometry
 plot_distribution

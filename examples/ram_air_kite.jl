@@ -3,6 +3,7 @@ if Base.active_project() != joinpath(@__DIR__, "Project.toml")
     Pkg.activate(@__DIR__)
 end
 using GLMakie
+using MakieControlPlots
 using VortexStepMethod
 using VortexStepMethod.ObjAdapter
 using VortexStepMethod.AirfoilAero: XFoilSolver, NeuralFoilSolver, ShrinkWrap
@@ -57,7 +58,7 @@ WRAP = ShrinkWrap(clearance=0.0)
 # Hover a slice to inspect its 2D airfoil.
 fig_slices_3d = plot_slices_3d(obj_path; n_slices=N_SECTIONS, wrap_method=WRAP,
                                wingtip_distance=WINGTIP_DISTANCE, delta=15.0)
-save("ram_air_slices_3d.png", fig_slices_3d)
+GLMakie.save("ram_air_slices_3d.png", fig_slices_3d)
 
 function matrix_wing(solver, subdir; n_panels=50, n_sections=N_SECTIONS)
     out_dir = joinpath("data", "ram_air_kite", subdir)
@@ -78,7 +79,7 @@ wing_xfoil = matrix_wing(XF_SOLVER, "polars_xfoil")
 # of delta_range; nothing is re-sliced or re-wrapped).
 fig_audit = plot_slices_3d(joinpath("data", "ram_air_kite", "polars_xfoil");
                            delta=1.0, obj_path=obj_path)
-save("ram_air_slices_audit.png", fig_audit)
+GLMakie.save("ram_air_slices_audit.png", fig_audit)
 body_xfoil = BodyAerodynamics([wing_xfoil])
 solver_xfoil = Solver(body_xfoil; aerodynamic_model_type=VSM, rtol=1e-5, solver_type=NONLIN,
                       relaxation_factor=RELAXATION, is_with_artificial_damping=ARTIFICIAL_DAMPING)
