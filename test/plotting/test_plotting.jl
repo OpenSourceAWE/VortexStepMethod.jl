@@ -200,7 +200,7 @@ end
         is_show=false)
     @test fig_rect isa Figure
 
-    # Tests for both backends
+    # Edge cases: empty panels and distributed apparent wind
     body_aero_empty = create_body_aero()
     empty!(body_aero_empty.panels)
     @test_throws Exception plot_geometry(
@@ -345,7 +345,7 @@ end
     )
     safe_rm(lit_bad_path)
 
-    # Test show_moments=true with literature data (both backends)
+    # Test show_moments=true with literature data
     cm_lit_path = tempname() * "_lit_moments.csv"
     open(cm_lit_path, "w") do io_cm_lit
         write(io_cm_lit,

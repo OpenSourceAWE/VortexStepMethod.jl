@@ -49,21 +49,12 @@ for d in data/ram_air_kite data/TUDELFT_V3_KITE \
     [[ -d "$d" ]] && pass "copied $d/" || fail "copied $d/"
 done
 
-# Verify menu.jl loads GLMakie and examples are backend-agnostic
+# Verify menu.jl loads GLMakie
 if grep -q "using GLMakie" "examples/menu.jl"; then
     pass "menu.jl uses GLMakie"
 else
     fail "menu.jl uses GLMakie"
 fi
-for f in bench.jl rectangular_wing.jl V3_kite.jl \
-         pyramid_model.jl ram_air_kite.jl stall_model.jl; do
-    if ! grep -q "using GLMakie" "examples/$f" && \
-       ! grep -q "using MakieControlPlots" "examples/$f"; then
-        pass "$f is backend-agnostic"
-    else
-        fail "$f is backend-agnostic"
-    fi
-done
 
 # The copied examples activate their own project (@__DIR__), so ensure that
 # environment is fully resolved and linked to this checkout before execution.
