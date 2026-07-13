@@ -38,7 +38,7 @@ end
 """
     obj_to_yaml(obj_path, output_dir; n_sections, Re, alpha_range=-180:1:180,
                 aero_solver=NeuralFoilSolver(), wrap_method=ShrinkWrap(),
-                spanwise_direction=[0.0, 1.0, 0.0], verbose=true)
+                spanwise_direction=[0.0, 1.0, 0.0], crease_frac=0.75, verbose=true)
 
 Convert a 3D wing `.obj` mesh to the native YAML geometry route.
 
@@ -50,6 +50,9 @@ into a clean airfoil and evaluated with `aero_solver`.
 `aero_solver` selects the 2D-airfoil backend: [`NeuralFoilSolver`](@ref) (default,
 fast) or [`XFoilSolver`](@ref) (viscous panel code); pass `aero_solver=XFoilSolver()`
 to use XFoil instead. Each section's polar is written as `POLAR_VECTORS`.
+
+`crease_frac` is the chordwise hinge location (0–1) about which each `delta_range`
+trailing-edge deflection pivots.
 
 `wrap_method` ([`ShrinkWrap`](@ref)) wraps each slice's point cloud into a clean closed
 airfoil, robust both to the noisy interior-structure points (ribs, spars) of a ram-air
@@ -85,7 +88,7 @@ function obj_to_yaml(obj_path::String, output_dir::String;
                      wrap_method::ShrinkWrap=ShrinkWrap(),
                      reuse_valid_airfoils::Bool=true, max_thickness_ratio::Real=2.0,
                      spanwise_direction=[0.0, 1.0, 0.0], rotation=I,
-                     wingtip_distance=0.0, verbose::Bool=true)
+                     wingtip_distance=0.0, crease_frac=0.75, verbose::Bool=true)
     (!endswith(obj_path, ".obj")) && (obj_path *= ".obj")
     isfile(obj_path) || error("OBJ file not found: $obj_path")
     !isapprox(spanwise_direction, [0.0, 1.0, 0.0]) &&
@@ -130,7 +133,7 @@ function obj_to_yaml(obj_path::String, output_dir::String;
         try
             res = generate_polar_from_coordinates(s.x_fit, s.y_fit,
                 joinpath(output_dir, csv_rel); Re=Float64(Re), alpha_range,
-                solver=aero_solver, delta_range,
+                solver=aero_solver, delta_range, crease_frac,
                 dat_prefix=joinpath(output_dir, "airfoils", "$j"))
             clvals = res isa AbstractVector ? collect(sol.cl for sol in res) : vec(res[1])
             all(isnan, clvals) && error("solver produced no converged points")
