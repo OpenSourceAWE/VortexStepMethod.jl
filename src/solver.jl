@@ -861,6 +861,40 @@ function local_lift_slope!(slopes, panels, alpha_dist, delta=deg2rad(0.5))
 end
 
 """
+    apply_artificial_viscosity!(gamma, panels, alpha_dist, laplacian, viscosity_matrix,
+                                lift_slope, mu_array, gamma_target, planform_area, factor)
+
+Apply one implicit Li/Gaunaa artificial-viscosity step to `gamma` in place and return
+`true` when it fired. The per-panel viscosity is
+`mu_i = max(0, -factor * planform_area * Cl'_i / width_i^2)`, with the local lift slope
+`Cl'_i` from [`local_lift_slope!`](@ref) evaluated at `alpha_dist`. When any panel is
+post-stall (`mu_i > 0`), `gamma` is replaced by the solution of
+`(I - diag(mu) L) gamma = gamma`, with `L` the spanwise Laplacian in `laplacian`
+(see [`build_spanwise_laplacian!`](@ref)); otherwise `gamma` is left unchanged. The
+remaining arguments are preallocated work buffers reused across iterations.
+"""
+function apply_artificial_viscosity!(gamma, panels, alpha_dist, laplacian, viscosity_matrix,
+        lift_slope, mu_array, gamma_target, planform_area, factor)
+    n_panels = length(panels)
+    local_lift_slope!(lift_slope, panels, alpha_dist)
+    any_stalled = false
+    @inbounds for i in 1:n_panels
+        m = -factor * planform_area * lift_slope[i] / panels[i].width^2
+        mu_array[i] = max(zero(eltype(mu_array)), m)
+        mu_array[i] > 0 && (any_stalled = true)
+    end
+    any_stalled || return false
+    gamma_target .= gamma
+    one_t, zero_t = one(eltype(viscosity_matrix)), zero(eltype(viscosity_matrix))
+    @inbounds for col in 1:n_panels, row in 1:n_panels
+        viscosity_matrix[row, col] =
+            (row == col ? one_t : zero_t) - mu_array[row] * laplacian[row, col]
+    end
+    ldiv!(gamma, lu!(viscosity_matrix), gamma_target)
+    return true
+end
+
+"""
     gamma_loop!(solver::Solver, AIC_x::Matrix{Float64},
               AIC_y::Matrix{Float64}, AIC_z::Matrix{Float64},
               panels::AbstractVector{<:Panel}, relaxation_factor::Float64; log=true)
@@ -1047,23 +1081,11 @@ function gamma_loop!(
             )
             # Gate the linear solve on any(mu > 0): fires exactly in post-stall.
             if use_viscosity
-                local_lift_slope!(lift_slope, panels, solver.lr.alpha_dist)
-                any_stalled = false
-                @inbounds for i in 1:n_panels
-                    m = -solver.artificial_viscosity_factor * planform_area *
-                        lift_slope[i] / panels[i].width^2
-                    mu_array[i] = max(zero(T), m)
-                    mu_array[i] > 0 && (any_stalled = true)
-                end
-                if any_stalled
-                    gamma_target .= gamma_new
-                    @inbounds for col in 1:n_panels, row in 1:n_panels
-                        viscosity_matrix[row, col] =
-                            (row == col ? one(T) : zero(T)) -
-                            mu_array[row] * laplacian[row, col]
-                    end
-                    gamma_new .= viscosity_matrix \ gamma_target
-                end
+                apply_artificial_viscosity!(
+                    gamma_new, panels, solver.lr.alpha_dist, laplacian,
+                    viscosity_matrix, lift_slope, mu_array, gamma_target,
+                    planform_area, solver.artificial_viscosity_factor,
+                )
             end
 
             # Update gamma with relaxation and damping

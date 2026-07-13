@@ -109,42 +109,77 @@ end
     @test all(small .== 0.0)
 end
 
-@testset "Artificial viscosity stabilizes post-stall" begin
-    # Paper case b: AR=10, Cl'=-pi; plain iteration diverges, implicit converges.
-    AR, clp, N, V, c = 10.0, -pi, 50, 1.0, 2.0
-    b = AR * c
-    dz = b / N
-    alpha_g = deg2rad(5.0)
-    idx = collect(0:N-1)
-    induction = [1.0 / (pi * dz) / (4.0 * (j - i)^2 - 1.0) for i in idx, j in idx]
+# A deep-alpha polar is required: the viscosity only fires where the local lift
+# slope is negative, and `cl` clamps flat past the tabulated alpha range. The
+# default 15-deg range never stalls, so we extend it to 40 deg.
+poststall_wing = ram_air_matrix_wing(; n_panels=20, n_sections=4,
+    alpha_range=deg2rad.(-5:2:40), delta_range=deg2rad.(-3:3:3))
+refine!(poststall_wing)
 
-    residual(gamma) =
-        0.5 .* V .* c .* (clp .* ((alpha_g .+ (induction * gamma) ./ V) .- alpha_g) .+ 1.0)
+roughness(v) = sum(abs, @views v[1:end-2] .- 2 .* v[2:end-1] .+ v[3:end])
 
-    laplacian = zeros(N, N)
-    VortexStepMethod.build_spanwise_laplacian!(laplacian, N)
-    mu = -0.035 * N^2 / AR * clp                  # Eq. (16), > 0 since clp < 0
-    system = Matrix(1.0I, N, N) .- mu .* laplacian
+@testset "apply_artificial_viscosity! smooths post-stall, no-op attached" begin
+    body_aero = BodyAerodynamics([poststall_wing])
+    panels = body_aero.panels
+    n = length(panels)
 
-    function iterate_loop(use_viscosity, omega; max_iter=20000)
-        gamma = zeros(N)
-        for _ in 1:max_iter
-            prev = gamma
-            nxt = use_viscosity ? (system \ residual(prev)) : residual(prev)
-            gamma = (1 - omega) .* prev .+ omega .* nxt
-            ref = max(maximum(abs.(gamma)), 1e-4)
-            maximum(abs.(gamma .- prev)) / ref < 1e-6 && return true, gamma
-        end
-        return false, gamma
-    end
+    laplacian = zeros(n, n)
+    VortexStepMethod.build_spanwise_laplacian!(laplacian, n)
+    viscosity_matrix = zeros(n, n)
+    lift_slope = zeros(n)
+    mu_array = zeros(n)
+    gamma_target = zeros(n)
+    planform_area = sum(p.width * p.chord for p in panels)
 
-    base_converged, _ = iterate_loop(false, 0.1)
-    av_converged, gamma_av = iterate_loop(true, 0.5)
+    spiky() = [isodd(i) ? 1.0 : -1.0 for i in 1:n]
+    attached = fill(deg2rad(2.0), n)
+    post_stall = fill(deg2rad(22.0), n)
 
-    @test !base_converged    # base fixed point diverges (sawtooth)
-    @test av_converged
-    peak = maximum(abs.(gamma_av))
-    sawtooth = sum(abs.(gamma_av[1:end-2] .- 2 .* gamma_av[2:end-1] .+
-        gamma_av[3:end])) / (length(gamma_av) - 2) / peak
-    @test sawtooth < 0.02
+    # Attached flow: the local slope is positive everywhere, so mu stays zero,
+    # the solve is skipped, and gamma is returned untouched.
+    gamma_attached = spiky()
+    fired_attached = VortexStepMethod.apply_artificial_viscosity!(gamma_attached,
+        panels, attached, laplacian, viscosity_matrix, lift_slope, mu_array,
+        gamma_target, planform_area, 0.035)
+    @test !fired_attached
+    @test gamma_attached == spiky()
+
+    # Post-stall: the solve fires and smooths the sawtooth.
+    gamma_stalled = spiky()
+    rough_before = roughness(gamma_stalled)
+    fired_stalled = VortexStepMethod.apply_artificial_viscosity!(gamma_stalled,
+        panels, post_stall, laplacian, viscosity_matrix, lift_slope, mu_array,
+        gamma_target, planform_area, 0.035)
+    @test fired_stalled
+    @test roughness(gamma_stalled) < rough_before
+
+    # The attached (hot) path must not allocate.
+    gamma_alloc = spiky()
+    VortexStepMethod.apply_artificial_viscosity!(gamma_alloc, panels, attached,
+        laplacian, viscosity_matrix, lift_slope, mu_array, gamma_target,
+        planform_area, 0.035)
+    allocs = @allocated VortexStepMethod.apply_artificial_viscosity!(gamma_alloc,
+        panels, attached, laplacian, viscosity_matrix, lift_slope, mu_array,
+        gamma_target, planform_area, 0.035)
+    @test allocs == 0
+end
+
+@testset "solve! artificial viscosity: attached no-op, post-stall finite" begin
+    body_aero = BodyAerodynamics([poststall_wing])
+    solver_off = Solver(body_aero; solver_type=LOOP, aerodynamic_model_type=VSM,
+        is_with_artificial_viscosity=false)
+    solver_on = Solver(body_aero; solver_type=LOOP, aerodynamic_model_type=VSM,
+        is_with_artificial_viscosity=true)
+
+    # Attached flow: viscosity never fires, so results are bit-identical.
+    set_va!(body_aero, [10.0, 0.0, 0.0])
+    gamma_off = copy(solve!(solver_off, body_aero).gamma_distribution)
+    set_va!(body_aero, [10.0, 0.0, 0.0])
+    gamma_on = copy(solve!(solver_on, body_aero).gamma_distribution)
+    @test gamma_on == gamma_off
+
+    # High angle of attack: the viscosity path runs and stays finite.
+    set_va!(body_aero, [10.0 * cosd(25), 0.0, 10.0 * sind(25)])
+    sol = solve!(solver_on, body_aero)
+    @test all(isfinite, sol.gamma_distribution)
 end
