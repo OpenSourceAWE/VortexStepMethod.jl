@@ -28,13 +28,10 @@ function plot_airfoil_fit end
     plot_airfoils(geometry_file::String; kwargs...)
 
 Plot every airfoil of a YAML wing geometry. The airfoil shapes are read from the
-`.dat` files referenced by the geometry's `wing_airfoils`. Routes to the active
-plotting backend; implemented in `ObjAdapterMakieExt` (load `Makie`/`GLMakie`).
+`.dat` files referenced by the geometry's `wing_airfoils`. Implemented in the
+`VortexStepMethodMakieExt` extension (load a Makie backend, e.g. `GLMakie`).
 """
 function plot_airfoils end
-function plot_airfoils(geometry_file::String; kwargs...)
-    plot_airfoils(geometry_file, VortexStepMethod._active_backend(); kwargs...)
-end
 
 """
     plot_slices_3d(path; n_slices=10, rotation=I, delta=0.0, is_show=true)

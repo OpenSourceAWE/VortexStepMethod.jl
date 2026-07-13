@@ -20,14 +20,7 @@ Example output is shown in the figure below, where the aerodynamic predictions o
 
 ## Installation
 Install [Julia 1.10](https://ufechner7.github.io/2024/08/09/installing-julia-with-juliaup.html) or later, 
-if you haven't already. On Linux, make sure that Python3 and Matplotlib are installed:
-```
-sudo apt install python3-matplotlib
-```
-Furthermore, the package `ControlPlots` must be installed globally:
-```
-julia -e 'using Pkg; Pkg.add("ControlPlots")'
-```
+if you haven't already.
 
 Before installing this software it is suggested to create a new project, for
 example like this:
@@ -62,10 +55,6 @@ julia> using VortexStepMethod
 julia> VortexStepMethod.install_examples()
 julia> include("examples/menu.jl")
 ```
-or, for using the ControlPlots library (faster time-to-first-plot):
-```
-include("examples_cp/menu_cp.jl")
-```
 
 ## Running the examples as developer
 If you have git installed, check out this repo because it makes it easier to understand the code:
@@ -88,11 +77,6 @@ Then you can display a menu with the available examples using the GLMakie librar
 ```julia
 menu()
 ```
-or using the ControlPlots library (faster time-to-first-plot):
-```julia
-menu_cp()
-```
-
 
 To browse the code, it is suggested to use [VSCode](https://code.visualstudio.com/) with the Julia plugin.
 
