@@ -8,6 +8,9 @@ CurrentModule = VortexStepMethod
 ```@docs
 calculate_AIC_matrices!
 gamma_loop!
+build_spanwise_laplacian!
+local_lift_slope!
+apply_artificial_viscosity!
 frozen_wake!
 calc_forces!
 calculate_cl

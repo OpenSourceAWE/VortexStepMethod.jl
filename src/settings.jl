@@ -70,6 +70,10 @@ Solver configuration, used within [`VSMSettings`](@ref).
 - `artificial_damping`: Enable artificial damping
     (default `false`)
 - `k2`, `k4`: Artificial damping parameters
+- `is_with_artificial_viscosity`: Enable Li/Gaunaa post-stall
+    artificial viscosity (default `false`)
+- `artificial_viscosity_factor`: Viscosity scaling coefficient k
+    (default `0.035`)
 - `type_initial_gamma_distribution`:
     [`ELLIPTIC`](@ref InitialGammaDistribution) or `ZEROS`
     (default `ELLIPTIC`)
@@ -95,6 +99,8 @@ Solver configuration, used within [`VSMSettings`](@ref).
     artificial_damping::Bool = false        # whether to apply artificial damping
     k2::Float64 = 0.1                       # artificial damping parameter
     k4::Float64 = 0.0                       # artificial damping parameter
+    is_with_artificial_viscosity::Bool = false  # Li/Gaunaa post-stall artificial viscosity
+    artificial_viscosity_factor::Float64 = 0.035 # viscosity scaling coefficient k
     type_initial_gamma_distribution::InitialGammaDistribution = ELLIPTIC # see: [InitialGammaDistribution](@ref)
     use_gamma_prev::Bool = true             # if false, always reinitialize gamma from type_initial_gamma_distribution
     core_radius_fraction::Float64 = 1e-20
