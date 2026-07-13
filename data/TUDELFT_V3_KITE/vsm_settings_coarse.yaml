@@ -37,7 +37,7 @@
 # Define the flight state for the aerodynamic analysis
 condition:
   wind_speed: 10.0 # [m/s] Free stream velocity magnitude
-  alpha: 5.0 # [°] Angle of attack (pitch angle relative to flow)
+  alpha: 0.0 # [°] Angle of attack (pitch angle relative to flow)
   beta: 0.0 # [°] Sideslip angle (yaw angle relative to flow)
   yaw_rate: 0.0 # [°/s] Yaw rate (for dynamic analysis, 0 for static)
 
