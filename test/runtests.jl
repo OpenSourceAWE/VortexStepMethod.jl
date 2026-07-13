@@ -40,7 +40,15 @@ function include_selected_tests()
     should_run_test("filament/test_bound_filament.jl") && include("filament/test_bound_filament.jl")
     should_run_test("filament/test_semi_infinite_filament.jl") && include("filament/test_semi_infinite_filament.jl")
     should_run_test("panel/test_panel.jl") && include("panel/test_panel.jl")
-    should_run_test("plotting/test_plotting.jl") && include("plotting/test_plotting.jl")
+    if should_run_test("plotting/test_plotting.jl")
+        # MakieControlPlots activates GLMakie on load, which needs a display. Only the
+        # Linux CI provides one (via xvfb); skip on headless macOS/Windows runners.
+        if Sys.islinux()
+            include("plotting/test_plotting.jl")
+        else
+            @info "Skipping plotting tests on $(Sys.KERNEL): GLMakie needs a display."
+        end
+    end
     should_run_test("ram_geometry/test_kite_geometry.jl") && include("ram_geometry/test_kite_geometry.jl")
     should_run_test("settings/test_settings.jl") && include("settings/test_settings.jl")
     should_run_test("solver/test_solver.jl") && include("solver/test_solver.jl")
