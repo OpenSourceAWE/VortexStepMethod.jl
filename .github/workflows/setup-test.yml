@@ -20,6 +20,6 @@ jobs:
           version: '1'
       - uses: julia-actions/cache@v2
       - name: Install xvfb for headless GLMakie
-        run: sudo apt-get update && sudo apt-get install -y xvfb
+        run: sudo apt-get update && sudo apt-get install -y xvfb libgl1-mesa-dri
       - name: Run setup tests
-        run: bash test/test_setup.sh
+        run: xvfb-run -a bash test/test_setup.sh
