@@ -46,68 +46,24 @@ export load_polar_data
 export CpData, CpPolar, cp_distribution, delta_cp
 export read_cp_data, write_cp_data
 
-export plot_circulation_distribution,
-    plot_combined_analysis, plot_distribution, plot_geometry, plot_polar_data,
+export plot_combined_analysis, plot_distribution, plot_geometry, plot_polar_data,
     plot_polars, plot_section_polars, save_plot, show_plot
 
-# Backend dispatch types for multi-backend support (Makie and ControlPlots can coexist)
-abstract type PlotBackend end
-struct MakieBackend <: PlotBackend end
-struct ControlPlotsBackend <: PlotBackend end
-export PlotBackend, MakieBackend, ControlPlotsBackend
-
-const _PLOT_BACKEND = Ref{Union{Nothing, PlotBackend}}(nothing)
-
-"""
-    set_plot_backend!(backend::PlotBackend)
-
-Select the active plotting backend when both Makie and ControlPlots are loaded.
-
-# Example
-```julia
-set_plot_backend!(MakieBackend())
-set_plot_backend!(ControlPlotsBackend())
-```
-"""
-function set_plot_backend!(backend::PlotBackend)
-    _PLOT_BACKEND[] = backend
-end
-export set_plot_backend!
-
-# Generic stubs — extended by MakieExt and ControlPlotsExt with a PlotBackend argument.
-# The no-backend-argument wrappers below route through the active backend.
-function plot_geometry end
-function plot_distribution end
-function plot_circulation_distribution end
-function plot_polars end
-function save_plot end
-function show_plot end
-function plot_polar_data end
-function plot_combined_analysis end
-function plot_section_polars end
-
-function _active_backend()
-    b = _PLOT_BACKEND[]
-    isnothing(b) && error(
-        "No plotting backend loaded. Load Makie or ControlPlots first, " *
-        "or call set_plot_backend!(MakieBackend()) / set_plot_backend!(ControlPlotsBackend()) " *
-        "when both are loaded."
-    )
-    b
-end
+# Plotting functions live in the `VortexStepMethodMakieExt` extension, loaded once a
+# Makie backend (`GLMakie` or `CairoMakie`) and `MakieControlPlots` are available. The
+# declarations below carry the public docstrings; the extension provides the methods.
 
 """
     plot_geometry(body_aero::BodyAerodynamics, title; kwargs...)
 
 Plot wing geometry from different viewpoints and optionally save/show plots.
-Routes to the active plotting backend (Makie or ControlPlots).
 
 # Arguments
 - `body_aero`: the [`BodyAerodynamics`](@ref) to plot
 - `title`: plot title
 
 # Keyword arguments
-- `data_type`: file extension for saving (default depends on backend)
+- `data_type`: file extension for saving (default: `".png"`)
 - `save_path`: path for saving the graphic (default: `nothing`)
 - `is_save`: whether to save the graphic (default: `false`)
 - `is_show`: whether to display the graphic (default: `false`)
@@ -115,15 +71,12 @@ Routes to the active plotting backend (Makie or ControlPlots).
 - `view_azimuth`: initial view azimuth angle in degrees (default: `-120`)
 - `use_tex`: use external `pdflatex` for rendering (default: `false`; ignored by Makie)
 """
-function plot_geometry(body_aero, title; kwargs...)
-    plot_geometry(body_aero, title, _active_backend(); kwargs...)
-end
+function plot_geometry end
 
 """
     plot_distribution(y_coordinates_list, results_list, label_list; kwargs...)
 
 Plot spanwise distributions of aerodynamic properties.
-Routes to the active plotting backend (Makie or ControlPlots).
 
 # Arguments
 - `y_coordinates_list`: list of spanwise coordinate arrays
@@ -132,21 +85,18 @@ Routes to the active plotting backend (Makie or ControlPlots).
 
 # Keyword arguments
 - `title`: plot title (default: `"spanwise_distribution"`)
-- `data_type`: file extension for saving (default depends on backend)
+- `data_type`: file extension for saving (default: `".png"`)
 - `save_path`: path to save plots (default: `nothing`)
 - `is_save`: whether to save (default: `false`)
 - `is_show`: whether to display (default: `true`)
 - `use_tex`: use external `pdflatex` for rendering (default: `false`; ignored by Makie)
 """
-function plot_distribution(y_coordinates_list, results_list, label_list; kwargs...)
-    plot_distribution(y_coordinates_list, results_list, label_list, _active_backend(); kwargs...)
-end
+function plot_distribution end
 
 """
     plot_polars(solver_list, body_aero_list, label_list; kwargs...)
 
 Plot polar data comparing different solvers and configurations.
-Routes to the active plotting backend (Makie or ControlPlots).
 
 # Arguments
 - `solver_list`: list of aerodynamic solvers
@@ -161,22 +111,19 @@ Routes to the active plotting backend (Makie or ControlPlots).
 - `side_slip`: side slip angle (default: `0.0`) [°]
 - `v_a`: apparent wind speed magnitude (default: `10.0`) [m/s]
 - `title`: plot title (default: `"polar"`)
-- `data_type`: file extension for saving (default depends on backend)
+- `data_type`: file extension for saving (default: `".png"`)
 - `save_path`: path to save plots (default: `nothing`)
 - `is_save`: whether to save (default: `true`)
 - `is_show`: whether to display (default: `true`)
 - `use_tex`: use external `pdflatex` for rendering (default: `false`; ignored by Makie)
 - `cl_over_cd`: plot CL/CD vs angle instead of CL vs CD (default: `true`)
 """
-function plot_polars(solver_list, body_aero_list, label_list; kwargs...)
-    plot_polars(solver_list, body_aero_list, label_list, _active_backend(); kwargs...)
-end
+function plot_polars end
 
 """
     plot_polar_data(body_aero::BodyAerodynamics; kwargs...)
 
 Plot polar data (Cl, Cd, Cm) as 3-D surfaces against angle of attack and trailing edge deflection.
-Routes to the active plotting backend (Makie or ControlPlots).
 
 # Arguments
 - `body_aero`: the [`BodyAerodynamics`](@ref) to plot (must use `POLAR_MATRICES` aero model)
@@ -187,15 +134,13 @@ Routes to the active plotting backend (Makie or ControlPlots).
 - `is_show`: whether to display (default: `true`)
 - `use_tex`: use external `pdflatex` for rendering (default: `false`; ignored by Makie)
 """
-function plot_polar_data(body_aero; kwargs...)
-    plot_polar_data(body_aero, _active_backend(); kwargs...)
-end
+function plot_polar_data end
 
 """
     plot_combined_analysis(solver, body_aero, results; kwargs...)
 
 Create a combined analysis by calling `plot_geometry`, `plot_distribution`, and `plot_polars`
-in sequence. Routes to the active plotting backend (Makie or ControlPlots).
+in sequence.
 
 # Arguments
 - `solver`: solver or vector of solvers
@@ -216,21 +161,19 @@ in sequence. Routes to the active plotting backend (Makie or ControlPlots).
 - `is_show`: whether to display (default: `true`)
 - `use_tex`: use external `pdflatex` for rendering (default: `false`; ignored by Makie)
 - `literature_path_list`: paths to literature CSV files (default: `String[]`)
-- `data_type`: file extension for saving (default depends on backend)
+- `data_type`: file extension for saving (default: `".png"`)
 - `save_path`: directory to save files (default: `nothing`)
 - `is_save`: whether to save (default: `false`)
 - `cl_over_cd`: plot CL/CD vs angle (default: `true`)
 """
-function plot_combined_analysis(solver, body_aero, results; kwargs...)
-    plot_combined_analysis(solver, body_aero, results, _active_backend(); kwargs...)
-end
+function plot_combined_analysis end
 
 """
     plot_section_polars(body_aero::BodyAerodynamics, coefficient=:cl; kwargs...)
 
 Plot one polar coefficient (`:cl`, `:cd`, or `:cm`) against angle of attack for
-every section of a wing using stored `POLAR_VECTORS` data. Routes to the active
-plotting backend.
+every section of a wing using stored `POLAR_VECTORS` data. Rendered through
+`MakieControlPlots`.
 
 # Arguments
 - `body_aero`: the [`BodyAerodynamics`](@ref) to plot
@@ -242,9 +185,10 @@ plotting backend.
 - `save_path`: directory to save the figure (default: `nothing`)
 - `data_type`: file extension for saving (default: `".png"`)
 """
-function plot_section_polars(body_aero, coefficient::Symbol=:cl; kwargs...)
-    plot_section_polars(body_aero, coefficient, _active_backend(); kwargs...)
-end
+function plot_section_polars end
+
+function save_plot end
+function show_plot end
 
 """
    const MVec3    = MVector{3, Float64}
