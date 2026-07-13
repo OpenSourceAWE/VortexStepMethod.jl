@@ -40,7 +40,7 @@ jobs:
             version: '1.12'
             build_is_production_build: true
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: julia-actions/setup-julia@v3
         with:
           version: ${{ matrix.version }}
@@ -82,7 +82,7 @@ jobs:
           - ubuntu-latest
     runs-on: ${{ matrix.os }}
     steps:
-    - uses: actions/checkout@v6
+    - uses: actions/checkout@v7
     - uses: julia-actions/setup-julia@v3
       with:
         arch: ${{ matrix.julia_arch }}
@@ -109,7 +109,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: julia-actions/setup-julia@v3
       - uses: julia-actions/cache@v2
       - uses: julia-actions/julia-buildpkg@v1
