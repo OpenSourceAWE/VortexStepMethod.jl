@@ -57,7 +57,7 @@ WRAP = ShrinkWrap(clearance=0.0, min_concave_radius=0.2)
 # Hover a slice to inspect its 2D airfoil (raw points + the shrink-wrap).
 fig_slices_3d = plot_slices_3d(OBJ_PATH; n_slices=N_SLICES, rotation=ROTATION,
                                n_bins=N_BINS, wrap_method=WRAP)
-save("V3_slices_3d.png", fig_slices_3d)
+GLMakie.save("V3_slices_3d.png", fig_slices_3d)
 
 # Generate per-slice NeuralFoil polars from the shrink-wrapped sections. XFoil is also
 # supported (pass `solver=XFoilSolver(...)`) but its panel method does not converge on
