@@ -81,13 +81,13 @@ fig_audit = plot_slices_3d(joinpath("data", "ram_air_kite", "polars_xfoil");
                            delta=1.0, obj_path=obj_path)
 GLMakie.save("ram_air_slices_audit.png", fig_audit)
 body_xfoil = BodyAerodynamics([wing_xfoil])
-solver_xfoil = Solver(body_xfoil; aerodynamic_model_type=VSM, rtol=1e-5, solver_type=NONLIN,
+solver_xfoil = Solver(body_xfoil; aerodynamic_model_type=VSM, rtol=1e-5, solver_type=LOOP,
                       relaxation_factor=RELAXATION, is_with_artificial_damping=ARTIFICIAL_DAMPING)
 
 println("Creating NeuralFoil wing...")
 wing_nf = matrix_wing(NF_SOLVER, "polars_neuralfoil")
 body_nf = BodyAerodynamics([wing_nf])
-solver_nf = Solver(body_nf; aerodynamic_model_type=VSM, rtol=1e-5, solver_type=NONLIN,
+solver_nf = Solver(body_nf; aerodynamic_model_type=VSM, rtol=1e-5, solver_type=LOOP,
                    relaxation_factor=RELAXATION, is_with_artificial_damping=ARTIFICIAL_DAMPING)
 
 # Compare using plot_polars

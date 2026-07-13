@@ -69,7 +69,7 @@ vsm_solver = Solver(
     body_aero;
     aerodynamic_model_type=VSM,
     is_with_artificial_damping=false,
-    solver_type=NONLIN,
+    solver_type=LOOP,
 )
 
 # Setting velocity conditions
