@@ -1,14 +1,27 @@
 #!/bin/bash -eu
 
 _yes_to_all=false
+_update=false
+_skip_subprojects=false
+_no_precompile=false
 
 print_usage() {
     echo "Usage:"
     echo "./bin/install"
     echo "./bin/install -y"
     echo "./bin/install --yes"
+    echo "./bin/install --update"
+    echo "./bin/install --skip-subprojects"
+    echo "./bin/install --no-precompile"
     echo "./bin/install -h"
     echo "./bin/install --help"
+    echo "Options:"
+    echo "  --update              Run Pkg.update() instead of seeding from the .default"
+    echo "                        manifest, then copy the resulting main manifest back to"
+    echo "                        Manifest-v<major>.toml.default (regenerates the defaults)."
+    echo "  --skip-subprojects    Skip setup of the examples/test/docs/... sub-projects."
+    echo "  --no-precompile       Skip the precompile, extension-verification and smoke-test"
+    echo "                        steps; just resolve/update manifests."
 }
 
 while [[ $# -gt 0 ]]; do
@@ -19,6 +32,18 @@ while [[ $# -gt 0 ]]; do
             ;;
         -y|--yes)
             _yes_to_all=true
+            shift
+            ;;
+        --update)
+            _update=true
+            shift
+            ;;
+        --skip-subprojects)
+            _skip_subprojects=true
+            shift
+            ;;
+        --no-precompile)
+            _no_precompile=true
             shift
             ;;
         *)
@@ -125,11 +150,19 @@ rename_manifest_if_needed() {
     fi
 }
 
+# In update mode sub-projects run Pkg.update() so their deps track the freshly
+# updated main manifest; otherwise they just resolve + instantiate.
+if [[ $_update == true ]]; then
+    _sub_pkg_cmd='using Pkg; Pkg.resolve(); Pkg.update()'
+else
+    _sub_pkg_cmd='using Pkg; Pkg.resolve(); Pkg.instantiate()'
+fi
+
 instantiate_with_fallback() {
     local _project="$1"
     local _label="$2"
 
-    if $_julia_cmd --project="${_project}" -e 'using Pkg; Pkg.resolve(); Pkg.instantiate()'; then
+    if $_julia_cmd --project="${_project}" -e "$_sub_pkg_cmd"; then
         rename_manifest_if_needed "${_project}"
         track_result "${_label}" "first"
         return 0
@@ -138,7 +171,7 @@ instantiate_with_fallback() {
     echo "First instantiate attempt failed for ${_label}, retrying with clean manifest..."
     cleanup_manifest_files "${_project}"
 
-    if $_julia_cmd --project="${_project}" -e 'using Pkg; Pkg.resolve(); Pkg.instantiate()'; then
+    if $_julia_cmd --project="${_project}" -e "$_sub_pkg_cmd"; then
         rename_manifest_if_needed "${_project}"
         track_result "${_label}" "retry"
         return 0
@@ -174,100 +207,89 @@ instantiate_main_with_fallback() {
 echo
 echo "Preparing main manifest for Julia ${_julia_major}..."
 
-if [[ -f "${MAIN_DEFAULT}" ]]; then
-    cp "${MAIN_DEFAULT}" "${MAIN_MANIFEST}"
-    echo "Copied ${MAIN_DEFAULT} to ${MAIN_MANIFEST}"
+if [[ $_update == true ]]; then
+    # Update mode: resolve fresh with Pkg.update() and copy the result back to the
+    # .default snapshot. Auto-precompile is skipped so the new default is ready to
+    # commit ASAP; any precompile runs afterwards (unless --no-precompile).
+    rm -f "${MAIN_MANIFEST}"
+    echo "Updating main project (Pkg.update, no auto-precompile)..."
+    JULIA_PKG_PRECOMPILE_AUTO=0 $_julia_cmd --project=. -e 'using Pkg; Pkg.update()'
+    rename_manifest_if_needed "."
+    cp "${MAIN_MANIFEST}" "${MAIN_DEFAULT}"
+    echo "Copied ${MAIN_MANIFEST} to ${MAIN_DEFAULT}"
+    echo "(safe to git commit + push now while precompile continues)"
 else
-    echo "Error: ${MAIN_DEFAULT} not found"
-    exit 1
-fi
-
-if ! instantiate_main_with_fallback "." "main"; then
-    echo "Error: could not instantiate main project."
-    exit 1
-fi
-
-SUBPROJECTS=("examples" "examples_cp" "test" "docs" "scripts")
-
-echo
-echo "Instantiating sub-projects..."
-for _sub in "${SUBPROJECTS[@]}"; do
-    _sub_manifest="${_sub}/Manifest-v${_julia_major}.toml"
-
-    if [[ $_julia_major == "1.11" ]]; then
-        cp "${MAIN_MANIFEST}" "${_sub_manifest}"
-    fi
-
-    if ! instantiate_with_fallback "${_sub}" "${_sub}"; then
-        echo "Error: could not instantiate sub-project '${_sub}'."
+    if [[ -f "${MAIN_DEFAULT}" ]]; then
+        cp "${MAIN_DEFAULT}" "${MAIN_MANIFEST}"
+        echo "Copied ${MAIN_DEFAULT} to ${MAIN_MANIFEST}"
+    else
+        echo "Error: ${MAIN_DEFAULT} not found"
         exit 1
     fi
-done
 
-echo
-if [[ ${#FAILED[@]} -eq 0 && ${#RETRIED_OK[@]} -eq 0 ]]; then
-    echo "Instantiate report: all projects worked on first try."
-elif [[ ${#FAILED[@]} -eq 0 ]]; then
-    echo "Instantiate report: all projects completed, but clean retry was required for:"
-    for _item in "${RETRIED_OK[@]}"; do
-        echo "  - ${_item}"
+    if ! instantiate_main_with_fallback "." "main"; then
+        echo "Error: could not instantiate main project."
+        exit 1
+    fi
+fi
+
+if [[ $_skip_subprojects == true ]]; then
+    echo
+    echo "Skipping sub-project setup (--skip-subprojects)."
+else
+    SUBPROJECTS=("examples" "test" "docs" "scripts")
+
+    echo
+    echo "Instantiating sub-projects..."
+    for _sub in "${SUBPROJECTS[@]}"; do
+        _sub_manifest="${_sub}/Manifest-v${_julia_major}.toml"
+
+        if [[ $_julia_major == "1.11" ]]; then
+            cp "${MAIN_MANIFEST}" "${_sub_manifest}"
+        fi
+
+        if ! instantiate_with_fallback "${_sub}" "${_sub}"; then
+            echo "Error: could not instantiate sub-project '${_sub}'."
+            exit 1
+        fi
     done
-    if [[ ${#FIRST_TRY_OK[@]} -gt 0 ]]; then
-        echo "Worked on first try for:"
-        for _item in "${FIRST_TRY_OK[@]}"; do
+
+    echo
+    if [[ ${#FAILED[@]} -eq 0 && ${#RETRIED_OK[@]} -eq 0 ]]; then
+        echo "Instantiate report: all projects worked on first try."
+    elif [[ ${#FAILED[@]} -eq 0 ]]; then
+        echo "Instantiate report: all projects completed, but clean retry was required for:"
+        for _item in "${RETRIED_OK[@]}"; do
             echo "  - ${_item}"
         done
-    fi
-else
-    echo "Instantiate report: failed projects:"
-    for _item in "${FAILED[@]}"; do
-        echo "  - ${_item}"
-    done
-    exit 1
-fi
-
-# Bootstrap LocalPreferences.toml for subprojects that need PythonCall.
-# Only copies the .default if no LocalPreferences.toml exists yet (e.g. fresh
-# clone). A subsequent run of bin/install_controlplots will add or update the
-# machine-specific settings on top.
-echo
-echo "Bootstrapping LocalPreferences.toml for subprojects..."
-for _lp_dir in examples_cp test; do
-    _lp_file="${_lp_dir}/LocalPreferences.toml"
-    _lp_default="${_lp_dir}/LocalPreferences.toml.default"
-    if [[ ! -f "$_lp_file" && -f "$_lp_default" ]]; then
-        cp "$_lp_default" "$_lp_file"
-        echo "  Created ${_lp_file} from default (CondaPkg disabled)."
-    fi
-done
-
-$_julia_cmd --project=. -e 'using Pkg; Pkg.precompile(); Pkg.activate("examples"); Pkg.precompile();
-Pkg.activate("examples_cp"); Pkg.precompile(); Pkg.activate("test"); Pkg.precompile();
-@info "Precompilation complete."'
-$_julia_cmd --project=examples -e 'using GLMakie, VortexStepMethod; @info "GLMakie extension ready."'
-_cp_lp="examples_cp/LocalPreferences.toml"
-# Skip ControlPlots verification only when Python is genuinely not yet configured
-# (Null backend with no exe= set).  After install_controlplots --system the file
-# still has backend="Null" but also has exe=..., so we proceed with verification.
-if grep -q 'backend = "Null"' "$_cp_lp" 2>/dev/null && ! grep -q 'exe = ' "$_cp_lp" 2>/dev/null; then
-    echo "Skipping ControlPlots extension verification (Python not yet configured)."
-    echo "Run ./bin/install_controlplots to set up Python and verify ControlPlots."
-else
-    # On Linux, prepend Julia's lib/julia so its bundled libcrypto.so.3 takes
-    # priority over an older system OpenSSL (e.g. Ubuntu 22.04 ships 3.0 while
-    # Julia 1.12 bundles 3.3+).
-    _julia_lib=$($_julia_cmd -e 'print(joinpath(Sys.BINDIR, "..", "lib", "julia"))' 2>/dev/null || true)
-    if [[ "$(uname -s)" == "Linux" && -n "$_julia_lib" && -d "$_julia_lib" ]]; then
-        LD_LIBRARY_PATH="${_julia_lib}${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}" \
-            $_julia_cmd -t1 --project=examples_cp \
-            -e 'using ControlPlots, VortexStepMethod; @info "ControlPlots extension ready."'
+        if [[ ${#FIRST_TRY_OK[@]} -gt 0 ]]; then
+            echo "Worked on first try for:"
+            for _item in "${FIRST_TRY_OK[@]}"; do
+                echo "  - ${_item}"
+            done
+        fi
     else
-        $_julia_cmd -t1 --project=examples_cp \
-            -e 'using ControlPlots, VortexStepMethod; @info "ControlPlots extension ready."'
+        echo "Instantiate report: failed projects:"
+        for _item in "${FAILED[@]}"; do
+            echo "  - ${_item}"
+        done
+        exit 1
     fi
 fi
+
+if [[ $_no_precompile == true || $_skip_subprojects == true ]]; then
+    echo
+    echo "Skipping precompile, extension verification and smoke test" \
+         "(--no-precompile/--skip-subprojects)."
+else
+echo
+$_julia_cmd --project=. -e 'using Pkg; Pkg.precompile(); Pkg.activate("examples"); Pkg.precompile();
+Pkg.activate("test"); Pkg.precompile();
+@info "Precompilation complete."'
+$_julia_cmd --project=examples -e 'using GLMakie, MakieControlPlots, VortexStepMethod; @info "Makie plotting extension ready."'
 $_julia_cmd --project=. -e 'using Pkg; Pkg.test(test_args=["settings/test_settings.jl"]);
 @info "Minimal test smoke check complete."'
+fi
 
 echo
 echo "Creating output directory..."

@@ -51,20 +51,9 @@ using Test
     end
 
     @testset "AutoForwardDiff matches AutoFiniteDiff (LOOP, POLAR_MATRICES)" begin
-        data_dir = joinpath(dirname(dirname(@__DIR__)), "data", "ram_air_kite")
-        body_path = joinpath(tempdir(), "ram_air_kite_body.obj")
-        foil_path = joinpath(tempdir(), "ram_air_kite_foil.dat")
-        cp(joinpath(data_dir, "ram_air_kite_body.obj"), body_path; force=true)
-        cp(joinpath(data_dir, "ram_air_kite_foil.dat"), foil_path; force=true)
-        for kind in ("cl", "cd", "cm")
-            name = "ram_air_kite_foil_$(kind)_polar.csv"
-            cp(joinpath(data_dir, name), joinpath(tempdir(), name); force=true)
-        end
-
-        ram_wing = ObjWing(body_path, foil_path;
-            alpha_range=deg2rad.(-5:1:15),
-            delta_range=deg2rad.(-3:1:5),
-            n_unrefined_sections=4,
+        ram_wing = ram_air_matrix_wing(; n_panels=8, n_sections=4,
+            alpha_range=deg2rad.(-5:5:15),
+            delta_range=deg2rad.(-3:3:3),
         )
         ram_body = BodyAerodynamics([ram_wing])
         ram_solver = Solver(ram_body;

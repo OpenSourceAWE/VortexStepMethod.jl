@@ -1,15 +1,12 @@
 module VortexStepMethodMakieExt
 using Makie, VortexStepMethod, LinearAlgebra, Statistics, DelimitedFiles
+import MakieControlPlots
 import VortexStepMethod: calculate_filaments_for_plotting
+import VortexStepMethod: ObjAdapter, AirfoilAero
 
 export plot_geometry, plot_distribution, plot_polars, save_plot, show_plot,
-    plot_polar_data, plot_combined_analysis
-
-# Set this extension as the active plotting backend when loaded (only if not already set)
-function __init__()
-    isnothing(VortexStepMethod._PLOT_BACKEND[]) &&
-        (VortexStepMethod._PLOT_BACKEND[] = VortexStepMethod.MakieBackend())
-end
+    plot_polar_data, plot_combined_analysis,
+    plot_section_polars
 
 # Global storage for panel mesh observables (for dynamic plotting)
 const PANEL_MESH_OBSERVABLES = Ref{Union{Nothing,Dict}}(nothing)
@@ -465,12 +462,12 @@ function create_geometry_plot_makie(body_aero::BodyAerodynamics, title,
 end
 
 """
-    plot_geometry(body_aero::BodyAerodynamics, title, ::MakieBackend;
+    plot_geometry(body_aero::BodyAerodynamics, title;
                   data_type=nothing, save_path=nothing,
                   is_save=false, is_show=false,
                   view_elevation=15, view_azimuth=-120, use_tex=false)
 
-Makie backend implementation of [`plot_geometry`](@ref).
+Makie implementation of [`plot_geometry`](@ref).
 
 # Arguments:
 - `body_aero`: the BodyAerodynamics to plot
@@ -485,8 +482,7 @@ Makie backend implementation of [`plot_geometry`](@ref).
 - `view_azimuth`: View azimuth angle in degrees (default: -120)
 - `use_tex`: Ignored for Makie (default: false)
 """
-function VortexStepMethod.plot_geometry(body_aero::BodyAerodynamics, title,
-    ::VortexStepMethod.MakieBackend;
+function VortexStepMethod.plot_geometry(body_aero::BodyAerodynamics, title;
     data_type=nothing,
     save_path=nothing,
     is_save=false,
@@ -523,11 +519,11 @@ function VortexStepMethod.plot_geometry(body_aero::BodyAerodynamics, title,
 end
 
 """
-    plot_distribution(y_coordinates_list, results_list, label_list, ::MakieBackend;
+    plot_distribution(y_coordinates_list, results_list, label_list;
                       title="spanwise_distribution", data_type=nothing,
                       save_path=nothing, is_save=false, is_show=true, use_tex=false)
 
-Makie backend implementation of [`plot_distribution`](@ref).
+Makie implementation of [`plot_distribution`](@ref).
 
 # Arguments
 - `y_coordinates_list`: List of spanwise coordinates
@@ -542,8 +538,7 @@ Makie backend implementation of [`plot_distribution`](@ref).
 - `is_show`: Whether to display (default: true)
 - `use_tex`: Ignored for Makie (default: false)
 """
-function VortexStepMethod.plot_distribution(y_coordinates_list, results_list, label_list,
-    ::VortexStepMethod.MakieBackend;
+function VortexStepMethod.plot_distribution(y_coordinates_list, results_list, label_list;
     title="spanwise_distribution",
     data_type=nothing,
     save_path=nothing,
@@ -676,14 +671,14 @@ Generate polar data for aerodynamic analysis over a range of angles.
 """
 
 """
-    plot_polars(solver_list, body_aero_list, label_list, ::MakieBackend;
+    plot_polars(solver_list, body_aero_list, label_list;
                 literature_path_list=String[],
                 angle_range=range(0, 20, 2), angle_type="angle_of_attack",
                 angle_of_attack=0.0, side_slip=0.0, v_a=10.0,
                 title="polar", data_type=nothing, save_path=nothing,
                 is_save=true, is_show=true, use_tex=false)
 
-Makie backend implementation of [`plot_polars`](@ref).
+Makie implementation of [`plot_polars`](@ref).
 
 # Arguments
 - `solver_list`: List of aerodynamic solvers
@@ -708,8 +703,7 @@ Makie backend implementation of [`plot_polars`](@ref).
 function VortexStepMethod.plot_polars(
     solver_list,
     body_aero_list,
-    label_list,
-    ::VortexStepMethod.MakieBackend;
+    label_list;
     literature_path_list=String[],
     angle_range=range(0, 20, 2),
     angle_type="angle_of_attack",
@@ -786,30 +780,31 @@ function VortexStepMethod.plot_polars(
                 zip(polar_data_list, cm_data_list, labels_with_re))
             marker = i <= n_solvers ? :star5 : :circle
             markersize = i <= n_solvers ? 12 : 8
+            linestyle = i <= n_solvers ? :solid : :dash
             angles = polar_data[1]
             scatterlines!(ax_cl, angles, polar_data[2];
-                label=label, marker=marker, markersize=markersize)
+                label=label, marker=marker, markersize=markersize, linestyle)
             scatterlines!(ax_cd, angles, polar_data[3];
-                label=label, marker=marker, markersize=markersize)
+                label=label, marker=marker, markersize=markersize, linestyle)
             scatterlines!(ax_cs, angles, polar_data[4];
-                label=label, marker=marker, markersize=markersize)
+                label=label, marker=marker, markersize=markersize, linestyle)
             if !all(isnan, cm.cmx)
                 scatterlines!(ax_cmx, angles,
                     Float64.(cm.cmx);
                     label=label, marker=marker,
-                    markersize=markersize)
+                    markersize=markersize, linestyle)
             end
             if !all(isnan, cm.cmy)
                 scatterlines!(ax_cmy, angles,
                     Float64.(cm.cmy);
                     label=label, marker=marker,
-                    markersize=markersize)
+                    markersize=markersize, linestyle)
             end
             if !all(isnan, cm.cmz)
                 scatterlines!(ax_cmz, angles,
                     Float64.(cm.cmz);
                     label=label, marker=marker,
-                    markersize=markersize)
+                    markersize=markersize, linestyle)
             end
         end
         Legend(fig[3, 1:3], ax_cl;
@@ -836,25 +831,26 @@ function VortexStepMethod.plot_polars(
                 zip(polar_data_list, labels_with_re))
             marker = i <= n_solvers ? :star5 : :circle
             markersize = i <= n_solvers ? 12 : 8
+            linestyle = i <= n_solvers ? :solid : :dash
             scatterlines!(ax_cl, polar_data[1], polar_data[2];
                 label=label, marker=marker,
-                markersize=markersize)
+                markersize=markersize, linestyle)
             scatterlines!(ax_cd, polar_data[1], polar_data[3];
                 label=label, marker=marker,
-                markersize=markersize)
+                markersize=markersize, linestyle)
             scatterlines!(ax_cs, polar_data[1], polar_data[4];
                 label=label, marker=marker,
-                markersize=markersize)
+                markersize=markersize, linestyle)
             if cl_over_cd
                 cl_cd = polar_data[2] ./ polar_data[3]
                 scatterlines!(ax_fourth, polar_data[1], cl_cd;
                     label=label, marker=marker,
-                    markersize=markersize)
+                    markersize=markersize, linestyle)
             else
                 scatterlines!(ax_fourth, polar_data[3],
                     polar_data[2];
                     label=label, marker=marker,
-                    markersize=markersize)
+                    markersize=markersize, linestyle)
             end
         end
         Legend(fig[3, :], ax_cl;
@@ -875,12 +871,12 @@ function VortexStepMethod.plot_polars(
 end
 
 """
-    plot_polar_data(body_aero::BodyAerodynamics, ::MakieBackend;
+    plot_polar_data(body_aero::BodyAerodynamics;
                     alphas=collect(deg2rad.(-5:0.3:25)),
                     delta_tes=collect(deg2rad.(-5:0.3:25)),
                     is_show=true, use_tex=false)
 
-Makie backend implementation of [`plot_polar_data`](@ref).
+Makie implementation of [`plot_polar_data`](@ref).
 
 # Arguments
 - `body_aero`: Wing aerodynamics struct
@@ -891,8 +887,7 @@ Makie backend implementation of [`plot_polar_data`](@ref).
 - `is_show`: Whether to display (default: true)
 - `use_tex`: Ignored for Makie (default: false)
 """
-function VortexStepMethod.plot_polar_data(body_aero::BodyAerodynamics,
-    ::VortexStepMethod.MakieBackend;
+function VortexStepMethod.plot_polar_data(body_aero::BodyAerodynamics;
     alphas=collect(deg2rad.(-5:0.3:25)),
     delta_tes=collect(deg2rad.(-5:0.3:25)),
     is_show=true,
@@ -920,7 +915,7 @@ function VortexStepMethod.plot_polar_data(body_aero::BodyAerodynamics,
 
             # Create interpolation matrix
             interp_matrix = [interp(alpha, delta_te)
-                             for alpha in alphas, delta_te in delta_tes]
+                             for delta_te in delta_tes, alpha in alphas]
 
             # Create wireframe
             wireframe!(ax, delta_tes, alphas, interp_matrix;
@@ -939,7 +934,7 @@ function VortexStepMethod.plot_polar_data(body_aero::BodyAerodynamics,
 end
 
 """
-    plot_combined_analysis(solver, body_aero, results, ::MakieBackend;
+    plot_combined_analysis(solver, body_aero, results;
                           solver_label="VSM",
                           angle_range=range(0,20,length=20),
                           angle_type="angle_of_attack",
@@ -950,7 +945,7 @@ end
                           literature_path_list=String[],
                           data_type=".png", save_path=nothing, is_save=false)
 
-Makie backend implementation of [`plot_combined_analysis`](@ref).
+Makie implementation of [`plot_combined_analysis`](@ref).
 
 # Arguments
 - `solver`: Aerodynamic solver
@@ -982,8 +977,7 @@ Makie backend implementation of [`plot_combined_analysis`](@ref).
 function VortexStepMethod.plot_combined_analysis(
     solver,
     body_aero,
-    results,
-    ::VortexStepMethod.MakieBackend;
+    results;
     solver_label="VSM",
     labels=nothing,
     angle_range=range(0, 20, length=20),
@@ -1304,6 +1298,389 @@ function VortexStepMethod.plot_combined_analysis(
         display(fig)
     end
 
+    return fig
+end
+
+"""
+    plot_section_polars(body_aero, coefficient=:cl; is_show=true,
+                        is_save=false, save_path=nothing, data_type=".png")
+
+Implementation of [`plot_section_polars`](@ref); rendered through `MakieControlPlots`.
+"""
+function VortexStepMethod.plot_section_polars(body_aero::BodyAerodynamics,
+    coefficient::Symbol=:cl; is_show::Bool=true, is_save::Bool=false,
+    save_path=nothing, data_type::String=".png")
+
+    coefficient in (:cl, :cd, :cm) ||
+        throw(ArgumentError("coefficient must be :cl, :cd, or :cm, got :$coefficient"))
+    idx = coefficient === :cl ? 2 : coefficient === :cd ? 3 : 4
+    label = uppercasefirst(string(coefficient))
+
+    alphas_deg = nothing
+    series = Vector{Float64}[]
+    labels = String[]
+    for wing in body_aero.wings
+        for (s, section) in enumerate(wing.unrefined_sections)
+            section.aero_model == POLAR_VECTORS || continue
+            aero = section.aero_data
+            aero === nothing && continue
+            section_alphas = rad2deg.(aero[1])
+            if isnothing(alphas_deg)
+                alphas_deg = collect(section_alphas)
+            elseif length(section_alphas) != length(alphas_deg)
+                @warn "section $s has a different α grid; plotting against the first section's α"
+            end
+            push!(series, Float64.(aero[idx]))
+            push!(labels, "section $s")
+        end
+    end
+    isempty(series) && error("No POLAR_VECTORS sections found in body")
+
+    plt = MakieControlPlots.plot(alphas_deg, series;
+        xlabel="α [deg]", ylabel=label, title="$label per section",
+        labels=labels, disp=(is_show || is_save))
+
+    if is_save && !isnothing(save_path)
+        isdir(save_path) || mkpath(save_path)
+        MakieControlPlots.savefig(
+            joinpath(save_path, "section_polars_$(coefficient)$(data_type)"))
+    end
+    return plt
+end
+
+# --- OBJ mesh / airfoil plotting (formerly ObjAdapterMakieExt) ---
+
+"""
+    fitted_airfoil_3d(section, wrap_method; delta=0.0, crease_frac=0.75) -> 3×N or nothing
+
+Shrink-wrap a section's sliced contour with `wrap_method` and map it back into 3D
+through the section's local airfoil frame, for overlaying on the 3D slice diagnostic.
+A nonzero `delta` (degrees) deflects the trailing edge and re-wraps
+([`deform_section`](@ref)), showing the geometry the solvers consume.
+Returns `nothing` for a degenerate slice.
+"""
+function fitted_airfoil_3d(s, wrap_method; delta=0.0, crease_frac=0.75)
+    frame = ObjAdapter.airfoil_frame(s.LE_point, s.TE_point, s.span_dir)
+    frame === nothing && return nothing
+    x_af, _, z_af = frame
+    px = [dot(p .- s.LE_point, x_af) for p in s.contour3d]
+    pz = [dot(p .- s.LE_point, z_af) for p in s.contour3d]
+    chord = maximum(px) - minimum(px)
+    chord < 1e-9 && return nothing
+    x0 = minimum(px)
+    xf, yf = AirfoilAero.shrink_wrap(collect((px .- x0) ./ chord),
+                                     collect(pz ./ chord), wrap_method)
+    maximum(abs, yf) > 1.0 && return nothing
+    if !iszero(delta)
+        def = AirfoilAero.deform_section(xf, yf, deg2rad(delta); crease_frac)
+        xf, yf = def.x, def.y
+    end
+    return reduce(hcat, [s.LE_point .+ x_af .* (x0 + xf[i] * chord) .+ z_af .* (yf[i] * chord)
+                         for i in eachindex(xf)])
+end
+
+"""
+    map_airfoil_3d(le, te, tangent, x, y) -> 3×N or nothing
+
+Map normalized airfoil coordinates into 3D through the airfoil frame of the station
+given by its LE/TE points and leading-edge tangent (chord scale = `|TE - LE|`).
+"""
+function map_airfoil_3d(le, te, tangent, x, y)
+    frame = ObjAdapter.airfoil_frame(le, te, tangent)
+    frame === nothing && return nothing
+    x_af, _, z_af = frame
+    chord = norm(te .- le)
+    return reduce(hcat, [le .+ x_af .* (x[i] * chord) .+ z_af .* (y[i] * chord)
+                         for i in eachindex(x)])
+end
+
+"""
+    generated_slices(out_dir, delta, fit_pts) -> (slices, le, te)
+
+Read the stations of a generated [`obj_to_yaml`](@ref) output directory and their
+written `.dat` airfoils — raw slice, wrap, and the `delta`-degree deformed wrap when
+it was generated — assembled for [`plot_slices_3d`](@ref). Nothing is re-sliced or
+re-wrapped; only the Kulfan fits of the stored coordinates are recomputed (via
+`fit_pts`), exactly as the polar pipeline fits them.
+"""
+function generated_slices(out_dir, delta, fit_pts)
+    geom = VortexStepMethod.YAML.load_file(joinpath(out_dir, "geometry.yaml"))
+    info = Dict(r[1] => r[3] for r in geom["wing_airfoils"]["data"])
+    rows = geom["wing_sections"]["data"]
+    les = [Float64.(r[2:4]) for r in rows]
+    tes = [Float64.(r[5:7]) for r in rows]
+    n = length(rows)
+    deg = round(float(delta); digits=1)
+    tag = "_d" * (deg == round(deg) ? string(Int(deg)) : string(deg)) * ".dat"
+    missing_deltas = String[]
+    slices = map(1:n) do i
+        id = rows[i][1]
+        tangent = normalize(les[min(i + 1, n)] .- les[max(i - 1, 1)])
+        xw, yw = AirfoilAero.read_dat_coordinates(joinpath(out_dir,
+                                                           info[id]["dat_file"]))
+        xr, yr = AirfoilAero.read_dat_coordinates(joinpath(out_dir,
+                                                           info[id]["raw_dat_file"]))
+        d2 = (; raw=Point2f.(xr, yr), fit=Point2f.(xw, yw),
+              fit_kulfan=fit_pts(xw, yw), def=Point2f[], def_kulfan=Point2f[])
+        def3d = nothing
+        if !iszero(delta)
+            dpath = joinpath(out_dir, "airfoils", "$(id)$(tag)")
+            if isfile(dpath)
+                xd, yd = AirfoilAero.read_dat_coordinates(dpath)
+                def3d = map_airfoil_3d(les[i], tes[i], tangent, xd, yd)
+                d2 = (; d2..., def=Point2f.(xd, yd), def_kulfan=fit_pts(xd, yd))
+            else
+                push!(missing_deltas, basename(dpath))
+            end
+        end
+        (; centroid=Point3f((les[i] .+ tes[i]) ./ 2), label_y=les[i][2],
+         cloud3d=map_airfoil_3d(les[i], tes[i], tangent, xr, yr),
+         wrap3d=map_airfoil_3d(les[i], tes[i], tangent, xw, yw), def3d, d2)
+    end
+    isempty(missing_deltas) ||
+        @warn "No generated .dat for delta=$(delta)° ($(join(missing_deltas, ", ")));" *
+              " generated deflections are named airfoils/<i>_d<degrees>.dat."
+    return slices, reduce(hcat, les), reduce(hcat, tes)
+end
+
+"""
+    plot_slices_3d(path; n_slices=10, rotation=I, n_bins=60, wingtip_distance=0.0,
+                   wrap_method=ShrinkWrap(), delta=0.0, crease_frac=0.75,
+                   obj_path=nothing, is_show=true)
+
+3D slice diagnostic with a hover 2D airfoil panel: raw slice points (green), the
+shrink-wrapped airfoil (crimson) and its Kulfan fit (black dashed), and, for nonzero
+`delta` (degrees), the deflected re-wrapped airfoil (purple — the
+[`deform_section`](@ref) geometry the solvers consume) and its Kulfan fit (orange
+dashed). **Hovering a slice** updates the 2D panel.
+
+`path` selects the source:
+- a mesh `.obj` file: live preview — slices and wraps here with `wrap_method`
+  (`n_slices`, `n_bins`, `wingtip_distance`, `crease_frac`).
+- a generated [`obj_to_yaml`](@ref) output directory: audit mode — stations and
+  airfoils are read from `geometry.yaml` and the written `.dat` files, so the plot
+  shows exactly what the polar pipeline analysed. `delta` must then match a
+  generated deflection value; pass `obj_path` to also draw the mesh (with the same
+  `rotation` used at generation).
+
+Pass a `3×3` rotation matrix to reorient the mesh first.
+"""
+function ObjAdapter.plot_slices_3d(path::String; n_slices::Int=10, rotation=I,
+        n_bins::Int=60, wingtip_distance=0.0,
+        wrap_method=AirfoilAero.ShrinkWrap(), delta=0.0, crease_frac=0.75,
+        obj_path=nothing, is_show::Bool=true)
+    kulfan_pts(k) = Point2f.(AirfoilAero.kulfan_to_coordinates(k; n_points=150)...)
+    fit_pts(x, y) = kulfan_pts(AirfoilAero.fit_kulfan_parameters(
+        x, y, AirfoilAero.LeastSquaresFit()))
+    mesh_path = isdir(path) ? obj_path : path
+    vertices = faces = nothing
+    if mesh_path !== nothing
+        vertices, faces = ObjAdapter.read_faces(mesh_path)
+        rotation === I || (vertices = [rotation * v for v in vertices])
+    end
+
+    if isdir(path)
+        slices, le, te = generated_slices(path, delta, fit_pts)
+    else
+        span = maximum(v -> v[2], vertices) - minimum(v -> v[2], vertices)
+        m = ObjAdapter.march_edges(vertices, faces; step=span / n_bins)
+        le = reduce(hcat, m.le)
+        te = reduce(hcat, m.te)
+        idx = ObjAdapter.station_indices(m.arclen, n_slices; wingtip_distance)
+        secs = filter(!isnothing,
+                      [ObjAdapter.build_section(vertices, faces, m.le[i], m.te[i],
+                                                m.point[i], m.tangent[i]) for i in idx])
+        slices = map(secs) do s
+            xf, yf = AirfoilAero.shrink_wrap(collect(Float64, s.x_airfoil),
+                                             collect(Float64, s.y_airfoil), wrap_method)
+            def = iszero(delta) ? nothing :
+                  AirfoilAero.deform_section(xf, yf, deg2rad(delta); crease_frac)
+            d2 = (; raw=Point2f.(s.x_airfoil, s.y_airfoil), fit=Point2f.(xf, yf),
+                  fit_kulfan=fit_pts(xf, yf),
+                  def=def === nothing ? Point2f[] : Point2f.(def.x, def.y),
+                  def_kulfan=def === nothing ? Point2f[] : kulfan_pts(def.kulfan))
+            (; centroid=Point3f((s.LE_point .+ s.TE_point) ./ 2),
+             label_y=s.LE_point[2], cloud3d=reduce(hcat, s.contour3d),
+             wrap3d=fitted_airfoil_3d(s, wrap_method),
+             def3d=def === nothing ? nothing :
+                   fitted_airfoil_3d(s, wrap_method; delta, crease_frac), d2)
+        end
+    end
+    show_delta = any(!isempty(s.d2.def) for s in slices)
+
+    fig = Figure(size=(1500, 850))
+    ax = Axis3(fig[1, 1]; aspect=:data, title="slices (hover a slice →)")
+    if vertices !== nothing
+        coords = permutedims(reduce(hcat, vertices))
+        tri = permutedims(reduce(hcat, [Int.(f) for f in faces]))
+        mesh!(ax, coords, tri; color=(:gray, 0.15), transparency=true)
+    end
+    lines!(ax, le[1, :], le[2, :], le[3, :]; color=:dodgerblue, linewidth=3, label="LE")
+    lines!(ax, te[1, :], te[2, :], te[3, :]; color=:orange, linewidth=3, label="TE")
+    for s in slices
+        s.cloud3d === nothing ||
+            scatter!(ax, s.cloud3d[1, :], s.cloud3d[2, :], s.cloud3d[3, :];
+                     color=:seagreen, markersize=3)
+        s.wrap3d === nothing ||
+            lines!(ax, s.wrap3d[1, :], s.wrap3d[2, :], s.wrap3d[3, :];
+                   color=:crimson, linewidth=1.5)
+        s.def3d === nothing ||
+            lines!(ax, s.def3d[1, :], s.def3d[2, :], s.def3d[3, :];
+                   color=:purple, linewidth=1.5)
+    end
+    axislegend(ax; position=:rt)
+
+    sel = Observable(1)
+    title2 = @lift("slice $($sel)  (y = $(round(slices[$sel].label_y, digits=2)))")
+    gl2 = GridLayout(fig[1, 2])
+    ax2 = Axis(gl2[2, 1]; title=title2, xlabel="x/c", ylabel="y/c", aspect=DataAspect())
+    colsize!(fig.layout, 1, Relative(0.6))
+    raw2 = scatter!(ax2, @lift(slices[$sel].d2.raw); color=:seagreen, markersize=6)
+    fit2 = lines!(ax2, @lift(slices[$sel].d2.fit); color=:crimson, linewidth=2)
+    fitk2 = lines!(ax2, @lift(slices[$sel].d2.fit_kulfan); color=:black,
+                   linewidth=1.5, linestyle=:dash)
+    handles, labels = [raw2, fit2, fitk2], ["slice", "wrap", "kulfan"]
+    if show_delta
+        def2 = lines!(ax2, @lift(slices[$sel].d2.def); color=:purple, linewidth=2)
+        defk2 = lines!(ax2, @lift(slices[$sel].d2.def_kulfan); color=:darkorange,
+                       linewidth=1.5, linestyle=:dash)
+        push!(handles, def2, defk2)
+        push!(labels, "δ=$(delta)° wrap", "δ kulfan")
+    end
+    ylims!(ax2, -1, 1)   # fixed y/c so airfoil thickness is comparable across slices
+    Legend(gl2[1, 1], handles, labels; orientation=:horizontal, framevisible=false)
+
+    on(events(ax.scene).mouseposition) do mp
+        is_mouseinside(ax.scene) || return
+        best, best_d = 1, Inf
+        for (i, s) in enumerate(slices)
+            pr = Makie.project(ax.scene, s.centroid)
+            d = (pr[1] - mp[1])^2 + (pr[2] - mp[2])^2
+            d < best_d && (best_d = d; best = i)
+        end
+        sel[] = best
+    end
+
+    is_show && display(fig)
+    return fig
+end
+
+"""
+    plot_airfoil_fit(x::Vector, y::Vector; title="Airfoil Fit", is_show=true)
+
+Plot a single airfoil with its Kulfan CST fit.
+
+# Arguments
+- `x, y`: Airfoil coordinates
+
+# Keyword Arguments
+- `title`: Plot title
+- `is_show`: Display figure
+
+# Returns
+- Makie Figure object and the fitted `KulfanParameters`
+"""
+function ObjAdapter.plot_airfoil_fit(x::Vector, y::Vector; title::String="Airfoil Fit",
+                                     is_show::Bool=true)
+    fig = Figure(size=(800, 400))
+    ax = Axis(fig[1, 1];
+              title=title,
+              xlabel="x/c",
+              ylabel="y/c",
+              aspect=DataAspect())
+
+    x_norm, y_norm, _ = AirfoilAero.normalize_airfoil(x, y)
+    scatter!(ax, x_norm, y_norm;
+            color=:blue, markersize=6, label="Input ($(length(x)) pts)")
+
+    params = AirfoilAero.fit_kulfan_parameters(x, y)
+    x_fit, y_fit = AirfoilAero.kulfan_to_coordinates(params; n_points=150)
+    lines!(ax, x_fit, y_fit;
+          color=:red, linewidth=2, linestyle=:dash, label="Kulfan fit")
+
+    info_text = """
+    Upper: $(round.(params.upper_weights[1:4], digits=3))...
+    Lower: $(round.(params.lower_weights[1:4], digits=3))...
+    LE: $(round(params.leading_edge_weight, digits=3))
+    TE: $(round(params.TE_thickness, digits=5))
+    """
+
+    ax_info = Axis(fig[1, 2]; title="Kulfan Parameters")
+    hidedecorations!(ax_info)
+    hidespines!(ax_info)
+    text!(ax_info, 0.1, 0.9;
+         text=info_text,
+         align=(:left, :top),
+         fontsize=12)
+
+    axislegend(ax; position=:rt)
+
+    is_show && display(fig)
+    return fig, params
+end
+
+"""
+    plot_airfoils(geometry_file; overlay=nothing, symmetric=false,
+                  idxs=nothing, n_cols=3, is_show=true, is_save=false,
+                  save_path=nothing, data_type=".png")
+
+Makie implementation of [`plot_airfoils`](@ref).
+
+With `overlay=false` each airfoil gets its own subplot; with `overlay=true` all
+airfoils are drawn on one axis coloured by section. By default (`overlay=nothing`)
+the overlay is used when there are more than 12 sections, where a subplot grid
+becomes unreadable. Both modes show the raw `_raw.dat` slice points as dots with
+the fitted airfoil as a line. Pass `idxs` (e.g. `idxs=[1]`) to plot only those
+airfoils by position; otherwise `symmetric=true` shows just the first half of the
+sections (the wing is mirror-symmetric, so the other half is redundant).
+"""
+function ObjAdapter.plot_airfoils(geometry_file::String;
+    overlay=nothing, symmetric::Bool=false, idxs=nothing, n_cols::Int=3,
+    is_show::Bool=true, is_save::Bool=false, save_path=nothing,
+    data_type::String=".png")
+
+    airfoils = ObjAdapter.airfoils_from_yaml(geometry_file)
+    isempty(airfoils) && error("No airfoils with a dat_file found in $geometry_file")
+    if idxs !== nothing
+        airfoils = airfoils[idxs]
+    elseif symmetric
+        airfoils = airfoils[1:cld(length(airfoils), 2)]
+    end
+
+    n = length(airfoils)
+    use_overlay = overlay === nothing ? n > 12 : overlay
+    title = "Airfoils: $(basename(geometry_file))"
+
+    if use_overlay
+        ids = [af.id for af in airfoils]
+        crange = (minimum(ids), maximum(ids))
+        fig = Figure(size=(900, 600))
+        ax = Axis(fig[1, 1]; title, xlabel="x/c", ylabel="y/c", aspect=DataAspect())
+        for af in airfoils
+            isempty(af.x_raw) || scatter!(ax, af.x_raw, af.y_raw;
+                color=af.id, colorrange=crange, colormap=:viridis, markersize=3)
+            lines!(ax, af.x, af.y; color=af.id, colorrange=crange, colormap=:viridis)
+        end
+        Colorbar(fig[1, 2]; colormap=:viridis, limits=crange, label="section")
+    else
+        ncol = min(n_cols, n)
+        nrow = ceil(Int, n / ncol)
+        fig = Figure(size=(380 * ncol, 320 * nrow))
+        Label(fig[0, :], title, fontsize=16)
+        for (i, af) in enumerate(airfoils)
+            ax = Axis(fig[div(i - 1, ncol) + 1, mod1(i, ncol)];
+                title="Airfoil $(af.id)", xlabel="x/c", ylabel="y/c",
+                aspect=DataAspect())
+            isempty(af.x_raw) ||
+                scatter!(ax, af.x_raw, af.y_raw; color=(:gray, 0.5), markersize=4)
+            lines!(ax, af.x, af.y; color=:black)
+        end
+    end
+
+    if is_save && !isnothing(save_path)
+        VortexStepMethod.save_plot(fig, save_path, "airfoils"; data_type)
+    end
+    is_show && display(fig)
     return fig
 end
 

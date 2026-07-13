@@ -29,7 +29,8 @@ Struct for storing the solution of the [solve!](@ref) function. Must contain all
 - `moment_unrefined_dist`::MVector{U, Float64}: Averaged moments for unrefined sections [Nm]
 - `cl_unrefined_dist`::MVector{U, Float64}: Averaged lift coefficients for unrefined sections [-]
 - `cd_unrefined_dist`::MVector{U, Float64}: Averaged drag coefficients for unrefined sections [-]
-- `cm_unrefined_dist`::MVector{U, Float64}: Averaged moment coefficients for unrefined sections [-]
+- `cm_unrefined_dist`::MVector{U, Float64}: Averaged airfoil moment coefficients for unrefined sections [-]
+- `moment_coeff_unrefined_dist`::MVector{U, Float64}: Summed `moment_frac`-referenced pitching-moment coefficient per unrefined section [-]
 - `alpha_unrefined_dist`::MVector{U, Float64}: Averaged angles of attack for unrefined sections [rad]
 - `solver_status`::SolverStatus: enum, see [SolverStatus](@ref)
 """
@@ -42,11 +43,15 @@ Struct for storing the solution of the [solve!](@ref) function. Must contain all
     _chord_dist::Vector{T} = zeros(T, P)
     ### end of private vectors
     width_dist::Vector{T} = zeros(T, P)
+    panel_area_dist::Vector{T} = zeros(T, P)
     alpha_dist::Vector{T} = zeros(T, P)
     alpha_geometric_dist::Vector{T} = zeros(T, P)
     cl_dist::Vector{T} = zeros(T, P)
     cd_dist::Vector{T} = zeros(T, P)
     cm_dist::Vector{T} = zeros(T, P)
+    cp_chord_x::Vector{T} = T[]
+    cp_upper_dist::Matrix{T} = zeros(T, 0, P)
+    cp_lower_dist::Matrix{T} = zeros(T, 0, P)
     lift_dist::Vector{T} = zeros(T, P)
     drag_dist::Vector{T} = zeros(T, P)
     panel_moment_dist::Vector{T} = zeros(T, P)
@@ -65,6 +70,7 @@ Struct for storing the solution of the [solve!](@ref) function. Must contain all
     cl_unrefined_dist::MVector{U, T} = zeros(MVector{U, T})
     cd_unrefined_dist::MVector{U, T} = zeros(MVector{U, T})
     cm_unrefined_dist::MVector{U, T} = zeros(MVector{U, T})
+    moment_coeff_unrefined_dist::MVector{U, T} = zeros(MVector{U, T})
     alpha_unrefined_dist::MVector{U, T} = zeros(MVector{U, T})
     x_airf_unrefined_dist::Vector{MVector{3, T}} = [zeros(MVector{3, T}) for _ in 1:U]
     y_airf_unrefined_dist::Vector{MVector{3, T}} = [zeros(MVector{3, T}) for _ in 1:U]
@@ -72,6 +78,7 @@ Struct for storing the solution of the [solve!](@ref) function. Must contain all
     va_unrefined_dist::Vector{MVector{3, T}} = [zeros(MVector{3, T}) for _ in 1:U]
     chord_unrefined_dist::MVector{U, T} = zeros(MVector{U, T})
     width_unrefined_dist::MVector{U, T} = zeros(MVector{U, T})
+    unrefined_count_dist::Vector{Int} = zeros(Int, U)
     solver_status::SolverStatus = FAILURE
 end
 
@@ -235,6 +242,55 @@ function solve!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics, gamma_dist
         solver.sol.gamma_distribution = gamma_new
     end
 
+    return calc_forces!(solver, body_aero; reference_point, moment_frac)
+end
+
+"""
+    prepare_cp_output!(sol::VSMSolution, panels)
+
+Size and reset the surface-pressure output of `sol` for the current `panels`. When any
+panel carries a `cp_polar`, allocate `n_chord × n_panels` matrices filled with `NaN`
+and copy the chord slices; otherwise leave the Cp output empty.
+"""
+function prepare_cp_output!(sol::VSMSolution{P, U, T}, panels) where {P, U, T}
+    idx = findfirst(p -> p.cp_polar !== nothing, panels)
+    if idx === nothing
+        isempty(sol.cp_chord_x) || (sol.cp_chord_x = T[])
+        size(sol.cp_upper_dist, 1) == 0 ||
+            (sol.cp_upper_dist = zeros(T, 0, P); sol.cp_lower_dist = zeros(T, 0, P))
+        return nothing
+    end
+    n_chord = panels[idx].cp_polar.data.n_chord
+    if size(sol.cp_upper_dist) != (n_chord, P)
+        sol.cp_upper_dist = fill(T(NaN), n_chord, P)
+        sol.cp_lower_dist = fill(T(NaN), n_chord, P)
+    else
+        fill!(sol.cp_upper_dist, T(NaN))
+        fill!(sol.cp_lower_dist, T(NaN))
+    end
+    sol.cp_chord_x = T.(panels[idx].cp_polar.data.chord_x)
+    return nothing
+end
+
+"""
+    delta_cp(sol::VSMSolution) -> Matrix
+
+Chordwise load `ΔCp = Cp_lower - Cp_upper` per chord slice (rows) and panel (columns)
+from the last [`solve!`](@ref). Empty when the wing carried no Cp table.
+"""
+delta_cp(sol::VSMSolution) = sol.cp_lower_dist .- sol.cp_upper_dist
+
+"""
+    calc_forces!(solver::Solver, body_aero::BodyAerodynamics;
+                 reference_point=solver.reference_point, moment_frac=0.1)
+
+Assemble aerodynamic forces and moments from the circulation already converged
+by [`solve_base!`](@ref) and stored in `solver`. Split out of [`solve!`](@ref).
+"""
+function calc_forces!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics;
+        reference_point=solver.reference_point, moment_frac=0.1) where {P, U, T}
+    gamma_new = solver.lr.gamma_new
+
     # Initialize arrays
     cl_dist = solver.sol.cl_dist
     cd_dist = solver.sol.cd_dist
@@ -254,11 +310,18 @@ function solve!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics, gamma_dist
     density = solver.density
     aerodynamic_model_type = solver.aerodynamic_model_type
 
+    prepare_cp_output!(solver.sol, panels)
+
     # Calculate coefficients for each panel
     for (i, panel) in enumerate(panels)                                               # zero bytes
         cl_dist[i] = calculate_cl(panel, alpha_dist[i])
         cd_dist[i], cm_dist[i] = calculate_cd_cm(panel, alpha_dist[i])
         width_dist[i] = panel.width
+        if panel.cp_polar !== nothing
+            up, low = cp_distribution(panel.cp_polar, alpha_dist[i], panel.delta)
+            solver.sol.cp_upper_dist[:, i] .= up
+            solver.sol.cp_lower_dist[:, i] .= low
+        end
 
         # Geometric AoA using panel-local axes and prescribed
         # freestream — scalar ops to avoid allocations
@@ -320,7 +383,7 @@ function solve!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics, gamma_dist
 
     # Initialize result arrays
     area_all_panels = zero(T)
-    panel_areas = zeros(T, length(panels))
+    panel_areas = solver.sol.panel_area_dist
 
     # Get wing properties
     spanwise_direction = body_aero.wings[1].spanwise_direction
@@ -418,6 +481,7 @@ function solve!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics, gamma_dist
         cl_unrefined_dist = solver.sol.cl_unrefined_dist
         cd_unrefined_dist = solver.sol.cd_unrefined_dist
         cm_unrefined_dist = solver.sol.cm_unrefined_dist
+        moment_coeff_unrefined_dist = solver.sol.moment_coeff_unrefined_dist
         alpha_unrefined_dist = solver.sol.alpha_unrefined_dist
         x_airf_unrefined_dist = solver.sol.x_airf_unrefined_dist
         y_airf_unrefined_dist = solver.sol.y_airf_unrefined_dist
@@ -425,12 +489,14 @@ function solve!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics, gamma_dist
         va_unrefined_dist = solver.sol.va_unrefined_dist
         chord_unrefined_dist = solver.sol.chord_unrefined_dist
         width_unrefined_dist = solver.sol.width_unrefined_dist
+        unrefined_count_dist = solver.sol.unrefined_count_dist
 
         # Zero all unrefined arrays
         moment_unrefined_dist .= 0.0
         cl_unrefined_dist .= 0.0
         cd_unrefined_dist .= 0.0
         cm_unrefined_dist .= 0.0
+        moment_coeff_unrefined_dist .= 0.0
         alpha_unrefined_dist .= 0.0
         for i in eachindex(x_airf_unrefined_dist)
             x_airf_unrefined_dist[i] .= 0.0
@@ -440,13 +506,12 @@ function solve!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics, gamma_dist
         end
         chord_unrefined_dist .= 0.0
         width_unrefined_dist .= 0.0
+        fill!(unrefined_count_dist, 0)
 
         panel_idx = 1
         unrefined_idx = 1
         for wing in body_aero.wings
             if wing.n_unrefined_sections > 0
-                # Accumulate values from refined panels to unrefined sections
-                unrefined_section_counts = zeros(Int, wing.n_unrefined_sections)
                 for local_panel_idx in 1:wing.n_panels
                     panel = body_aero.panels[panel_idx]
                     original_section_idx = wing.refined_panel_mapping[local_panel_idx]
@@ -457,6 +522,7 @@ function solve!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics, gamma_dist
                     cl_unrefined_dist[target_unrefined_idx] += solver.sol.cl_dist[panel_idx]
                     cd_unrefined_dist[target_unrefined_idx] += solver.sol.cd_dist[panel_idx]
                     cm_unrefined_dist[target_unrefined_idx] += solver.sol.cm_dist[panel_idx]
+                    moment_coeff_unrefined_dist[target_unrefined_idx] += solver.sol.moment_coeff_dist[panel_idx]
                     alpha_unrefined_dist[target_unrefined_idx] += solver.sol.alpha_dist[panel_idx]
 
                     # Accumulate geometry
@@ -467,15 +533,16 @@ function solve!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics, gamma_dist
                     chord_unrefined_dist[target_unrefined_idx] += panel.chord
                     width_unrefined_dist[target_unrefined_idx] += panel.width
 
-                    unrefined_section_counts[original_section_idx] += 1
+                    unrefined_count_dist[target_unrefined_idx] += 1
                     panel_idx += 1
                 end
 
-                # Average coefficients and geometry (width stays summed)
+                # Average coefficients and geometry. width and
+                # moment_coeff_unrefined_dist stay summed (extensive).
                 for i in 1:wing.n_unrefined_sections
                     target_unrefined_idx = unrefined_idx + i - 1
-                    if unrefined_section_counts[i] > 0
-                        count = unrefined_section_counts[i]
+                    if unrefined_count_dist[target_unrefined_idx] > 0
+                        count = unrefined_count_dist[target_unrefined_idx]
                         moment_unrefined_dist[target_unrefined_idx] /= count
                         cl_unrefined_dist[target_unrefined_idx] /= count
                         cd_unrefined_dist[target_unrefined_idx] /= count
@@ -1002,6 +1069,7 @@ function _section_with_eltype(section::Section, ::Type{TD}) where TD
         MVector{3, TD}(section.TE_point),
         section.aero_model,
         section.aero_data,
+        section.cp_data,
     )
 end
 
@@ -1160,7 +1228,7 @@ function linearize(solver::Solver, body_aero::BodyAerodynamics, y::Vector{T};
         else
             results[1:3] .= solver_c.sol.force_coeffs
             results[4:6] .= solver_c.sol.moment_coeffs
-            results[7:end] .= solver_c.sol.cm_unrefined_dist
+            results[7:end] .= solver_c.sol.moment_coeff_unrefined_dist
         end
         return nothing
     end

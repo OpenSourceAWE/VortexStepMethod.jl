@@ -22,8 +22,8 @@ Main structure for calculating aerodynamic properties of bodies. Use the constru
 - `y::MVector{P, Float64}` = MVector{P,Float64}(zeros(P))
 - `cache::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}}` = [LazyBufferCache() for _ in 1:15]
 """
-@with_kw mutable struct BodyAerodynamics{P, W<:AbstractWing, T}
-    panels::Vector{Panel{T}}
+@with_kw mutable struct BodyAerodynamics{P, W<:AbstractWing, T, PN<:Panel{T}}
+    panels::Vector{PN}
     wings::Vector{W}
     _va::MVector{3, T} = zeros(MVector{3, T})
     has_distributed_va::Bool = false
@@ -64,7 +64,7 @@ aerodynamic properties, returning a fully initialized structure ready for simula
 
 # Example
 ```julia
-wing = ObjWing("body.obj", "foil.dat")
+wing = Wing("wing.yaml"; n_panels=40); refine!(wing)
 body_aero = BodyAerodynamics([wing], va=[15.0, 0.0, 0.0], omega=zeros(3))
 ```
 """
@@ -95,8 +95,11 @@ function BodyAerodynamics(
         end
     end
 
-    # Initialize panels
-    panels = Panel{T}[]
+    # All panels share one concrete type from the wings' (uniform) aero model, so the
+    # panel vector stays concretely typed — see panel_interp_types.
+    sec0 = first(first(wings).unrefined_sections)
+    CL, CD, CM, CP = panel_interp_types(sec0, first(wings).remove_nan)
+    panels = Panel{T, CL, CD, CM, CP}[]
     for wing in wings
         for section in wing.unrefined_sections
             section.LE_point .-= kite_body_origin
@@ -105,12 +108,11 @@ function BodyAerodynamics(
 
         # Create panels
         for _ in 1:wing.n_panels
-            panel = Panel{T}()
-            push!(panels, panel)
+            push!(panels, Panel{T, CL, CD, CM, CP}())
         end
     end
 
-    body_aero = BodyAerodynamics{length(panels), W, T}(; panels, wings)
+    body_aero = BodyAerodynamics{length(panels), W, T, eltype(panels)}(; panels, wings)
     reinit!(body_aero; va, omega)
     return body_aero
 end
@@ -247,6 +249,7 @@ function reinit!(body_aero::BodyAerodynamics{P, W, T};
     vec = zeros(MVector{3, T})
     for wing in body_aero.wings
         reinit!(wing)
+        validate_cp_sections(wing.refined_sections)
         panel_props = wing.panel_props
         wing_init_aero = init_aero && !_can_skip_panel_aero_reinit(wing, body_aero.panels, idx)
         
@@ -315,28 +318,29 @@ end
 )
     size(va_input) == (n_panels, 3) ||
         throw(ArgumentError("'va' must be shape (3,) or ($(n_panels), 3); got $(size(va_input))"))
+    if !isnothing(panel_areas)
+        length(panel_areas) == n_panels ||
+            throw(ArgumentError("panel_areas must be shape ($(n_panels),), got length $(length(panel_areas))"))
+    end
 
     T = promote_type(eltype(va_input),
                      isnothing(panel_areas) ? Float64 : eltype(panel_areas))
-    areas = if isnothing(panel_areas)
-        ones(T, n_panels)
-    else
-        length(panel_areas) == n_panels ||
-            throw(ArgumentError("panel_areas must be shape ($(n_panels),), got length $(length(panel_areas))"))
-        T.(panel_areas)
-    end
-
-    total_area = sum(areas)
-    total_area > 0.0 || throw(ArgumentError("Total panel area must be positive."))
-
+    total_area = zero(T)
     weighted_speed_sq = zero(T)
     direction = zeros(MVector{3, T})
     @inbounds for i in 1:n_panels
-        @views va_i = va_input[i, :]
-        speed_i = norm(va_i)
-        weighted_speed_sq += areas[i] * speed_i^2
-        direction .+= areas[i] .* va_i
+        area_i = isnothing(panel_areas) ? one(T) : T(panel_areas[i])
+        va1 = va_input[i, 1]
+        va2 = va_input[i, 2]
+        va3 = va_input[i, 3]
+        speed_i = sqrt(va1^2 + va2^2 + va3^2)
+        total_area += area_i
+        weighted_speed_sq += area_i * speed_i^2
+        direction[1] += area_i * va1
+        direction[2] += area_i * va2
+        direction[3] += area_i * va3
     end
+    total_area > 0.0 || throw(ArgumentError("Total panel area must be positive."))
 
     reference_speed = sqrt(weighted_speed_sq / total_area)
     direction_norm = norm(direction)

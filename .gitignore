@@ -8,6 +8,7 @@ docs/build/
 results/TUDELFT_V3_LEI_KITE/polars/tutorial_testing_stall_model_n_panels_54_distribution_SPLIT_PROVIDED.pdf
 !test/data/*.bin
 CLAUDE.md
+ideas.txt
 
 # Claude Code sandbox artifacts
 .bash_profile
@@ -33,10 +34,27 @@ hooks
 .idea
 results/TUDELFT_V3_KITE/polars/tutorial_testing_stall_model_n_panels_54_distribution_SPLIT_PROVIDED.pdf
 .gitignore
+data/ram_air_kite/ram_air_kite_foil.dat
+data/ram_air_kite/ram_air_kite_foil_cl_polar.csv
 data/ram_air_kite/ram_air_kite_foil_cd_polar.csv
 data/ram_air_kite/ram_air_kite_foil_cm_polar.csv
 output/
 output_cairo/
-examples_cp/.CondaPkg/
-test/.CondaPkg/
+.CondaPkg/
 LocalPreferences.toml
+
+# Pipeline-generated polars/dat/cp (regenerate via AirfoilAero/ObjAdapter)
+data/**/polars_neuralfoil/
+data/**/polars_xfoil/
+data/TUDELFT_V3_KITE/aero_geometry_neuralfoil.yaml
+
+# Local planning docs (not tracked)
+docs/architecture_plan.md
+docs/awesio_alignment_plan.md
+docs/awesio_cp_issue_proposal.md
+
+# Sub-package manifests (env-specific)
+lib/**/Manifest.toml
+
+# Generated test geometries (regenerated on demand by ram_air_matrix_wing)
+test/generated/

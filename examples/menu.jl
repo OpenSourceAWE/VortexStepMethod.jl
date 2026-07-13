@@ -3,10 +3,9 @@ Pkg.activate(@__DIR__)
 
 using GLMakie
 using CairoMakie
+using MakieControlPlots
 using VortexStepMethod
 using REPL.TerminalMenus
-
-set_plot_backend!(MakieBackend())
 
 url = "https://opensourceawe.github.io/VortexStepMethod.jl/dev"
 
@@ -16,6 +15,7 @@ example_files = [
     "pyramid_model.jl",
     "rectangular_wing.jl",
     "ram_air_kite.jl",
+    "obj_to_yaml_kite.jl",
     "stall_model.jl",
     "bench.jl",
     "linearize_check.jl",

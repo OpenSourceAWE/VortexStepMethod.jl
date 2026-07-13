@@ -1,123 +1,107 @@
+using Pkg
+if Base.active_project() != joinpath(@__DIR__, "Project.toml")
+    Pkg.activate(@__DIR__)
+end
+using GLMakie
+using MakieControlPlots
 using VortexStepMethod
+using VortexStepMethod.ObjAdapter
+using VortexStepMethod.AirfoilAero: XFoilSolver, NeuralFoilSolver, ShrinkWrap
 using LinearAlgebra
 
 PLOT = true
-PRN = true
-SAVE_ALL = false
 USE_TEX = false
-DEFORM = true
-LINEARIZE = false
-OUTPUT_DIR = joinpath(dirname(@__DIR__), "output")
-
-# Create wing geometry
-wing = ObjWing(
-    joinpath("data", "ram_air_kite", "ram_air_kite_body.obj"),
-    joinpath("data", "ram_air_kite", "ram_air_kite_foil.dat");
-    n_unrefined_sections=2,
-    prn=PRN
-)
-body_aero = BodyAerodynamics([wing];)
-println("First init")
-@time VortexStepMethod.reinit!(body_aero)
-
-if DEFORM
-    # Linear interpolation of alpha from 10° at one tip to 0° at the other
-    println("Deform")
-    @time VortexStepMethod.unrefined_deform!(
-        wing, deg2rad.([-10,0]), deg2rad.([0,0]); smooth=true)
-    println("Deform init")
-    @time VortexStepMethod.reinit!(body_aero; init_aero=false)
-end
-
-# Create solvers
-solver = Solver(body_aero;
-    aerodynamic_model_type=VSM,
-    is_with_artificial_damping=false,
-    rtol=1e-5,
-    solver_type=NONLIN
-)
-
-# Setting velocity conditions
 v_a = 15.0
-aoa = 10.0
-side_slip = 0.0
-yaw_rate = 0.0
-aoa_rad = deg2rad(aoa)
-vel_app = [
-    cos(aoa_rad) * cos(side_slip),
-    sin(side_slip),
-    sin(aoa_rad)
-] * v_a
-set_va!(body_aero, vel_app)
+RE = 1e6
 
-if LINEARIZE
-    println("Linearize")
-    jac, res = VortexStepMethod.linearize(
-        solver,
-        body_aero,
-        [zeros(4); vel_app; zeros(3)];
-        theta_idxs=1:4,
-        va_idxs=5:7,
-        omega_idxs=8:10,
-        moment_frac=0.1)
-    @time jac, res = VortexStepMethod.linearize(
-        solver,
-        body_aero,
-        [zeros(4); vel_app; zeros(3)];
-        theta_idxs=1:4,
-        va_idxs=5:7,
-        omega_idxs=8:10,
-        moment_frac=0.1)
+# Shared boundary-layer transition settings — both backends use the e^N model.
+N_CRIT    = 9.0   # e^N transition criticality (lower = dirtier / earlier)
+XTR_UPPER = 0.05  # forced upper-surface transition (chord fraction)
+XTR_LOWER = 0.05  # forced lower-surface transition
+
+# XFoil-only settings.
+XF_NPAN     = 160  # panel count (XFoil PANE default)
+XF_MAX_ITER = 100  # viscous iterations per angle
+XF_MACH     = 0.0  # Mach number (0 = incompressible)
+XF_SOLVER = XFoilSolver(npan=XF_NPAN, max_iter=XF_MAX_ITER, ncrit=N_CRIT,
+                        xtrip=(XTR_UPPER, XTR_LOWER), mach=XF_MACH)
+
+# NeuralFoil-only settings.
+NF_MODEL_SIZE = "large"  # network size: xxsmall … xxxlarge (accuracy vs speed)
+NF_SOLVER = NeuralFoilSolver(model_size=NF_MODEL_SIZE, n_crit=N_CRIT,
+                             xtr_upper=XTR_UPPER, xtr_lower=XTR_LOWER)
+
+# VSM solver stability settings.
+RELAXATION         = 0.03   # iteration relaxation factor
+ARTIFICIAL_DAMPING = false  # smooth-circulation stabiliser for difficult cases
+
+# Convert-then-load: the .obj mesh is sliced per section, each section fitted and swept
+# over (alpha, delta) with the chosen solver, written as long-format POLAR_MATRICES.
+# The result is cached under data/ram_air_kite/<subdir>; delete it to regenerate.
+obj_path = joinpath("data", "ram_air_kite", "ram_air_kite_body.obj")
+alpha_range = -8:2:26
+# alpha_range = 0:1
+delta_range = 0:1
+N_SECTIONS = 10
+
+# Inset the tip stations 10 cm along the leading edge so they avoid the near-zero-chord
+# wingtips, which slice to degenerate airfoils that XFoil cannot analyse.
+WINGTIP_DISTANCE = 0.1
+
+# Shrink-wrap each raw slice into a clean closed airfoil: the distance-field wrap
+# hugs the cloud at `clearance` (floored at one grid `cell_size`) with a round nose.
+WRAP = ShrinkWrap(clearance=0.0)
+
+# 3D slice diagnostic (live preview): mesh + LE/TE curves + section contours, their
+# wraps and Kulfan fits. A nonzero `delta` (deg) also overlays the deflected
+# re-wrapped airfoil (purple) — the deform_section geometry the solvers consume.
+# Hover a slice to inspect its 2D airfoil.
+fig_slices_3d = plot_slices_3d(obj_path; n_slices=N_SECTIONS, wrap_method=WRAP,
+                               wingtip_distance=WINGTIP_DISTANCE, delta=15.0)
+GLMakie.save("ram_air_slices_3d.png", fig_slices_3d)
+
+function matrix_wing(solver, subdir; n_panels=50, n_sections=N_SECTIONS)
+    out_dir = joinpath("data", "ram_air_kite", subdir)
+    yaml = joinpath(out_dir, "geometry.yaml")
+    if !isfile(yaml)
+        obj_to_yaml(obj_path, out_dir; n_sections, Re=RE, alpha_range, delta_range,
+            aero_solver=solver, wrap_method=WRAP, wingtip_distance=WINGTIP_DISTANCE,
+            verbose=false)
+    end
+    return Wing(yaml; n_panels)
 end
 
-# Plotting polar data
-PLOT && plot_polar_data(body_aero)
+println("Creating XFoil wing...")
+wing_xfoil = matrix_wing(XF_SOLVER, "polars_xfoil")
 
-# Plotting geometry
-PLOT && plot_geometry(
-    body_aero,
-    "Ram air kite geometry";
-    save_path=OUTPUT_DIR,
-    is_save=false || SAVE_ALL,
-    is_show=true,
-    view_elevation=15,
-    view_azimuth=-120,
-    use_tex=USE_TEX
-)
+# Audit plot: same diagnostic, but read from the generated output directory — the
+# written .dat airfoils the polars were actually computed from (delta must be one
+# of delta_range; nothing is re-sliced or re-wrapped).
+fig_audit = plot_slices_3d(joinpath("data", "ram_air_kite", "polars_xfoil");
+                           delta=1.0, obj_path=obj_path)
+GLMakie.save("ram_air_slices_audit.png", fig_audit)
+body_xfoil = BodyAerodynamics([wing_xfoil])
+solver_xfoil = Solver(body_xfoil; aerodynamic_model_type=VSM, rtol=1e-5, solver_type=NONLIN,
+                      relaxation_factor=RELAXATION, is_with_artificial_damping=ARTIFICIAL_DAMPING)
 
-# Solving and plotting distributions
-println("Solve")
-results = VortexStepMethod.solve(solver, body_aero; log=true)
-@time VortexStepMethod.solve(solver, body_aero; log=true)
+println("Creating NeuralFoil wing...")
+wing_nf = matrix_wing(NF_SOLVER, "polars_neuralfoil")
+body_nf = BodyAerodynamics([wing_nf])
+solver_nf = Solver(body_nf; aerodynamic_model_type=VSM, rtol=1e-5, solver_type=NONLIN,
+                   relaxation_factor=RELAXATION, is_with_artificial_damping=ARTIFICIAL_DAMPING)
 
-body_y_coordinates = [panel.aero_center[2] for panel in body_aero.panels]
-
-PLOT && plot_distribution(
-    [body_y_coordinates],
-    [results],
-    ["VSM"];
-    title="CAD_spanwise_distributions_alpha_$(round(aoa, digits=1))_delta_$(round(side_slip, digits=1))_yaw_$(round(yaw_rate, digits=1))_v_a_$(round(v_a, digits=1))",
-    save_path=OUTPUT_DIR,
-    is_save=false || SAVE_ALL,
-    is_show=true,
-    use_tex=USE_TEX
-)
-
-PLOT && plot_polars(
-    [solver],
-    [body_aero],
-    [
-        "VSM from Ram Air Kite OBJ and DAT file",
-    ];
-    angle_range=range(0, 20, length=20),
-    angle_type="angle_of_attack",
-    angle_of_attack=0,
-    side_slip=0,
-    v_a=10,
-    title="ram_kite_panels_$(wing.n_panels)_distribution_$(wing.spanwise_distribution)",
-    save_path=OUTPUT_DIR,
-    is_save=false || SAVE_ALL,
-    is_show=true,
-    use_tex=USE_TEX
-)
+# Compare using plot_polars
+if PLOT
+    println("Computing and plotting polars...")
+    fig = plot_polars(
+        [solver_xfoil, solver_nf],
+        [body_xfoil, body_nf],
+        ["XFoil", "NeuralFoil"];
+        angle_range=range(-5, 25, length=31),
+        v_a=v_a,
+        title="Ram Air Kite: XFoil vs NeuralFoil",
+        is_save=false,
+        use_tex=USE_TEX
+    )
+end
 nothing

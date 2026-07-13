@@ -132,12 +132,6 @@ more examples by typing:
 julia> include("examples/menu.jl")
 ```
 
-or, you prefer to use the ControlPlots library:
-
-```julia
-julia> include("examples_cp/menu_cp.jl")
-```
-
 You should see the following menu:
 
 ```text
@@ -161,7 +155,13 @@ Press `<ENTER>` to run the selected example.
 
 ## Plotting Backends
 
-The examples in this package support three plotting backends. Here is a comparison to help you choose:
+The examples use two Makie backends — `GLMakie` (interactive) and `CairoMakie`
+(headless / vector output). For a
+[ControlPlots](https://github.com/aenarete/ControlPlots.jl)-style plotting API on
+top of Makie, the examples also load
+[`MakieControlPlots`](https://github.com/OpenSourceAWE/MakieControlPlots.jl),
+which provides `plot`, `plotx`, and `plotxy` helpers. Here is a comparison to
+help you choose a backend:
 
 ### GLMakie
 **Advantages:**
@@ -172,7 +172,6 @@ The examples in this package support three plotting backends. Here is a comparis
 **Disadvantages:**
 - Requires a display server (does not work in headless/server environments without a virtual framebuffer).
 - Heavier dependency: needs OpenGL drivers and a GPU.
-- Longer initial load time compared to ControlPlots
 
 ### CairoMakie
 **Advantages:**
@@ -183,29 +182,14 @@ The examples in this package support three plotting backends. Here is a comparis
 - Plots are static — no interactive zoom or pan.
 - Slower for very large or complex scenes because rendering is done in software.
 - 3D support is limited compared to GLMakie.
-- Longer initial load time compared to ControlPlots
 
-### ControlPlots (based on PyPlot / Matplotlib)
-**Advantages:**
-- Simple API, easy to learn for students
-- In addition, the Matplotlib API for users coming from Python/Matplotlib is supported.
-- Works in headless environments; can save to PNG, SVG, PDF, etc.
-- Very lightweight Julia-side dependency (delegates work to Python).
-
-**Disadvantages:**
-- Requires a working Python installation with Matplotlib (via `PyCall`).
-- Might crash when multithreading is enabled. Start Julia with `-t 1,0` to avoid problems.
-- No native Makie ecosystem integration (e.g. cannot use `Makie.Observable` for live updates).
-- Interactivity is limited and depends on the Matplotlib backend in use.
-- Extra setup complexity when Python or Matplotlib are not already installed.
-
-| Feature | GLMakie | CairoMakie | ControlPlots |
-|---|---|---|---|
-| Interactive (zoom/pan) | yes | no | yes |
-| Headless / server | no* | yes | yes |
-| Vector output (PDF/SVG) | no | yes | yes |
-| GPU required | yes | no | no |
-| 3D support | full | limited | limited |
-| Load time | slow | medium | fast |
+| Feature | GLMakie | CairoMakie |
+|---|---|---|
+| Interactive (zoom/pan) | yes | no |
+| Headless / server | no* | yes |
+| Vector output (PDF/SVG) | no | yes |
+| GPU required | yes | no |
+| 3D support | full | limited |
+| Load time | slow | medium |
 
 \* GLMakie can run headless with a virtual framebuffer (e.g. `Xvfb`), but this requires additional setup.

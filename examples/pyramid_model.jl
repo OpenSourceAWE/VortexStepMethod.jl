@@ -1,4 +1,10 @@
+using Pkg
+if Base.active_project() != joinpath(@__DIR__, "Project.toml")
+    Pkg.activate(@__DIR__)
+end
 using LinearAlgebra
+using GLMakie
+using MakieControlPlots
 using VortexStepMethod
 
 # Load VSM vsm_settings from YAML configuration file

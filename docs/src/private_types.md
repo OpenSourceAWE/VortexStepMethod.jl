@@ -8,5 +8,25 @@ CurrentModule = VortexStepMethod
 ```@docs
 Panel
 PanelProperties
+Filament
 BoundFilament
+SemiInfiniteFilament
+```
+
+### Aerodynamic model constants
+```@docs
+LEI_AIRFOIL_BREUKELS
+```
+
+### Airfoil aerodynamics (AirfoilAero)
+```@meta
+CurrentModule = VortexStepMethod.AirfoilAero
+```
+```@docs
+KulfanParameters
+NeuralFoilModel
+NeuralFoilResult
+```
+```@meta
+CurrentModule = VortexStepMethod
 ```

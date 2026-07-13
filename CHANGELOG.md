@@ -1,5 +1,82 @@
 # Changelog
 
+## Unreleased (v4.0.0)
+
+### Breaking
+- `ObjWing` polar generation now uses NeuralFoil (via `ObjAdapter.obj_to_yaml`)
+  instead of XFoil + a user-supplied `.dat` file. The constructor signature is
+  backward-compatible (`dat_path` is accepted and silently ignored), but the
+  resulting aerodynamic polars will differ numerically from v3.x outputs.
+  To reproduce old XFoil-based polars pass `aero_solver=XFoilSolver()` to
+  `ObjAdapter.obj_to_yaml` and call `Wing` directly.
+
+### Added
+- `NeuralFoil`-based airfoil polar generation via the new `AirfoilAero` submodule
+  (`NeuralFoilSolver`, `XFoilSolver`, `analyze_section`, `analyze_sweep`,
+  `fit_kulfan_parameters`, `shrink_wrap`, `ShrinkWrap`)
+- `ObjAdapter` submodule: converts a 3D wing `.obj` mesh to the native YAML/CSV
+  geometry format (`obj_to_yaml`, `perpendicular_sections`, `generate_section_polars`,
+  `write_yaml`, `plot_slices_3d`, `plot_airfoils`)
+- `ObjWing(obj_path[, dat_path]; Re, n_panels, aero_solver, remake, ...)` convenience
+  constructor restored for backward compatibility — internally calls
+  `ObjAdapter.obj_to_yaml` then `Wing`; `aero_solver` selects the polar backend
+  (default `NeuralFoilSolver()`; pass `XFoilSolver()` for old behavior);
+  `remake=false` (default) reuses an existing `geometry.yaml` in `output_dir` to skip
+  expensive polar generation when only `n_panels` changes; set `remake=true` to force
+  regeneration
+- Surface-pressure (Cp) tables: `CpData`, `CpPolar`, `read_cp_data`, `write_cp_data`,
+  `cp_distribution`, `delta_cp`; Cp fields propagate through `Section` and `Wing`
+  and are spanwise-interpolated during `refine!`
+- `POLY` aero model for polynomial cl/cd/cm (exported)
+- `examples/V3_neuralfoil.jl` and `examples/obj_to_yaml_kite.jl`
+
+### Changed
+- OBJ-based wings are now built via `ObjAdapter.obj_to_yaml` + `Wing(yaml_path)`
+  instead of the old `ObjWing` pipeline (XFoil + single `.dat` file);
+  `ObjWing` is kept as a shim that accepts but ignores `dat_path`
+- `Section` and `add_section!` accept an optional `cp_data` argument
+- plotting is now Makie-only; the `VortexStepMethodMakieExt` extension loads once a
+  Makie backend and [`MakieControlPlots`](https://github.com/OpenSourceAWE/MakieControlPlots.jl)
+  are available, and `plot_section_polars` is rendered through `MakieControlPlots`
+
+### Removed
+- `ObjWing` as a standalone pipeline (replaced by `ObjAdapter`); the name is
+  re-exported as a compatibility wrapper
+- `auto_rotation` helper (internal, removed from public API)
+- `PanelGroupingMethod` enum (already removed in v3.0.0 — stale docs entry cleaned up)
+- ControlPlots test run removed from CI (`plot-controlplots` arg) due to
+  a `libraqm`/HarfBuzz symbol conflict in the GitHub Actions environment
+- the `ControlPlots` plotting extension, `examples_cp/`, and the `PythonCall`/Matplotlib
+  setup (`bin/install_controlplots`, CondaPkg `LocalPreferences` defaults)
+- the `PlotBackend`/`MakieBackend`/`ControlPlotsBackend` types and `set_plot_backend!`;
+  plotting works as soon as a Makie backend and `MakieControlPlots` are loaded
+- the never-implemented `plot_circulation_distribution`
+
+## VortexStepMethod v3.3.6 2026-06-13
+
+### Added
+- `calc_forces!` and `solve_base!` (both exported): `solve!` is now
+  `solve_base!` followed by `calc_forces!`, so a frozen circulation can be
+  mapped to forces without re-running the nonlinear gamma solve (#245)
+- `calculate_cd` and `calculate_cm`, splitting the combined `calculate_cd_cm`
+  into separate drag- and moment-coefficient functions; `calculate_cd_cm` is
+  kept as a thin wrapper (#246)
+
+### Changed
+- `calc_forces!` is now allocation-free in the per-step hot path
+  (preallocated `panel_area_dist` and `unrefined_count_dist` buffers) (#245)
+
+### Fixed
+- 3D polar plotting (#245)
+- flaky Aqua `persistent_tasks` test now actually disabled via
+  `persistent_tasks=false` (`()` did not disable it) (#246)
+
+## VortexStepMethod v3.3.5 2026-06-05
+
+### Added
+- `moment_coeff_unrefined_dist` field in `VSMSolution`: the summed
+  `moment_frac`-referenced pitching-moment coefficient per unrefined section [-]
+
 ## VortexStepMethod v3.3.4 2026-05-31
 
 ### Added

@@ -68,3 +68,26 @@ end
         rm(settings_file; force=true)
     end
 end
+
+calc_forces_allocs(solver, body_aero) =
+    (calc_forces!(solver, body_aero); @allocated calc_forces!(solver, body_aero))
+
+@testset "calc_forces! is zero-alloc" begin
+    settings_file = create_temp_wing_settings(
+        "solver", "solver_test_wing.yaml";
+        alpha=5.0, beta=0.0, wind_speed=10.0,
+    )
+    try
+        settings = VSMSettings(settings_file)
+        wing = Wing(settings)
+        refine!(wing)
+        body_aero = BodyAerodynamics([wing])
+        solver = Solver(body_aero, settings)
+        set_va!(body_aero, [10.0, 0.0, 0.0])
+        solve!(solver, body_aero)
+
+        @test calc_forces_allocs(solver, body_aero) == 0
+    finally
+        rm(settings_file; force=true)
+    end
+end
