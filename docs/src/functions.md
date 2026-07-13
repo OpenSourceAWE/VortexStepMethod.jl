@@ -74,7 +74,7 @@ CurrentModule = VortexStepMethod
 set_va!
 solve
 solve!
-reinit!(body_aero::BodyAerodynamics)
+reinit!(body_aero::BodyAerodynamics{P, W, T}) where {P, W, T}
 linearize
 calculate_results
 ```
