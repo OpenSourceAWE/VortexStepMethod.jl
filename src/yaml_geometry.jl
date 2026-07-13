@@ -419,7 +419,8 @@ end
 
 """
     ObjWing(obj_path[, dat_path]; n_panels, Re, alpha_range, delta_range,
-            n_sections, spanwise_direction, aero_solver, remake, output_dir, verbose) → Wing
+            n_sections, spanwise_direction, aero_solver, remake, output_dir,
+            crease_frac, verbose) → Wing
 
 Convenience constructor retained for backward compatibility. Converts an OBJ mesh
 to a YAML wing geometry via [`ObjAdapter.obj_to_yaml`](@ref) and returns a [`Wing`](@ref).
@@ -443,6 +444,7 @@ function ObjWing(obj_path, dat_path=nothing;
                  aero_solver=AirfoilAero.NeuralFoilSolver(),
                  remake::Bool=false,
                  output_dir::String=mktempdir(),
+                 crease_frac=0.75,
                  verbose::Bool=false)
     yaml_path = joinpath(output_dir, "geometry.yaml")
     if remake || !isfile(yaml_path)
@@ -454,6 +456,7 @@ function ObjWing(obj_path, dat_path=nothing;
                                            delta_range,
                                            aero_solver,
                                            spanwise_direction,
+                                           crease_frac,
                                            verbose)
     end
     return Wing(yaml_path; n_panels, spanwise_distribution, spanwise_direction, remove_nan)
