@@ -1,5 +1,10 @@
+using Pkg
+if Base.active_project() != joinpath(@__DIR__, "Project.toml")
+    Pkg.activate(@__DIR__)
+end
 using LinearAlgebra
 using VortexStepMethod
+using VortexStepMethod.ObjAdapter
 using VortexStepMethod: solve_base!
 
 
@@ -52,12 +57,11 @@ println("Rectangular wing, solve!:")
 println("Rectangular wing, solve:")
 @time solve(vsm_solver, body_aero, nothing)
 
-# Create wing geometry
-wing = ObjWing(
-    joinpath("data", "ram_air_kite", "ram_air_kite_body.obj"),
-    joinpath("data", "ram_air_kite", "ram_air_kite_foil.dat");
-    prn=false
-)
+# Create wing geometry (convert-then-load: obj -> per-section NeuralFoil POLAR_MATRICES)
+ram_yaml = obj_to_yaml(
+    joinpath("data", "ram_air_kite", "ram_air_kite_body.obj"), mktempdir();
+    n_sections=10, Re=1e6, alpha_range=-10:2:20, delta_range=-5:5:5, verbose=false)
+wing = Wing(ram_yaml; n_panels=40)
 body_aero = BodyAerodynamics([wing])
 
 # Create solvers

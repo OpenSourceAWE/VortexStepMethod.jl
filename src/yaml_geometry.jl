@@ -1,6 +1,11 @@
 # Data structures for YAML wing geometry
 @with_kw struct WingAirfoilInfo
     csv_file_path::String
+    dat_file::String = ""
+    cp_file_path::String = ""
+    cl_file_path::String = ""
+    cd_file_path::String = ""
+    cm_file_path::String = ""
 end
 
 @with_kw struct WingSectionData
@@ -51,6 +56,21 @@ wing = Wing(
 )
 ```
 """
+function assemble_polar_matrix(dv::Dict{String,Vector{Float64}})
+    alphas = sort(unique(dv["alpha"]))
+    deltas = sort(unique(dv["delta"]))
+    ai = Dict(a => i for (i, a) in enumerate(alphas))
+    di = Dict(d => j for (j, d) in enumerate(deltas))
+    cl = fill(NaN, length(alphas), length(deltas))
+    cd = fill(NaN, length(alphas), length(deltas))
+    cm = fill(NaN, length(alphas), length(deltas))
+    for k in eachindex(dv["alpha"])
+        i, j = ai[dv["alpha"][k]], di[dv["delta"][k]]
+        cl[i, j], cd[i, j], cm[i, j] = dv["cl"][k], dv["cd"][k], dv["cm"][k]
+    end
+    return (deg2rad.(alphas), deg2rad.(deltas), cl, cd, cm)
+end
+
 function load_polar_data(csv_file_path::String)
     # Return early for empty path
     if isempty(csv_file_path)
@@ -81,37 +101,30 @@ function load_polar_data(csv_file_path::String)
             return (nothing, INVISCID)
         end
 
-        # Split header and normalize to lowercase
+        # Split header and normalize to lowercase. A `delta` column marks the
+        # long-format `(alpha, delta)` polar, loaded as POLAR_MATRICES.
         header_parts = map(strip ∘ lowercase, split(header_line, ','))
-        
-        # Find column indices for required columns
-        required_cols = ["alpha", "cl", "cd", "cm"]
+        has_delta = "delta" in header_parts
+        wanted = has_delta ? ["alpha", "delta", "cl", "cd", "cm"] :
+                             ["alpha", "cl", "cd", "cm"]
         col_indices = Dict{String, Int}()
-        
         for (i, col_name) in enumerate(header_parts)
-            if col_name in required_cols
-                col_indices[col_name] = i
-            end
+            col_name in wanted && (col_indices[col_name] = i)
         end
-        
-        # Check if all required columns are present
-        missing_cols = setdiff(required_cols, keys(col_indices))
+
+        missing_cols = setdiff(wanted, keys(col_indices))
         if !isempty(missing_cols)
             @warn "CSV file missing required columns: $(join(missing_cols, ", ")) in $csv_file_path"
             return (nothing, INVISCID)
         end
 
         # Parse data rows
-        data_vectors = Dict{String, Vector{Float64}}()
-        for col in required_cols
-            data_vectors[col] = Float64[]
-        end
-
+        data_vectors = Dict(col => Float64[] for col in wanted)
         for line_num in eachindex(lines)
             line_num == firstindex(lines) && continue
             line = strip(lines[line_num])
             isempty(line) && continue  # Skip empty lines
-            
+
             parts = split(line, ',')
             if length(parts) != length(header_parts)
                 @warn "Line $line_num has incorrect number of columns in $csv_file_path"
@@ -119,10 +132,8 @@ function load_polar_data(csv_file_path::String)
             end
 
             try
-                for col in required_cols
-                    value_str = strip(parts[col_indices[col]])
-                    value = parse(Float64, value_str)
-                    push!(data_vectors[col], value)
+                for col in wanted
+                    push!(data_vectors[col], parse(Float64, strip(parts[col_indices[col]])))
                 end
             catch e
                 @warn "Failed to parse line $line_num in $csv_file_path: $e"
@@ -136,16 +147,32 @@ function load_polar_data(csv_file_path::String)
             return (nothing, INVISCID)
         end
 
+        has_delta && return (assemble_polar_matrix(data_vectors), POLAR_MATRICES)
+
         # Convert alpha from degrees to radians and create tuple
         alpha_rad = deg2rad.(data_vectors["alpha"])
         aero_data = (alpha_rad, data_vectors["cl"], data_vectors["cd"], data_vectors["cm"])
-        
+
         return (aero_data, POLAR_VECTORS)
 
     catch e
         @warn "Error reading CSV file $csv_file_path: $e"
         return (nothing, INVISCID)
     end
+end
+
+"""
+    load_matrix_polar_data(cl_path, cd_path, cm_path) -> (aero_data, POLAR_MATRICES)
+
+Read the three `(alpha × delta)` coefficient matrices (see [`read_aero_matrix`](@ref))
+and assemble the `POLAR_MATRICES` `aero_data = (alpha, delta, cl, cd, cm)`.
+"""
+function load_matrix_polar_data(cl_path::String, cd_path::String, cm_path::String)
+    cl_matrix, alpha, delta = read_aero_matrix(cl_path)
+    cd_matrix, _, _ = read_aero_matrix(cd_path)
+    cm_matrix, _, _ = read_aero_matrix(cm_path)
+    return (collect(alpha), collect(delta), cl_matrix, cd_matrix, cm_matrix),
+        POLAR_MATRICES
 end
 
 """
@@ -203,7 +230,6 @@ function Wing(
     # Load YAML file following Uwe's suggestion
     data = YAML.load_file(geometry_file)
 
-    # Convert YAML data to our struct format
     # Convert wing sections
     wing_sections_data = data["wing_sections"]
     sections = WingSectionData[]
@@ -223,25 +249,48 @@ function Wing(
     # Convert wing airfoils
     wing_airfoils_data = data["wing_airfoils"]
     airfoils = WingAirfoilData[]
+    airfoil_poly_map = Dict{Int64, NTuple{3, Vector{Float64}}}()
+    airfoil_type_map = Dict{Int64, String}()
     for row in wing_airfoils_data["data"]
         airfoil_dict = Dict(zip(wing_airfoils_data["headers"], row))
+        airfoil_type_map[airfoil_dict["airfoil_id"]] = String(airfoil_dict["type"])
+        info = airfoil_dict["info_dict"]
+        if haskey(info, "cl_coeffs")
+            airfoil_poly_map[airfoil_dict["airfoil_id"]] = (
+                Float64.(info["cl_coeffs"]), Float64.(info["cd_coeffs"]),
+                Float64.(info["cm_coeffs"]))
+        end
         push!(airfoils, WingAirfoilData(
             airfoil_id = airfoil_dict["airfoil_id"],
             type = airfoil_dict["type"],
-            info_dict = WingAirfoilInfo(csv_file_path = get(airfoil_dict["info_dict"], "csv_file_path", ""))
+            info_dict = WingAirfoilInfo(
+                csv_file_path = get(airfoil_dict["info_dict"], "csv_file_path", ""),
+                dat_file = get(airfoil_dict["info_dict"], "dat_file", ""),
+                cp_file_path = get(airfoil_dict["info_dict"], "cp_file_path", ""),
+                cl_file_path = get(airfoil_dict["info_dict"], "cl_file_path", ""),
+                cd_file_path = get(airfoil_dict["info_dict"], "cd_file_path", ""),
+                cm_file_path = get(airfoil_dict["info_dict"], "cm_file_path", ""))
         ))
     end
-    
+
     # Create CSV file mapping from airfoils
     airfoil_csv_map = Dict{Int64, String}()
+    airfoil_cp_map = Dict{Int64, String}()
+    airfoil_matrix_map = Dict{Int64, NTuple{3, String}}()
     for airfoil in airfoils
         if !isempty(airfoil.info_dict.csv_file_path)
             airfoil_csv_map[airfoil.airfoil_id] = airfoil.info_dict.csv_file_path
         end
+        if !isempty(airfoil.info_dict.cp_file_path)
+            airfoil_cp_map[airfoil.airfoil_id] = airfoil.info_dict.cp_file_path
+        end
+        if !isempty(airfoil.info_dict.cl_file_path)
+            airfoil_matrix_map[airfoil.airfoil_id] = (airfoil.info_dict.cl_file_path,
+                airfoil.info_dict.cd_file_path, airfoil.info_dict.cm_file_path)
+        end
     end
     
-    # Create Wing using the standard constructor
-    # n_unrefined_sections will be set automatically after sections are added
+    # n_unrefined_sections is set automatically as sections are added
     wing = Wing(n_panels;
         spanwise_distribution=spanwise_distribution,
         spanwise_direction=MVec3(spanwise_direction),
@@ -256,19 +305,33 @@ function Wing(
         le_coord = [section.LE_x, section.LE_y, section.LE_z]
         te_coord = [section.TE_x, section.TE_y, section.TE_z]
 
-        # Load polar data and create section
-        csv_file_path = get(airfoil_csv_map, section.airfoil_id, "")
-        if !isempty(csv_file_path) && !isabspath(csv_file_path)
-            # NOTE: The spanwise direction is currently restricted to [0.0, 1.0, 0.0] (the global Y axis).
-            # This is required because downstream geometry and panel generation code assumes the spanwise axis is aligned with Y.
-            # If you need to support arbitrary spanwise directions, refactor the geometry logic accordingly.
-            csv_file_path = joinpath(dirname(geometry_file), csv_file_path)
+        base_dir = dirname(geometry_file)
+        resolve(p) = (!isempty(p) && !isabspath(p)) ? joinpath(base_dir, p) : p
+
+        # Core accepts only resolved forms (poly/polars/inviscid); rich types resolve in AirfoilAero.
+        airfoil_type = get(airfoil_type_map, section.airfoil_id, "")
+        if haskey(airfoil_poly_map, section.airfoil_id)
+            aero_data = airfoil_poly_map[section.airfoil_id]
+            aero_model = POLY
+        elseif haskey(airfoil_matrix_map, section.airfoil_id)
+            cl_p, cd_p, cm_p = airfoil_matrix_map[section.airfoil_id]
+            aero_data, aero_model = load_matrix_polar_data(
+                resolve(cl_p), resolve(cd_p), resolve(cm_p))
+        elseif airfoil_type in ("neuralfoil", "breukels_regression", "masure_regression")
+            throw(ArgumentError("airfoil_id $(section.airfoil_id) has unresolved " *
+                "type \"$airfoil_type\"; resolve it with AirfoilAero " *
+                "(resolve_aero_geometry) into polars/poly before loading."))
+        else
+            csv_file_path = resolve(get(airfoil_csv_map, section.airfoil_id, ""))
+            aero_data, aero_model = load_polar_data(csv_file_path)
         end
-        aero_data, aero_model = load_polar_data(csv_file_path)
+
+        cp_file_path = resolve(get(airfoil_cp_map, section.airfoil_id, ""))
+        cp_data = isempty(cp_file_path) ? nothing : read_cp_data(cp_file_path)
 
         prn && println("Section airfoil_id $(section.airfoil_id): Using $aero_model model")
 
-        add_section!(wing, le_coord, te_coord, aero_model, aero_data)
+        add_section!(wing, le_coord, te_coord, aero_model, aero_data, cp_data)
     end
 
     refine!(wing; sort_sections)
@@ -342,20 +405,56 @@ function Wing(settings::VSMSettings; sort_sections::Bool=true)
             sort_sections
         )
     elseif has_obj && has_dat
-        # Use ObjWing constructor (ObjWing doesn't sort sections internally)
-        ObjWing(
-            wing_settings.obj_file,
-            wing_settings.dat_file;
-            n_panels=wing_settings.n_panels,
-            spanwise_distribution=wing_settings.spanwise_panel_distribution,
-            spanwise_direction=wing_settings.spanwise_direction,
-            remove_nan=wing_settings.remove_nan,
-            use_prior_polar=wing_settings.use_prior_polar
-        )
+        throw(ArgumentError(
+            "OBJ/DAT geometry is handled by the ObjAdapter package: convert to a " *
+            "standard YAML with ObjAdapter first, then load it via geometry_file."
+        ))
     else
         throw(ArgumentError(
             "WingSettings must specify either geometry_file or " *
             "both obj_file and dat_file"
         ))
     end
+end
+
+"""
+    ObjWing(obj_path[, dat_path]; n_panels, Re, alpha_range, delta_range,
+            n_sections, spanwise_direction, aero_solver, remake, output_dir, verbose) → Wing
+
+Convenience constructor retained for backward compatibility. Converts an OBJ mesh
+to a YAML wing geometry via [`ObjAdapter.obj_to_yaml`](@ref) and returns a [`Wing`](@ref).
+
+`dat_path` is accepted but ignored — airfoil shapes are extracted directly from the
+OBJ geometry. Use `aero_solver=AirfoilAero.XFoilSolver()` to reproduce old XFoil-based
+polars; the default is `AirfoilAero.NeuralFoilSolver()`.
+
+By default (`remake=false`) an existing `geometry.yaml` in `output_dir` is reused,
+skipping the expensive polar generation. Set `remake=true` to force regeneration.
+"""
+function ObjWing(obj_path, dat_path=nothing;
+                 n_panels::Int=56,
+                 Re::Real=1e6,
+                 alpha_range=deg2rad.(-5:1:20),
+                 delta_range=deg2rad.(-5:1:20),
+                 n_sections::Union{Nothing, Int}=nothing,
+                 spanwise_direction=[0.0, 1.0, 0.0],
+                 spanwise_distribution=UNCHANGED,
+                 remove_nan::Bool=true,
+                 aero_solver=AirfoilAero.NeuralFoilSolver(),
+                 remake::Bool=false,
+                 output_dir::String=mktempdir(),
+                 verbose::Bool=false)
+    yaml_path = joinpath(output_dir, "geometry.yaml")
+    if remake || !isfile(yaml_path)
+        n_sec = isnothing(n_sections) ? n_panels + 1 : n_sections
+        yaml_path = ObjAdapter.obj_to_yaml(obj_path, output_dir;
+                                           n_sections=n_sec,
+                                           Re,
+                                           alpha_range,
+                                           delta_range,
+                                           aero_solver,
+                                           spanwise_direction,
+                                           verbose)
+    end
+    return Wing(yaml_path; n_panels, spanwise_distribution, spanwise_direction, remove_nan)
 end

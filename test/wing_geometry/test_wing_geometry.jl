@@ -1,6 +1,7 @@
 using Test
 using LinearAlgebra
 using VortexStepMethod
+using VortexStepMethod.AirfoilAero: lei_poly_coeffs
 using VortexStepMethod: Wing, Section, add_section!, refine_mesh_by_splitting_provided_sections!, refine!
 import Base: ==
 
@@ -338,21 +339,22 @@ end
         @test isapprox(sections[end].TE_point[2], -5.0; atol=1e-5)
     end
 
-    @testset "LEI airfoil interpolation" begin
+    @testset "POLY airfoil interpolation" begin
         n_panels = 4
         span = 20.0
 
+        c_tip = lei_poly_coeffs(0.0, 0.0)
+        c_mid = lei_poly_coeffs(2.0, 0.5)
+        c_root = lei_poly_coeffs(4.0, 1.0)
+
         wing = Wing(n_panels; spanwise_distribution=LINEAR)
-        add_section!(wing, [0.0, span/2, 0.0], [-1.0, span/2, 0.0], LEI_AIRFOIL_BREUKELS, (0.0, 0.0))
-        add_section!(wing, [0.0, 0.0, 0.0], [-1.0, 0.0, 0.0], LEI_AIRFOIL_BREUKELS, (2.0, 0.5))
-        add_section!(wing, [0.0, -span/2, 0.0], [-1.0, -span/2, 0.0], LEI_AIRFOIL_BREUKELS, (4.0, 1.0))
+        add_section!(wing, [0.0, span/2, 0.0], [-1.0, span/2, 0.0], POLY, c_tip)
+        add_section!(wing, [0.0, 0.0, 0.0], [-1.0, 0.0, 0.0], POLY, c_mid)
+        add_section!(wing, [0.0, -span/2, 0.0], [-1.0, -span/2, 0.0], POLY, c_root)
 
         refine!(wing)
         sections = wing.refined_sections
         @test length(sections) == wing.n_panels + 1
-
-        expected_tube_diameter = range(0, 4; length=n_panels+1)
-        expected_chamber_height = range(0, 1; length=n_panels+1)
 
         for (i, section) in enumerate(sections)
             expected_LE = [0.0, span/2 - (i-1)*span/n_panels, 0.0]
@@ -360,13 +362,13 @@ end
 
             @test isapprox(section.LE_point, expected_LE; rtol=1e-5)
             @test isapprox(section.TE_point, expected_TE; rtol=1e-4)
-
-            aero_model = section.aero_model
-            aero_data = section.aero_data
-            @test aero_model === LEI_AIRFOIL_BREUKELS
-            @test isapprox(aero_data[1], expected_tube_diameter[i])
-            @test isapprox(aero_data[2], expected_chamber_height[i])
+            @test section.aero_model === POLY
+            @test length(section.aero_data) == 3
         end
+
+        @test isapprox(sections[1].aero_data[1], c_tip[1]; rtol=1e-6)
+        @test isapprox(sections[3].aero_data[1], c_mid[1]; rtol=1e-6)
+        @test isapprox(sections[end].aero_data[1], c_root[1]; rtol=1e-6)
     end
 
     @testset "Split provided sections" begin
@@ -430,6 +432,7 @@ end
 
         @test wing_no_reuse.refined_sections[3].aero_data != no_reuse_baseline
     end
+
 
     @testset "Refined panel mapping" begin
         # Test that refined panel mapping actually maps each panel to its closest unrefined panel

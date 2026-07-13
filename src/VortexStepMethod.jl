@@ -23,7 +23,6 @@ using DifferentiationInterface
 using ForwardDiff
 import YAML
 using StructMapping
-using Xfoil
 
 # Export public interface
 export SolverSettings, VSMSettings, WingSettings
@@ -36,15 +35,20 @@ export calculate_projected_area, calculate_span
 export MVec3
 
 export LLT, Model, VSM
-export AeroModel, INVISCID, LEI_AIRFOIL_BREUKELS, POLAR_MATRICES, POLAR_VECTORS
+export AeroModel, INVISCID, POLY, LEI_AIRFOIL_BREUKELS, POLAR_MATRICES, POLAR_VECTORS
 export BILLOWING, COSINE, LINEAR, PanelDistribution, SPLIT_PROVIDED, UNCHANGED
 export ELLIPTIC, InitialGammaDistribution, ZEROS
 export FAILURE, FEASIBLE, INFEASIBLE, SolverStatus
 export LOOP, NONLIN, SolverType
 export load_polar_data
 
-export plot_circulation_distribution, plot_combined_analysis, plot_distribution, plot_geometry,
-    plot_polar_data, plot_polars, save_plot, show_plot
+# Surface-pressure (Cp) table types + IO (generation lives in AirfoilAero)
+export CpData, CpPolar, cp_distribution, delta_cp
+export read_cp_data, write_cp_data
+
+export plot_circulation_distribution,
+    plot_combined_analysis, plot_distribution, plot_geometry, plot_polar_data,
+    plot_polars, plot_section_polars, save_plot, show_plot
 
 # Backend dispatch types for multi-backend support (Makie and ControlPlots can coexist)
 abstract type PlotBackend end
@@ -80,6 +84,7 @@ function save_plot end
 function show_plot end
 function plot_polar_data end
 function plot_combined_analysis end
+function plot_section_polars end
 
 function _active_backend()
     b = _PLOT_BACKEND[]
@@ -221,6 +226,27 @@ function plot_combined_analysis(solver, body_aero, results; kwargs...)
 end
 
 """
+    plot_section_polars(body_aero::BodyAerodynamics, coefficient=:cl; kwargs...)
+
+Plot one polar coefficient (`:cl`, `:cd`, or `:cm`) against angle of attack for
+every section of a wing using stored `POLAR_VECTORS` data. Routes to the active
+plotting backend.
+
+# Arguments
+- `body_aero`: the [`BodyAerodynamics`](@ref) to plot
+- `coefficient`: `:cl`, `:cd`, or `:cm` (default: `:cl`)
+
+# Keyword arguments
+- `is_show`: whether to display (default: `true`)
+- `is_save`: whether to save (default: `false`)
+- `save_path`: directory to save the figure (default: `nothing`)
+- `data_type`: file extension for saving (default: `".png"`)
+"""
+function plot_section_polars(body_aero, coefficient::Symbol=:cl; kwargs...)
+    plot_section_polars(body_aero, coefficient, _active_backend(); kwargs...)
+end
+
+"""
    const MVec3    = MVector{3, Float64}
 
 Basic 3-dimensional vector, stack allocated, mutable.
@@ -266,24 +292,36 @@ Enumeration of the implemented wing types.
 @enum WingType  RECTANGULAR CURVED ELLIPTICAL
 
 """
-   AeroModel `LEI_AIRFOIL_BREUKELS` `POLAR_VECTORS` `POLAR_MATRICES` `INVISCID`
+   AeroModel `POLY` `POLAR_VECTORS` `POLAR_MATRICES` `INVISCID`
 
 Enumeration of the implemented aerodynamic models. See also: [AeroData](@ref)
 
 # Elements
-- `LEI_AIRFOIL_BREUKELS`: Polynom approximation for leading edge inflatable kites
+- `POLY`: α-polynomial coefficients for cl/cd/cm (e.g. Breukels LEI coeffs, generated
+  by the `AirfoilAero` package). Core only evaluates the polynomial.
 - `POLAR_VECTORS`: Polar vectors as function of alpha (lookup tables with interpolation)
 - `POLAR_MATRICES`: Polar matrices as function of alpha and delta (lookup tables with interpolation)
 - INVISCID
 
+`LEI_AIRFOIL_BREUKELS` is a deprecated alias of `POLY`.
+
 where `alpha` is the angle of attack, `delta` is trailing edge angle.
 """
 @enum AeroModel begin
-   LEI_AIRFOIL_BREUKELS
+   POLY
    POLAR_VECTORS
    POLAR_MATRICES
    INVISCID
 end
+
+"""
+    LEI_AIRFOIL_BREUKELS
+
+Deprecated alias of [`POLY`](@ref). The Breukels `(tube_diameter, camber)` → coeff
+derivation now lives in `AirfoilAero.lei_poly_coeffs`; sections carry the resulting
+`(cl_coeffs, cd_coeffs, cm_coeffs)`.
+"""
+const LEI_AIRFOIL_BREUKELS = POLY
 
 """
    PanelDistribution `LINEAR` `COSINE` `SPLIT_PROVIDED` `UNCHANGED` `BILLOWING`
@@ -345,16 +383,16 @@ abstract type AbstractWing{T} end
 """
     AeroData= Union{
         Nothing,
-        NTuple{2, Float64},
+        Tuple{Vector{Float64}, Vector{Float64}, Vector{Float64}},
         Tuple{Vector{Float64}, Vector{Float64}, Vector{Float64}, Vector{Float64}},
         Tuple{Vector{Float64}, Vector{Float64}, Matrix{Float64}, Matrix{Float64}, Matrix{Float64}}
     }
 
 Union of different definitions of the aerodynamic properties of a wing section. See also: [AeroModel](@ref)
   - nothing for INVISCID
-  - (`tube_diameter`, camber) for `LEI_AIRFOIL_BREUKELS`
+  - (`cl_coeffs`, `cd_coeffs`, `cm_coeffs`) α-polynomial coefficients for `POLY`
   - (`alpha_range`, `cl_vector`, `cd_vector`, `cm_vector`) for `POLAR_VECTORS`
-  - (`alpha_range`, `delta_range`, `cl_matrix`, `cd_matrix`, `cm_matrix`) for `POLAR_MATRICES` 
+  - (`alpha_range`, `delta_range`, `cl_matrix`, `cd_matrix`, `cm_matrix`) for `POLAR_MATRICES`
 
 where `alpha` is the angle of attack [rad], `delta` is trailing edge angle [rad], `cl` the lift coefficient,
 `cd` the drag coefficient and `cm` the pitching moment coefficient. The camber of a kite refers to 
@@ -364,7 +402,7 @@ and the chord line of the airfoil.
 """
 const AeroData = Union{
         Nothing,
-        NTuple{2, Float64},
+        Tuple{Vector{Float64}, Vector{Float64}, Vector{Float64}},
         Tuple{Vector{Float64}, Vector{Float64}, Vector{Float64}, Vector{Float64}},
         Tuple{Vector{Float64}, Vector{Float64}, Matrix{Float64}, Matrix{Float64}, Matrix{Float64}}
     }
@@ -432,16 +470,25 @@ end
 
 # Include core functionality
 include("settings.jl")
+include("cp_types.jl")
 include("wing_geometry.jl")
 include("polars.jl")
-include("obj_geometry.jl")
 include("yaml_geometry.jl")
 include("filament.jl")
 include("panel.jl")
 include("body_aerodynamics.jl")
 include("wake.jl")
 include("solver.jl")
+include("cp_polars.jl")
+
 include("plotting_helpers.jl")
+
+# Airfoil-polar generation and OBJ-mesh conversion, folded in as internal submodules
+# (formerly the AirfoilAero and ObjAdapter packages). Access as
+# `VortexStepMethod.AirfoilAero` / `.ObjAdapter`, or `using VortexStepMethod.AirfoilAero`.
+include("airfoil_aero/AirfoilAero.jl")
+include("obj_adapter/ObjAdapter.jl")
+
 include("precompile.jl")
 
 

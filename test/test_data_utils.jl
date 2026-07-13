@@ -4,6 +4,52 @@
 using YAML
 using Random: randstring
 using Logging
+using VortexStepMethod.ObjAdapter: obj_to_yaml
+using VortexStepMethod.AirfoilAero: NeuralFoilSolver
+
+"""
+    ram_air_matrix_wing(; n_panels, n_sections=4,
+                        alpha_range=deg2rad.(-5:5:15), delta_range=deg2rad.(-3:3:3))
+
+Build a ram-air-kite `Wing` via convert-then-load: the obj mesh is converted to a
+standard geometry YAML with a per-section NeuralFoil `(alpha, delta)` `POLAR_MATRICES`
+([`obj_to_yaml`](@ref)), then loaded with `Wing(yaml)`. Replaces the removed live
+`ObjWing` route in tests. `alpha_range`/`delta_range` are in radians (converted to the
+degrees `obj_to_yaml` expects).
+
+The expensive conversion (mesh slicing + NeuralFoil matrix generation) is written once
+into `test/generated/` (gitignored), keyed by `(n_sections, alpha_range, delta_range)`;
+if that geometry already exists it is reused, so it is generated only once per
+configuration across all runs. Each call still reloads a fresh `Wing`.
+"""
+function ram_air_matrix_wing(; n_panels, n_sections=4,
+        alpha_range=deg2rad.(-5:5:15), delta_range=deg2rad.(-3:3:3))
+    _, yaml = ram_air_matrix_dir(; n_sections, alpha_range, delta_range)
+    return Wing(yaml; n_panels)
+end
+
+"""
+    ram_air_matrix_dir(; n_sections=4, alpha_range=deg2rad.(-5:5:15),
+                       delta_range=deg2rad.(-3:3:3)) -> (gen_dir, yaml)
+
+The generated-geometry directory and its `geometry.yaml` backing
+[`ram_air_matrix_wing`](@ref). Converts the ram-air obj mesh once per configuration
+into `test/generated/` (gitignored, stable path keyed by the config) and reuses an
+existing conversion, so the slow NeuralFoil sweep runs only once across the whole
+suite. Use this when a test needs the generated files themselves, not just the `Wing`.
+"""
+function ram_air_matrix_dir(; n_sections=4,
+        alpha_range=deg2rad.(-5:5:15), delta_range=deg2rad.(-3:3:3))
+    data_dir = joinpath(dirname(@__DIR__), "data", "ram_air_kite")
+    obj = joinpath(data_dir, "ram_air_kite_body.obj")
+    key = (n_sections, collect(alpha_range), collect(delta_range))
+    gen_dir = joinpath(@__DIR__, "generated", "ram_matrix_$(string(hash(key); base=16))")
+    yaml = joinpath(gen_dir, "geometry.yaml")
+    isfile(yaml) || obj_to_yaml(obj, gen_dir; n_sections, Re=1e6,
+        alpha_range=rad2deg.(alpha_range), delta_range=rad2deg.(delta_range),
+        aero_solver=NeuralFoilSolver(), verbose=false)
+    return gen_dir, yaml
+end
 
 """
     suppress_warnings(f)

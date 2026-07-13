@@ -5,40 +5,10 @@ using LinearAlgebra
 using Test
 using Logging
 
-# Helper to find the data directory for test files
-function _find_ram_data_dir()
-    data_dir = joinpath(dirname(dirname(@__DIR__)), "data", "ram_air_kite")
-    if isdir(data_dir)
-        return data_dir
-    else
-        # Fallback for case where test is run from different working directory
-        return joinpath(@__DIR__, "..", "..", "data", "ram_air_kite")
-    end
-end
-
 if !@isdefined ram_wing_results
-    data_dir = _find_ram_data_dir()
-    body_path = joinpath(tempdir(), "ram_air_kite_body.obj")
-    foil_path = joinpath(tempdir(), "ram_air_kite_foil.dat")
-
-    body_src = joinpath(data_dir, "ram_air_kite_body.obj")
-    foil_src = joinpath(data_dir, "ram_air_kite_foil.dat")
-
-    if isfile(body_src) && isfile(foil_src)
-        cp(body_src, body_path; force=true)
-        cp(foil_src, foil_path; force=true)
-        for kind in ("cl", "cd", "cm")
-            name = "ram_air_kite_foil_$(kind)_polar.csv"
-            cp(joinpath(data_dir, name), joinpath(tempdir(), name); force=true)
-        end
-    else
-        error("Required data files not found: $body_src or $foil_src")
-    end
-
-    ram_wing = ObjWing(body_path, foil_path;
-        alpha_range=deg2rad.(-5:1:15),
-        delta_range=deg2rad.(-3:1:5),
-        n_unrefined_sections=4,
+    ram_wing = ram_air_matrix_wing(; n_panels=8, n_sections=4,
+        alpha_range=deg2rad.(-5:5:15),
+        delta_range=deg2rad.(-3:3:3),
     )
 end
 
@@ -111,7 +81,9 @@ end
 
             scale_norm = max(norm(actual_change), 1e-8)
             err_rel = norm(predicted_change .- actual_change) / scale_norm
-            tol = scale == 1.0 ? 1e-3 : 1e-1
+            # scale=1 floor is a few×1e-3, not numerical precision: the shared
+            # POLAR_MATRICES are piecewise-linear, so a step can cross a grid node.
+            tol = scale == 1.0 ? 5e-3 : 1e-1
             @test err_rel < tol
         end
     end

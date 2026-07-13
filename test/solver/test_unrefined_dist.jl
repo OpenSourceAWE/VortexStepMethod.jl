@@ -149,6 +149,7 @@ using Test
         end
     end
 
+
     @testset "Unrefined arrays with different panel counts" begin
         # Test with various panel/section combinations
         test_cases = [

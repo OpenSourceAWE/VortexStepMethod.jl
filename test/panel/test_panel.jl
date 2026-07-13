@@ -34,7 +34,8 @@ function create_panel(section1::Section, section2::Section)
     y_airf = bound_2 .- bound_1
     y_airf = y_airf ./ norm(y_airf)
 
-    panel = Panel{Float64}()
+    CL, CD, CM, CP = VortexStepMethod.panel_interp_types(section1, true)
+    panel = Panel{Float64, CL, CD, CM, CP}()
     reinit!(
         panel,
         section1,
