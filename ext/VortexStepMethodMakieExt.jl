@@ -1,5 +1,5 @@
 module VortexStepMethodMakieExt
-using Makie, VortexStepMethod, LinearAlgebra, Statistics, DelimitedFiles
+using MakieControlPlots.Makie, VortexStepMethod, LinearAlgebra, Statistics, DelimitedFiles
 import MakieControlPlots
 import VortexStepMethod: calculate_filaments_for_plotting
 import VortexStepMethod: ObjAdapter, AirfoilAero

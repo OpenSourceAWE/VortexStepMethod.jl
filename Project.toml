@@ -36,11 +36,10 @@ Xfoil = "19641d66-a62d-11e8-2441-8f57a969a9c4"
 YAML = "ddb6d928-2868-570f-bddf-ab3f9cf99eb6"
 
 [weakdeps]
-Makie = "ee78f7c6-11fb-53f2-987a-cfe4a2b5a57a"
 MakieControlPlots = "6d616b69-6563-4f6e-8472-6f6c706c6f74"
 
 [extensions]
-VortexStepMethodMakieExt = ["Makie", "MakieControlPlots"]
+VortexStepMethodMakieExt = ["MakieControlPlots"]
 
 [compat]
 Colors = "0.13"
@@ -53,7 +52,6 @@ Interpolations = "0.15, 0.16"
 LaTeXStrings = "1"
 LinearAlgebra = "1"
 Logging = "1"
-Makie = "0.24.6"
 MakieControlPlots = "0.1.5"
 Measures = "0.3"
 NPZ = "0.4"
