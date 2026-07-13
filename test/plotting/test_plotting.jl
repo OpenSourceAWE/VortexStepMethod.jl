@@ -29,10 +29,6 @@ using Test
 const makie_ext = backend == "Makie" ?
     Base.get_extension(VortexStepMethod, :VortexStepMethodMakieExt) : nothing
 
-# Resolve repo data directory for ram air kite assets
-_ram_data_dir = joinpath(dirname(dirname(@__DIR__)),
-                         "data", "ram_air_kite")
-
 # Helper to robustly delete files on platforms with occasional file locks
 safe_rm(path) = begin
     if isfile(path)
@@ -50,17 +46,9 @@ safe_rm(path) = begin
     nothing
 end
 
-let
-    body_path = joinpath(tempdir(), "ram_air_kite_body.obj")
-    foil_path = joinpath(tempdir(), "ram_air_kite_foil.dat")
-    body_src = joinpath(_ram_data_dir, "ram_air_kite_body.obj")
-    foil_src = joinpath(_ram_data_dir, "ram_air_kite_foil.dat")
-    cp(body_src, body_path; force=true)
-    cp(foil_src, foil_path; force=true)
-    global ram_wing = ObjWing(body_path, foil_path;
-                              alpha_range=deg2rad.(-1:1),
-                              delta_range=deg2rad.(-1:1))
-end
+global ram_wing = ram_air_matrix_wing(; n_panels=20, n_sections=4,
+                          alpha_range=deg2rad.(-1:1.0:1),
+                          delta_range=deg2rad.(-1:1.0:1))
 
 function create_body_aero()
     n_panels = 20          # Number of panels
