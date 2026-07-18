@@ -2,7 +2,8 @@
 @with_kw struct WingAirfoilInfo
     csv_file_path::String
     dat_file::String = ""
-    aero_file_path::String = ""
+    cp_file::String = ""
+    cf_file::String = ""
     cl_file_path::String = ""
     cd_file_path::String = ""
     cm_file_path::String = ""
@@ -266,7 +267,8 @@ function Wing(
             info_dict = WingAirfoilInfo(
                 csv_file_path = get(airfoil_dict["info_dict"], "csv_file_path", ""),
                 dat_file = get(airfoil_dict["info_dict"], "dat_file", ""),
-                aero_file_path = get(airfoil_dict["info_dict"], "aero_file_path", ""),
+                cp_file = get(airfoil_dict["info_dict"], "cp_file", ""),
+                cf_file = get(airfoil_dict["info_dict"], "cf_file", ""),
                 cl_file_path = get(airfoil_dict["info_dict"], "cl_file_path", ""),
                 cd_file_path = get(airfoil_dict["info_dict"], "cd_file_path", ""),
                 cm_file_path = get(airfoil_dict["info_dict"], "cm_file_path", ""))
@@ -275,14 +277,15 @@ function Wing(
 
     # Create CSV file mapping from airfoils
     airfoil_csv_map = Dict{Int64, String}()
-    airfoil_aero_map = Dict{Int64, String}()
+    airfoil_surface_map = Dict{Int64, NTuple{3, String}}()
     airfoil_matrix_map = Dict{Int64, NTuple{3, String}}()
     for airfoil in airfoils
         if !isempty(airfoil.info_dict.csv_file_path)
             airfoil_csv_map[airfoil.airfoil_id] = airfoil.info_dict.csv_file_path
         end
-        if !isempty(airfoil.info_dict.aero_file_path)
-            airfoil_aero_map[airfoil.airfoil_id] = airfoil.info_dict.aero_file_path
+        if !isempty(airfoil.info_dict.cp_file) && !isempty(airfoil.info_dict.cf_file)
+            airfoil_surface_map[airfoil.airfoil_id] = (airfoil.info_dict.dat_file,
+                airfoil.info_dict.cp_file, airfoil.info_dict.cf_file)
         end
         if !isempty(airfoil.info_dict.cl_file_path)
             airfoil_matrix_map[airfoil.airfoil_id] = (airfoil.info_dict.cl_file_path,
@@ -326,8 +329,9 @@ function Wing(
             aero_data, aero_model = load_polar_data(csv_file_path)
         end
 
-        aero_file_path = resolve(get(airfoil_aero_map, section.airfoil_id, ""))
-        section_aero = isempty(aero_file_path) ? nothing : read_section_aero(aero_file_path)
+        surface = get(airfoil_surface_map, section.airfoil_id, nothing)
+        section_aero = isnothing(surface) ? nothing :
+            read_section_aero(resolve(surface[1]), resolve(surface[2]), resolve(surface[3]))
 
         prn && println("Section airfoil_id $(section.airfoil_id): Using $aero_model model")
 

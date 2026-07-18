@@ -13,7 +13,6 @@ using NonlinearSolve
 using SciMLBase
 import NonlinearSolve: solve, solve!
 using Interpolations
-using NPZ
 using Parameters
 using Serialization
 using Timers
@@ -43,8 +42,9 @@ export FAILURE, FEASIBLE, INFEASIBLE, SolverStatus
 export LOOP, NONLIN, SolverType
 export load_polar_data
 
-# Per-section surface aero (contour + Cp + cf) + npz IO (generation lives in AirfoilAero)
-export SectionAero, section_surface, read_section_aero, write_section_aero
+# Per-section surface aero (contour + Cp + cf). Human-readable CSV/dat IO: reading here,
+# writing in AirfoilAero.
+export SectionAero, section_surface, read_section_aero
 
 export plot_combined_analysis, plot_distribution, plot_geometry, plot_polar_data,
     plot_polars, plot_section_polars, save_plot, show_plot

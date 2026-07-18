@@ -127,7 +127,6 @@ function obj_to_yaml(obj_path::String, output_dir::String;
     ok = Int[]
     for j in unique(ids)
         s = stations[j]
-        dat_rel = joinpath("airfoils", "$j.dat")
         raw_rel = joinpath("airfoils", "$(j)_raw.dat")
         csv_rel = joinpath("polars", "$j.csv")
         try
@@ -137,11 +136,16 @@ function obj_to_yaml(obj_path::String, output_dir::String;
                 dat_prefix=joinpath(output_dir, "airfoils", "$j"))
             clvals = res isa AbstractVector ? collect(sol.cl for sol in res) : vec(res[1])
             all(isnan, clvals) && error("solver produced no converged points")
-            write_dat(joinpath(output_dir, dat_rel), "section_$j", s.x_fit, s.y_fit)
+            aero = generate_section_aero(aero_solver, s.x_fit, s.y_fit;
+                alpha_range=deg2rad.(alpha_range),
+                delta_range=(isnothing(delta_range) ? [0.0] : deg2rad.(collect(delta_range))),
+                reynolds_number=Float64(Re), crease_frac)
+            paths = write_section_aero(joinpath(output_dir, "airfoils", "$j"), aero)
+            dat_rel, cp_rel, cf_rel = (relpath(p, output_dir) for p in paths)
             write_dat(joinpath(output_dir, raw_rel), "section_$(j)_raw", s.xa, s.ya)
             push!(airfoil_rows, Any[j, "polar_vectors",
                 Dict("dat_file" => dat_rel, "raw_dat_file" => raw_rel,
-                     "csv_file_path" => csv_rel)])
+                     "csv_file_path" => csv_rel, "cp_file" => cp_rel, "cf_file" => cf_rel)])
             push!(ok, j)
             finite_cl = [v for v in clvals if !isnan(v)]
             cl_max = isempty(finite_cl) ? NaN : maximum(finite_cl)
@@ -165,6 +169,8 @@ function obj_to_yaml(obj_path::String, output_dir::String;
                                 s.TE_point[1], s.TE_point[2], s.TE_point[3]])
     end
 
+    sort!(section_rows; by = row -> row[3])          # clean spanwise order (by LE_y)
+    sort!(airfoil_rows; by = row -> row[1])          # airfoils by id
     yaml_path = joinpath(output_dir, "geometry.yaml")
     write_geometry_yaml(yaml_path, section_rows, airfoil_rows)
     verbose && @info "Wrote geometry to $yaml_path ($(length(section_rows)) sections)"

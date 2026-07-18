@@ -5,8 +5,8 @@ using VortexStepMethod.AirfoilAero: KulfanParameters, LeastSquaresFit, ShrinkWra
                        shrink_wrap, fit_kulfan_parameters, kulfan_to_coordinates,
                        neuralfoil_aero, class_function, bernstein_basis,
                        leading_edge_basis, normalize_airfoil
-using VortexStepMethod: SectionAero, section_surface, read_section_aero,
-                        write_section_aero
+using VortexStepMethod: SectionAero, section_surface, read_section_aero
+using VortexStepMethod.AirfoilAero: write_section_aero
 
 read_dat_coords(path) = begin
     x = Float64[]; y = Float64[]
@@ -116,7 +116,7 @@ end
     @test size(cm) == (length(alpha_range), length(delta_range))
 end
 
-@testset "SectionAero round-trip and interpolation" begin
+@testset "SectionAero CSV round-trip and interpolation" begin
     alpha_range = deg2rad.([-5.0, 0.0, 5.0, 10.0])
     delta_range = deg2rad.([-3.0, 0.0, 3.0])
     xc = [1.0, 0.5, 0.0, 0.5, 1.0]
@@ -130,15 +130,15 @@ end
     cf = cp ./ 1000
     aero = SectionAero(alpha_range, delta_range, x, y, cp, cf)
 
-    path = joinpath(mktempdir(), "aero.npz")
-    write_section_aero(path, aero)
-    back = read_section_aero(path)
+    prefix = joinpath(mktempdir(), "af")
+    dat, cp_csv, cf_csv = write_section_aero(prefix, aero)
+    back = read_section_aero(dat, cp_csv, cf_csv)
     xb, yb, cpb, cfb = section_surface(back, alpha_range[2], delta_range[1])
-    @test xb ≈ xc
-    @test yb ≈ yc
+    @test isapprox(xb, xc; atol=1e-6)           # contour via .dat (8-decimal)
+    @test isapprox(yb, yc; atol=1e-6)
     @test cpb ≈ cp[:, 2, 1]
     @test cfb ≈ cf[:, 2, 1]
-    @test read_section_aero(joinpath(@__DIR__, "does_not_exist.npz")) === nothing
+    @test read_section_aero("no.dat", "no_cp.csv", "no_cf.csv") === nothing
 
     _, _, cpa, _ = section_surface(aero, alpha_range[3], delta_range[2])
     @test cpa ≈ cp[:, 3, 2]

@@ -78,3 +78,41 @@ function fill_node_nans!(grid, i)
     grid[i, :, :] = m
     return grid
 end
+
+"""
+    write_node_table(path, aero, values) -> path
+
+Write a per-node aero table (`Cp` or `cf`, shaped `n_node × n_alpha × n_delta`) as a
+human-readable CSV: header `alpha, delta, n0, n1, …` (node columns in the contour node
+order), one row per `(alpha, delta)` with angles in degrees.
+"""
+function write_node_table(path::AbstractString, aero::SectionAero, values)
+    open(String(path), "w") do io
+        println(io, "alpha,delta," * join(("n$(k - 1)" for k in 1:size(values, 1)), ","))
+        for jd in eachindex(aero.delta_range), ia in eachindex(aero.alpha_range)
+            row = [rad2deg(aero.alpha_range[ia]), rad2deg(aero.delta_range[jd])]
+            append!(row, values[:, ia, jd])
+            println(io, join(row, ","))
+        end
+    end
+    return path
+end
+
+"""
+    write_section_aero(prefix, aero::SectionAero) -> (dat, cp_csv, cf_csv)
+
+Write a [`SectionAero`](@ref) as human-readable files sharing `prefix`: `{prefix}.dat`
+(contour at `delta=0`, `{prefix}_d{deg}.dat` per non-zero deflection) plus
+`{prefix}_cp.csv` and `{prefix}_cf.csv` (per-node tables in the contour node order).
+`read_section_aero` reads them back. The single writer for surface aero (submodule
+side); loading lives in the main package.
+"""
+function write_section_aero(prefix::AbstractString, aero::SectionAero)
+    for (jd, d) in enumerate(aero.delta_range)
+        path = iszero(d) ? "$prefix.dat" : "$(prefix)_d$(round(Int, rad2deg(d))).dat"
+        write_dat(path, "section", aero.x[:, jd], aero.y[:, jd])
+    end
+    write_node_table("$(prefix)_cp.csv", aero, aero.cp)
+    write_node_table("$(prefix)_cf.csv", aero, aero.cf)
+    return "$prefix.dat", "$(prefix)_cp.csv", "$(prefix)_cf.csv"
+end

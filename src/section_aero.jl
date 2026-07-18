@@ -71,26 +71,72 @@ function section_surface(aero::SectionAero, alpha, delta)
 end
 
 """
-    write_section_aero(path, aero::SectionAero) -> path
+    read_dat(path) -> (x, y)
 
-Write a [`SectionAero`](@ref) to `path` as an `.npz` (arrays `alpha_range`,
-`delta_range`, `x`, `y`, `cp`, `cf`).
+Read Selig `.dat` airfoil coordinates (two whitespace-separated columns), skipping the
+name/header line and any non-numeric lines.
 """
-function write_section_aero(path::AbstractString, aero::SectionAero)
-    npzwrite(String(path), Dict("alpha_range" => aero.alpha_range,
-        "delta_range" => aero.delta_range, "x" => aero.x, "y" => aero.y,
-        "cp" => aero.cp, "cf" => aero.cf))
-    return path
+function read_dat(path::AbstractString)
+    x = Float64[]
+    y = Float64[]
+    for ln in eachline(String(path))
+        p = split(strip(ln))
+        length(p) >= 2 || continue
+        xv, yv = tryparse(Float64, p[1]), tryparse(Float64, p[2])
+        (xv === nothing || yv === nothing) && continue
+        push!(x, xv)
+        push!(y, yv)
+    end
+    return x, y
 end
 
 """
-    read_section_aero(path) -> Union{Nothing, SectionAero}
+    read_node_table(path) -> (alpha, delta, values)
 
-Load a [`SectionAero`](@ref) from an `.npz`; `nothing` if `path` does not exist.
+Read a per-node aero CSV (header `alpha, delta, n0, n1, …`; angles in degrees) into
+radian `alpha`/`delta` vectors (one entry per row) and a `nrow × n_node` value matrix.
 """
-function read_section_aero(path::AbstractString)
-    isfile(path) || return nothing
-    d = npzread(String(path))
-    return SectionAero(d["alpha_range"], d["delta_range"],
-                       d["x"], d["y"], d["cp"], d["cf"])
+function read_node_table(path::AbstractString)
+    lines = [l for l in readlines(String(path)) if !isempty(strip(l))]
+    rows = [parse.(Float64, split(l, ',')) for l in lines[2:end]]
+    alpha = deg2rad.([r[1] for r in rows])
+    delta = deg2rad.([r[2] for r in rows])
+    values = reduce(vcat, (permutedims(r[3:end]) for r in rows))
+    return alpha, delta, values
+end
+
+"""
+    read_section_aero(dat_file, cp_file, cf_file) -> Union{Nothing, SectionAero}
+
+Assemble a [`SectionAero`](@ref) from the human-readable files: the airfoil contour
+(`dat_file`, plus `{stem}_d{deg}.dat` per non-zero deflection) and the per-node `Cp`
+and `cf` tables (`alpha, delta, n0…` in the `.dat` node order). Returns `nothing` if any
+file is missing. This is the single loader for both provided and generated aero.
+"""
+function read_section_aero(dat_file::AbstractString, cp_file::AbstractString,
+                           cf_file::AbstractString)
+    (isfile(dat_file) && isfile(cp_file) && isfile(cf_file)) || return nothing
+    alpha, delta, cp_rows = read_node_table(cp_file)
+    _, _, cf_rows = read_node_table(cf_file)
+    alpha_range = sort(unique(alpha))
+    delta_range = sort(unique(delta))
+    n_node = size(cp_rows, 2)
+    stem = replace(String(dat_file), r"\.dat$" => "")
+    x = fill(NaN, n_node, length(delta_range))
+    y = fill(NaN, n_node, length(delta_range))
+    for (jd, d) in enumerate(delta_range)
+        xd, yd = read_dat(iszero(d) ? String(dat_file) :
+                          "$(stem)_d$(round(Int, rad2deg(d))).dat")
+        x[:, jd] .= xd
+        y[:, jd] .= yd
+    end
+    cp = fill(NaN, n_node, length(alpha_range), length(delta_range))
+    cf = fill(NaN, n_node, length(alpha_range), length(delta_range))
+    for r in eachindex(alpha)
+        ia = searchsortedfirst(alpha_range, alpha[r])
+        jd = searchsortedfirst(delta_range, delta[r])
+        cp[:, ia, jd] .= cp_rows[r, :]
+        cf[:, ia, jd] .= cf_rows[r, :]
+    end
+    return SectionAero(alpha_range, delta_range, x, y, cp, cf)
 end
