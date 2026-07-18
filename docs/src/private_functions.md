@@ -80,9 +80,8 @@ remove_vector_nans
 generate_polar_data
 extract_literature_polar_data
 parse_literature_column
-interpolate_cp_to_refined!
-prepare_cp_output!
-validate_cp_sections
+interpolate_section_aero_to_refined!
+validate_section_aero
 ```
 
 ### Examples
@@ -115,9 +114,7 @@ flood_outside
 trace_level_set
 largest_linking_gap
 resample_arc
-resample_x
 smooth_turning!
-split_surfaces
 ```
 
 ### NeuralFoil network
@@ -143,7 +140,9 @@ read_dat_coordinates
 write_dat
 write_polar_csv
 write_polar_matrix_csv
-fill_slice_nans!
+flat_plate_cf
+neuralfoil_contour_solution
+fill_node_nans!
 ```
 
 ## OBJ mesh conversion (ObjAdapter)

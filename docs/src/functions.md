@@ -9,16 +9,14 @@ calculate_span
 calculate_projected_area
 ```
 
-## Surface-pressure (Cp) tables
-The Cp table types and IO live in the core package; the generation of Cp tables
-(from XFoil/NeuralFoil) lives in `AirfoilAero`.
+## Surface aero (contour + Cp + cf) tables
+The per-section surface aero table type and its npz IO live in the core package; the
+generation (from XFoil/NeuralFoil) lives in `AirfoilAero`.
 ```@docs
-CpData
-CpPolar
-read_cp_data
-write_cp_data
-cp_distribution
-delta_cp
+SectionAero
+section_surface
+read_section_aero
+write_section_aero
 ```
 
 ## Airfoil aerodynamics (AirfoilAero)
@@ -47,7 +45,7 @@ neuralfoil_aero
 generate_aero_matrices
 generate_polar_from_coordinates
 generate_polar_from_dat
-generate_cp_polar
+generate_section_aero
 ```
 
 ## OBJ mesh conversion (ObjAdapter)

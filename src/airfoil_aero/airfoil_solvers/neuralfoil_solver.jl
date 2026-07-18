@@ -24,15 +24,34 @@ end
     analyze_sweep(solver::NeuralFoilSolver, def, alpha_range, Re) -> Vector{SectionSolution}
 
 Evaluate all angles (radians) in one vectorized NeuralFoil call on the deformed
-Kulfan parameters. Cp comes at NeuralFoil's fixed station x/c.
+Kulfan parameters, then map the station `Cp` onto the deformed contour nodes
+(`def.x`, `def.y`) — upper nodes from `cp_upper`, lower from `cp_lower`. `cf` is a
+flat-plate closure ([`flat_plate_cf`](@ref)), NeuralFoil not exposing skin friction.
 """
 function analyze_sweep(solver::NeuralFoilSolver, def::DeformedSection, alpha_range, Re)
     res = neuralfoil_section(def.kulfan, rad2deg.(collect(alpha_range)), Re;
         model_size=solver.model_size, weights_dir=solver.weights_dir,
         n_crit=solver.n_crit, xtr_upper=solver.xtr_upper, xtr_lower=solver.xtr_lower)
-    return [SectionSolution(alpha_range[i], res.cl[i], res.cd[i], res.cm[i],
-                            res.confidence[i], res.x, res.cp_upper[:, i],
-                            res.x, res.cp_lower[:, i]) for i in eachindex(alpha_range)]
+    x, y = collect(float.(def.x)), collect(float.(def.y))
+    le = argmin(x)
+    cf = [flat_plate_cf(clamp(xk, 0.0, 1.0), Re) for xk in x]
+    return [neuralfoil_contour_solution(alpha_range[i], res, i, x, y, le, cf)
+            for i in eachindex(alpha_range)]
+end
+
+"""
+    neuralfoil_contour_solution(alpha, res, i, x, y, le, cf) -> SectionSolution
+
+Assemble a full-contour [`SectionSolution`](@ref) for case `i` of a NeuralFoil sweep
+`res`: interpolate `res.cp_upper`/`res.cp_lower` (at `res.x`) onto the contour nodes
+`(x, y)` split at the leading edge `le`, carrying the precomputed `cf`.
+"""
+function neuralfoil_contour_solution(alpha, res, i, x, y, le, cf)
+    up = linear_interpolation(res.x, res.cp_upper[:, i]; extrapolation_bc=Line())
+    lo = linear_interpolation(res.x, res.cp_lower[:, i]; extrapolation_bc=Line())
+    cp = [(k <= le ? up : lo)(clamp(x[k], 0.0, 1.0)) for k in eachindex(x)]
+    return SectionSolution(alpha, res.cl[i], res.cd[i], res.cm[i],
+                           res.confidence[i], x, y, cp, cf)
 end
 
 """

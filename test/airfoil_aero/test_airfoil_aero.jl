@@ -5,8 +5,8 @@ using VortexStepMethod.AirfoilAero: KulfanParameters, LeastSquaresFit, ShrinkWra
                        shrink_wrap, fit_kulfan_parameters, kulfan_to_coordinates,
                        neuralfoil_aero, class_function, bernstein_basis,
                        leading_edge_basis, normalize_airfoil
-using VortexStepMethod: CpData, CpPolar, read_cp_data, write_cp_data,
-                        cp_distribution, delta_cp
+using VortexStepMethod: SectionAero, section_surface, read_section_aero,
+                        write_section_aero
 
 read_dat_coords(path) = begin
     x = Float64[]; y = Float64[]
@@ -116,60 +116,55 @@ end
     @test size(cm) == (length(alpha_range), length(delta_range))
 end
 
-@testset "Cp table round-trip and interpolation" begin
-    n_chord = 5
-    chord_x = [0.1, 0.3, 0.5, 0.7, 0.9]
+@testset "SectionAero round-trip and interpolation" begin
     alpha_range = deg2rad.([-5.0, 0.0, 5.0, 10.0])
     delta_range = deg2rad.([-3.0, 0.0, 3.0])
+    xc = [1.0, 0.5, 0.0, 0.5, 1.0]
+    yc = [0.0, 0.06, 0.0, -0.04, 0.0]
+    n_node = length(xc)
+    x = repeat(xc, 1, length(delta_range))
+    y = repeat(yc, 1, length(delta_range))
     val(i, ia, jd) = 100i + 10ia + jd
-    cp_upper = [float(val(i, ia, jd)) for i in 1:n_chord,
-                ia in eachindex(alpha_range), jd in eachindex(delta_range)]
-    cp_lower = -cp_upper
-    data = CpData(n_chord, chord_x, alpha_range, delta_range, cp_upper, cp_lower)
+    cp = [float(val(i, ia, jd)) for i in 1:n_node,
+          ia in eachindex(alpha_range), jd in eachindex(delta_range)]
+    cf = cp ./ 1000
+    aero = SectionAero(alpha_range, delta_range, x, y, cp, cf)
 
-    path = joinpath(mktempdir(), "cp.csv")
-    write_cp_data(path, data)
-    back = read_cp_data(path)
-    @test back.n_chord == n_chord
-    @test back.chord_x ≈ chord_x
-    @test back.alpha_range ≈ alpha_range
-    @test back.delta_range ≈ delta_range
-    @test back.cp_upper ≈ cp_upper
-    @test back.cp_lower ≈ cp_lower
-    @test read_cp_data(joinpath(@__DIR__, "does_not_exist.csv")) === nothing
+    path = joinpath(mktempdir(), "aero.npz")
+    write_section_aero(path, aero)
+    back = read_section_aero(path)
+    xb, yb, cpb, cfb = section_surface(back, alpha_range[2], delta_range[1])
+    @test xb ≈ xc
+    @test yb ≈ yc
+    @test cpb ≈ cp[:, 2, 1]
+    @test cfb ≈ cf[:, 2, 1]
+    @test read_section_aero(joinpath(@__DIR__, "does_not_exist.npz")) === nothing
 
-    polar = CpPolar(data)
-    @test CpData(polar) === data
-    up, lo = cp_distribution(polar, alpha_range[2], delta_range[1])
-    @test up ≈ cp_upper[:, 2, 1]
-    @test lo ≈ cp_lower[:, 2, 1]
-    @test delta_cp(polar, alpha_range[3], delta_range[2]) ≈
-        cp_lower[:, 3, 2] .- cp_upper[:, 3, 2]
+    _, _, cpa, _ = section_surface(aero, alpha_range[3], delta_range[2])
+    @test cpa ≈ cp[:, 3, 2]
 end
 
-@testset "generate_cp_polar builds a Cp table" begin
+@testset "generate_section_aero builds a surface table" begin
     truth = KulfanParameters(fill(0.15, 8), fill(-0.15, 8), 0.1, 0.0)
     alpha_range = deg2rad.(-4.0:2.0:4.0)
     delta_range = deg2rad.([0.0, 5.0])
-    polar = generate_cp_polar(NeuralFoilSolver(model_size="medium"), truth;
-        alpha_range, delta_range, n_chord=6, reynolds_number=5e5)
-    @test polar isa CpPolar
-    @test CpData(polar).n_chord == 6
-    up, lo = cp_distribution(polar, alpha_range[2], delta_range[1])
-    @test length(up) == 6
-    @test all(isfinite, up) && all(isfinite, lo)
-    @test all(isfinite, delta_cp(polar, alpha_range[end], delta_range[end]))
+    aero = generate_section_aero(NeuralFoilSolver(model_size="medium"), truth;
+        alpha_range, delta_range, reynolds_number=5e5)
+    @test aero isa SectionAero
+    x, y, cp, cf = section_surface(aero, alpha_range[2], delta_range[1])
+    @test length(cp) == size(aero.cp, 1)
+    @test all(isfinite, cp) && all(isfinite, cf)
+    @test all(cf .>= 0)
 
-    up_lo_a, _ = cp_distribution(polar, alpha_range[1], delta_range[1])
-    up_hi_a, _ = cp_distribution(polar, alpha_range[end], delta_range[1])
-    @test maximum(abs.(up_lo_a .- up_hi_a)) > 0.1
-    up_hi_d, _ = cp_distribution(polar, alpha_range[2], delta_range[end])
-    @test maximum(abs.(up .- up_hi_d)) > 0.005
+    _, _, cp_lo_a, _ = section_surface(aero, alpha_range[1], delta_range[1])
+    _, _, cp_hi_a, _ = section_surface(aero, alpha_range[end], delta_range[1])
+    @test maximum(abs.(cp_lo_a .- cp_hi_a)) > 0.1
 
-    x, y = read_dat_coords(joinpath(@__DIR__, "data", "test_airfoil.dat"))
-    polar2 = generate_cp_polar(NeuralFoilSolver(model_size="medium"), x, y;
-        alpha_range, delta_range=deg2rad.([0.0, 5.0]), n_chord=4, reynolds_number=5e5)
-    @test CpData(polar2).n_chord == 4
+    xdat, ydat = read_dat_coords(joinpath(@__DIR__, "data", "test_airfoil.dat"))
+    aero2 = generate_section_aero(NeuralFoilSolver(model_size="medium"), xdat, ydat;
+        alpha_range, delta_range=deg2rad.([0.0, 5.0]), reynolds_number=5e5)
+    @test aero2 isa SectionAero
+    @test size(aero2.cp, 1) > 0
 end
 
 @testset "NeuralFoil physical invariants" begin

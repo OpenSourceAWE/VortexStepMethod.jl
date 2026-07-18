@@ -33,8 +33,10 @@ end
 
 Set the deformed coordinates once (repaneling if `solver.repanel`), then solve
 `alpha_range` (radians) sweeping negative and positive angles outward from zero with a
-reinit at each side for convergence. Non-converged angles yield empty Cp and `NaN`
-confidence.
+reinit at each side for convergence. Each converged angle reads the surface pressure
+(`Xfoil.cpdump`) and the boundary layer (`Xfoil.bldump`, giving `cf` and the node
+coordinates) at the same panel nodes. Non-converged angles yield empty node arrays and
+`NaN` confidence.
 """
 function analyze_sweep(solver::XFoilSolver, def::DeformedSection, alpha_range, Re)
     Xfoil.set_coordinates(def.x, def.y)
@@ -50,9 +52,11 @@ function analyze_sweep(solver::XFoilSolver, def::DeformedSection, alpha_range, R
                 xtrip=solver.xtrip, ncrit=solver.ncrit)
             reinit = false
             if converged
-                xc, cp = Xfoil.cpdump()
-                xu, cu, xl, cl2 = split_surfaces(xc, cp)
-                sols[ia] = SectionSolution(alpha_range[ia], cl, cd, cm, 1.0, xu, cu, xl, cl2)
+                _, cp = Xfoil.cpdump()
+                _, xb, yb, _, _, _, cf = Xfoil.bldump()
+                n = min(length(cp), length(cf))
+                sols[ia] = SectionSolution(alpha_range[ia], cl, cd, cm, 1.0,
+                                           xb[1:n], yb[1:n], cp[1:n], cf[1:n])
             else
                 sols[ia] = SectionSolution(alpha_range[ia], NaN, NaN, NaN, NaN,
                                            Float64[], Float64[], Float64[], Float64[])

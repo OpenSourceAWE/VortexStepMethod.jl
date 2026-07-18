@@ -19,7 +19,7 @@ Represents a panel in a vortex step method simulation. All points and vectors ar
 - cl_interp::CL = nothing: lift interpolation (its type is a struct parameter)
 - cd_interp::CD = nothing: drag interpolation
 - cm_interp::CM = nothing: moment interpolation
-- cp_polar::CP = nothing: optional surface-pressure table, see [CpPolar](@ref)
+- section_aero::SA = nothing: optional surface aero table, see [SectionAero](@ref)
 - `control_point`::Vector{MVec3}: Panel control point
 - `bound_point_1`::Vector{MVec3}: First bound point
 - `bound_point_2`::Vector{MVec3}: Second bound point
@@ -35,7 +35,7 @@ Represents a panel in a vortex step method simulation. All points and vectors ar
         SemiInfiniteFilament()
     ): Panel filaments, see: [BoundFilament](@ref)
 """
-@with_kw mutable struct Panel{T, CL, CD, CM, CP}
+@with_kw mutable struct Panel{T, CL, CD, CM, SA}
     TE_point_1::MVector{3, T} = zeros(MVector{3, T})
     LE_point_1::MVector{3, T} = zeros(MVector{3, T})
     TE_point_2::MVector{3, T} = zeros(MVector{3, T})
@@ -50,7 +50,7 @@ Represents a panel in a vortex step method simulation. All points and vectors ar
     cl_interp::CL = nothing
     cd_interp::CD = nothing
     cm_interp::CM = nothing
-    cp_polar::CP = nothing
+    section_aero::SA = nothing
     aero_center::MVector{3, T} = zeros(MVector{3, T})
     control_point::MVector{3, T} = zeros(MVector{3, T})
     bound_point_1::MVector{3, T} = zeros(MVector{3, T})
@@ -123,11 +123,11 @@ function init_pos!(
 end
 
 """
-    build_interps(section_1, section_2, remove_nan) -> (cl, cd, cm, cp)
+    build_interps(section_1, section_2, remove_nan) -> (cl, cd, cm, section_aero)
 
 Build the averaged aerodynamic interpolations for the panel between two sections.
-Returns `(cl_interp, cd_interp, cm_interp, cp_polar)`, each `nothing` for models that
-do not use it (INVISCID, POLY). `cl`/`cm` clamp (`Flat`) past the alpha range but
+Returns `(cl_interp, cd_interp, cm_interp, section_aero)`, each `nothing` for models
+that do not use it (INVISCID, POLY). `cl`/`cm` clamp (`Flat`) past the alpha range but
 extrapolate linearly (`Line`) over delta; `cd` extrapolates linearly in both. The
 concrete return types parameterise [`Panel`](@ref) — see [`panel_interp_types`](@ref).
 """
@@ -179,15 +179,14 @@ function build_interps(section_1::Section, section_2::Section, remove_nan)
             cm_i = linear_interpolation((alphas, deltas), cm; extrapolation_bc=cm_bc)
         end
     end
-    cp = nothing
-    if section_1.cp_data !== nothing
-        cp_1, cp_2 = section_1.cp_data, section_2.cp_data
-        cp_up = (cp_1.cp_upper .+ cp_2.cp_upper) ./ 2
-        cp_low = (cp_1.cp_lower .+ cp_2.cp_lower) ./ 2
-        cp = CpPolar(CpData(cp_1.n_chord, cp_1.chord_x,
-            cp_1.alpha_range, cp_1.delta_range, cp_up, cp_low))
+    aero = nothing
+    if section_1.section_aero !== nothing
+        a1, a2 = section_1.section_aero, section_2.section_aero
+        aero = SectionAero(a1.alpha_range, a1.delta_range,
+            (a1.x .+ a2.x) ./ 2, (a1.y .+ a2.y) ./ 2,
+            (a1.cp .+ a2.cp) ./ 2, (a1.cf .+ a2.cf) ./ 2)
     end
-    return cl_i, cd_i, cm_i, cp
+    return cl_i, cd_i, cm_i, aero
 end
 
 """
@@ -218,7 +217,7 @@ function init_aero!(panel::Panel, section_1::Section, section_2::Section;
     elseif !(panel.aero_model in (POLAR_VECTORS, POLAR_MATRICES, INVISCID))
         throw(ArgumentError("Unsupported aero model: $(panel.aero_model)"))
     end
-    panel.cl_interp, panel.cd_interp, panel.cm_interp, panel.cp_polar =
+    panel.cl_interp, panel.cd_interp, panel.cm_interp, panel.section_aero =
         build_interps(section_1, section_2, remove_nan)
     return nothing
 end
