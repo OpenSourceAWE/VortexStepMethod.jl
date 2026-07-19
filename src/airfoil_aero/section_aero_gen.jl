@@ -1,15 +1,15 @@
 """
-    generate_section_aero(solver, base; alpha_range, delta_range, reynolds_number,
-                          crease_frac=0.9, remove_nan=true) -> SectionAero
+    generate_airfoil_aero(solver, base; alpha_range, delta_range, reynolds_number,
+                          crease_frac=0.9, remove_nan=true) -> (SectionAero, sols)
 
-Build a native-resolution surface table (closed contour + `Cp` + `cf` per node over the
-`(alpha, delta)` grid) for a base airfoil (Kulfan parameters) using the given
-[`AbstractAirfoilSolver`](@ref). For each `delta` the section is deformed
-([`deform_section`](@ref)) and swept over `alpha_range` (radians); each converged angle
-contributes its full-contour `(x, y, cp, cf)`. Non-converged points stay `NaN` and,
-when `remove_nan`, are filled per node with `interpolate_matrix_nans!`.
+Run **one** solver sweep of a base airfoil (Kulfan) over the `(alpha, delta)` grid
+(radians) and return both the [`SectionAero`](@ref) (contour + `Cp` + `cf` per node) and
+the raw `sols::Vector{Vector{SectionSolution}}` (one inner vector per delta). The `sols`
+also carry `cl/cd/cm`, so a caller can write the polar from the same sweep — this is how
+`obj_to_yaml` avoids a second sweep. Non-converged points stay `NaN` and, when
+`remove_nan`, are filled per node with `interpolate_matrix_nans!`.
 """
-function generate_section_aero(solver::AbstractAirfoilSolver, base::KulfanParameters;
+function generate_airfoil_aero(solver::AbstractAirfoilSolver, base::KulfanParameters;
         alpha_range, delta_range, reynolds_number, crease_frac=0.9, remove_nan=true)
     x0, y0 = kulfan_to_coordinates(base)
     n_alpha, n_delta = length(alpha_range), length(delta_range)
@@ -26,7 +26,7 @@ function generate_section_aero(solver::AbstractAirfoilSolver, base::KulfanParame
             break
         end
     end
-    n_node == 0 && throw(ErrorException("generate_section_aero: no converged angle"))
+    n_node == 0 && throw(ErrorException("generate_airfoil_aero: no converged angle"))
 
     x = fill(NaN, n_node, n_delta)
     y = fill(NaN, n_node, n_delta)
@@ -48,16 +48,32 @@ function generate_section_aero(solver::AbstractAirfoilSolver, base::KulfanParame
             fill_node_nans!(cf, i)
         end
     end
-    return SectionAero(collect(float.(alpha_range)), collect(float.(delta_range)),
+    aero = SectionAero(collect(float.(alpha_range)), collect(float.(delta_range)),
                        x, y, cp, cf)
+    return aero, sols
 end
 
 """
-    generate_section_aero(solver, x::Vector, y::Vector; kwargs...) -> SectionAero
+    generate_airfoil_aero(solver, x::Vector, y::Vector; kwargs...) -> (SectionAero, sols)
 
 Convenience: [`shrink_wrap`](@ref) the coordinates and fit base Kulfan parameters
 ([`LeastSquaresFit`](@ref)) first.
 """
+function generate_airfoil_aero(solver::AbstractAirfoilSolver, x::Vector, y::Vector;
+        kwargs...)
+    xw, yw = shrink_wrap(x, y, ShrinkWrap())
+    return generate_airfoil_aero(solver, fit_kulfan_parameters(xw, yw, LeastSquaresFit());
+                                 kwargs...)
+end
+
+"""
+    generate_section_aero(solver, base_or_coords; kwargs...) -> SectionAero
+
+Just the [`SectionAero`](@ref) from [`generate_airfoil_aero`](@ref) (drops the raw sols).
+"""
+generate_section_aero(solver::AbstractAirfoilSolver, base::KulfanParameters; kwargs...) =
+    generate_airfoil_aero(solver, base; kwargs...)[1]
+
 function generate_section_aero(solver::AbstractAirfoilSolver, x::Vector, y::Vector;
         kwargs...)
     xw, yw = shrink_wrap(x, y, ShrinkWrap())

@@ -74,7 +74,8 @@ calculate_new_aero_data
 assemble_polar_matrix
 load_matrix_polar_data
 read_aero_matrix
-write_aero_matrix
+read_dat
+read_node_table
 interpolate_matrix_nans!
 remove_vector_nans
 generate_polar_data
@@ -140,6 +141,8 @@ read_dat_coordinates
 write_dat
 write_polar_csv
 write_polar_matrix_csv
+write_aero_matrix
+write_node_table
 flat_plate_cf
 neuralfoil_contour_solution
 fill_node_nans!

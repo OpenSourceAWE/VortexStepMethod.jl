@@ -30,7 +30,7 @@ function write_dat(filepath::String, name::String, x::Vector, y::Vector)
     open(filepath, "w") do io
         println(io, name)
         for i in eachindex(x)
-            println(io, @sprintf("%.8f %.8f", x[i], y[i]))
+            println(io, @sprintf("%.5f %.5f", x[i], y[i]))
         end
     end
     return filepath

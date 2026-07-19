@@ -134,8 +134,8 @@ end
     dat, cp_csv, cf_csv = write_section_aero(prefix, aero)
     back = read_section_aero(dat, cp_csv, cf_csv)
     xb, yb, cpb, cfb = section_surface(back, alpha_range[2], delta_range[1])
-    @test isapprox(xb, xc; atol=1e-6)           # contour via .dat (8-decimal)
-    @test isapprox(yb, yc; atol=1e-6)
+    @test isapprox(xb, xc; atol=1e-4)           # contour via .dat (5-decimal)
+    @test isapprox(yb, yc; atol=1e-4)
     @test cpb ≈ cp[:, 2, 1]
     @test cfb ≈ cf[:, 2, 1]
     @test read_section_aero("no.dat", "no_cp.csv", "no_cf.csv") === nothing

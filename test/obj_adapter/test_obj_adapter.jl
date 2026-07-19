@@ -3,6 +3,7 @@ using VortexStepMethod.ObjAdapter
 using VortexStepMethod
 using VortexStepMethod.AirfoilAero: NeuralFoilSolver
 using LinearAlgebra
+import YAML
 
 obj_path = normpath(joinpath(@__DIR__, "..", "..",
                              "data", "ram_air_kite", "ram_air_kite_body.obj"))
@@ -45,19 +46,19 @@ obj_path = normpath(joinpath(@__DIR__, "..", "..",
         @test all(af -> !isempty(af.x), airfoils)
     end
 
-    @testset "generate_section_polars writes per-slice files" begin
-        secdir = mktempdir()
-        generate_section_polars(obj_path, secdir;
-            n_slices=3, Re=5e5, alpha_range=-4:2:4, delta_range=-2:2:2,
-            solver=NeuralFoilSolver(model_size="medium"), verbose=false)
-        @test isfile(joinpath(secdir, "1.dat"))
-        @test isfile(joinpath(secdir, "1.csv"))
-        # a delta_range writes long-format POLAR_MATRICES + a .dat per deflection
-        @test occursin("delta", lowercase(readline(joinpath(secdir, "1.csv"))))
-        @test isfile(joinpath(secdir, "1_d2.dat"))
+    @testset "obj_to_yaml writes shape + polar + Cp/cf per airfoil" begin
+        outdir = mktempdir()
+        yaml = obj_to_yaml(obj_path, outdir; n_sections=3, Re=5e5,
+            alpha_range=-4:2:4, aero_solver=NeuralFoilSolver(model_size="medium"),
+            verbose=false)
+        @test isfile(yaml)
+        info = Dict(YAML.load_file(yaml)["wing_airfoils"]["data"][1][3])
+        @test all(haskey(info, k) for k in ("dat_file", "csv_file_path", "cp_file", "cf_file"))
+        @test isfile(joinpath(outdir, info["dat_file"]))
+        @test isfile(joinpath(outdir, info["cp_file"]))
+        @test isfile(joinpath(outdir, info["cf_file"]))
 
-        @test_throws ErrorException generate_section_polars("missing.obj", secdir;
-            n_slices=3, Re=5e5)
+        @test_throws ErrorException obj_to_yaml("missing.obj", outdir; n_sections=3, Re=5e5)
     end
 
     @testset "center_to_com! rejects non-triangular faces" begin

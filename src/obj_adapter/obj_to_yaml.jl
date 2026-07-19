@@ -130,16 +130,21 @@ function obj_to_yaml(obj_path::String, output_dir::String;
         raw_rel = joinpath("airfoils", "$(j)_raw.dat")
         csv_rel = joinpath("polars", "$j.csv")
         try
-            res = generate_polar_from_coordinates(s.x_fit, s.y_fit,
-                joinpath(output_dir, csv_rel); Re=Float64(Re), alpha_range,
-                solver=aero_solver, delta_range, crease_frac,
-                dat_prefix=joinpath(output_dir, "airfoils", "$j"))
-            clvals = res isa AbstractVector ? collect(sol.cl for sol in res) : vec(res[1])
+            alphas = deg2rad.(collect(Float64, alpha_range))
+            deltas = isnothing(delta_range) ? [0.0] : deg2rad.(collect(Float64, delta_range))
+            # one solver sweep -> both the SectionAero and the polar
+            aero, sols = generate_airfoil_aero(aero_solver, s.x_fit, s.y_fit;
+                alpha_range=alphas, delta_range=deltas, reynolds_number=Float64(Re),
+                crease_frac)
+            clvals = collect(sol.cl for sol in sols[1])
             all(isnan, clvals) && error("solver produced no converged points")
-            aero = generate_section_aero(aero_solver, s.x_fit, s.y_fit;
-                alpha_range=deg2rad.(alpha_range),
-                delta_range=(isnothing(delta_range) ? [0.0] : deg2rad.(collect(delta_range))),
-                reynolds_number=Float64(Re), crease_frac)
+            if isnothing(delta_range)
+                write_polar_csv(joinpath(output_dir, csv_rel), sols[1])
+            else
+                coeff(f) = [f(sols[jd][ia]) for ia in eachindex(alphas), jd in eachindex(deltas)]
+                write_polar_matrix_csv(joinpath(output_dir, csv_rel), alphas, deltas,
+                                       coeff(s -> s.cl), coeff(s -> s.cd), coeff(s -> s.cm))
+            end
             paths = write_section_aero(joinpath(output_dir, "airfoils", "$j"), aero)
             dat_rel, cp_rel, cf_rel = (relpath(p, output_dir) for p in paths)
             write_dat(joinpath(output_dir, raw_rel), "section_$(j)_raw", s.xa, s.ya)

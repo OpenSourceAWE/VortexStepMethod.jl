@@ -59,13 +59,13 @@ fig_slices_3d = plot_slices_3d(OBJ_PATH; n_slices=N_SLICES, rotation=ROTATION,
                                n_bins=N_BINS, wrap_method=WRAP)
 GLMakie.save("V3_slices_3d.png", fig_slices_3d)
 
-# Generate per-slice NeuralFoil polars from the shrink-wrapped sections. XFoil is also
-# supported (pass `solver=XFoilSolver(...)`) but its panel method does not converge on
-# the V3's thin, tube-nosed membrane airfoils, so NeuralFoil is used here.
-println("Generating NeuralFoil polars from OBJ mesh...")
-generate_section_polars(OBJ_PATH, POLARS_DIR; n_slices=N_SLICES, Re=RE,
-    rotation=ROTATION, n_bins=N_BINS, wrap_method=WRAP,
-    solver=NF_SOLVER, delta_range=DELTA_RANGE, verbose=true)
+# `obj_to_yaml` generates the whole aero geometry from the OBJ: shape (.dat), polar CSV,
+# and Cp/cf tables plus a geometry.yaml. XFoil (`aero_solver=XFoilSolver(...)`) also works
+# but doesn't converge on the V3's thin membrane airfoils, so NeuralFoil is used here.
+println("Generating V3 aero geometry from OBJ (obj_to_yaml)...")
+gen_dir = joinpath("data", "TUDELFT_V3_KITE", "generated_neuralfoil")
+nf_yaml = obj_to_yaml(OBJ_PATH, gen_dir; n_sections=N_SLICES, Re=RE,
+    rotation=ROTATION, wrap_method=WRAP, aero_solver=NF_SOLVER, verbose=true)
 
 # Flight conditions
 v_a = 10.0
@@ -82,29 +82,12 @@ body_cfd = BodyAerodynamics([wing_cfd])
 VortexStepMethod.reinit!(body_cfd)
 solver_cfd = Solver(body_cfd, settings_cfd)
 
-# Build a wing whose every airfoil points at a generated POLAR_VECTORS CSV under
-# `polars_subdir`. Repoints a copy of the awesIO geometry and loads it as a normal
-# uniform POLAR_VECTORS wing — no manual section surgery needed.
-using YAML
-yaml_path = joinpath("data", "TUDELFT_V3_KITE", "aero_geometry.yaml")
-function build_polar_wing(polars_subdir, out_name)
-    geom = YAML.load_file(yaml_path)
-    for (i, airfoil) in enumerate(geom["wing_airfoils"]["data"])
-        airfoil[2] = "polars"
-        airfoil[3] = Dict("csv_file_path" => "$polars_subdir/$i.csv")
-    end
-    out_yaml = joinpath("data", "TUDELFT_V3_KITE", out_name)
-    write_yaml(out_yaml, geom)
-    wing = Wing(out_yaml; n_panels=50, spanwise_distribution=LINEAR)
-    refine!(wing)
-    body = BodyAerodynamics([wing])
-    VortexStepMethod.reinit!(body)
-    s = Solver(body, settings_cfd)
-    return s, body
-end
-
 println("Creating wing with NeuralFoil polars...")
-solver_nf, body_nf = build_polar_wing("polars_neuralfoil", "aero_geometry_neuralfoil.yaml")
+wing_nf = Wing(nf_yaml; n_panels=50, spanwise_distribution=LINEAR)
+refine!(wing_nf)
+body_nf = BodyAerodynamics([wing_nf])
+VortexStepMethod.reinit!(body_nf)
+solver_nf = Solver(body_nf, settings_cfd)
 
 # Compare CFD-polar and NeuralFoil-polar wings against published references
 # (Poland 2025 RANS CFD and wind tunnel). `plot_polars` sweeps each solver over the
