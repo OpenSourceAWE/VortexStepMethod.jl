@@ -1470,17 +1470,21 @@ function refine_mesh_by_splitting_provided_sections!(
                 section_pair;
                 endpoints=false, reuse_aero_data)
 
-            # Apply billowing by rotating chords around LE
+            # Apply billowing by rotating chords around LE.
             if billowing_percentage > 0 && idx > start_idx
                 s_l = sections[li]; s_r = sections[li + 1]
-                le_l = s_l.LE_point; le_r = s_r.LE_point
-                diff_vec = le_l - le_r
+                if dot(s_l.LE_point - s_r.LE_point, wing.spanwise_direction) >= 0
+                    le_neg, le_pos = s_r.LE_point, s_l.LE_point
+                else
+                    le_neg, le_pos = s_l.LE_point, s_r.LE_point
+                end
+                diff_vec = le_pos - le_neg
                 span_len = norm(diff_vec)
                 y_hat = diff_vec / span_len
                 apply_billowing_to_pair!(
                     wing.refined_sections,
                     start_idx, idx - 1,
-                    y_hat, span_len, le_r,
+                    y_hat, span_len, le_neg,
                     s_l.TE_point, s_r.TE_point,
                     billowing_percentage)
             end
