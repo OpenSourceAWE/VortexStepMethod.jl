@@ -273,7 +273,8 @@ function reinit!(body_aero::BodyAerodynamics{P, W, T};
                 panel_props.y_airf[i, :],
                 panel_props.z_airf[i, :],
                 delta,
-                vec;
+                vec,
+                wing.spanwise_direction;
                 remove_nan=wing.remove_nan,
                 init_aero=wing_init_aero
             )

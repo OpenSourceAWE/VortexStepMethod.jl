@@ -895,6 +895,7 @@ function refine!(wing::AbstractWing{T}; recompute_mapping=true, sort_sections=tr
         sorted || sort!(wing.unrefined_sections;
             by=_section_sort_key, rev=true)
     end
+
     n_sections = wing.n_panels + 1
     reuse_aero_data = _can_reuse_prior_refined_polar_data(wing, n_sections)
 
