@@ -308,19 +308,20 @@ function calculate_relative_alpha_and_velocity(panel::Panel, induced_velocity)
 end
 
 """
-    calculate_cl(panel::Panel, alpha::Float64)
+    calculate_cl(panel::Panel, alpha)
+    calculate_cl(panel::Panel, alpha, delta)
 
-Calculate lift coefficient for given angle of attack.
-
-# Arguments
-- `panel::Panel`: Panel object
-- `alpha::Float64`: Angle of attack in radians
+Calculate lift coefficient for given angle of attack `alpha` [rad]. The 3-arg
+form evaluates the `(α, δ)` polar (`POLAR_MATRICES`) at the passed flap
+deflection `delta` [rad] instead of the panel's stored `delta`; the 2-arg form
+forwards with `panel.delta`. Other aero models ignore `delta`.
 
 # Returns
 - `Float64`: Lift coefficient (Cl)
 """
-function calculate_cl(panel::Panel{Tp}, alpha::Ta) where {Tp, Ta}
-    R = promote_type(Tp, Ta)
+calculate_cl(panel::Panel, alpha) = calculate_cl(panel, alpha, panel.delta)
+function calculate_cl(panel::Panel{Tp}, alpha::Ta, delta::Td) where {Tp, Ta, Td}
+    R = promote_type(Tp, Ta, Td)
     isnan(alpha) && return R(NaN)
     if panel.aero_model == POLY
         cl = evalpoly(rad2deg(alpha), reverse(panel.cl_coeffs))
@@ -335,17 +336,21 @@ function calculate_cl(panel::Panel{Tp}, alpha::Ta) where {Tp, Ta}
     interp === nothing &&
         throw(ArgumentError("cl_interp is not initialized for $(panel.aero_model)."))
     return panel.aero_model == POLAR_VECTORS ? R(interp(alpha)) :
-                                               R(interp(alpha, panel.delta))
+                                               R(interp(alpha, delta))
 end
 
 
 """
     calculate_cd(panel::Panel, alpha)
+    calculate_cd(panel::Panel, alpha, delta)
 
-Calculate the drag coefficient for the given angle of attack.
+Calculate the drag coefficient for the given angle of attack. The 3-arg form
+evaluates the `(α, δ)` polar at the passed flap deflection `delta`; see
+[`calculate_cl`](@ref).
 """
-function calculate_cd(panel::Panel{Tp}, alpha::Ta) where {Tp, Ta}
-    R = promote_type(Tp, Ta)
+calculate_cd(panel::Panel, alpha) = calculate_cd(panel, alpha, panel.delta)
+function calculate_cd(panel::Panel{Tp}, alpha::Ta, delta::Td) where {Tp, Ta, Td}
+    R = promote_type(Tp, Ta, Td)
     isnan(alpha) && return R(NaN)
     if panel.aero_model == POLY
         if abs(alpha) > (π/9)  # Outside ±20 degrees
@@ -357,7 +362,7 @@ function calculate_cd(panel::Panel{Tp}, alpha::Ta) where {Tp, Ta}
         cd_interp === nothing &&
             throw(ArgumentError("cd_interp is not initialized for $(panel.aero_model)."))
         return panel.aero_model == POLAR_VECTORS ? R(cd_interp(alpha)) :
-                                                   R(cd_interp(alpha, panel.delta))
+                                                   R(cd_interp(alpha, delta))
     elseif !(panel.aero_model == INVISCID)
         throw(ArgumentError("Unsupported aero model: $(panel.aero_model)"))
     end
@@ -366,11 +371,15 @@ end
 
 """
     calculate_cm(panel::Panel, alpha)
+    calculate_cm(panel::Panel, alpha, delta)
 
-Calculate the pitching-moment coefficient for the given angle of attack.
+Calculate the pitching-moment coefficient for the given angle of attack. The
+3-arg form evaluates the `(α, δ)` polar at the passed flap deflection `delta`;
+see [`calculate_cl`](@ref).
 """
-function calculate_cm(panel::Panel{Tp}, alpha::Ta) where {Tp, Ta}
-    R = promote_type(Tp, Ta)
+calculate_cm(panel::Panel, alpha) = calculate_cm(panel, alpha, panel.delta)
+function calculate_cm(panel::Panel{Tp}, alpha::Ta, delta::Td) where {Tp, Ta, Td}
+    R = promote_type(Tp, Ta, Td)
     isnan(alpha) && return R(NaN)
     if panel.aero_model == POLY
         return R(evalpoly(rad2deg(alpha), reverse(panel.cm_coeffs)))
@@ -379,7 +388,7 @@ function calculate_cm(panel::Panel{Tp}, alpha::Ta) where {Tp, Ta}
         cm_interp === nothing &&
             throw(ArgumentError("cm_interp is not initialized for $(panel.aero_model)."))
         return panel.aero_model == POLAR_VECTORS ? R(cm_interp(alpha)) :
-                                                   R(cm_interp(alpha, panel.delta))
+                                                   R(cm_interp(alpha, delta))
     elseif !(panel.aero_model == INVISCID)
         throw(ArgumentError("Unsupported aero model: $(panel.aero_model)"))
     end
