@@ -20,6 +20,8 @@ include("airfoil_io.jl")
 include("polar_gen.jl")
 include("polar_export.jl")
 include("section_aero_gen.jl")
+include("geometry_yaml.jl")
+include("geometry_gen.jl")
 
 export KulfanParameters, KulfanFitMethod, LeastSquaresFit
 export ShrinkWrap, shrink_wrap
@@ -33,5 +35,6 @@ export generate_airfoil_aero, write_section_aero
 export turn_trailing_edge!, get_lower_upper
 export read_dat_coordinates, write_dat, write_polar_csv, write_polar_matrix_csv
 export generate_polar_from_coordinates, generate_polar_from_dat, resolve_airfoil
+export write_geometry_yaml, write_yaml, generate_airfoils
 
 end

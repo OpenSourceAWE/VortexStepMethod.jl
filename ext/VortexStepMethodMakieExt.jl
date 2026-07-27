@@ -10,6 +10,8 @@ export plot_geometry, plot_distribution, plot_polars, save_plot, show_plot,
 
 # Global storage for panel mesh observables (for dynamic plotting)
 const PANEL_MESH_OBSERVABLES = Ref{Union{Nothing,Dict}}(nothing)
+# Global storage for airfoil-skin observables, keyed by body objectid.
+const AIRFOIL_SKIN_OBSERVABLES = Ref{Union{Nothing,Dict}}(nothing)
 
 """
     plot!(ax, panel::VortexStepMethod.Panel; use_observables=false, kwargs...)
@@ -55,16 +57,104 @@ function Makie.plot!(ax, panel::VortexStepMethod.Panel; color=(:red, 0.2), R_b_w
 end
 
 """
-    plot!(ax, body::VortexStepMethod.BodyAerodynamics; use_observables=false, kwargs...)
+    airfoil_skin_geometry(body; R_b_w=nothing, T_b_w=nothing) -> (vertices, faces, ribs)
 
-Plot a `BodyAerodynamics` object by plotting each of its panels.
+Lofted airfoil skin of a `BodyAerodynamics`: each refined section's airfoil contour
+(the `SectionAero` rest slice) placed on its chord and offset in thickness along the
+airfoil upper-surface normal — the adjacent panel's `z_airf`, so the skin matches
+VSM's own aero orientation (a `cross(chord, span)` fallback is used only if `z_airf`
+is not yet populated). Transformed to world by `R_b_w`/`T_b_w`. `vertices`/`faces`
+triangulate the skin between consecutive equal-node sections; `ribs` is one closed
+contour polyline per section. Sections without contour data are skipped.
+"""
+function airfoil_skin_geometry(body; R_b_w=nothing, T_b_w=nothing)
+    to_world(p) = (isnothing(R_b_w) || isnothing(T_b_w)) ? Point3f(p) :
+        Point3f(R_b_w * p + T_b_w)
+    ribs = Vector{Point3f}[]
+    panel_offset = 0
+    for wing in body.wings
+        sections = wing.refined_sections
+        n = length(sections)
+        n_panels = n - 1
+        for (i, section) in enumerate(sections)
+            isnothing(section.section_aero) && continue
+            leading = Point3f(section.LE_point)
+            chord = Point3f(section.TE_point) - leading
+            chord_len = norm(chord)
+            chord_len < 1e-9 && continue
+            panel_idx = panel_offset + clamp(i, 1, max(n_panels, 1))
+            up = panel_idx <= length(body.panels) ?
+                Point3f(body.panels[panel_idx].z_airf) : Point3f(0, 0, 0)
+            if norm(up) < 1e-9                          # not solved yet: geometric fallback
+                neighbor = Point3f(sections[i < n ? i + 1 : max(i - 1, 1)].LE_point)
+                spanwise = i < n ? neighbor - leading : leading - neighbor
+                up = cross(chord, spanwise)
+            end
+            up = norm(up) < 1e-9 ? Point3f(0, 0, 1) : Point3f(up / norm(up))
+            xs = section.section_aero.x
+            ys = section.section_aero.y
+            push!(ribs, [to_world(leading + xs[k, 1] * chord + (ys[k, 1] * chord_len) * up)
+                         for k in axes(xs, 1)])
+        end
+        panel_offset += n_panels
+    end
+    vertices = Point3f[]
+    faces = Makie.GLTriangleFace[]
+    for i in 1:length(ribs) - 1
+        length(ribs[i]) == length(ribs[i + 1]) || continue
+        base = length(vertices)
+        append!(vertices, ribs[i])
+        append!(vertices, ribs[i + 1])
+        node_count = length(ribs[i])
+        for k in 1:node_count - 1
+            a1, a2 = base + k, base + k + 1
+            b1, b2 = base + node_count + k, base + node_count + k + 1
+            push!(faces, Makie.GLTriangleFace(a1, a2, b2))
+            push!(faces, Makie.GLTriangleFace(a1, b2, b1))
+        end
+    end
+    return vertices, faces, ribs
+end
+
+"""
+    plot!(ax, body::VortexStepMethod.BodyAerodynamics; use_observables=false,
+          airfoils=false, kwargs...)
+
+Plot a `BodyAerodynamics` object. By default draws each panel as a flat quad; with
+`airfoils=true` instead draws the lofted airfoil skin (one see-through wing-shaped
+mesh with a contour rib line per section, see [`airfoil_skin_geometry`](@ref)).
 
 If `use_observables=true`, creates observables for dynamic updates keyed by (body_id, panel_index).
 Otherwise, creates static plots (original behavior).
 """
 function Makie.plot!(ax, body::VortexStepMethod.BodyAerodynamics; color=(:red, 0.2), R_b_w=nothing, T_b_w=nothing,
-    use_observables=false, kwargs...)
+    use_observables=false, airfoils=false,
+    airfoil_color=:deepskyblue, airfoil_opacity=0.2, rib_color=:black, kwargs...)
     plots = []
+
+    if airfoils
+        vertices, faces, ribs = airfoil_skin_geometry(body; R_b_w, T_b_w)
+        skin_color = (airfoil_color, airfoil_opacity)
+        if use_observables
+            isnothing(AIRFOIL_SKIN_OBSERVABLES[]) && (AIRFOIL_SKIN_OBSERVABLES[] = Dict())
+            vertices_obs = Observable(vertices)
+            rib_obs = [Observable(rib) for rib in ribs]
+            isempty(faces) || push!(plots, mesh!(ax, vertices_obs, faces;
+                color=skin_color, transparency=true))
+            for rib in rib_obs
+                push!(plots, lines!(ax, rib; color=rib_color, transparency=true))
+            end
+            AIRFOIL_SKIN_OBSERVABLES[][objectid(body)] =
+                (vertices=vertices_obs, ribs=rib_obs)
+        else
+            isempty(faces) || push!(plots, mesh!(ax, vertices, faces;
+                color=skin_color, transparency=true))
+            for rib in ribs
+                push!(plots, lines!(ax, rib; color=rib_color, transparency=true))
+            end
+        end
+        return plots
+    end
 
     if use_observables
         # Initialize global storage if needed
@@ -122,33 +212,32 @@ Requires that `plot(body; use_observables=true)` or `plot!(ax, body; use_observa
 was called first to create the observables.
 """
 function Makie.plot!(body::VortexStepMethod.BodyAerodynamics; R_b_w=nothing, T_b_w=nothing, kwargs...)
-    # Check if observables exist
-    if isnothing(PANEL_MESH_OBSERVABLES[])
-        error("No panel observables found. Call plot(body; use_observables=true) first.")
-    end
-
     body_id = objectid(body)
 
-    # Update each panel using stable (body_id, panel_idx) key
-    for (panel_idx, panel) in enumerate(body.panels)
-        key = (body_id, panel_idx)
-        if !haskey(PANEL_MESH_OBSERVABLES[], key)
-            error("No observables found for body $body_id panel $panel_idx. " *
-                  "Call plot(body; use_observables=true) first.")
+    # Panel meshes (if plotted with use_observables): refresh from corner_points.
+    if !isnothing(PANEL_MESH_OBSERVABLES[])
+        for (panel_idx, panel) in enumerate(body.panels)
+            key = (body_id, panel_idx)
+            haskey(PANEL_MESH_OBSERVABLES[], key) || continue
+            obs = PANEL_MESH_OBSERVABLES[][key]
+            points = [Point3f(panel.corner_points[:, i]) for i in 1:4]
+            if !isnothing(R_b_w) && !isnothing(T_b_w)
+                points = [Point3f(R_b_w * p + T_b_w) for p in points]
+            end
+            obs.vertices[] = points
+            obs.border[] = [points..., points[1]]
         end
+    end
 
-        # Get observables for this panel
-        obs = PANEL_MESH_OBSERVABLES[][key]
-
-        # Recompute vertices from current panel.corner_points
-        points = [Point3f(panel.corner_points[:, i]) for i in 1:4]
-        if !isnothing(R_b_w) && !isnothing(T_b_w)
-            points = [Point3f(R_b_w * p + T_b_w) for p in points]
+    # Airfoil skin (if plotted with use_observables): refresh from the current pose.
+    if !isnothing(AIRFOIL_SKIN_OBSERVABLES[]) &&
+            haskey(AIRFOIL_SKIN_OBSERVABLES[], body_id)
+        skin = AIRFOIL_SKIN_OBSERVABLES[][body_id]
+        vertices, _, ribs = airfoil_skin_geometry(body; R_b_w, T_b_w)
+        skin.vertices[] = vertices
+        for (i, rib) in enumerate(ribs)
+            i <= length(skin.ribs) && (skin.ribs[i][] = rib)
         end
-
-        # Update observables
-        obs.vertices[] = points
-        obs.border[] = [points..., points[1]]
     end
 
     return nothing

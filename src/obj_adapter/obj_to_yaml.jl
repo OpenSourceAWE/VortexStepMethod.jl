@@ -94,11 +94,6 @@ function obj_to_yaml(obj_path::String, output_dir::String;
     !isapprox(spanwise_direction, [0.0, 1.0, 0.0]) &&
         throw(ArgumentError("Spanwise direction has to be [0.0, 1.0, 0.0]"))
 
-    airfoil_dir = joinpath(output_dir, "airfoils")
-    polar_dir = joinpath(output_dir, "polars")
-    mkpath(airfoil_dir)
-    mkpath(polar_dir)
-
     vertices, faces = read_faces(obj_path)
 
     raw_sections = perpendicular_sections(vertices, faces, n_sections;
@@ -122,44 +117,10 @@ function obj_to_yaml(obj_path::String, output_dir::String;
     isempty(valid) && error("All sliced sections are degenerate in $obj_path")
     ids = [degenerate[k] && reuse_valid_airfoils ?
            valid[argmin(abs.(valid .- k))] : k for k in 1:n]
-    section_rows = Vector{Any}[]
-    airfoil_rows = Vector{Any}[]
-    ok = Int[]
-    for j in unique(ids)
-        s = stations[j]
-        raw_rel = joinpath("airfoils", "$(j)_raw.dat")
-        csv_rel = joinpath("polars", "$j.csv")
-        try
-            alphas = deg2rad.(collect(Float64, alpha_range))
-            deltas = isnothing(delta_range) ? [0.0] : deg2rad.(collect(Float64, delta_range))
-            # one solver sweep -> both the SectionAero and the polar
-            aero, sols = generate_airfoil_aero(aero_solver, s.x_fit, s.y_fit;
-                alpha_range=alphas, delta_range=deltas, reynolds_number=Float64(Re),
-                crease_frac)
-            clvals = collect(sol.cl for sol in sols[1])
-            all(isnan, clvals) && error("solver produced no converged points")
-            if isnothing(delta_range)
-                write_polar_csv(joinpath(output_dir, csv_rel), sols[1])
-            else
-                coeff(f) = [f(sols[jd][ia]) for ia in eachindex(alphas), jd in eachindex(deltas)]
-                write_polar_matrix_csv(joinpath(output_dir, csv_rel), alphas, deltas,
-                                       coeff(s -> s.cl), coeff(s -> s.cd), coeff(s -> s.cm))
-            end
-            paths = write_section_aero(joinpath(output_dir, "airfoils", "$j"), aero)
-            dat_rel, cp_rel, cf_rel = (relpath(p, output_dir) for p in paths)
-            write_dat(joinpath(output_dir, raw_rel), "section_$(j)_raw", s.xa, s.ya)
-            push!(airfoil_rows, Any[j, "polar_vectors",
-                Dict("dat_file" => dat_rel, "raw_dat_file" => raw_rel,
-                     "csv_file_path" => csv_rel, "cp_file" => cp_rel, "cf_file" => cf_rel)])
-            push!(ok, j)
-            finite_cl = [v for v in clvals if !isnan(v)]
-            cl_max = isempty(finite_cl) ? NaN : maximum(finite_cl)
-            verbose && println("  Airfoil $j: CL_max=$(round(cl_max, digits=2))")
-        catch e
-            reuse_valid_airfoils ||
-                error("Section $j polar generation failed: $(sprint(showerror, e))")
-        end
-    end
+    airfoils = [(; id = j, x_fit = stations[j].x_fit, y_fit = stations[j].y_fit,
+                 x_raw = stations[j].xa, y_raw = stations[j].ya) for j in unique(ids)]
+    airfoil_rows, ok = generate_airfoils(airfoils, output_dir; Re, alpha_range,
+        delta_range, aero_solver, reuse_valid_airfoils, crease_frac, verbose)
     isempty(ok) && error("No section produced a valid polar in $obj_path")
 
     # Each section uses its nearest airfoil that actually produced a polar — covering
@@ -168,6 +129,7 @@ function obj_to_yaml(obj_path::String, output_dir::String;
     reused = [k => final_ids[k] for k in 1:n if final_ids[k] != k]
     isempty(reused) || @warn "Reused the nearest valid airfoil for: " *
         join(["section $k → airfoil $j" for (k, j) in reused], ", ")
+    section_rows = Vector{Any}[]
     for k in 1:n
         s = stations[k]
         push!(section_rows, Any[final_ids[k], s.LE_point[1], s.LE_point[2], s.LE_point[3],
@@ -221,76 +183,4 @@ function resolve_aero_geometry(yaml_in::String, out_dir::String; verbose=true)
     write_yaml(yaml_out, data)
     verbose && @info "Resolved geometry -> $yaml_out"
     return yaml_out
-end
-
-"""
-    write_geometry_yaml(path, section_rows, airfoil_rows)
-
-Write a geometry YAML via [`write_yaml`], one line per section/airfoil row.
-`section_rows` are `[airfoil_id, LE_x, LE_y, LE_z, TE_x, TE_y, TE_z]`; `airfoil_rows`
-are `[airfoil_id, type, info_dict]` where `info_dict` holds `dat_file`,
-`csv_file_path`, and optionally `raw_dat_file`.
-"""
-function write_geometry_yaml(path::String, section_rows, airfoil_rows)
-    data = Dict(
-        "wing_sections" => Dict(
-            "headers" => ["airfoil_id", "LE_x", "LE_y", "LE_z",
-                          "TE_x", "TE_y", "TE_z"],
-            "data" => section_rows),
-        "wing_airfoils" => Dict(
-            "headers" => ["airfoil_id", "type", "info_dict"],
-            "data" => [[id, type, info] for (id, type, info) in airfoil_rows]))
-    return write_yaml(path, data)
-end
-
-yaml_scalar(x::Bool) = string(x)
-yaml_scalar(x::Integer) = string(x)
-yaml_scalar(x::Real) = string(round(Float64(x); digits=3))
-yaml_scalar(x::AbstractString) = "\"$(replace(x, '\\' => '/'))\""
-yaml_scalar(::Nothing) = "null"
-yaml_scalar(x) = string(x)
-
-yaml_sorted(x::AbstractDict) = sort!(collect(x); by = p -> string(first(p)))
-yaml_isscalar(x) = x isa Union{Real,AbstractString,Bool,Nothing}
-yaml_scalardict(x) = x isa AbstractDict && all(yaml_isscalar, values(x))
-yaml_flowable(x) = yaml_isscalar(x) || yaml_scalardict(x) ||
-    (x isa AbstractVector && all(e -> yaml_isscalar(e) || yaml_scalardict(e), x))
-
-yaml_flow(x) =
-    yaml_isscalar(x) ? yaml_scalar(x) :
-    x isa AbstractDict ?
-        "{" * join(("$k: $(yaml_flow(v))" for (k, v) in yaml_sorted(x)), ", ") * "}" :
-    x isa AbstractVector ? "[" * join(map(yaml_flow, x), ", ") * "]" :
-    yaml_scalar(x)
-
-function yaml_emit(io, x, indent)
-    pad = "  "^indent
-    if x isa AbstractDict
-        for (k, v) in yaml_sorted(x)
-            yaml_flowable(v) ? println(io, pad, k, ": ", yaml_flow(v)) :
-                (println(io, pad, k, ":"); yaml_emit(io, v, indent + 1))
-        end
-    elseif x isa AbstractVector
-        for el in x
-            yaml_flowable(el) ? println(io, pad, "- ", yaml_flow(el)) :
-                (println(io, pad, "-"); yaml_emit(io, el, indent + 1))
-        end
-    else
-        println(io, pad, yaml_scalar(x))
-    end
-end
-
-"""
-    write_yaml(path, data)
-
-Write `data` (nested `Dict`s, vectors, scalars) to `path` as YAML with every float
-rounded to millimetre precision (3 decimals) and every leaf list on one line. The
-single writer for all generated geometry YAMLs, so their formatting stays consistent.
-Mapping keys are emitted in sorted order.
-"""
-function write_yaml(path::String, data)
-    open(path, "w") do io
-        yaml_emit(io, data, 0)
-    end
-    return path
 end

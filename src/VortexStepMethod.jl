@@ -431,6 +431,7 @@ include("plotting_helpers.jl")
 # `VortexStepMethod.AirfoilAero` / `.ObjAdapter`, or `using VortexStepMethod.AirfoilAero`.
 include("airfoil_aero/AirfoilAero.jl")
 include("obj_adapter/ObjAdapter.jl")
+include("surfplan_adapter/SurfplanAdapter.jl")
 
 include("precompile.jl")
 
