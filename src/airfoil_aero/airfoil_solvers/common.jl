@@ -98,8 +98,11 @@ XFoil consumes the coordinates directly, NeuralFoil the Kulfan parameters.
 `flip_thickness_neg` folds a soft membrane about its lower surface for negative `delta`.
 The re-wrap uses zero clearance (it hugs the deflected shape at grid resolution);
 the rolling-ball wrap bridges the crease with a `min_concave_radius` fillet instead
-of the overlapping panels that XFoil's own repaneling can hit
-there. `delta == 0` returns the base coordinates unchanged.
+of the overlapping panels that XFoil's own repaneling can hit there. The wrap runs
+for every `delta` including `0`, so all deflections share the same node count
+(`2·n_points - 1`) — a delta sweep that mixed the wrapped deflected shapes with an
+unwrapped base would give the base a different node count, and the per-node `(cp, cf)`
+assembly in [`generate_airfoil_aero`](@ref) would drop that column to `NaN`.
 """
 function deform_section(x, y, delta; crease_frac=0.9, thickness_frac=1.0,
                         flip_thickness_neg=true,
@@ -109,8 +112,8 @@ function deform_section(x, y, delta; crease_frac=0.9, thickness_frac=1.0,
         pivot = flip_thickness_neg && delta < 0 ? 1 - thickness_frac : thickness_frac
         lower, upper = get_lower_upper(xd, yd, crease_frac)
         turn_trailing_edge!(delta, xd, yd, lower, upper, crease_frac; thickness_frac=pivot)
-        xd, yd = shrink_wrap(xd, yd, wrap_method)
     end
+    xd, yd = shrink_wrap(xd, yd, wrap_method)
     kulfan = fit_kulfan_parameters(xd, yd, LeastSquaresFit())
     return DeformedSection(kulfan, xd, yd)
 end

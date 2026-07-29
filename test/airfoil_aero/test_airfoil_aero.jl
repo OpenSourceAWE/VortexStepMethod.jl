@@ -194,6 +194,21 @@ end
     @test count(>(0), load) > length(load) ÷ 2
 end
 
+@testset "deform_section node count is delta-independent" begin
+    # A base whose paneling differs from shrink_wrap's fixed output (2·n_points-1)
+    # must still come back at that same length for delta == 0, or a delta sweep
+    # mixes lengths and generate_airfoil_aero NaN-s the delta == 0 column.
+    sym = KulfanParameters(fill(0.15, 8), fill(-0.15, 8), 0.0, 0.0)
+    xb, yb = kulfan_to_coordinates(sym)   # default paneling, != shrink_wrap output
+    base = deform_section(xb, yb, 0.0; crease_frac=0.8)
+    @test length(base.x) != length(xb)    # delta == 0 is re-wrapped, not passed through
+    for d in (deg2rad(-5.0), deg2rad(5.0), deg2rad(15.0))
+        def = deform_section(xb, yb, d; crease_frac=0.8)
+        @test length(def.x) == length(base.x)
+        @test length(def.y) == length(base.y)
+    end
+end
+
 @testset "generate_polar_from_coordinates POLAR_VECTORS sweep" begin
     x, y = read_dat_coords(joinpath(@__DIR__, "data", "test_airfoil.dat"))
     csv = joinpath(mktempdir(), "polar.csv")
