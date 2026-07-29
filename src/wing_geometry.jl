@@ -86,6 +86,23 @@ function reinit!(refined_section::Section{Tr}, section::Section) where {Tr}
 end
 
 """
+    copy_sections(sections) -> Vector{Section}
+
+Copy a vector of [`Section`](@ref)s into fresh objects. Each copy gets its own
+`LE_point`/`TE_point` storage, so mutating a copy's geometry never aliases the
+source; the read-only `aero_data`/`section_aero` tables are shared by reference.
+A plain `copy` would only duplicate the vector and keep the mutable sections
+shared, letting a geometry edit on one list corrupt another.
+"""
+function copy_sections(sections::AbstractVector{Section{T}}) where {T}
+    copies = [Section{T}() for _ in sections]
+    for (dest, src) in zip(copies, sections)
+        reinit!(dest, src)
+    end
+    return copies
+end
+
+"""
     validate_section_aero(sections)
 
 Enforce the all-or-none surface-aero rule and a uniform node resolution: either every
@@ -812,7 +829,7 @@ function copy_sections_to_refined!(
             "Increase n_panels."
     end
     if length(wing.refined_sections) == 0
-        wing.refined_sections = copy(wing.unrefined_sections)
+        wing.refined_sections = copy_sections(wing.unrefined_sections)
     else
         for (refined, unrefined) in zip(
                 wing.refined_sections, wing.unrefined_sections)

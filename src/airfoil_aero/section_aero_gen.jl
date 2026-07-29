@@ -19,14 +19,10 @@ function generate_airfoil_aero(solver::AbstractAirfoilSolver, base::KulfanParame
         sols[jd] = analyze_sweep(solver, def, alpha_range, reynolds_number)
     end
 
-    n_node = 0
-    for col in sols, s in col
-        if !isempty(s.cp)
-            n_node = length(s.cp)
-            break
-        end
-    end
-    n_node == 0 && throw(ErrorException("generate_airfoil_aero: no converged angle"))
+    lens = [length(s.cp) for col in sols for s in col if !isempty(s.cp)]
+    isempty(lens) && throw(ErrorException("generate_airfoil_aero: no converged angle"))
+    # the modal node count, so a single degenerate wrap cannot drop every other column
+    n_node = argmax(u -> count(==(u), lens), unique(lens))
 
     x = fill(NaN, n_node, n_delta)
     y = fill(NaN, n_node, n_delta)
@@ -125,9 +121,15 @@ side); loading lives in the main package.
 """
 function write_section_aero(prefix::AbstractString, aero::SectionAero)
     for (jd, d) in enumerate(aero.delta_range)
-        path = iszero(d) ? "$prefix.dat" : "$(prefix)_d$(round(Int, rad2deg(d))).dat"
-        write_dat(path, "section", aero.x[:, jd], aero.y[:, jd])
+        iszero(d) && continue
+        write_dat("$(prefix)_d$(round(Int, rad2deg(d))).dat", "section",
+                  aero.x[:, jd], aero.y[:, jd])
     end
+    # never write `$prefix.dat` all-NaN (read_dat_coordinates would drop it to empty)
+    finite(jd) = any(isfinite, view(aero.x, :, jd))
+    jz = findfirst(iszero, aero.delta_range)
+    jdat = jz !== nothing && finite(jz) ? jz : findfirst(finite, eachindex(aero.delta_range))
+    write_dat("$prefix.dat", "section", aero.x[:, jdat], aero.y[:, jdat])
     write_node_table("$(prefix)_cp.csv", aero, aero.cp)
     write_node_table("$(prefix)_cf.csv", aero, aero.cf)
     return "$prefix.dat", "$(prefix)_cp.csv", "$(prefix)_cf.csv"

@@ -433,14 +433,16 @@ to a YAML wing geometry via [`ObjAdapter.obj_to_yaml`](@ref) and returns a [`Win
 OBJ geometry. Use `aero_solver=AirfoilAero.XFoilSolver()` to reproduce old XFoil-based
 polars; the default is `AirfoilAero.NeuralFoilSolver()`.
 
+`alpha_range` and `delta_range` are in degrees (matching [`ObjAdapter.obj_to_yaml`](@ref)).
+
 By default (`remake=false`) an existing `geometry.yaml` in `output_dir` is reused,
 skipping the expensive polar generation. Set `remake=true` to force regeneration.
 """
 function ObjWing(obj_path, dat_path=nothing;
                  n_panels::Int=56,
                  Re::Real=1e6,
-                 alpha_range=deg2rad.(-5:1:20),
-                 delta_range=deg2rad.(-5:1:20),
+                 alpha_range=-5:1:20,
+                 delta_range=-5:1:20,
                  n_sections::Union{Nothing, Int}=nothing,
                  spanwise_direction=[0.0, 1.0, 0.0],
                  spanwise_distribution=UNCHANGED,
