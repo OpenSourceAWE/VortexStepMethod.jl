@@ -46,6 +46,7 @@ generate_polar_from_coordinates
 generate_polar_from_dat
 generate_airfoil_aero
 generate_section_aero
+generate_airfoils
 write_section_aero
 ```
 
@@ -62,6 +63,17 @@ write_yaml
 perpendicular_sections
 plot_airfoils
 plot_slices_3d
+```
+
+## Surfplan conversion (SurfplanAdapter)
+These live in the `SurfplanAdapter` submodule of `VortexStepMethod`, which converts a
+Surfplan export to the native YAML/CSV geometry format. Load it with
+`using VortexStepMethod.SurfplanAdapter`.
+```@meta
+CurrentModule = VortexStepMethod.SurfplanAdapter
+```
+```@docs
+surfplan_to_aero_yaml
 ```
 ```@meta
 CurrentModule = VortexStepMethod

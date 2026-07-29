@@ -44,6 +44,7 @@ update_panel_properties!
 build_interps
 panel_interp_types
 reinit!(wing::AbstractWing)
+reinit!(panel::Panel, section_1::Section, section_2::Section, aero_center, control_point, bound_point_1, bound_point_2, x_airf, y_airf, z_airf, delta, vec, spanwise_direction)
 rotated_te
 calculate_filaments_for_plotting
 ```
@@ -185,6 +186,7 @@ set_axes_equal_makie!
 map_airfoil_3d
 fitted_airfoil_3d
 generated_slices
+airfoil_skin_geometry
 Makie.plot!(ax, panel::VortexStepMethod.Panel)
 Makie.plot!(ax, body::VortexStepMethod.BodyAerodynamics)
 Makie.plot!(body::VortexStepMethod.BodyAerodynamics)

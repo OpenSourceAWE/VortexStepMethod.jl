@@ -1476,7 +1476,7 @@ given by its LE/TE points and leading-edge tangent (chord scale = `|TE - LE|`).
 """
 function map_airfoil_3d(le, te, tangent, x, y)
     frame = ObjAdapter.airfoil_frame(le, te, tangent)
-    frame === nothing && return nothing
+    (frame === nothing || isempty(x)) && return nothing
     x_af, _, z_af = frame
     chord = norm(te .- le)
     return reduce(hcat, [le .+ x_af .* (x[i] * chord) .+ z_af .* (y[i] * chord)
