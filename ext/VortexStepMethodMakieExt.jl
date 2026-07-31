@@ -60,12 +60,13 @@ end
     airfoil_skin_geometry(body; R_b_w=nothing, T_b_w=nothing) -> (vertices, faces, ribs)
 
 Lofted airfoil skin of a `BodyAerodynamics`: each refined section's airfoil contour
-(the `SectionAero` rest slice) placed on its chord and offset in thickness along the
-airfoil upper-surface normal — the adjacent panel's `z_airf`, so the skin matches
-VSM's own aero orientation (a `cross(chord, span)` fallback is used only if `z_airf`
-is not yet populated). Transformed to world by `R_b_w`/`T_b_w`. `vertices`/`faces`
-triangulate the skin between consecutive equal-node sections; `ribs` is one closed
-contour polyline per section. Sections without contour data are skipped.
+(the deflected slice at the adjacent panel's `delta`, via `section_surface`) placed on
+its chord and offset in thickness along the airfoil upper-surface normal — the adjacent
+panel's `z_airf`, so the skin matches VSM's own aero orientation and shows the current
+flap deflection (a `cross(chord, span)` fallback is used only if `z_airf` is not yet
+populated). Transformed to world by `R_b_w`/`T_b_w`. `vertices`/`faces` triangulate the
+skin between consecutive equal-node sections; `ribs` is one closed contour polyline per
+section. Sections without contour data are skipped.
 """
 function airfoil_skin_geometry(body; R_b_w=nothing, T_b_w=nothing)
     to_world(p) = (isnothing(R_b_w) || isnothing(T_b_w)) ? Point3f(p) :
@@ -91,10 +92,10 @@ function airfoil_skin_geometry(body; R_b_w=nothing, T_b_w=nothing)
                 up = cross(chord, spanwise)
             end
             up = norm(up) < 1e-9 ? Point3f(0, 0, 1) : Point3f(up / norm(up))
-            xs = section.section_aero.x
-            ys = section.section_aero.y
-            push!(ribs, [to_world(leading + xs[k, 1] * chord + (ys[k, 1] * chord_len) * up)
-                         for k in axes(xs, 1)])
+            delta = panel_idx <= length(body.panels) ? body.panels[panel_idx].delta : 0.0
+            xs, ys, _, _ = VortexStepMethod.section_surface(section.section_aero, 0.0, delta)
+            push!(ribs, [to_world(leading + xs[k] * chord + (ys[k] * chord_len) * up)
+                         for k in eachindex(xs)])
         end
         panel_offset += n_panels
     end

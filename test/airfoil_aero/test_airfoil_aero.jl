@@ -177,11 +177,17 @@ end
 
     xs, ys = kulfan_to_coordinates(sym; n_points=120)
     xs, ys = collect(xs), collect(ys)
-    camber(k) = k.upper_weights .+ k.lower_weights
+    # geometric camber line; the weight sum is not a symmetry proxy once
+    # shrink_wrap resamples the two surfaces at differing x-stations
+    function max_camber(k)
+        cx, cy = kulfan_to_coordinates(k; n_points=120)
+        cy = collect(cy)
+        return maximum(abs, reverse(cy[1:120]) .+ cy[120:end]) / 2
+    end
     base = deform_section(xs, ys, 0.0)
     flap = deform_section(xs, ys, deg2rad(10.0); crease_frac=0.75)
-    @test maximum(abs, camber(base.kulfan)) < 1e-6
-    @test maximum(abs, camber(flap.kulfan)) > 0.1
+    @test max_camber(base.kulfan) < 5e-3
+    @test max_camber(flap.kulfan) > 0.02
 
     @test minimum(flap.x) ≈ 0 atol = 0.01
     @test maximum(flap.x) ≈ 1 atol = 0.01
