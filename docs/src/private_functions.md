@@ -55,6 +55,7 @@ unrefined_deform!
 deform!
 compute_refined_panel_mapping!
 compute_refined_section_interpolation!
+copy_sections
 copy_sections_to_refined!
 _apply_refined_section_thetas!
 _panel_thetas_to_section_thetas!
