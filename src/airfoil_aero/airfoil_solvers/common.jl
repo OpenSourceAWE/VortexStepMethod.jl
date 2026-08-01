@@ -100,9 +100,7 @@ The re-wrap uses zero clearance (it hugs the deflected shape at grid resolution)
 the rolling-ball wrap bridges the crease with a `min_concave_radius` fillet instead
 of the overlapping panels that XFoil's own repaneling can hit there. The wrap runs
 for every `delta` including `0`, so all deflections share the same node count
-(`2·n_points - 1`) — a delta sweep that mixed the wrapped deflected shapes with an
-unwrapped base would give the base a different node count, and the per-node `(cp, cf)`
-assembly in [`generate_airfoil_aero`](@ref) would drop that column to `NaN`.
+(`2·n_points - 1`).
 """
 function deform_section(x, y, delta; crease_frac=0.9, thickness_frac=1.0,
                         flip_thickness_neg=true,

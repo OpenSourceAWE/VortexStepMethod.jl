@@ -66,9 +66,9 @@ plot_slices_3d
 ```
 
 ## Surfplan conversion (SurfplanAdapter)
-These live in the `SurfplanAdapter` submodule of `VortexStepMethod`, which converts a
-Surfplan export to the native YAML/CSV geometry format. Load it with
-`using VortexStepMethod.SurfplanAdapter`.
+These live in the `SurfplanAdapter` submodule of `VortexStepMethod`, which converts the
+output of the (Python) SurfplanAdapter export into the native, VSM-loadable YAML/CSV
+geometry format. Load it with `using VortexStepMethod.SurfplanAdapter`.
 ```@meta
 CurrentModule = VortexStepMethod.SurfplanAdapter
 ```

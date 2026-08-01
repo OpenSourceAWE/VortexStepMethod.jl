@@ -8,7 +8,7 @@ using ..AirfoilAero: shrink_wrap, ShrinkWrap, read_dat_coordinates,
 """
     surfplan_to_aero_yaml(adapter_dir, output_dir; aero_solver=NeuralFoilSolver(),
         wrap_method=ShrinkWrap(), alpha_range=-180:1:180, delta_range=nothing,
-        Re=nothing, crease_frac=0.75, verbose=true) -> geometry_yaml_path
+        Re=nothing, crease_frac=0.75, force=false, verbose=true) -> geometry_yaml_path
 
 Generate a pressure-ready `geometry.yaml` (per-node surface `cp`/`cf` tables plus
 polars) from a SurfplanAdapter aero export, so the wing can be flown with the
@@ -26,12 +26,20 @@ defaults to the full `-180:1:180` sweep rather than the export's narrow polar ra
 
 The `.txt` → adapter-YAML step (the upstream Python `SurfplanAdapter`) is the
 documented prerequisite. Load the result with `Wing(geometry_yaml_path)`.
+
+An existing `geometry.yaml` in `output_dir` is reused as-is, skipping the expensive
+polar generation; set `force=true` to regenerate the polars.
 """
 function surfplan_to_aero_yaml(adapter_dir::AbstractString, output_dir::AbstractString;
         aero_solver::AbstractAirfoilSolver=NeuralFoilSolver(),
         wrap_method::ShrinkWrap=ShrinkWrap(),
         alpha_range=-180:1:180, delta_range=nothing, Re=nothing,
-        crease_frac=0.75, verbose::Bool=true)
+        crease_frac=0.75, force::Bool=false, verbose::Bool=true)
+    yaml_path = joinpath(output_dir, "geometry.yaml")
+    if !force && isfile(yaml_path)
+        verbose && @info "Reusing existing $yaml_path (pass force=true to regenerate)"
+        return yaml_path
+    end
     data = YAML.load_file(joinpath(adapter_dir, "aero_geometry.yaml"))
     wing_sections = data["wing_sections"]["data"]
     wing_airfoils = data["wing_airfoils"]
@@ -72,7 +80,6 @@ function surfplan_to_aero_yaml(adapter_dir::AbstractString, output_dir::Abstract
     end
     sort!(section_rows; by = row -> row[3])
     sort!(airfoil_rows; by = row -> row[1])
-    yaml_path = joinpath(output_dir, "geometry.yaml")
     write_geometry_yaml(yaml_path, section_rows, airfoil_rows)
     verbose && @info "Wrote pressure geometry to $yaml_path " *
         "($(length(section_rows)) sections, $(length(ok)) airfoils)"

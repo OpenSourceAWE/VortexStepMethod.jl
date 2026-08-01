@@ -61,7 +61,8 @@ GLMakie.save("V3_slices_3d.png", fig_slices_3d)
 
 # `obj_to_yaml` generates the whole aero geometry from the OBJ: shape (.dat), polar CSV,
 # and Cp/cf tables plus a geometry.yaml. XFoil (`aero_solver=XFoilSolver(...)`) also works
-# but doesn't converge on the V3's thin membrane airfoils, so NeuralFoil is used here.
+# but doesn't converge on the V3's concave slices (the sharp corner behind the leading
+# edge), so NeuralFoil is used here.
 println("Generating V3 aero geometry from OBJ (obj_to_yaml)...")
 gen_dir = joinpath("data", "TUDELFT_V3_KITE", "generated_neuralfoil")
 nf_yaml = obj_to_yaml(OBJ_PATH, gen_dir; n_sections=N_SLICES, Re=RE,

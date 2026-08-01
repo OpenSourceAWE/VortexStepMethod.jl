@@ -23,7 +23,7 @@ This creates two triangles: (LE1, TE1, TE2) and (LE1, TE2, LE2).
 If `use_observables=true`, creates observables for dynamic updates.
 """
 function Makie.plot!(ax, panel::VortexStepMethod.Panel; color=(:red, 0.2), R_b_w=nothing, T_b_w=nothing,
-    use_observables=false, kwargs...)
+    use_observables=false, border_linewidth=1.5, kwargs...)
     plots = []
     points = [Point3f(panel.corner_points[:, i]) for i in 1:4]
     if !isnothing(R_b_w) && !isnothing(T_b_w)
@@ -38,7 +38,8 @@ function Makie.plot!(ax, panel::VortexStepMethod.Panel; color=(:red, 0.2), R_b_w
 
         p = mesh!(ax, vertices_obs, faces_obs; color, transparency=true, kwargs...)
         push!(plots, p)
-        p = lines!(ax, border_obs; color=:black, transparency=true, kwargs...)
+        p = lines!(ax, border_obs; color=:black, linewidth=border_linewidth,
+                   transparency=true, kwargs...)
         push!(plots, p)
 
         # Note: Observables are stored at the body level, not individual panel level
@@ -49,7 +50,8 @@ function Makie.plot!(ax, panel::VortexStepMethod.Panel; color=(:red, 0.2), R_b_w
         p = mesh!(ax, points, faces; color, transparency=true, kwargs...)
         push!(plots, p)
         border_points = [points..., points[1]]
-        p = lines!(ax, border_points; color=:black, transparency=true, kwargs...)
+        p = lines!(ax, border_points; color=:black, linewidth=border_linewidth,
+                   transparency=true, kwargs...)
         push!(plots, p)
     end
 
@@ -130,7 +132,8 @@ Otherwise, creates static plots (original behavior).
 """
 function Makie.plot!(ax, body::VortexStepMethod.BodyAerodynamics; color=(:red, 0.2), R_b_w=nothing, T_b_w=nothing,
     use_observables=false, airfoils=false,
-    airfoil_color=:deepskyblue, airfoil_opacity=0.2, rib_color=:black, kwargs...)
+    airfoil_color=:deepskyblue, airfoil_opacity=0.2, rib_color=:black,
+    border_linewidth=1.5, kwargs...)
     plots = []
 
     if airfoils
@@ -143,7 +146,8 @@ function Makie.plot!(ax, body::VortexStepMethod.BodyAerodynamics; color=(:red, 0
             isempty(faces) || push!(plots, mesh!(ax, vertices_obs, faces;
                 color=skin_color, transparency=true))
             for rib in rib_obs
-                push!(plots, lines!(ax, rib; color=rib_color, transparency=true))
+                push!(plots, lines!(ax, rib; color=rib_color,
+                    linewidth=border_linewidth, transparency=true))
             end
             AIRFOIL_SKIN_OBSERVABLES[][objectid(body)] =
                 (vertices=vertices_obs, ribs=rib_obs)
@@ -151,7 +155,8 @@ function Makie.plot!(ax, body::VortexStepMethod.BodyAerodynamics; color=(:red, 0
             isempty(faces) || push!(plots, mesh!(ax, vertices, faces;
                 color=skin_color, transparency=true))
             for rib in ribs
-                push!(plots, lines!(ax, rib; color=rib_color, transparency=true))
+                push!(plots, lines!(ax, rib; color=rib_color,
+                    linewidth=border_linewidth, transparency=true))
             end
         end
         return plots
@@ -181,7 +186,8 @@ function Makie.plot!(ax, body::VortexStepMethod.BodyAerodynamics; color=(:red, 0
             # Plot using observables
             p = mesh!(ax, vertices_obs, faces_obs; color, transparency=true, kwargs...)
             push!(plots, p)
-            p = lines!(ax, border_obs; color=:black, transparency=true, kwargs...)
+            p = lines!(ax, border_obs; color=:black, linewidth=border_linewidth,
+                       transparency=true, kwargs...)
             push!(plots, p)
 
             # Store observables with stable key
@@ -194,7 +200,8 @@ function Makie.plot!(ax, body::VortexStepMethod.BodyAerodynamics; color=(:red, 0
     else
         # Static plotting (original behavior)
         for panel in body.panels
-            p = Makie.plot!(ax, panel; color, R_b_w, T_b_w, use_observables=false, kwargs...)
+            p = Makie.plot!(ax, panel; color, R_b_w, T_b_w, use_observables=false,
+                            border_linewidth, kwargs...)
             push!(plots, p)
         end
     end

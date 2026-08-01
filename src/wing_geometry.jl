@@ -88,11 +88,9 @@ end
 """
     copy_sections(sections) -> Vector{Section}
 
-Copy a vector of [`Section`](@ref)s into fresh objects. Each copy gets its own
-`LE_point`/`TE_point` storage, so mutating a copy's geometry never aliases the
-source; the read-only `aero_data`/`section_aero` tables are shared by reference.
-A plain `copy` would only duplicate the vector and keep the mutable sections
-shared, letting a geometry edit on one list corrupt another.
+Copy a vector of [`Section`](@ref)s into fresh objects with their own
+`LE_point`/`TE_point` storage; the read-only `aero_data`/`section_aero` tables are
+shared by reference.
 """
 function copy_sections(sections::AbstractVector{Section{T}}) where {T}
     copies = [Section{T}() for _ in sections]

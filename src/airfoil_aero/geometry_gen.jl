@@ -66,6 +66,8 @@ function generate_airfoils(airfoils, output_dir::String;
         catch e
             reuse_valid_airfoils ||
                 error("Airfoil $j polar generation failed: $(sprint(showerror, e))")
+            @warn "Airfoil $j did not solve, reusing the nearest valid airfoil: " *
+                sprint(showerror, e)
         end
     end
     return airfoil_rows, ok

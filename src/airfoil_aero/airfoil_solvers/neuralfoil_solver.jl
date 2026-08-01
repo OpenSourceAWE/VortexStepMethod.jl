@@ -24,8 +24,8 @@ end
     analyze_sweep(solver::NeuralFoilSolver, def, alpha_range, Re) -> Vector{SectionSolution}
 
 Evaluate all angles (radians) in one vectorized NeuralFoil call on the deformed
-Kulfan parameters, then map the station `Cp` onto the deformed contour nodes
-(`def.x`, `def.y`) — upper nodes from `cp_upper`, lower from `cp_lower`. `cf` is a
+Kulfan parameters, then assemble a single per-node `cp` on the deformed contour nodes
+(`def.x`, `def.y`) from NeuralFoil's separate upper/lower surface pressures. `cf` is a
 flat-plate closure ([`flat_plate_cf`](@ref)), NeuralFoil not exposing skin friction.
 """
 function analyze_sweep(solver::NeuralFoilSolver, def::DeformedSection, alpha_range, Re)
