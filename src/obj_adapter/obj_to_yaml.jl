@@ -54,6 +54,9 @@ to use XFoil instead. Each section's polar is written as `POLAR_VECTORS`.
 `crease_frac` is the chordwise hinge location (0–1) about which each `delta_range`
 trailing-edge deflection pivots.
 
+With `force=false` (default) an existing `geometry.yaml` in `output_dir` is reused;
+`force=true` regenerates it (e.g. after changing `delta_range` or the mesh).
+
 `wrap_method` ([`ShrinkWrap`](@ref)) wraps each slice's point cloud into a clean closed
 airfoil, robust both to the noisy interior-structure points (ribs, spars) of a ram-air
 kite slice that otherwise pull a plain least-squares fit inward, and to the complex,
@@ -88,7 +91,13 @@ function obj_to_yaml(obj_path::String, output_dir::String;
                      wrap_method::ShrinkWrap=ShrinkWrap(),
                      reuse_valid_airfoils::Bool=true, max_thickness_ratio::Real=2.0,
                      spanwise_direction=[0.0, 1.0, 0.0], rotation=I,
-                     wingtip_distance=0.05, crease_frac=0.75, verbose::Bool=true)
+                     wingtip_distance=0.05, crease_frac=0.75, force::Bool=false,
+                     verbose::Bool=true)
+    yaml_path = joinpath(output_dir, "geometry.yaml")
+    if !force && isfile(yaml_path)
+        verbose && @info "Reusing existing geometry (force=true to regenerate)" yaml_path
+        return yaml_path
+    end
     (!endswith(obj_path, ".obj")) && (obj_path *= ".obj")
     isfile(obj_path) || error("OBJ file not found: $obj_path")
     !isapprox(spanwise_direction, [0.0, 1.0, 0.0]) &&
@@ -138,7 +147,6 @@ function obj_to_yaml(obj_path::String, output_dir::String;
 
     sort!(section_rows; by = row -> row[3])          # clean spanwise order (by LE_y)
     sort!(airfoil_rows; by = row -> row[1])          # airfoils by id
-    yaml_path = joinpath(output_dir, "geometry.yaml")
     write_geometry_yaml(yaml_path, section_rows, airfoil_rows)
     verbose && @info "Wrote geometry to $yaml_path ($(length(section_rows)) sections)"
     return yaml_path

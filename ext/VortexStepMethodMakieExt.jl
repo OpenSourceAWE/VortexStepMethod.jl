@@ -117,14 +117,12 @@ end
 """
     airfoil_skin_geometry(body; R_b_w=nothing, T_b_w=nothing) -> (vertices, faces, ribs)
 
-Lofted airfoil skin of a `BodyAerodynamics`: each refined section's airfoil contour
-(the deflected slice at the owning panel's `delta`, via `section_surface`) fitted between
-the panel's leading- and trailing-edge `corner_points` by a 2D similarity that pins the
-contour's own LE/TE to those corners. Sourcing LE/TE and the [`panel_normal`](@ref) from
-`corner_points` (not the section's `LE_point`/`TE_point`) shares one geometry source with
-the panel quads, so the skin tracks per-frame deformation during a `SysLog` replay (which
-restores `corner_points` and `delta`). Pinning the TE means a flap deflection shows as the
-fore body bulging up rather than the TE detaching. Transformed to world by `R_b_w`/`T_b_w`.
+Lofted airfoil skin of a `BodyAerodynamics`: each section's deflected contour
+(`section_surface` at the panel's `delta`) is fitted between the panel's `corner_points`
+by a 2D similarity, TE pinned so a deflection bulges the fore body up. The skin reflects
+`delta` only when the geometry carries per-`delta` slices (`obj_to_yaml` with a
+`delta_range`); with δ=0-only data it renders undeflected, a deliberate cue that the
+deflected slices are missing. Transformed to world by `R_b_w`/`T_b_w`.
 `vertices`/`faces` triangulate the skin between consecutive equal-node sections; `ribs` is
 one closed contour polyline per section. Sections without contour data are skipped.
 """
