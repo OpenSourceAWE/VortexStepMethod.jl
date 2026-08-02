@@ -327,7 +327,7 @@ function calculate_cl(panel::Panel{Tp}, alpha::Ta, delta::Td) where {Tp, Ta, Td}
     R = promote_type(Tp, Ta, Td)
     isnan(alpha) && return R(NaN)
     if panel.aero_model == POLY
-        cl = evalpoly(rad2deg(alpha), reverse(panel.cl_coeffs))
+        cl = evalpoly(rad2deg(alpha), panel.cl_coeffs)
         if abs(alpha) > (π/9)
             cl = 2 * cos(alpha) * sin(alpha)^2
         end
@@ -359,7 +359,7 @@ function calculate_cd(panel::Panel{Tp}, alpha::Ta, delta::Td) where {Tp, Ta, Td}
         if abs(alpha) > (π/9)  # Outside ±20 degrees
             return R(2 * sin(alpha)^3)
         end
-        return R(evalpoly(rad2deg(alpha), reverse(panel.cd_coeffs)))
+        return R(evalpoly(rad2deg(alpha), panel.cd_coeffs))
     elseif panel.aero_model in (POLAR_VECTORS, POLAR_MATRICES)
         cd_interp = panel.cd_interp
         cd_interp === nothing &&
@@ -385,7 +385,7 @@ function calculate_cm(panel::Panel{Tp}, alpha::Ta, delta::Td) where {Tp, Ta, Td}
     R = promote_type(Tp, Ta, Td)
     isnan(alpha) && return R(NaN)
     if panel.aero_model == POLY
-        return R(evalpoly(rad2deg(alpha), reverse(panel.cm_coeffs)))
+        return R(evalpoly(rad2deg(alpha), panel.cm_coeffs))
     elseif panel.aero_model in (POLAR_VECTORS, POLAR_MATRICES)
         cm_interp = panel.cm_interp
         cm_interp === nothing &&
