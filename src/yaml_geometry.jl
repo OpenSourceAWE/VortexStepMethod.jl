@@ -220,6 +220,7 @@ function Wing(
     remove_nan=true,
     use_prior_polar=false,
     billowing_percentage=0.0,
+    crease_frac=0.75,
     prn=false,
     sort_sections=true
 )
@@ -299,9 +300,10 @@ function Wing(
         spanwise_direction=MVec3(spanwise_direction),
         remove_nan=remove_nan,
         use_prior_polar=use_prior_polar,
-        billowing_percentage=Float64(billowing_percentage)
+        billowing_percentage=Float64(billowing_percentage),
+        crease_frac=Float64(crease_frac)
     )
-    
+
     # Parse sections and populate wing
     for section in sections
         # Get coordinates directly from struct fields
@@ -406,6 +408,7 @@ function Wing(settings::VSMSettings; sort_sections::Bool=true)
             remove_nan=wing_settings.remove_nan,
             use_prior_polar=wing_settings.use_prior_polar,
             billowing_percentage=wing_settings.billowing_percentage,
+            crease_frac=wing_settings.crease_frac,
             sort_sections
         )
     elseif has_obj && has_dat

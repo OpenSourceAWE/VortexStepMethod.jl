@@ -278,6 +278,7 @@ function reinit!(body_aero::BodyAerodynamics{P, W, T};
                 remove_nan=wing.remove_nan,
                 init_aero=wing_init_aero
             )
+            body_aero.panels[idx].crease_frac = wing.crease_frac
             idx += 1
         end
     end

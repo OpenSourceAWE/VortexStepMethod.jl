@@ -256,6 +256,7 @@ Represents a wing composed of multiple sections with aerodynamic properties.
 - `refined_sections::AbstractVector{<:Section}`: Vector of refined wing sections, see: [Section](@ref)
 - `remove_nan::Bool`: Wether to remove the NaNs from interpolations or not
 - `use_prior_polar::Bool`: Keep previously-initialized section/panel polar data when refining geometry updates
+- `crease_frac::Float64`: chordwise flap-hinge fraction (0–1) used when plotting the deflected plate
 
 # Deformation Fields (optional, for deformable wings)
 - `non_deformed_sections::AbstractVector{<:Section}`: Original undeformed sections
@@ -303,6 +304,7 @@ mutable struct Wing{P, T} <: AbstractWing{T}
     remove_nan::Bool
     use_prior_polar::Bool
     billowing_percentage::Float64  # TE billow as percentage of arc length (0=flat)
+    crease_frac::T
 
     # Grouping
     refined_panel_mapping::Vector{Int16}  # Maps each refined panel index to unrefined section index (1 to n_unrefined_sections)
@@ -360,7 +362,8 @@ function Wing(n_panels::Int;
         spanwise_direction::PosVector=MVec3([0.0, 1.0, 0.0]),
         remove_nan::Bool=true,
         use_prior_polar::Bool=false,
-        billowing_percentage=0.0)
+        billowing_percentage=0.0,
+        crease_frac=0.75)
 
     # For YAML wings, n_unrefined_sections will be set when sections are added
     # Set to 0 as placeholder for now
@@ -374,6 +377,7 @@ function Wing(n_panels::Int;
     Wing{n_panels, Float64}(
         Int16(n_panels), n_unrefined_sections_value, spanwise_distribution, panel_props, spanwise_direction_m,
         Section{Float64}[], Section{Float64}[], remove_nan, use_prior_polar, Float64(billowing_percentage),
+        Float64(crease_frac),
         # Grouping
         Int16[],
         # Refined-section interpolation cache

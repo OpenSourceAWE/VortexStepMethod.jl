@@ -34,6 +34,8 @@ Represents a panel in a vortex step method simulation. All points and vectors ar
         SemiInfiniteFilament(),
         SemiInfiniteFilament()
     ): Panel filaments, see: [BoundFilament](@ref)
+- `delta`::T=0: flap trailing-edge deflection [rad]
+- `crease_frac`::T=0: chordwise flap-hinge fraction (0–1); 0 disables the plate kink
 """
 @with_kw mutable struct Panel{T, CL, CD, CM, SA}
     TE_point_1::MVector{3, T} = zeros(MVector{3, T})
@@ -67,6 +69,7 @@ Represents a panel in a vortex step method simulation. All points and vectors ar
         SemiInfiniteFilament{T}()
     )
     delta::T = zero(T)
+    crease_frac::T = zero(T)
 end
 
 """

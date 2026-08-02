@@ -13,28 +13,86 @@ const PANEL_MESH_OBSERVABLES = Ref{Union{Nothing,Dict}}(nothing)
 # Global storage for airfoil-skin observables, keyed by body objectid.
 const AIRFOIL_SKIN_OBSERVABLES = Ref{Union{Nothing,Dict}}(nothing)
 
+const PLATE_FACES = [Makie.GLTriangleFace(1, 2, 5), Makie.GLTriangleFace(1, 5, 6),
+    Makie.GLTriangleFace(2, 3, 4), Makie.GLTriangleFace(2, 4, 5)]
+const PLATE_BORDER_IDX = [1, 2, 3, 4, 5, 6, 1]
+
+"""
+    panel_normal(panel) -> Point3f
+
+Body-frame airfoil-upper-surface unit normal of a panel, from its `corner_points`
+and sign-aligned to `z_airf` (both body-frame, so the sign relation survives the
+kite's attitude changes). Falls back to `+z` for a degenerate quad.
+"""
+function panel_normal(panel)
+    c = panel.corner_points
+    up = cross(Point3f(c[:, 2]) - Point3f(c[:, 1]), Point3f(c[:, 1]) - Point3f(c[:, 4]))
+    n = norm(up)
+    up = n < 1e-9 ? Point3f(0, 0, 1) : Point3f(up / n)
+    dot(up, Point3f(panel.z_airf)) < 0 && (up = -up)
+    return up
+end
+
+"""
+    plate_hinge_local(crease_frac, delta) -> (lx, ly)
+
+Chordwise/thickness fractions (chord = 1, LE at 0) of the flap hinge for a plate
+whose trailing edge is deflected by `delta` [rad] about `crease_frac` and then
+re-pinned so the TE stays at the panel TE corner. A downward deflection therefore
+lifts the hinge (`ly > 0`, the "bulge up"). `crease_frac` outside `(0, 1)` disables
+the kink (hinge stays on the chord line).
+"""
+function plate_hinge_local(crease_frac, delta)
+    (crease_frac <= 0 || crease_frac >= 1) && return (Float64(crease_frac), 0.0)
+    tex = crease_frac + (1 - crease_frac) * cos(delta)
+    tey = -(1 - crease_frac) * sin(delta)
+    den = tex^2 + tey^2
+    den < 1e-12 && return (Float64(crease_frac), 0.0)
+    return (crease_frac * tex / den, -crease_frac * tey / den)
+end
+
+"""
+    panel_plate_geometry(panel; R_b_w=nothing, T_b_w=nothing) -> Vector{Point3f}
+
+The 6 vertices `[LE_1, hinge_1, TE_1, TE_2, hinge_2, LE_2]` of a panel's flat-plate
+skin, kinked at [`plate_hinge_local`](@ref) by the panel's `delta`/`crease_frac`
+(TE pinned to the corners, hinge bulging up). Triangulated by [`PLATE_FACES`](@ref);
+with `delta == 0` the two quads are coplanar (the original flat quad). Transformed to
+world by `R_b_w`/`T_b_w`.
+"""
+function panel_plate_geometry(panel; R_b_w=nothing, T_b_w=nothing)
+    to_world(p) = (isnothing(R_b_w) || isnothing(T_b_w)) ? Point3f(p) :
+        Point3f(R_b_w * p + T_b_w)
+    c = panel.corner_points
+    c1 = Point3f(c[:, 1]); c2 = Point3f(c[:, 2]); c3 = Point3f(c[:, 3]); c4 = Point3f(c[:, 4])
+    up = panel_normal(panel)
+    lx, ly = plate_hinge_local(panel.crease_frac, panel.delta)
+    chord1 = c2 - c1; chord2 = c3 - c4
+    hinge1 = c1 + lx * chord1 + (ly * norm(chord1)) * up
+    hinge2 = c4 + lx * chord2 + (ly * norm(chord2)) * up
+    return [to_world(c1), to_world(hinge1), to_world(c2),
+            to_world(c3), to_world(hinge2), to_world(c4)]
+end
+
 """
     plot!(ax, panel::VortexStepMethod.Panel; use_observables=false, kwargs...)
 
-Plot a single `Panel` as a `mesh`.
-The corner points are ordered as: LE1, TE1, TE2, LE2.
-This creates two triangles: (LE1, TE1, TE2) and (LE1, TE2, LE2).
+Plot a single `Panel` as a flat-plate `mesh`, kinked at the flap hinge by the
+panel's `delta`/`crease_frac` (see [`panel_plate_geometry`](@ref)); with `delta == 0`
+this is the flat quad LE1-TE1-TE2-LE2.
 
 If `use_observables=true`, creates observables for dynamic updates.
 """
 function Makie.plot!(ax, panel::VortexStepMethod.Panel; color=(:red, 0.2), R_b_w=nothing, T_b_w=nothing,
     use_observables=false, border_linewidth=1.5, kwargs...)
     plots = []
-    points = [Point3f(panel.corner_points[:, i]) for i in 1:4]
-    if !isnothing(R_b_w) && !isnothing(T_b_w)
-        points = [Point3f(R_b_w * p + T_b_w) for p in points]
-    end
+    points = panel_plate_geometry(panel; R_b_w, T_b_w)
 
     if use_observables
         # Create observables for dynamic updates
         vertices_obs = Observable(points)
-        faces_obs = Observable([Makie.GLTriangleFace(1, 2, 3), Makie.GLTriangleFace(1, 3, 4)])
-        border_obs = Observable([points..., points[1]])
+        faces_obs = Observable(copy(PLATE_FACES))
+        border_obs = Observable(points[PLATE_BORDER_IDX])
 
         p = mesh!(ax, vertices_obs, faces_obs; color, transparency=true, kwargs...)
         push!(plots, p)
@@ -46,11 +104,9 @@ function Makie.plot!(ax, panel::VortexStepMethod.Panel; color=(:red, 0.2), R_b_w
         # Individual panels need their parent body for proper tracking
     else
         # Static plotting (original behavior)
-        faces = [Makie.GLTriangleFace(1, 2, 3), Makie.GLTriangleFace(1, 3, 4)]
-        p = mesh!(ax, points, faces; color, transparency=true, kwargs...)
+        p = mesh!(ax, points, PLATE_FACES; color, transparency=true, kwargs...)
         push!(plots, p)
-        border_points = [points..., points[1]]
-        p = lines!(ax, border_points; color=:black, linewidth=border_linewidth,
+        p = lines!(ax, points[PLATE_BORDER_IDX]; color=:black, linewidth=border_linewidth,
                    transparency=true, kwargs...)
         push!(plots, p)
     end
@@ -62,13 +118,15 @@ end
     airfoil_skin_geometry(body; R_b_w=nothing, T_b_w=nothing) -> (vertices, faces, ribs)
 
 Lofted airfoil skin of a `BodyAerodynamics`: each refined section's airfoil contour
-(the deflected slice at the adjacent panel's `delta`, via `section_surface`) placed on
-its chord and offset in thickness along the airfoil upper-surface normal — the adjacent
-panel's `z_airf`, so the skin matches VSM's own aero orientation and shows the current
-flap deflection (a `cross(chord, span)` fallback is used only if `z_airf` is not yet
-populated). Transformed to world by `R_b_w`/`T_b_w`. `vertices`/`faces` triangulate the
-skin between consecutive equal-node sections; `ribs` is one closed contour polyline per
-section. Sections without contour data are skipped.
+(the deflected slice at the owning panel's `delta`, via `section_surface`) fitted between
+the panel's leading- and trailing-edge `corner_points` by a 2D similarity that pins the
+contour's own LE/TE to those corners. Sourcing LE/TE and the [`panel_normal`](@ref) from
+`corner_points` (not the section's `LE_point`/`TE_point`) shares one geometry source with
+the panel quads, so the skin tracks per-frame deformation during a `SysLog` replay (which
+restores `corner_points` and `delta`). Pinning the TE means a flap deflection shows as the
+fore body bulging up rather than the TE detaching. Transformed to world by `R_b_w`/`T_b_w`.
+`vertices`/`faces` triangulate the skin between consecutive equal-node sections; `ribs` is
+one closed contour polyline per section. Sections without contour data are skipped.
 """
 function airfoil_skin_geometry(body; R_b_w=nothing, T_b_w=nothing)
     to_world(p) = (isnothing(R_b_w) || isnothing(T_b_w)) ? Point3f(p) :
@@ -79,25 +137,41 @@ function airfoil_skin_geometry(body; R_b_w=nothing, T_b_w=nothing)
         sections = wing.refined_sections
         n = length(sections)
         n_panels = n - 1
+        n_panels < 1 && continue
+        spanwise = Point3f(wing.spanwise_direction)
+        increasing = dot(Point3f(sections[n].LE_point) -
+                         Point3f(sections[1].LE_point), spanwise) > 0
         for (i, section) in enumerate(sections)
             isnothing(section.section_aero) && continue
-            leading = Point3f(section.LE_point)
-            chord = Point3f(section.TE_point) - leading
+            panel_idx = panel_offset + min(i, n_panels)
+            panel_idx <= length(body.panels) || continue
+            panel = body.panels[panel_idx]
+            corners = panel.corner_points
+            corner1 = Point3f(corners[:, 1]); corner3 = Point3f(corners[:, 3])
+            corner2 = Point3f(corners[:, 2]); corner4 = Point3f(corners[:, 4])
+            plus_edge = i <= n_panels ? !increasing : increasing
+            leading = plus_edge ? corner1 : corner4
+            trailing = plus_edge ? corner2 : corner3
+            chord = trailing - leading
             chord_len = norm(chord)
             chord_len < 1e-9 && continue
-            panel_idx = panel_offset + clamp(i, 1, max(n_panels, 1))
-            up = panel_idx <= length(body.panels) ?
-                Point3f(body.panels[panel_idx].z_airf) : Point3f(0, 0, 0)
-            if norm(up) < 1e-9                          # not solved yet: geometric fallback
-                neighbor = Point3f(sections[i < n ? i + 1 : max(i - 1, 1)].LE_point)
-                spanwise = i < n ? neighbor - leading : leading - neighbor
-                up = cross(chord, spanwise)
+            up = panel_normal(panel)
+            xs, ys, _, _ = VortexStepMethod.section_surface(section.section_aero,
+                                                            0.0, panel.delta)
+            le_i = argmin(xs)
+            le_x = xs[le_i]; le_y = ys[le_i]
+            te_x = 0.5 * (xs[1] + xs[end]); te_y = 0.5 * (ys[1] + ys[end])
+            dx = te_x - le_x; dy = te_y - le_y
+            den = dx^2 + dy^2
+            den < 1e-18 && continue
+            rib = Vector{Point3f}(undef, length(xs))
+            for k in eachindex(xs)
+                px = xs[k] - le_x; py = ys[k] - le_y
+                lx = (px * dx + py * dy) / den
+                ly = (py * dx - px * dy) / den
+                rib[k] = to_world(leading + lx * chord + (ly * chord_len) * up)
             end
-            up = norm(up) < 1e-9 ? Point3f(0, 0, 1) : Point3f(up / norm(up))
-            delta = panel_idx <= length(body.panels) ? body.panels[panel_idx].delta : 0.0
-            xs, ys, _, _ = VortexStepMethod.section_surface(section.section_aero, 0.0, delta)
-            push!(ribs, [to_world(leading + xs[k] * chord + (ys[k] * chord_len) * up)
-                         for k in eachindex(xs)])
+            push!(ribs, rib)
         end
         panel_offset += n_panels
     end
@@ -173,15 +247,12 @@ function Makie.plot!(ax, body::VortexStepMethod.BodyAerodynamics; color=(:red, 0
         # Create observables for each panel
         for (panel_idx, panel) in enumerate(body.panels)
             # Compute initial points
-            points = [Point3f(panel.corner_points[:, i]) for i in 1:4]
-            if !isnothing(R_b_w) && !isnothing(T_b_w)
-                points = [Point3f(R_b_w * p + T_b_w) for p in points]
-            end
+            points = panel_plate_geometry(panel; R_b_w, T_b_w)
 
             # Create observables
             vertices_obs = Observable(points)
-            faces_obs = Observable([Makie.GLTriangleFace(1, 2, 3), Makie.GLTriangleFace(1, 3, 4)])
-            border_obs = Observable([points..., points[1]])
+            faces_obs = Observable(copy(PLATE_FACES))
+            border_obs = Observable(points[PLATE_BORDER_IDX])
 
             # Plot using observables
             p = mesh!(ax, vertices_obs, faces_obs; color, transparency=true, kwargs...)
@@ -228,12 +299,9 @@ function Makie.plot!(body::VortexStepMethod.BodyAerodynamics; R_b_w=nothing, T_b
             key = (body_id, panel_idx)
             haskey(PANEL_MESH_OBSERVABLES[], key) || continue
             obs = PANEL_MESH_OBSERVABLES[][key]
-            points = [Point3f(panel.corner_points[:, i]) for i in 1:4]
-            if !isnothing(R_b_w) && !isnothing(T_b_w)
-                points = [Point3f(R_b_w * p + T_b_w) for p in points]
-            end
+            points = panel_plate_geometry(panel; R_b_w, T_b_w)
             obs.vertices[] = points
-            obs.border[] = [points..., points[1]]
+            obs.border[] = points[PLATE_BORDER_IDX]
         end
     end
 
@@ -260,19 +328,16 @@ function Makie.plot(panel::VortexStepMethod.Panel; size=(1200, 800),
     )
 
     # Create observables for panel geometry
-    points = [Point3f(panel.corner_points[:, i]) for i in 1:4]
-    if !isnothing(R_b_w) && !isnothing(T_b_w)
-        points = [Point3f(R_b_w * p + T_b_w) for p in points]
-    end
+    points = panel_plate_geometry(panel; R_b_w, T_b_w)
 
     vertices_obs = Observable(points)
-    faces_obs = Observable([Makie.GLTriangleFace(1, 2, 3), Makie.GLTriangleFace(1, 3, 4)])
+    faces_obs = Observable(copy(PLATE_FACES))
 
     # Plot mesh using observables
     mesh!(ax, vertices_obs, faces_obs; color, transparency=true, kwargs...)
 
     # Plot border
-    border_obs = Observable([points..., points[1]])
+    border_obs = Observable(points[PLATE_BORDER_IDX])
     lines!(ax, border_obs; color=:black, transparency=true, kwargs...)
 
     # Store observables globally for updates
@@ -311,15 +376,12 @@ function Makie.plot(body_aero::VortexStepMethod.BodyAerodynamics; size=(1200, 80
     # Create observables for each panel using stable (body_id, panel_idx) key
     for (panel_idx, panel) in enumerate(body_aero.panels)
         # Compute initial points
-        points = [Point3f(panel.corner_points[:, i]) for i in 1:4]
-        if !isnothing(R_b_w) && !isnothing(T_b_w)
-            points = [Point3f(R_b_w * p + T_b_w) for p in points]
-        end
+        points = panel_plate_geometry(panel; R_b_w, T_b_w)
 
         # Create observables
         vertices_obs = Observable(points)
-        faces_obs = Observable([Makie.GLTriangleFace(1, 2, 3), Makie.GLTriangleFace(1, 3, 4)])
-        border_obs = Observable([points..., points[1]])
+        faces_obs = Observable(copy(PLATE_FACES))
+        border_obs = Observable(points[PLATE_BORDER_IDX])
 
         # Plot using observables
         mesh!(ax, vertices_obs, faces_obs; color, transparency=true, kwargs...)

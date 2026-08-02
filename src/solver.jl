@@ -1161,6 +1161,7 @@ function _wing_with_eltype(wing::Wing{P, Float64}, ::Type{TD}) where {P, TD}
         wing.remove_nan,
         wing.use_prior_polar,
         wing.billowing_percentage,
+        TD(wing.crease_frac),
         copy(wing.refined_panel_mapping),
         copy(wing.refined_section_left_idx),
         Vector{TD}(wing.refined_section_weight),
