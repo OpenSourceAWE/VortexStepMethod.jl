@@ -88,7 +88,7 @@ function obj_to_yaml(obj_path::String, output_dir::String;
                      wrap_method::ShrinkWrap=ShrinkWrap(),
                      reuse_valid_airfoils::Bool=true, max_thickness_ratio::Real=2.0,
                      spanwise_direction=[0.0, 1.0, 0.0], rotation=I,
-                     wingtip_distance=0.0, crease_frac=0.75, verbose::Bool=true)
+                     wingtip_distance=0.05, crease_frac=0.75, verbose::Bool=true)
     (!endswith(obj_path, ".obj")) && (obj_path *= ".obj")
     isfile(obj_path) || error("OBJ file not found: $obj_path")
     !isapprox(spanwise_direction, [0.0, 1.0, 0.0]) &&

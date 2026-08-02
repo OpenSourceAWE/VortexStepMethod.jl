@@ -47,7 +47,7 @@ function ram_air_matrix_dir(; n_sections=4,
     yaml = joinpath(gen_dir, "geometry.yaml")
     isfile(yaml) || obj_to_yaml(obj, gen_dir; n_sections, Re=1e6,
         alpha_range=rad2deg.(alpha_range), delta_range=rad2deg.(delta_range),
-        aero_solver=NeuralFoilSolver(), verbose=false)
+        aero_solver=NeuralFoilSolver(), wingtip_distance=0.05, verbose=false)
     return gen_dir, yaml
 end
 
