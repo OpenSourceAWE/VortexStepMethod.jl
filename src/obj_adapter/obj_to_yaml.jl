@@ -93,15 +93,16 @@ function obj_to_yaml(obj_path::String, output_dir::String;
                      spanwise_direction=[0.0, 1.0, 0.0], rotation=I,
                      wingtip_distance=0.05, crease_frac=0.75, force::Bool=false,
                      verbose::Bool=true)
+    (!endswith(obj_path, ".obj")) && (obj_path *= ".obj")
+    isfile(obj_path) || error("OBJ file not found: $obj_path")
+    !isapprox(spanwise_direction, [0.0, 1.0, 0.0]) &&
+        throw(ArgumentError("Spanwise direction has to be [0.0, 1.0, 0.0]"))
+
     yaml_path = joinpath(output_dir, "geometry.yaml")
     if !force && isfile(yaml_path)
         verbose && @info "Reusing existing geometry (force=true to regenerate)" yaml_path
         return yaml_path
     end
-    (!endswith(obj_path, ".obj")) && (obj_path *= ".obj")
-    isfile(obj_path) || error("OBJ file not found: $obj_path")
-    !isapprox(spanwise_direction, [0.0, 1.0, 0.0]) &&
-        throw(ArgumentError("Spanwise direction has to be [0.0, 1.0, 0.0]"))
 
     vertices, faces = read_faces(obj_path)
 

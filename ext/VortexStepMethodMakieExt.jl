@@ -84,7 +84,7 @@ this is the flat quad LE1-TE1-TE2-LE2.
 If `use_observables=true`, creates observables for dynamic updates.
 """
 function Makie.plot!(ax, panel::VortexStepMethod.Panel; color=(:red, 0.2), R_b_w=nothing, T_b_w=nothing,
-    use_observables=false, border_linewidth=1.5, kwargs...)
+    use_observables=false, border_linewidth=1.5, transparency=true, kwargs...)
     plots = []
     points = panel_plate_geometry(panel; R_b_w, T_b_w)
 
@@ -94,20 +94,20 @@ function Makie.plot!(ax, panel::VortexStepMethod.Panel; color=(:red, 0.2), R_b_w
         faces_obs = Observable(copy(PLATE_FACES))
         border_obs = Observable(points[PLATE_BORDER_IDX])
 
-        p = mesh!(ax, vertices_obs, faces_obs; color, transparency=true, kwargs...)
+        p = mesh!(ax, vertices_obs, faces_obs; color, transparency, kwargs...)
         push!(plots, p)
         p = lines!(ax, border_obs; color=:black, linewidth=border_linewidth,
-                   transparency=true, kwargs...)
+                   transparency, kwargs...)
         push!(plots, p)
 
         # Note: Observables are stored at the body level, not individual panel level
         # Individual panels need their parent body for proper tracking
     else
         # Static plotting (original behavior)
-        p = mesh!(ax, points, PLATE_FACES; color, transparency=true, kwargs...)
+        p = mesh!(ax, points, PLATE_FACES; color, transparency, kwargs...)
         push!(plots, p)
         p = lines!(ax, points[PLATE_BORDER_IDX]; color=:black, linewidth=border_linewidth,
-                   transparency=true, kwargs...)
+                   transparency, kwargs...)
         push!(plots, p)
     end
 
@@ -205,7 +205,7 @@ Otherwise, creates static plots (original behavior).
 function Makie.plot!(ax, body::VortexStepMethod.BodyAerodynamics; color=(:red, 0.2), R_b_w=nothing, T_b_w=nothing,
     use_observables=false, airfoils=false,
     airfoil_color=:deepskyblue, airfoil_opacity=0.2, rib_color=:black,
-    border_linewidth=1.5, kwargs...)
+    border_linewidth=1.5, transparency=true, kwargs...)
     plots = []
 
     if airfoils
@@ -216,19 +216,19 @@ function Makie.plot!(ax, body::VortexStepMethod.BodyAerodynamics; color=(:red, 0
             vertices_obs = Observable(vertices)
             rib_obs = [Observable(rib) for rib in ribs]
             isempty(faces) || push!(plots, mesh!(ax, vertices_obs, faces;
-                color=skin_color, transparency=true))
+                color=skin_color, transparency))
             for rib in rib_obs
                 push!(plots, lines!(ax, rib; color=rib_color,
-                    linewidth=border_linewidth, transparency=true))
+                    linewidth=border_linewidth, transparency))
             end
             AIRFOIL_SKIN_OBSERVABLES[][objectid(body)] =
                 (vertices=vertices_obs, ribs=rib_obs)
         else
             isempty(faces) || push!(plots, mesh!(ax, vertices, faces;
-                color=skin_color, transparency=true))
+                color=skin_color, transparency))
             for rib in ribs
                 push!(plots, lines!(ax, rib; color=rib_color,
-                    linewidth=border_linewidth, transparency=true))
+                    linewidth=border_linewidth, transparency))
             end
         end
         return plots
@@ -253,10 +253,10 @@ function Makie.plot!(ax, body::VortexStepMethod.BodyAerodynamics; color=(:red, 0
             border_obs = Observable(points[PLATE_BORDER_IDX])
 
             # Plot using observables
-            p = mesh!(ax, vertices_obs, faces_obs; color, transparency=true, kwargs...)
+            p = mesh!(ax, vertices_obs, faces_obs; color, transparency, kwargs...)
             push!(plots, p)
             p = lines!(ax, border_obs; color=:black, linewidth=border_linewidth,
-                       transparency=true, kwargs...)
+                       transparency, kwargs...)
             push!(plots, p)
 
             # Store observables with stable key
@@ -270,7 +270,7 @@ function Makie.plot!(ax, body::VortexStepMethod.BodyAerodynamics; color=(:red, 0
         # Static plotting (original behavior)
         for panel in body.panels
             p = Makie.plot!(ax, panel; color, R_b_w, T_b_w, use_observables=false,
-                            border_linewidth, kwargs...)
+                            border_linewidth, transparency, kwargs...)
             push!(plots, p)
         end
     end

@@ -188,6 +188,9 @@ map_airfoil_3d
 fitted_airfoil_3d
 generated_slices
 airfoil_skin_geometry
+panel_normal
+plate_hinge_local
+panel_plate_geometry
 Makie.plot!(ax, panel::VortexStepMethod.Panel)
 Makie.plot!(ax, body::VortexStepMethod.BodyAerodynamics)
 Makie.plot!(body::VortexStepMethod.BodyAerodynamics)
