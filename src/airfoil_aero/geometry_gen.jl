@@ -13,10 +13,11 @@ placement; this writes the surface pressure/friction tables, polars and airfoil
 `airfoils` is a vector of `(; id, x_fit, y_fit, x_raw, y_raw)`: `x_fit`/`y_fit` is
 the wrapped airfoil the solver analyses; `x_raw`/`y_raw` the raw points it enclosed.
 
-Writes into `output_dir` (indexed by `id`): `airfoils/{id}.dat` (wrapped shape),
-`airfoils/{id}_raw.dat` (raw points), `airfoils/{id}_cp.csv` / `_cf.csv` (per-node
-surface pressure and skin friction), and `polars/{id}.csv` (`POLAR_VECTORS`, or a
-`POLAR_MATRICES` grid when `delta_range` is set). `aero_solver` selects the backend
+Writes into `output_dir` (indexed by `id`), one directory per file kind:
+`airfoils/{id}.dat` (wrapped shape), `airfoils/{id}_{delta_suffix(δ)}.dat` (per
+deflection), `airfoils/{id}_raw.dat` (raw points); `pressure/{id}_cp.csv` / `_cf.csv`
+(per-node surface pressure and skin friction); and `polars/{id}.csv` (`POLAR_VECTORS`,
+or a `POLAR_MATRICES` grid when `delta_range` is set). `aero_solver` selects the backend
 ([`NeuralFoilSolver`](@ref) default, [`XFoilSolver`](@ref) opt-in).
 
 With `reuse_valid_airfoils=true` an airfoil the solver cannot converge is skipped
@@ -28,6 +29,7 @@ function generate_airfoils(airfoils, output_dir::String;
         reuse_valid_airfoils::Bool=true, crease_frac=0.75, verbose::Bool=true)
     mkpath(joinpath(output_dir, "airfoils"))
     mkpath(joinpath(output_dir, "polars"))
+    mkpath(joinpath(output_dir, "pressure"))
     airfoil_rows = Vector{Any}[]
     ok = Int[]
     for af in airfoils
@@ -51,7 +53,8 @@ function generate_airfoils(airfoils, output_dir::String;
                 write_polar_matrix_csv(joinpath(output_dir, csv_rel), alphas, deltas,
                     coeff(s -> s.cl), coeff(s -> s.cd), coeff(s -> s.cm))
             end
-            paths = write_section_aero(joinpath(output_dir, "airfoils", "$j"), aero)
+            paths = write_section_aero(joinpath(output_dir, "airfoils", "$j"), aero;
+                table_prefix=joinpath(output_dir, "pressure", "$j"))
             dat_rel, cp_rel, cf_rel = (relpath(p, output_dir) for p in paths)
             write_dat(joinpath(output_dir, raw_rel), "section_$(j)_raw",
                       af.x_raw, af.y_raw)

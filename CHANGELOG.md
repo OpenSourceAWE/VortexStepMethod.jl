@@ -15,8 +15,11 @@
   (`NeuralFoilSolver`, `XFoilSolver`, `analyze_section`, `analyze_sweep`,
   `fit_kulfan_parameters`, `shrink_wrap`, `ShrinkWrap`)
 - `ObjAdapter` submodule: converts a 3D wing `.obj` mesh to the native YAML/CSV
-  geometry format (`obj_to_yaml`, `perpendicular_sections`, `generate_section_polars`,
+  geometry format (`obj_to_yaml`, `perpendicular_sections`,
   `write_yaml`, `plot_slices_3d`, `plot_airfoils`)
+- `SurfplanAdapter` submodule: `surfplan_to_aero_yaml` turns a SurfplanAdapter aero
+  export into the native pressure-ready YAML/CSV geometry (shared `generate_airfoils`
+  core with `ObjAdapter`)
 - `ObjWing(obj_path[, dat_path]; Re, n_panels, aero_solver, remake, ...)` convenience
   constructor restored for backward compatibility — internally calls
   `ObjAdapter.obj_to_yaml` then `Wing`; `aero_solver` selects the polar backend
@@ -24,9 +27,10 @@
   `remake=false` (default) reuses an existing `geometry.yaml` in `output_dir` to skip
   expensive polar generation when only `n_panels` changes; set `remake=true` to force
   regeneration
-- Surface-pressure (Cp) tables: `CpData`, `CpPolar`, `read_cp_data`, `write_cp_data`,
-  `cp_distribution`, `delta_cp`; Cp fields propagate through `Section` and `Wing`
-  and are spanwise-interpolated during `refine!`
+- Per-section surface aero tables: `SectionAero` (full contour + surface pressure
+  `cp` + skin friction `cf` per node over an `(α, δ)` grid), `section_surface`,
+  `read_section_aero` / `write_section_aero`; surface aero propagates through
+  `Section` and `Wing` and is spanwise-interpolated during `refine!`
 - `POLY` aero model for polynomial cl/cd/cm (exported)
 - `examples/V3_neuralfoil.jl` and `examples/obj_to_yaml_kite.jl`
 
@@ -34,7 +38,7 @@
 - OBJ-based wings are now built via `ObjAdapter.obj_to_yaml` + `Wing(yaml_path)`
   instead of the old `ObjWing` pipeline (XFoil + single `.dat` file);
   `ObjWing` is kept as a shim that accepts but ignores `dat_path`
-- `Section` and `add_section!` accept an optional `cp_data` argument
+- `Section` and `add_section!` accept an optional `section_aero` argument
 - plotting is now Makie-only; the `VortexStepMethodMakieExt` extension loads once a
   Makie backend and [`MakieControlPlots`](https://github.com/OpenSourceAWE/MakieControlPlots.jl)
   are available, and `plot_section_polars` is rendered through `MakieControlPlots`

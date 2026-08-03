@@ -7,7 +7,7 @@ using Interpolations
 using NPZ
 using Xfoil
 using Printf: @sprintf
-using ..VortexStepMethod: SectionAero, interpolate_matrix_nans!
+using ..VortexStepMethod: SectionAero, interpolate_matrix_nans!, delta_suffix
 
 include("kulfan.jl")
 include("shrink_wrap.jl")

@@ -111,26 +111,32 @@ function write_node_table(path::AbstractString, aero::SectionAero, values)
 end
 
 """
-    write_section_aero(prefix, aero::SectionAero) -> (dat, cp_csv, cf_csv)
+    write_section_aero(dat_prefix, aero::SectionAero; table_prefix=dat_prefix)
+        -> (dat, cp_csv, cf_csv)
 
-Write a [`SectionAero`](@ref) as human-readable files sharing `prefix`: `{prefix}.dat`
-(contour at `delta=0`, `{prefix}_d{deg}.dat` per non-zero deflection) plus
-`{prefix}_cp.csv` and `{prefix}_cf.csv` (per-node tables in the contour node order).
-`read_section_aero` reads them back. The single writer for surface aero (submodule
-side); loading lives in the main package.
+Write a [`SectionAero`](@ref) as human-readable files. The airfoil contours share
+`dat_prefix`: `{dat_prefix}.dat` (contour at `delta=0`) plus
+`{dat_prefix}_{delta_suffix(δ)}.dat` per non-zero deflection. The per-node `Cp`/`cf`
+tables share `table_prefix` (defaults to `dat_prefix`): `{table_prefix}_cp.csv` and
+`{table_prefix}_cf.csv`. Pass a separate `table_prefix` to keep the surface tables out
+of the airfoil-shape directory. `read_section_aero` reads them back. The single writer
+for surface aero (submodule side); loading lives in the main package.
 """
-function write_section_aero(prefix::AbstractString, aero::SectionAero)
+function write_section_aero(dat_prefix::AbstractString, aero::SectionAero;
+                            table_prefix::AbstractString=dat_prefix)
+    mkpath(dirname(dat_prefix))
+    mkpath(dirname(table_prefix))
     for (jd, d) in enumerate(aero.delta_range)
         iszero(d) && continue
-        write_dat("$(prefix)_d$(round(Int, rad2deg(d))).dat", "section",
+        write_dat("$(dat_prefix)_$(delta_suffix(d)).dat", "section",
                   aero.x[:, jd], aero.y[:, jd])
     end
-    # never write `$prefix.dat` all-NaN (read_dat_coordinates would drop it to empty)
+    # never write `$dat_prefix.dat` all-NaN (read_dat_coordinates would drop it to empty)
     finite(jd) = any(isfinite, view(aero.x, :, jd))
     jz = findfirst(iszero, aero.delta_range)
     jdat = jz !== nothing && finite(jz) ? jz : findfirst(finite, eachindex(aero.delta_range))
-    write_dat("$prefix.dat", "section", aero.x[:, jdat], aero.y[:, jdat])
-    write_node_table("$(prefix)_cp.csv", aero, aero.cp)
-    write_node_table("$(prefix)_cf.csv", aero, aero.cf)
-    return "$prefix.dat", "$(prefix)_cp.csv", "$(prefix)_cf.csv"
+    write_dat("$dat_prefix.dat", "section", aero.x[:, jdat], aero.y[:, jdat])
+    write_node_table("$(table_prefix)_cp.csv", aero, aero.cp)
+    write_node_table("$(table_prefix)_cf.csv", aero, aero.cf)
+    return "$dat_prefix.dat", "$(table_prefix)_cp.csv", "$(table_prefix)_cf.csv"
 end

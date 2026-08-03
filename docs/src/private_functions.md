@@ -78,6 +78,7 @@ load_matrix_polar_data
 read_aero_matrix
 read_dat
 read_node_table
+delta_suffix
 interpolate_matrix_nans!
 remove_vector_nans
 generate_polar_data

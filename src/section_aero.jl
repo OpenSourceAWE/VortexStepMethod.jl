@@ -30,14 +30,17 @@ end
     SectionAero(alpha_range, delta_range, x, y, cp, cf) -> SectionAero
 
 Build the per-node interpolants (linear, `Line()` extrapolation) from the raw grid. A
-single-element `delta_range` is padded to two constant slices so every interpolant
+single-element `delta_range` is padded to two identical slices so every interpolant
 shares one 2D `(alpha, delta)` form.
 """
 function SectionAero(alpha_range, delta_range, x, y, cp, cf)
     alpha_range = collect(float.(alpha_range))
     delta_range = collect(float.(delta_range))
     if length(delta_range) == 1
-        delta_range = [delta_range[1], delta_range[1] + 1.0]
+        # linear_interpolation needs >= 2 delta nodes; duplicate the single slice.
+        # The second delta coordinate is arbitrary: both slices are equal, so the
+        # interpolant is constant in delta and its exact spacing never matters.
+        delta_range = [delta_range[1], delta_range[1] + 1]
         x = hcat(x, x)
         y = hcat(y, y)
         cp = cat(cp, cp; dims=3)
@@ -68,6 +71,20 @@ function section_surface(aero::SectionAero, alpha, delta)
     cp = [itp(alpha, delta) for itp in aero.cp_interp]
     cf = [itp(alpha, delta) for itp in aero.cf_interp]
     return x, y, cp, cf
+end
+
+"""
+    delta_suffix(delta) -> String
+
+Filename tag for a non-zero trailing-edge deflection `delta` [rad], e.g. `d5`, `dm3`
+(−3°), `d2p5` (2.5°). Uses millidegree precision (negatives as `m`, the decimal point
+as `p`) so sub-degree deflections get distinct `.dat` files instead of colliding.
+Shared by [`write_section_aero`](@ref) and [`read_section_aero`](@ref).
+"""
+function delta_suffix(delta)
+    deg = round(rad2deg(delta); digits=3)
+    s = isinteger(deg) ? string(Int(deg)) : string(deg)
+    return "d" * replace(s, "-" => "m", "." => "p")
 end
 
 """
@@ -109,7 +126,7 @@ end
     read_section_aero(dat_file, cp_file, cf_file) -> Union{Nothing, SectionAero}
 
 Assemble a [`SectionAero`](@ref) from the human-readable files: the airfoil contour
-(`dat_file`, plus `{stem}_d{deg}.dat` per non-zero deflection) and the per-node `Cp`
+(`dat_file`, plus `{stem}_{delta_suffix(δ)}.dat` per non-zero deflection) and the per-node `Cp`
 and `cf` tables (`alpha, delta, n0…` in the `.dat` node order). Returns `nothing` if any
 file is missing. This is the single loader for both provided and generated aero.
 """
@@ -126,7 +143,7 @@ function read_section_aero(dat_file::AbstractString, cp_file::AbstractString,
     y = fill(NaN, n_node, length(delta_range))
     for (jd, d) in enumerate(delta_range)
         xd, yd = read_dat(iszero(d) ? String(dat_file) :
-                          "$(stem)_d$(round(Int, rad2deg(d))).dat")
+                          "$(stem)_$(delta_suffix(d)).dat")
         x[:, jd] .= xd
         y[:, jd] .= yd
     end
