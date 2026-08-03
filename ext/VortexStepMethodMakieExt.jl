@@ -1687,7 +1687,7 @@ function ObjAdapter.plot_slices_3d(path::String; n_slices::Int=10, rotation=I,
     end
     axislegend(ax; position=:rt)
 
-    sel = Observable(1)
+    sel = Observable(max(1, cld(length(slices), 2)))
     title2 = @lift("slice $($sel)  (y = $(round(slices[$sel].label_y, digits=2)))")
     gl2 = GridLayout(fig[1, 2])
     ax2 = Axis(gl2[2, 1]; title=title2, xlabel="x/c", ylabel="y/c", aspect=DataAspect())
