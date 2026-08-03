@@ -93,7 +93,9 @@ For each unique airfoil id `j`, `obj_to_yaml` writes into `output_dir`:
 
 - `airfoils/{j}.dat` — the shrink-wrapped airfoil (matches the polar)
 - `airfoils/{j}_raw.dat` — the raw sliced points the wrap enclosed (for inspection)
-- `airfoils/{j}_d{deg}.dat` — each deflected shape, when a `delta_range` is given
+- `airfoils/{j}_d{tag}.dat` — each deflected shape, when a `delta_range` is given. The
+  `{tag}` encodes the deflection in degrees (`m` for a minus sign, `p` for the decimal
+  point), e.g. `_d5.dat` for 5°, `_dm3.dat` for −3°, `_d2p5.dat` for 2.5°
 - `polars/{j}.csv` — the generated polar (`POLAR_VECTORS` or `POLAR_MATRICES`)
 - `geometry.yaml` — `wing_sections` (leading/trailing-edge points) plus `wing_airfoils`
   (each section's `type` and the `.dat`/`.csv` paths above)

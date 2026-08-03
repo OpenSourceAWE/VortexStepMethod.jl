@@ -77,7 +77,9 @@ Writes into `output_dir`, indexed by source-airfoil id `j` (degenerate sections
 share a neighbour's id):
 - `airfoils/{j}.dat`     — shrink-wrapped airfoil coordinates (matches the polar)
 - `airfoils/{j}_raw.dat` — raw sliced section points (the wrap encloses these)
-- `airfoils/{j}_d{deg}.dat` — each trailing-edge-deflected shape (with a `delta_range`)
+- `airfoils/{j}_d{tag}.dat` — each trailing-edge-deflected shape (with a `delta_range`);
+  `{tag}` is the deflection in degrees with `m` for minus and `p` for the decimal point
+  (e.g. `_dm3.dat`, `_d2p5.dat`)
 - `polars/{j}.csv`    — NeuralFoil polar (alpha, Cd, Cs, Cl, Cm)
 - `geometry.yaml`     — `wing_sections` + `wing_airfoils` referencing the above
 

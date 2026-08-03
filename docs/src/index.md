@@ -139,9 +139,9 @@ vel_app = [cos(alpha), 0.0, sin(alpha)] .* v_a
 set_va!(body_aero, vel_app)
 ```
 
-It is possible to import the wing geometry using an `.obj` file as shown in the example `ram_air_kite.jl`. During the import the polars are calculated automatically using XFoil. This approach is valid for rigid wings and ram-air kites, but not for leading edge inflatable kites.
+It is possible to import the wing geometry using an `.obj` file as shown in the example `ram_air_kite.jl`. During the import the polars are calculated automatically, using NeuralFoil by default or XFoil as a viscous cross-check. This approach is valid for rigid wings and ram-air kites, but not for leading edge inflatable kites. See [From CAD mesh to aerodynamic model](@ref) for the full pipeline.
 
-Surfplan files can be converted to an input for `VortexStepMethod.jl` using the [SurfplanAdapter](https://github.com/jellepoland/SurfplanAdapter).
+Surfplan geometries are handled by the built-in `SurfplanAdapter` submodule: the upstream (Python) [SurfplanAdapter](https://github.com/jellepoland/SurfplanAdapter) exports a Surfplan file to an adapter directory, and `VortexStepMethod.SurfplanAdapter.surfplan_to_aero_yaml` converts that into a solver-ready `geometry.yaml`.
 
 ## Output
 - the aerodynamic forces Fx, Fy, Fz

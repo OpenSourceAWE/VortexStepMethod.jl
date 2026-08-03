@@ -68,18 +68,13 @@ over `alpha_range` only and written as a `POLAR_VECTORS` CSV (returns the
 `(alpha, delta)` and write a long-format `POLAR_MATRICES` CSV (returns the `(cl, cd,
 cm)` matrices). Both angle ranges are in degrees. `crease_frac` is the chordwise hinge
 location (0–1) about which each `delta_range` deflection pivots. With `dat_prefix` set,
-each deflected shape is also written to `{dat_prefix}_d{deg}.dat` (the deflection in
-degrees).
+each deflected shape is also written to `{dat_prefix}_{delta_suffix(δ)}.dat`.
 """
 function generate_polar_from_coordinates(x::Vector, y::Vector, output_path::String;
                                          Re::Real, alpha_range=-180:1:180,
                                          solver::AbstractAirfoilSolver=NeuralFoilSolver(),
                                          delta_range=nothing, crease_frac=0.75,
                                          dat_prefix=nothing)
-    delta_tag(delta_rad) = begin
-        deg = round(rad2deg(delta_rad); digits=1)
-        "d" * (deg == round(deg) ? string(Int(round(deg))) : string(deg))
-    end
     alphas = deg2rad.(collect(Float64, alpha_range))
     if delta_range === nothing
         def = deform_section(x, y, 0.0)
@@ -89,7 +84,7 @@ function generate_polar_from_coordinates(x::Vector, y::Vector, output_path::Stri
     end
     deltas = deg2rad.(collect(Float64, delta_range))
     on_deform = dat_prefix === nothing ? nothing :
-        (d, xd, yd) -> write_dat("$(dat_prefix)_$(delta_tag(d)).dat",
+        (d, xd, yd) -> write_dat("$(dat_prefix)_$(delta_suffix(d)).dat",
                                  "deflection", xd, yd)
     cl, cd, cm = generate_aero_matrices(solver, x, y;
         alpha_range=alphas, delta_range=deltas, Re, crease_frac, on_deform)
