@@ -53,42 +53,6 @@ end
 
 
 """
-    write_aero_matrix(filepath::String, matrix::Matrix{Float64}, 
-                      alpha_range::Vector{Float64}, delta_range::Vector{Float64};
-                      label::String="C_l")
-
-Write an aerodynamic coefficient matrix to CSV with angle labels.
-The first row contains flap deflection angles, first column contains angles of attack.
-
-# Arguments
-- `filepath`: Path to output CSV file
-- `matrix`: Matrix of aerodynamic coefficients
-- `alpha_range`: Vector of angle of attack values in radians
-- `delta_range`: Vector of flap deflection angles in radians
-- `label`: Coefficient label for the header
-"""
-function write_aero_matrix(filepath::AbstractString, matrix::Matrix{Float64}, 
-                         alpha_range::Vector{Float64}, delta_range::Vector{Float64},
-                         label::AbstractString)
-    open(String(filepath), "w") do io
-        # Write header with delta values
-        delta_labels = ["δ=$(round(rad2deg(δ), digits=1))°" for δ in delta_range]
-        deltas_str = join(delta_labels, ",")
-        deltas_str isa String || throw(ArgumentError("Failed to serialize delta header labels."))
-        header = string(label, "/delta,", deltas_str)
-        println(io, header)
-        
-        # Write data rows with alpha values and coefficients (4 decimals is plenty)
-        for i in eachindex(alpha_range)
-            coeffs_str = join((round(v; digits=4) for v in matrix[i, :]), ",")
-            coeffs_str isa String || throw(ArgumentError("Failed to serialize coefficient row."))
-            row = string("α=$(round(rad2deg(alpha_range[i]), digits=1))°,", coeffs_str)
-            println(io, row)
-        end
-    end
-end
-
-"""
     read_aero_matrix(filepath::AbstractString) -> (Matrix{Float64}, Vector{Float64}, Vector{Float64})
 
 Read an aerodynamic coefficient matrix from CSV with angle labels.

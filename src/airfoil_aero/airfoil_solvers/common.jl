@@ -11,11 +11,13 @@ abstract type AbstractAirfoilSolver end
 """
     SectionSolution
 
-Result of a single 2D analysis: integrated coefficients plus the surface pressure
-as `(x/c, Cp)` per surface (each single-valued in x, leading edge to trailing
+Result of a single 2D analysis: integrated coefficients plus the full closed surface
+as node arrays `(x, y)` with surface pressure `cp` and skin friction `cf` per node
+(one continuous contour, trailing edge → upper → leading edge → lower → trailing
 edge). `confidence` is `1.0`/`NaN` for XFoil (converged/not) or NeuralFoil's
-`analysis_confidence`. The generator resamples the `(x, Cp)` pairs onto the shared
-chord slices.
+`analysis_confidence`. Non-converged angles carry empty node arrays. `cf` is the
+tangential skin-friction coefficient (exact from XFoil `bldump`, approximate from a
+flat-plate closure for NeuralFoil).
 """
 struct SectionSolution
     alpha::Float64
@@ -23,10 +25,10 @@ struct SectionSolution
     cd::Float64
     cm::Float64
     confidence::Float64
-    x_upper::Vector{Float64}
-    cp_upper::Vector{Float64}
-    x_lower::Vector{Float64}
-    cp_lower::Vector{Float64}
+    x::Vector{Float64}
+    y::Vector{Float64}
+    cp::Vector{Float64}
+    cf::Vector{Float64}
 end
 
 """
@@ -96,8 +98,9 @@ XFoil consumes the coordinates directly, NeuralFoil the Kulfan parameters.
 `flip_thickness_neg` folds a soft membrane about its lower surface for negative `delta`.
 The re-wrap uses zero clearance (it hugs the deflected shape at grid resolution);
 the rolling-ball wrap bridges the crease with a `min_concave_radius` fillet instead
-of the overlapping panels that XFoil's own repaneling can hit
-there. `delta == 0` returns the base coordinates unchanged.
+of the overlapping panels that XFoil's own repaneling can hit there. The wrap runs
+for every `delta` including `0`, so all deflections share the same node count
+(`2·n_points - 1`).
 """
 function deform_section(x, y, delta; crease_frac=0.9, thickness_frac=1.0,
                         flip_thickness_neg=true,
@@ -107,37 +110,10 @@ function deform_section(x, y, delta; crease_frac=0.9, thickness_frac=1.0,
         pivot = flip_thickness_neg && delta < 0 ? 1 - thickness_frac : thickness_frac
         lower, upper = get_lower_upper(xd, yd, crease_frac)
         turn_trailing_edge!(delta, xd, yd, lower, upper, crease_frac; thickness_frac=pivot)
-        xd, yd = shrink_wrap(xd, yd, wrap_method)
     end
+    xd, yd = shrink_wrap(xd, yd, wrap_method)
     kulfan = fit_kulfan_parameters(xd, yd, LeastSquaresFit())
     return DeformedSection(kulfan, xd, yd)
-end
-
-"""
-    split_surfaces(x, cp) -> (x_upper, cp_upper, x_lower, cp_lower)
-
-Split a Selig-ordered `(x, cp)` node set at the leading edge (`argmin(x)`) into
-upper and lower surfaces, each ordered leading edge → trailing edge (x increasing).
-"""
-function split_surfaces(x, cp)
-    le = argmin(x)
-    upper = le:-1:1
-    lower = le:length(x)
-    return x[upper], cp[upper], x[lower], cp[lower]
-end
-
-"""
-    resample_x(xs, values, targets) -> Vector{Float64}
-
-Linearly interpolate `values` (given at `xs`) onto `targets`, sorting by `x` and
-dropping zero-length segments so the breakpoints are strictly increasing.
-"""
-function resample_x(xs, values, targets)
-    p = sortperm(xs)
-    xs, values = xs[p], values[p]
-    keep = [true; diff(xs) .> 0]
-    itp = linear_interpolation(xs[keep], values[keep]; extrapolation_bc=Line())
-    return itp.(targets)
 end
 
 """
@@ -149,4 +125,20 @@ NeuralFoil vectorization).
 """
 function analyze_sweep(solver::AbstractAirfoilSolver, def::DeformedSection, alpha_range, Re)
     return [analyze_section(solver, def, a, Re) for a in alpha_range]
+end
+
+"""
+    flat_plate_cf(xc, Re) -> Float64
+
+Approximate local skin-friction coefficient at chord fraction `xc` (0..1) for
+Reynolds number `Re` (`Re_x = Re·xc`), taking the larger of the two standard
+flat-plate correlations: the Blasius laminar solution `cf = 0.664·Re_x^(-1/2)` and
+Prandtl's one-seventh-power-law turbulent estimate `cf = 0.027·Re_x^(-1/7)` (see
+e.g. White, *Viscous Fluid Flow*; Schlichting & Gersten, *Boundary-Layer Theory*).
+A stand-in per-node `cf` for backends that do not expose one (NeuralFoil); XFoil
+returns the exact distribution via `bldump`.
+"""
+function flat_plate_cf(xc, Re)
+    rex = max(Re * max(xc, 1e-3), 1.0)
+    return max(0.664 / sqrt(rex), 0.027 / rex^(1 / 7))
 end

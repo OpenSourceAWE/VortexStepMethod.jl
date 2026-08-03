@@ -1,4 +1,25 @@
 """
+    write_aero_matrix(filepath, matrix, alpha_range, delta_range, label) -> filepath
+
+Write an `(alpha × delta)` coefficient matrix to a labelled CSV: the header row holds
+the flap deflections (`δ=…°`), the first column the angles of attack (`α=…°`), both in
+degrees. `alpha_range`/`delta_range` are radians; `label` (e.g. `"C_l"`) names the
+coefficient. The submodule-side writer; `read_aero_matrix` (main package) reads it back.
+"""
+function write_aero_matrix(filepath::AbstractString, matrix::Matrix{Float64},
+        alpha_range::Vector{Float64}, delta_range::Vector{Float64}, label::AbstractString)
+    open(String(filepath), "w") do io
+        deltas_str = join(("δ=$(round(rad2deg(δ), digits=1))°" for δ in delta_range), ",")
+        println(io, string(label, "/delta,", deltas_str))
+        for i in eachindex(alpha_range)
+            coeffs_str = join((round(v; digits=4) for v in matrix[i, :]), ",")
+            println(io, string("α=$(round(rad2deg(alpha_range[i]), digits=1))°,", coeffs_str))
+        end
+    end
+    return filepath
+end
+
+"""
     generate_aero_matrices(solver, x, y; alpha_range, delta_range, Re,
                            crease_frac=0.75, remove_nan=true, on_deform=nothing)
         -> (cl, cd, cm)

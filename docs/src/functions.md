@@ -9,16 +9,13 @@ calculate_span
 calculate_projected_area
 ```
 
-## Surface-pressure (Cp) tables
-The Cp table types and IO live in the core package; the generation of Cp tables
-(from XFoil/NeuralFoil) lives in `AirfoilAero`.
+## Surface aero (contour + Cp + cf) tables
+The per-section surface aero table type and its loader live in the core package; the
+generation and CSV/dat writing (from XFoil/NeuralFoil) live in `AirfoilAero`.
 ```@docs
-CpData
-CpPolar
-read_cp_data
-write_cp_data
-cp_distribution
-delta_cp
+SectionAero
+section_surface
+read_section_aero
 ```
 
 ## Airfoil aerodynamics (AirfoilAero)
@@ -47,7 +44,10 @@ neuralfoil_aero
 generate_aero_matrices
 generate_polar_from_coordinates
 generate_polar_from_dat
-generate_cp_polar
+generate_airfoil_aero
+generate_section_aero
+generate_airfoils
+write_section_aero
 ```
 
 ## OBJ mesh conversion (ObjAdapter)
@@ -59,11 +59,21 @@ CurrentModule = VortexStepMethod.ObjAdapter
 ```
 ```@docs
 obj_to_yaml
-generate_section_polars
 write_yaml
 perpendicular_sections
 plot_airfoils
 plot_slices_3d
+```
+
+## Surfplan conversion (SurfplanAdapter)
+These live in the `SurfplanAdapter` submodule of `VortexStepMethod`, which converts the
+output of the (Python) SurfplanAdapter export into the native, VSM-loadable YAML/CSV
+geometry format. Load it with `using VortexStepMethod.SurfplanAdapter`.
+```@meta
+CurrentModule = VortexStepMethod.SurfplanAdapter
+```
+```@docs
+surfplan_to_aero_yaml
 ```
 ```@meta
 CurrentModule = VortexStepMethod

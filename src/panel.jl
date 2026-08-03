@@ -19,7 +19,7 @@ Represents a panel in a vortex step method simulation. All points and vectors ar
 - cl_interp::CL = nothing: lift interpolation (its type is a struct parameter)
 - cd_interp::CD = nothing: drag interpolation
 - cm_interp::CM = nothing: moment interpolation
-- cp_polar::CP = nothing: optional surface-pressure table, see [CpPolar](@ref)
+- section_aero::SA = nothing: optional surface aero table, see [SectionAero](@ref)
 - `control_point`::Vector{MVec3}: Panel control point
 - `bound_point_1`::Vector{MVec3}: First bound point
 - `bound_point_2`::Vector{MVec3}: Second bound point
@@ -34,8 +34,10 @@ Represents a panel in a vortex step method simulation. All points and vectors ar
         SemiInfiniteFilament(),
         SemiInfiniteFilament()
     ): Panel filaments, see: [BoundFilament](@ref)
+- `delta`::T=0: flap trailing-edge deflection [rad]
+- `crease_frac`::T=0: chordwise flap-hinge fraction (0–1); 0 disables the plate kink
 """
-@with_kw mutable struct Panel{T, CL, CD, CM, CP}
+@with_kw mutable struct Panel{T, CL, CD, CM, SA}
     TE_point_1::MVector{3, T} = zeros(MVector{3, T})
     LE_point_1::MVector{3, T} = zeros(MVector{3, T})
     TE_point_2::MVector{3, T} = zeros(MVector{3, T})
@@ -50,7 +52,7 @@ Represents a panel in a vortex step method simulation. All points and vectors ar
     cl_interp::CL = nothing
     cd_interp::CD = nothing
     cm_interp::CM = nothing
-    cp_polar::CP = nothing
+    section_aero::SA = nothing
     aero_center::MVector{3, T} = zeros(MVector{3, T})
     control_point::MVector{3, T} = zeros(MVector{3, T})
     bound_point_1::MVector{3, T} = zeros(MVector{3, T})
@@ -67,6 +69,7 @@ Represents a panel in a vortex step method simulation. All points and vectors ar
         SemiInfiniteFilament{T}()
     )
     delta::T = zero(T)
+    crease_frac::T = zero(T)
 end
 
 """
@@ -123,11 +126,11 @@ function init_pos!(
 end
 
 """
-    build_interps(section_1, section_2, remove_nan) -> (cl, cd, cm, cp)
+    build_interps(section_1, section_2, remove_nan) -> (cl, cd, cm, section_aero)
 
 Build the averaged aerodynamic interpolations for the panel between two sections.
-Returns `(cl_interp, cd_interp, cm_interp, cp_polar)`, each `nothing` for models that
-do not use it (INVISCID, POLY). `cl`/`cm` clamp (`Flat`) past the alpha range but
+Returns `(cl_interp, cd_interp, cm_interp, section_aero)`, each `nothing` for models
+that do not use it (INVISCID, POLY). `cl`/`cm` clamp (`Flat`) past the alpha range but
 extrapolate linearly (`Line`) over delta; `cd` extrapolates linearly in both. The
 concrete return types parameterise [`Panel`](@ref) — see [`panel_interp_types`](@ref).
 """
@@ -179,15 +182,14 @@ function build_interps(section_1::Section, section_2::Section, remove_nan)
             cm_i = linear_interpolation((alphas, deltas), cm; extrapolation_bc=cm_bc)
         end
     end
-    cp = nothing
-    if section_1.cp_data !== nothing
-        cp_1, cp_2 = section_1.cp_data, section_2.cp_data
-        cp_up = (cp_1.cp_upper .+ cp_2.cp_upper) ./ 2
-        cp_low = (cp_1.cp_lower .+ cp_2.cp_lower) ./ 2
-        cp = CpPolar(CpData(cp_1.n_chord, cp_1.chord_x,
-            cp_1.alpha_range, cp_1.delta_range, cp_up, cp_low))
+    aero = nothing
+    if section_1.section_aero !== nothing
+        a1, a2 = section_1.section_aero, section_2.section_aero
+        aero = SectionAero(a1.alpha_range, a1.delta_range,
+            (a1.x .+ a2.x) ./ 2, (a1.y .+ a2.y) ./ 2,
+            (a1.cp .+ a2.cp) ./ 2, (a1.cf .+ a2.cf) ./ 2)
     end
-    return cl_i, cd_i, cm_i, cp
+    return cl_i, cd_i, cm_i, aero
 end
 
 """
@@ -218,11 +220,22 @@ function init_aero!(panel::Panel, section_1::Section, section_2::Section;
     elseif !(panel.aero_model in (POLAR_VECTORS, POLAR_MATRICES, INVISCID))
         throw(ArgumentError("Unsupported aero model: $(panel.aero_model)"))
     end
-    panel.cl_interp, panel.cd_interp, panel.cm_interp, panel.cp_polar =
+    panel.cl_interp, panel.cd_interp, panel.cm_interp, panel.section_aero =
         build_interps(section_1, section_2, remove_nan)
     return nothing
 end
 
+"""
+    reinit!(panel, section_1, section_2, aero_center, control_point, bound_point_1,
+            bound_point_2, x_airf, y_airf, z_airf, delta, vec, spanwise_direction; kwargs...)
+
+Reinitialize a panel's geometry, horseshoe filaments and aerodynamic interpolations.
+
+The panel is oriented so its `y_airf` (and the bound vortex `bound_2 -> bound_1`) points
+along `+spanwise_direction`, with `z_airf` pointing to the airfoil upper surface. This
+makes the aero independent of section ordering: a reversed order would otherwise flip the
+normal and make the panel look up its polar at a negated angle of attack.
+"""
 function reinit!(
     panel::Panel,
     section_1::Section,
@@ -235,12 +248,22 @@ function reinit!(
     y_airf,
     z_airf,
     delta,
-    vec;
+    vec,
+    spanwise_direction;
     init_aero = true,
     remove_nan = true
 )
+    flip = dot(y_airf, spanwise_direction) < 0
+    if flip
+        section_1, section_2 = section_2, section_1
+        bound_point_1, bound_point_2 = bound_point_2, bound_point_1
+    end
     init_pos!(panel, section_1, section_2, aero_center, control_point, bound_point_1, bound_point_2,
         x_airf, y_airf, z_airf, delta, vec)
+    if flip
+        panel.y_airf .*= -1
+        panel.z_airf .*= -1
+    end
     init_aero && init_aero!(panel, section_1, section_2; remove_nan)
     return nothing
 end
@@ -288,22 +311,23 @@ function calculate_relative_alpha_and_velocity(panel::Panel, induced_velocity)
 end
 
 """
-    calculate_cl(panel::Panel, alpha::Float64)
+    calculate_cl(panel::Panel, alpha)
+    calculate_cl(panel::Panel, alpha, delta)
 
-Calculate lift coefficient for given angle of attack.
-
-# Arguments
-- `panel::Panel`: Panel object
-- `alpha::Float64`: Angle of attack in radians
+Calculate lift coefficient for given angle of attack `alpha` [rad]. The 3-arg
+form evaluates the `(α, δ)` polar (`POLAR_MATRICES`) at the passed flap
+deflection `delta` [rad] instead of the panel's stored `delta`; the 2-arg form
+forwards with `panel.delta`. Other aero models ignore `delta`.
 
 # Returns
 - `Float64`: Lift coefficient (Cl)
 """
-function calculate_cl(panel::Panel{Tp}, alpha::Ta) where {Tp, Ta}
-    R = promote_type(Tp, Ta)
+calculate_cl(panel::Panel, alpha) = calculate_cl(panel, alpha, panel.delta)
+function calculate_cl(panel::Panel{Tp}, alpha::Ta, delta::Td) where {Tp, Ta, Td}
+    R = promote_type(Tp, Ta, Td)
     isnan(alpha) && return R(NaN)
     if panel.aero_model == POLY
-        cl = evalpoly(rad2deg(alpha), reverse(panel.cl_coeffs))
+        cl = evalpoly(rad2deg(alpha), panel.cl_coeffs)
         if abs(alpha) > (π/9)
             cl = 2 * cos(alpha) * sin(alpha)^2
         end
@@ -315,29 +339,33 @@ function calculate_cl(panel::Panel{Tp}, alpha::Ta) where {Tp, Ta}
     interp === nothing &&
         throw(ArgumentError("cl_interp is not initialized for $(panel.aero_model)."))
     return panel.aero_model == POLAR_VECTORS ? R(interp(alpha)) :
-                                               R(interp(alpha, panel.delta))
+                                               R(interp(alpha, delta))
 end
 
 
 """
     calculate_cd(panel::Panel, alpha)
+    calculate_cd(panel::Panel, alpha, delta)
 
-Calculate the drag coefficient for the given angle of attack.
+Calculate the drag coefficient for the given angle of attack. The 3-arg form
+evaluates the `(α, δ)` polar at the passed flap deflection `delta`; see
+[`calculate_cl`](@ref).
 """
-function calculate_cd(panel::Panel{Tp}, alpha::Ta) where {Tp, Ta}
-    R = promote_type(Tp, Ta)
+calculate_cd(panel::Panel, alpha) = calculate_cd(panel, alpha, panel.delta)
+function calculate_cd(panel::Panel{Tp}, alpha::Ta, delta::Td) where {Tp, Ta, Td}
+    R = promote_type(Tp, Ta, Td)
     isnan(alpha) && return R(NaN)
     if panel.aero_model == POLY
         if abs(alpha) > (π/9)  # Outside ±20 degrees
             return R(2 * sin(alpha)^3)
         end
-        return R(evalpoly(rad2deg(alpha), reverse(panel.cd_coeffs)))
+        return R(evalpoly(rad2deg(alpha), panel.cd_coeffs))
     elseif panel.aero_model in (POLAR_VECTORS, POLAR_MATRICES)
         cd_interp = panel.cd_interp
         cd_interp === nothing &&
             throw(ArgumentError("cd_interp is not initialized for $(panel.aero_model)."))
         return panel.aero_model == POLAR_VECTORS ? R(cd_interp(alpha)) :
-                                                   R(cd_interp(alpha, panel.delta))
+                                                   R(cd_interp(alpha, delta))
     elseif !(panel.aero_model == INVISCID)
         throw(ArgumentError("Unsupported aero model: $(panel.aero_model)"))
     end
@@ -346,20 +374,24 @@ end
 
 """
     calculate_cm(panel::Panel, alpha)
+    calculate_cm(panel::Panel, alpha, delta)
 
-Calculate the pitching-moment coefficient for the given angle of attack.
+Calculate the pitching-moment coefficient for the given angle of attack. The
+3-arg form evaluates the `(α, δ)` polar at the passed flap deflection `delta`;
+see [`calculate_cl`](@ref).
 """
-function calculate_cm(panel::Panel{Tp}, alpha::Ta) where {Tp, Ta}
-    R = promote_type(Tp, Ta)
+calculate_cm(panel::Panel, alpha) = calculate_cm(panel, alpha, panel.delta)
+function calculate_cm(panel::Panel{Tp}, alpha::Ta, delta::Td) where {Tp, Ta, Td}
+    R = promote_type(Tp, Ta, Td)
     isnan(alpha) && return R(NaN)
     if panel.aero_model == POLY
-        return R(evalpoly(rad2deg(alpha), reverse(panel.cm_coeffs)))
+        return R(evalpoly(rad2deg(alpha), panel.cm_coeffs))
     elseif panel.aero_model in (POLAR_VECTORS, POLAR_MATRICES)
         cm_interp = panel.cm_interp
         cm_interp === nothing &&
             throw(ArgumentError("cm_interp is not initialized for $(panel.aero_model)."))
         return panel.aero_model == POLAR_VECTORS ? R(cm_interp(alpha)) :
-                                                   R(cm_interp(alpha, panel.delta))
+                                                   R(cm_interp(alpha, delta))
     elseif !(panel.aero_model == INVISCID)
         throw(ArgumentError("Unsupported aero model: $(panel.aero_model)"))
     end

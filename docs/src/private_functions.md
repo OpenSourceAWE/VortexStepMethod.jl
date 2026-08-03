@@ -44,6 +44,7 @@ update_panel_properties!
 build_interps
 panel_interp_types
 reinit!(wing::AbstractWing)
+reinit!(panel::Panel, section_1::Section, section_2::Section, aero_center, control_point, bound_point_1, bound_point_2, x_airf, y_airf, z_airf, delta, vec, spanwise_direction)
 rotated_te
 calculate_filaments_for_plotting
 ```
@@ -54,6 +55,7 @@ unrefined_deform!
 deform!
 compute_refined_panel_mapping!
 compute_refined_section_interpolation!
+copy_sections
 copy_sections_to_refined!
 _apply_refined_section_thetas!
 _panel_thetas_to_section_thetas!
@@ -74,15 +76,16 @@ calculate_new_aero_data
 assemble_polar_matrix
 load_matrix_polar_data
 read_aero_matrix
-write_aero_matrix
+read_dat
+read_node_table
+delta_suffix
 interpolate_matrix_nans!
 remove_vector_nans
 generate_polar_data
 extract_literature_polar_data
 parse_literature_column
-interpolate_cp_to_refined!
-prepare_cp_output!
-validate_cp_sections
+interpolate_section_aero_to_refined!
+validate_section_aero
 ```
 
 ### Examples
@@ -115,9 +118,7 @@ flood_outside
 trace_level_set
 largest_linking_gap
 resample_arc
-resample_x
 smooth_turning!
-split_surfaces
 ```
 
 ### NeuralFoil network
@@ -143,7 +144,11 @@ read_dat_coordinates
 write_dat
 write_polar_csv
 write_polar_matrix_csv
-fill_slice_nans!
+write_aero_matrix
+write_node_table
+flat_plate_cf
+neuralfoil_contour_solution
+fill_node_nans!
 ```
 
 ## OBJ mesh conversion (ObjAdapter)
@@ -183,6 +188,10 @@ set_axes_equal_makie!
 map_airfoil_3d
 fitted_airfoil_3d
 generated_slices
+airfoil_skin_geometry
+panel_normal
+plate_hinge_local
+panel_plate_geometry
 Makie.plot!(ax, panel::VortexStepMethod.Panel)
 Makie.plot!(ax, body::VortexStepMethod.BodyAerodynamics)
 Makie.plot!(body::VortexStepMethod.BodyAerodynamics)

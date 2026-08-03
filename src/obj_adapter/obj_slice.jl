@@ -273,23 +273,23 @@ end
     march_edges(vertices, faces; step) -> (; le, te, point, tangent, arclen)
 
 March the leading edge outward from mid-span in both directions in steps of arc
-length `step`. Each cut is a plane whose normal is the running LE tangent with its
-chordwise component dropped, so it tilts to follow a tip that curls downward. Cuts
-sample mesh *edges*, so the picks are robust to vertex density. Returns, ordered along
-the span, the LE/TE points, each cut's plane origin and tangent, and the cumulative LE
-arc length. Build the airfoil for a chosen station with `build_section`.
+length `step`. Each cut is a vertical spanwise plane (both the chordwise and vertical
+components of the running LE tangent dropped from the normal) so a tip that curls
+downward can't tilt the plane toward horizontal, where its min-chord "LE" pick would
+jump across the wing. Marching stops when the leading edge stops advancing spanwise.
+Cuts sample mesh *edges*, so the picks are robust to vertex density. Returns, ordered
+along the span, the LE/TE points, each cut's plane origin and tangent, and the
+cumulative LE arc length. Build the airfoil for a chosen station with `build_section`.
 """
 function march_edges(vertices, faces; step)
     ys = [v[2] for v in vertices]
     y_min, y_max = extrema(ys)
     y_mid = (y_min + y_max) / 2
 
-    # Slice the mesh with a plane through `point` normal to the span/height projection
-    # of `tangent`; the leading and trailing edges are the min- and max-chord (x) points
-    # of that slice contour. Returns `nothing` if the plane misses the mesh.
+    # Vertical spanwise plane (z dropped): a tip curl mustn't tilt the cut horizontal.
     cut(point, tangent) = begin
         segments = slice_mesh_at_plane(vertices, faces, point,
-                                       normalize([0.0, tangent[2], tangent[3]]))
+                                       normalize([0.0, tangent[2], 0.0]))
         isempty(segments) && return nothing
         crossings = Vector{Float64}[]
         for (start_point, end_point) in segments
@@ -330,7 +330,7 @@ function march_edges(vertices, faces; step)
                 break
             end
             le_step = found.le .- prev_le
-            (norm(le_step) < 1e-9 || dot(normalize(le_step), tangent) < 0.0) && break
+            (norm(le_step) < 1e-9 || le_step[2] * direction <= 0.0) && break
             push!(rows, (; found.le, found.te, point=probe, tangent))
             tangent = normalize(le_step)
             prev_le = found.le

@@ -42,9 +42,9 @@ export FAILURE, FEASIBLE, INFEASIBLE, SolverStatus
 export LOOP, NONLIN, SolverType
 export load_polar_data
 
-# Surface-pressure (Cp) table types + IO (generation lives in AirfoilAero)
-export CpData, CpPolar, cp_distribution, delta_cp
-export read_cp_data, write_cp_data
+# Per-section surface aero (contour + Cp + cf). Human-readable CSV/dat IO: reading here,
+# writing in AirfoilAero.
+export SectionAero, section_surface, read_section_aero
 
 export plot_combined_analysis, plot_distribution, plot_geometry, plot_polar_data,
     plot_polars, plot_section_polars, save_plot, show_plot
@@ -414,7 +414,7 @@ end
 
 # Include core functionality
 include("settings.jl")
-include("cp_types.jl")
+include("section_aero.jl")
 include("wing_geometry.jl")
 include("polars.jl")
 include("yaml_geometry.jl")
@@ -423,7 +423,6 @@ include("panel.jl")
 include("body_aerodynamics.jl")
 include("wake.jl")
 include("solver.jl")
-include("cp_polars.jl")
 
 include("plotting_helpers.jl")
 
@@ -432,6 +431,7 @@ include("plotting_helpers.jl")
 # `VortexStepMethod.AirfoilAero` / `.ObjAdapter`, or `using VortexStepMethod.AirfoilAero`.
 include("airfoil_aero/AirfoilAero.jl")
 include("obj_adapter/ObjAdapter.jl")
+include("surfplan_adapter/SurfplanAdapter.jl")
 
 include("precompile.jl")
 

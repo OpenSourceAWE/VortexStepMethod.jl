@@ -3,8 +3,9 @@
 
 Breukels leading-edge-inflatable α-polynomial coefficients (α in **degrees**) for a
 section with normalized `tube_diameter` and `camber`. `cl_coeffs` is a cubic (4
-coefficients, ascending order), `cd_coeffs`/`cm_coeffs` are quadratic (3). Feed the
-result to a core `POLY` section as `aero_data = (cl_coeffs, cd_coeffs, cm_coeffs)`.
+coefficients), `cd_coeffs`/`cm_coeffs` are quadratic (3), each in ascending order
+(constant term first), ready to pass straight to `evalpoly`. Feed the result to a core
+`POLY` section as `aero_data = (cl_coeffs, cd_coeffs, cm_coeffs)`.
 """
 function lei_poly_coeffs(tube_diameter, camber)
     t = tube_diameter
@@ -50,5 +51,7 @@ function lei_poly_coeffs(tube_diameter, camber)
         ((-1.787703*t + 0.352443)*k +
          (-0.839323*t + 0.137932)),
     ]
-    return cl_coeffs, cd_coeffs, cm_coeffs
+    # Coefficients are built highest-degree first above (Breukels paper layout);
+    # flip once here so callers get ascending order (constant term first) for `evalpoly`.
+    return reverse!(cl_coeffs), reverse!(cd_coeffs), reverse!(cm_coeffs)
 end

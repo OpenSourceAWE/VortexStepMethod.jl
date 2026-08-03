@@ -36,6 +36,8 @@ Settings for a single wing, used within [`VSMSettings`](@ref).
     reinit/refine updates (default `false`)
 - `billowing_percentage`: TE billow as percentage of arc length
     (default `0.0`; only used with `BILLOWING` distribution).
+- `crease_frac`: Chordwise flap-hinge fraction (0–1) for drawing the
+    δ-deflected plate/skin (default `0.75`).
 """
 @with_kw mutable struct WingSettings
     name::String = "main_wing"
@@ -48,6 +50,7 @@ Settings for a single wing, used within [`VSMSettings`](@ref).
     remove_nan::Bool = true
     use_prior_polar::Bool = false
     billowing_percentage::Float64 = 0.0 # TE billow as % of arc length
+    crease_frac::Float64 = 0.75
 end
 
 """
@@ -183,6 +186,9 @@ function VSMSettings(filename; data_prefix=true)
             if haskey(wing_data, "billowing_percentage")
                 wing.billowing_percentage =
                     Float64(wing_data["billowing_percentage"])
+            end
+            if haskey(wing_data, "crease_frac")
+                wing.crease_frac = Float64(wing_data["crease_frac"])
             end
 
             push!(vsm_settings.wings, wing)

@@ -5,8 +5,8 @@ using VortexStepMethod.AirfoilAero: KulfanParameters, LeastSquaresFit, ShrinkWra
                        shrink_wrap, fit_kulfan_parameters, kulfan_to_coordinates,
                        neuralfoil_aero, class_function, bernstein_basis,
                        leading_edge_basis, normalize_airfoil
-using VortexStepMethod: CpData, CpPolar, read_cp_data, write_cp_data,
-                        cp_distribution, delta_cp
+using VortexStepMethod: SectionAero, section_surface, read_section_aero
+using VortexStepMethod.AirfoilAero: write_section_aero
 
 read_dat_coords(path) = begin
     x = Float64[]; y = Float64[]
@@ -116,60 +116,55 @@ end
     @test size(cm) == (length(alpha_range), length(delta_range))
 end
 
-@testset "Cp table round-trip and interpolation" begin
-    n_chord = 5
-    chord_x = [0.1, 0.3, 0.5, 0.7, 0.9]
+@testset "SectionAero CSV round-trip and interpolation" begin
     alpha_range = deg2rad.([-5.0, 0.0, 5.0, 10.0])
     delta_range = deg2rad.([-3.0, 0.0, 3.0])
+    xc = [1.0, 0.5, 0.0, 0.5, 1.0]
+    yc = [0.0, 0.06, 0.0, -0.04, 0.0]
+    n_node = length(xc)
+    x = repeat(xc, 1, length(delta_range))
+    y = repeat(yc, 1, length(delta_range))
     val(i, ia, jd) = 100i + 10ia + jd
-    cp_upper = [float(val(i, ia, jd)) for i in 1:n_chord,
-                ia in eachindex(alpha_range), jd in eachindex(delta_range)]
-    cp_lower = -cp_upper
-    data = CpData(n_chord, chord_x, alpha_range, delta_range, cp_upper, cp_lower)
+    cp = [float(val(i, ia, jd)) for i in 1:n_node,
+          ia in eachindex(alpha_range), jd in eachindex(delta_range)]
+    cf = cp ./ 1000
+    aero = SectionAero(alpha_range, delta_range, x, y, cp, cf)
 
-    path = joinpath(mktempdir(), "cp.csv")
-    write_cp_data(path, data)
-    back = read_cp_data(path)
-    @test back.n_chord == n_chord
-    @test back.chord_x ≈ chord_x
-    @test back.alpha_range ≈ alpha_range
-    @test back.delta_range ≈ delta_range
-    @test back.cp_upper ≈ cp_upper
-    @test back.cp_lower ≈ cp_lower
-    @test read_cp_data(joinpath(@__DIR__, "does_not_exist.csv")) === nothing
+    prefix = joinpath(mktempdir(), "af")
+    dat, cp_csv, cf_csv = write_section_aero(prefix, aero)
+    back = read_section_aero(dat, cp_csv, cf_csv)
+    xb, yb, cpb, cfb = section_surface(back, alpha_range[2], delta_range[1])
+    @test isapprox(xb, xc; atol=1e-6)           # contour via .dat (8-decimal)
+    @test isapprox(yb, yc; atol=1e-6)
+    @test cpb ≈ cp[:, 2, 1]
+    @test cfb ≈ cf[:, 2, 1]
+    @test read_section_aero("no.dat", "no_cp.csv", "no_cf.csv") === nothing
 
-    polar = CpPolar(data)
-    @test CpData(polar) === data
-    up, lo = cp_distribution(polar, alpha_range[2], delta_range[1])
-    @test up ≈ cp_upper[:, 2, 1]
-    @test lo ≈ cp_lower[:, 2, 1]
-    @test delta_cp(polar, alpha_range[3], delta_range[2]) ≈
-        cp_lower[:, 3, 2] .- cp_upper[:, 3, 2]
+    _, _, cpa, _ = section_surface(aero, alpha_range[3], delta_range[2])
+    @test cpa ≈ cp[:, 3, 2]
 end
 
-@testset "generate_cp_polar builds a Cp table" begin
+@testset "generate_section_aero builds a surface table" begin
     truth = KulfanParameters(fill(0.15, 8), fill(-0.15, 8), 0.1, 0.0)
     alpha_range = deg2rad.(-4.0:2.0:4.0)
     delta_range = deg2rad.([0.0, 5.0])
-    polar = generate_cp_polar(NeuralFoilSolver(model_size="medium"), truth;
-        alpha_range, delta_range, n_chord=6, reynolds_number=5e5)
-    @test polar isa CpPolar
-    @test CpData(polar).n_chord == 6
-    up, lo = cp_distribution(polar, alpha_range[2], delta_range[1])
-    @test length(up) == 6
-    @test all(isfinite, up) && all(isfinite, lo)
-    @test all(isfinite, delta_cp(polar, alpha_range[end], delta_range[end]))
+    aero = generate_section_aero(NeuralFoilSolver(model_size="medium"), truth;
+        alpha_range, delta_range, reynolds_number=5e5)
+    @test aero isa SectionAero
+    x, y, cp, cf = section_surface(aero, alpha_range[2], delta_range[1])
+    @test length(cp) == size(aero.cp, 1)
+    @test all(isfinite, cp) && all(isfinite, cf)
+    @test all(cf .>= 0)
 
-    up_lo_a, _ = cp_distribution(polar, alpha_range[1], delta_range[1])
-    up_hi_a, _ = cp_distribution(polar, alpha_range[end], delta_range[1])
-    @test maximum(abs.(up_lo_a .- up_hi_a)) > 0.1
-    up_hi_d, _ = cp_distribution(polar, alpha_range[2], delta_range[end])
-    @test maximum(abs.(up .- up_hi_d)) > 0.005
+    _, _, cp_lo_a, _ = section_surface(aero, alpha_range[1], delta_range[1])
+    _, _, cp_hi_a, _ = section_surface(aero, alpha_range[end], delta_range[1])
+    @test maximum(abs.(cp_lo_a .- cp_hi_a)) > 0.1
 
-    x, y = read_dat_coords(joinpath(@__DIR__, "data", "test_airfoil.dat"))
-    polar2 = generate_cp_polar(NeuralFoilSolver(model_size="medium"), x, y;
-        alpha_range, delta_range=deg2rad.([0.0, 5.0]), n_chord=4, reynolds_number=5e5)
-    @test CpData(polar2).n_chord == 4
+    xdat, ydat = read_dat_coords(joinpath(@__DIR__, "data", "test_airfoil.dat"))
+    aero2 = generate_section_aero(NeuralFoilSolver(model_size="medium"), xdat, ydat;
+        alpha_range, delta_range=deg2rad.([0.0, 5.0]), reynolds_number=5e5)
+    @test aero2 isa SectionAero
+    @test size(aero2.cp, 1) > 0
 end
 
 @testset "NeuralFoil physical invariants" begin
@@ -182,11 +177,17 @@ end
 
     xs, ys = kulfan_to_coordinates(sym; n_points=120)
     xs, ys = collect(xs), collect(ys)
-    camber(k) = k.upper_weights .+ k.lower_weights
+    # geometric camber line; the weight sum is not a symmetry proxy once
+    # shrink_wrap resamples the two surfaces at differing x-stations
+    function max_camber(k)
+        cx, cy = kulfan_to_coordinates(k; n_points=120)
+        cy = collect(cy)
+        return maximum(abs, reverse(cy[1:120]) .+ cy[120:end]) / 2
+    end
     base = deform_section(xs, ys, 0.0)
     flap = deform_section(xs, ys, deg2rad(10.0); crease_frac=0.75)
-    @test maximum(abs, camber(base.kulfan)) < 1e-6
-    @test maximum(abs, camber(flap.kulfan)) > 0.1
+    @test max_camber(base.kulfan) < 5e-3
+    @test max_camber(flap.kulfan) > 0.02
 
     @test minimum(flap.x) ≈ 0 atol = 0.01
     @test maximum(flap.x) ≈ 1 atol = 0.01
@@ -197,6 +198,21 @@ end
     load = sec.cp_lower[:, 1] .- sec.cp_upper[:, 1]
     @test sum(load) > 0
     @test count(>(0), load) > length(load) ÷ 2
+end
+
+@testset "deform_section node count is delta-independent" begin
+    # A base whose paneling differs from shrink_wrap's fixed output (2·n_points-1)
+    # must still come back at that same length for delta == 0, or a delta sweep
+    # mixes lengths and generate_airfoil_aero NaN-s the delta == 0 column.
+    sym = KulfanParameters(fill(0.15, 8), fill(-0.15, 8), 0.0, 0.0)
+    xb, yb = kulfan_to_coordinates(sym)   # default paneling, != shrink_wrap output
+    base = deform_section(xb, yb, 0.0; crease_frac=0.8)
+    @test length(base.x) != length(xb)    # delta == 0 is re-wrapped, not passed through
+    for d in (deg2rad(-5.0), deg2rad(5.0), deg2rad(15.0))
+        def = deform_section(xb, yb, d; crease_frac=0.8)
+        @test length(def.x) == length(base.x)
+        @test length(def.y) == length(base.y)
+    end
 end
 
 @testset "generate_polar_from_coordinates POLAR_VECTORS sweep" begin

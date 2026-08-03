@@ -465,4 +465,76 @@ end
         @test_throws ArgumentError VortexStepMethod.save_plot(fig, nothing, "test_title", data_type=".png")
     end
 end
+
+"""
+Build a body whose refined sections carry a [`SectionAero`](@ref) surface table, so
+the lofted airfoil-skin plotting path (`plot!(...; airfoils=true)`) has contours.
+"""
+function create_body_aero_with_skin(; n_panels=4)
+    xs = [1.0, 0.75, 0.25, 0.0, 0.25, 0.75, 1.0]
+    ys = [0.0, 0.05, 0.05, 0.0, -0.05, -0.05, 0.0]
+    n_node = length(xs)
+    alpha_range = deg2rad.([-2.0, 0.0, 2.0])
+    x = reshape(xs, n_node, 1)
+    y = reshape(ys, n_node, 1)
+    cp = zeros(n_node, length(alpha_range), 1)
+    cf = fill(0.003, n_node, length(alpha_range), 1)
+    section_aero = SectionAero(alpha_range, [0.0], x, y, cp, cf)
+
+    wing = Wing(n_panels, spanwise_distribution=LINEAR)
+    add_section!(wing, [0.0, 2.0, 0.0], [1.0, 2.0, 0.0], INVISCID, nothing, section_aero)
+    add_section!(wing, [0.0, -2.0, 0.0], [1.0, -2.0, 0.0], INVISCID, nothing, section_aero)
+    refine!(wing)
+    body_aero = BodyAerodynamics([wing])
+    set_va!(body_aero, [20.0, 0.0, 1.0])
+    return body_aero, n_node
+end
+
+@testset "Airfoil skin (Makie)" begin
+    airfoil_skin_geometry = getfield(makie_ext, :airfoil_skin_geometry)
+    skin_observables = getfield(makie_ext, :AIRFOIL_SKIN_OBSERVABLES)
+    skin_observables[] = nothing
+
+    body_aero, n_node = create_body_aero_with_skin(; n_panels=4)
+    n_sections = length(body_aero.wings[1].refined_sections)
+
+    vertices, faces, ribs = airfoil_skin_geometry(body_aero)
+    @test length(ribs) == n_sections
+    @test all(rib -> length(rib) == n_node, ribs)
+    @test !isempty(vertices)
+    # Each of the (n_sections - 1) lofted strips triangulates (n_node - 1) quads.
+    @test length(faces) == 2 * (n_sections - 1) * (n_node - 1)
+
+    # Static airfoil-skin plot.
+    fig = Figure()
+    ax = Axis3(fig[1, 1])
+    plots = Makie.plot!(ax, body_aero; airfoils=true)
+    @test !isempty(plots)
+
+    # Observable airfoil-skin plot registers the body for pose updates.
+    fig_obs = Figure()
+    ax_obs = Axis3(fig_obs[1, 1])
+    Makie.plot!(ax_obs, body_aero; airfoils=true, use_observables=true)
+    @test !isnothing(skin_observables[])
+    @test haskey(skin_observables[], objectid(body_aero))
+
+    # In-place update refreshes the registered skin observables without error.
+    @test_nowarn Makie.plot!(body_aero)
+
+    # A body without any surface aero yields no skin geometry, but still plots.
+    plain_body = create_body_aero()
+    v_plain, f_plain, ribs_plain = airfoil_skin_geometry(plain_body)
+    @test isempty(v_plain)
+    @test isempty(f_plain)
+    @test isempty(ribs_plain)
+
+    # Update path is a no-op (no error) when the body was never registered.
+    skin_observables[] = nothing
+    @test_nowarn Makie.plot!(plain_body)
+
+    # border_linewidth flows through the standard (non-airfoil) panel plot.
+    fig_lw = Figure()
+    ax_lw = Axis3(fig_lw[1, 1])
+    @test_nowarn Makie.plot!(ax_lw, plain_body; border_linewidth=3.0)
+end
 nothing

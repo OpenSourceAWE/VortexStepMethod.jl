@@ -1,4 +1,5 @@
 using VortexStepMethod
+using VortexStepMethod.AirfoilAero: lei_poly_coeffs
 using LinearAlgebra
 using Test
 if !@isdefined(test_data_path)
@@ -109,12 +110,25 @@ end
     @test all(small .== 0.0)
 end
 
-# A deep-alpha polar is required: the viscosity only fires where the local lift
-# slope is negative, and `cl` clamps flat past the tabulated alpha range. The
-# default 15-deg range never stalls, so we extend it to 40 deg.
-poststall_wing = ram_air_matrix_wing(; n_panels=20, n_sections=4,
-    alpha_range=deg2rad.(-5:2:40), delta_range=deg2rad.(-3:3:3))
-refine!(poststall_wing)
+"""
+    flat_plate_wing(; n_panels=20, span=20.0, chord=1.0)
+
+A rectangular wing with a Breukels flat-plate (zero-camber) LEI polar that genuinely
+stalls: the local lift slope is positive in attached flow and turns negative past
+stall, which is what the artificial-viscosity path keys on. The planar rectangular
+planform keeps the stall behaviour predictable across the span, unlike a drooped kite.
+"""
+function flat_plate_wing(; n_panels=20, span=20.0, chord=1.0)
+    wing = Wing(n_panels; spanwise_distribution=LINEAR)
+    coeffs = lei_poly_coeffs(0.1, 0.0)
+    add_section!(wing, [0.0,  span/2, 0.0], [chord,  span/2, 0.0],
+                 LEI_AIRFOIL_BREUKELS, coeffs)
+    add_section!(wing, [0.0, -span/2, 0.0], [chord, -span/2, 0.0],
+                 LEI_AIRFOIL_BREUKELS, coeffs)
+    refine!(wing)
+    return wing
+end
+poststall_wing = flat_plate_wing()
 
 roughness(v) = sum(abs, @views v[1:end-2] .- 2 .* v[2:end-1] .+ v[3:end])
 
@@ -133,7 +147,7 @@ roughness(v) = sum(abs, @views v[1:end-2] .- 2 .* v[2:end-1] .+ v[3:end])
 
     spiky() = [isodd(i) ? 1.0 : -1.0 for i in 1:n]
     attached = fill(deg2rad(2.0), n)
-    post_stall = fill(deg2rad(22.0), n)
+    post_stall = fill(deg2rad(16.0), n)
 
     # Attached flow: the local slope is positive everywhere, so mu stays zero,
     # the solve is skipped, and gamma is returned untouched.
@@ -179,7 +193,7 @@ end
     @test gamma_on == gamma_off
 
     # High angle of attack: the viscosity path runs and stays finite.
-    set_va!(body_aero, [10.0 * cosd(25), 0.0, 10.0 * sind(25)])
+    set_va!(body_aero, [10.0 * cosd(20), 0.0, 10.0 * sind(20)])
     sol = solve!(solver_on, body_aero)
     @test all(isfinite, sol.gamma_distribution)
 end

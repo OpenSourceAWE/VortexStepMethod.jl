@@ -2,7 +2,8 @@
 @with_kw struct WingAirfoilInfo
     csv_file_path::String
     dat_file::String = ""
-    cp_file_path::String = ""
+    cp_file::String = ""
+    cf_file::String = ""
     cl_file_path::String = ""
     cd_file_path::String = ""
     cm_file_path::String = ""
@@ -219,6 +220,7 @@ function Wing(
     remove_nan=true,
     use_prior_polar=false,
     billowing_percentage=0.0,
+    crease_frac=0.75,
     prn=false,
     sort_sections=true
 )
@@ -266,7 +268,8 @@ function Wing(
             info_dict = WingAirfoilInfo(
                 csv_file_path = get(airfoil_dict["info_dict"], "csv_file_path", ""),
                 dat_file = get(airfoil_dict["info_dict"], "dat_file", ""),
-                cp_file_path = get(airfoil_dict["info_dict"], "cp_file_path", ""),
+                cp_file = get(airfoil_dict["info_dict"], "cp_file", ""),
+                cf_file = get(airfoil_dict["info_dict"], "cf_file", ""),
                 cl_file_path = get(airfoil_dict["info_dict"], "cl_file_path", ""),
                 cd_file_path = get(airfoil_dict["info_dict"], "cd_file_path", ""),
                 cm_file_path = get(airfoil_dict["info_dict"], "cm_file_path", ""))
@@ -275,14 +278,15 @@ function Wing(
 
     # Create CSV file mapping from airfoils
     airfoil_csv_map = Dict{Int64, String}()
-    airfoil_cp_map = Dict{Int64, String}()
+    airfoil_surface_map = Dict{Int64, NTuple{3, String}}()
     airfoil_matrix_map = Dict{Int64, NTuple{3, String}}()
     for airfoil in airfoils
         if !isempty(airfoil.info_dict.csv_file_path)
             airfoil_csv_map[airfoil.airfoil_id] = airfoil.info_dict.csv_file_path
         end
-        if !isempty(airfoil.info_dict.cp_file_path)
-            airfoil_cp_map[airfoil.airfoil_id] = airfoil.info_dict.cp_file_path
+        if !isempty(airfoil.info_dict.cp_file) && !isempty(airfoil.info_dict.cf_file)
+            airfoil_surface_map[airfoil.airfoil_id] = (airfoil.info_dict.dat_file,
+                airfoil.info_dict.cp_file, airfoil.info_dict.cf_file)
         end
         if !isempty(airfoil.info_dict.cl_file_path)
             airfoil_matrix_map[airfoil.airfoil_id] = (airfoil.info_dict.cl_file_path,
@@ -296,9 +300,10 @@ function Wing(
         spanwise_direction=MVec3(spanwise_direction),
         remove_nan=remove_nan,
         use_prior_polar=use_prior_polar,
-        billowing_percentage=Float64(billowing_percentage)
+        billowing_percentage=Float64(billowing_percentage),
+        crease_frac=Float64(crease_frac)
     )
-    
+
     # Parse sections and populate wing
     for section in sections
         # Get coordinates directly from struct fields
@@ -326,12 +331,13 @@ function Wing(
             aero_data, aero_model = load_polar_data(csv_file_path)
         end
 
-        cp_file_path = resolve(get(airfoil_cp_map, section.airfoil_id, ""))
-        cp_data = isempty(cp_file_path) ? nothing : read_cp_data(cp_file_path)
+        surface = get(airfoil_surface_map, section.airfoil_id, nothing)
+        section_aero = isnothing(surface) ? nothing :
+            read_section_aero(resolve(surface[1]), resolve(surface[2]), resolve(surface[3]))
 
         prn && println("Section airfoil_id $(section.airfoil_id): Using $aero_model model")
 
-        add_section!(wing, le_coord, te_coord, aero_model, aero_data, cp_data)
+        add_section!(wing, le_coord, te_coord, aero_model, aero_data, section_aero)
     end
 
     refine!(wing; sort_sections)
@@ -402,6 +408,7 @@ function Wing(settings::VSMSettings; sort_sections::Bool=true)
             remove_nan=wing_settings.remove_nan,
             use_prior_polar=wing_settings.use_prior_polar,
             billowing_percentage=wing_settings.billowing_percentage,
+            crease_frac=wing_settings.crease_frac,
             sort_sections
         )
     elseif has_obj && has_dat
@@ -429,14 +436,16 @@ to a YAML wing geometry via [`ObjAdapter.obj_to_yaml`](@ref) and returns a [`Win
 OBJ geometry. Use `aero_solver=AirfoilAero.XFoilSolver()` to reproduce old XFoil-based
 polars; the default is `AirfoilAero.NeuralFoilSolver()`.
 
+`alpha_range` and `delta_range` are in degrees (matching [`ObjAdapter.obj_to_yaml`](@ref)).
+
 By default (`remake=false`) an existing `geometry.yaml` in `output_dir` is reused,
 skipping the expensive polar generation. Set `remake=true` to force regeneration.
 """
 function ObjWing(obj_path, dat_path=nothing;
                  n_panels::Int=56,
                  Re::Real=1e6,
-                 alpha_range=deg2rad.(-5:1:20),
-                 delta_range=deg2rad.(-5:1:20),
+                 alpha_range=-5:1:20,
+                 delta_range=-5:1:20,
                  n_sections::Union{Nothing, Int}=nothing,
                  spanwise_direction=[0.0, 1.0, 0.0],
                  spanwise_distribution=UNCHANGED,

@@ -1,7 +1,8 @@
 
 using Test
 using VortexStepMethod
-using VortexStepMethod: write_aero_matrix, read_aero_matrix
+using VortexStepMethod: read_aero_matrix
+using VortexStepMethod.AirfoilAero: write_aero_matrix
 using VortexStepMethod.ObjAdapter: create_interpolations, find_circle_center_and_radius,
     calculate_inertia_tensor, center_to_com!, read_faces, calc_inertia_y_rotation
 using LinearAlgebra

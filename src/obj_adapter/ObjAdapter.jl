@@ -13,7 +13,6 @@ import ..VortexStepMethod
 
 include("obj_geometry.jl")
 include("obj_slice.jl")
-include("polar_generation.jl")
 include("obj_to_yaml.jl")
 
 """
@@ -46,7 +45,6 @@ function plot_slices_3d end
 export obj_to_yaml, resolve_aero_geometry
 export write_geometry_yaml, write_yaml, airfoils_from_yaml
 export perpendicular_sections
-export generate_section_polars
 export read_faces, center_to_com!, calculate_inertia_tensor, calc_inertia_y_rotation
 export plot_airfoil_fit, plot_airfoils, plot_slices_3d
 

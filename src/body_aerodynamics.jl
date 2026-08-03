@@ -249,7 +249,7 @@ function reinit!(body_aero::BodyAerodynamics{P, W, T};
     vec = zeros(MVector{3, T})
     for wing in body_aero.wings
         reinit!(wing)
-        validate_cp_sections(wing.refined_sections)
+        validate_section_aero(wing.refined_sections)
         panel_props = wing.panel_props
         wing_init_aero = init_aero && !_can_skip_panel_aero_reinit(wing, body_aero.panels, idx)
         
@@ -273,10 +273,12 @@ function reinit!(body_aero::BodyAerodynamics{P, W, T};
                 panel_props.y_airf[i, :],
                 panel_props.z_airf[i, :],
                 delta,
-                vec;
+                vec,
+                wing.spanwise_direction;
                 remove_nan=wing.remove_nan,
                 init_aero=wing_init_aero
             )
+            body_aero.panels[idx].crease_frac = wing.crease_frac
             idx += 1
         end
     end
