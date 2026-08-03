@@ -1,14 +1,6 @@
 # Changelog
 
-## Unreleased (v4.0.0)
-
-### Breaking
-- `ObjWing` polar generation now uses NeuralFoil (via `ObjAdapter.obj_to_yaml`)
-  instead of XFoil + a user-supplied `.dat` file. The constructor signature is
-  backward-compatible (`dat_path` is accepted and silently ignored), but the
-  resulting aerodynamic polars will differ numerically from v3.x outputs.
-  To reproduce old XFoil-based polars pass `aero_solver=XFoilSolver()` to
-  `ObjAdapter.obj_to_yaml` and call `Wing` directly.
+## VortexStepMethod v4.0.0 2026-08-03
 
 ### Added
 - `NeuralFoil`-based airfoil polar generation via the new `AirfoilAero` submodule
@@ -32,16 +24,38 @@
   `read_section_aero` / `write_section_aero`; surface aero propagates through
   `Section` and `Wing` and is spanwise-interpolated during `refine!`
 - `POLY` aero model for polynomial cl/cd/cm (exported)
+- `lei_poly_coeffs(tube_diameter, camber)` (exported from `AirfoilAero`) returning
+  the Breukels α-polynomial cl/cd/cm coefficients
+- Li/Gaunaa spanwise artificial viscosity (Li, Gaunaa, Pirrung & Lønbæk,
+  TORQUE 2026) for the LOOP solver, stabilizing post-stall circulation
+  distributions that otherwise develop non-physical sawtooth oscillations;
+  opt-in via `is_with_artificial_viscosity` (default `false`) and
+  `artificial_viscosity_factor` (default `0.035`) on the solver settings
+- `crease_frac` wing setting (chordwise flap-hinge fraction, default `0.75`)
+  for drawing the δ-deflected plate/skin, readable from YAML
 - `examples/V3_neuralfoil.jl` and `examples/obj_to_yaml_kite.jl`
 
 ### Changed
+- BREAKING - `ObjWing` polar generation now uses NeuralFoil (via
+  `ObjAdapter.obj_to_yaml`) instead of XFoil + a user-supplied `.dat` file. The
+  constructor signature is backward-compatible (`dat_path` is accepted and
+  silently ignored), but the resulting aerodynamic polars will differ
+  numerically from v3.x outputs. To reproduce old XFoil-based polars pass
+  `aero_solver=XFoilSolver()` to `ObjAdapter.obj_to_yaml` and call `Wing`
+  directly.
 - OBJ-based wings are now built via `ObjAdapter.obj_to_yaml` + `Wing(yaml_path)`
   instead of the old `ObjWing` pipeline (XFoil + single `.dat` file);
   `ObjWing` is kept as a shim that accepts but ignores `dat_path`
+- BREAKING - `LEI_AIRFOIL_BREUKELS` is now a deprecated alias of `POLY`, and the
+  built-in Breukels regression no longer runs at solve time. Sections must carry
+  the α-polynomial coefficients directly instead of `(tube_diameter, camber)`;
+  compute them up front with `lei_poly_coeffs(tube_diameter, camber)`
 - `Section` and `add_section!` accept an optional `section_aero` argument
-- plotting is now Makie-only; the `VortexStepMethodMakieExt` extension loads once a
-  Makie backend and [`MakieControlPlots`](https://github.com/OpenSourceAWE/MakieControlPlots.jl)
-  are available, and `plot_section_polars` is rendered through `MakieControlPlots`
+- BREAKING - plotting is now Makie-only; the `VortexStepMethodMakieExt` extension
+  loads once a Makie backend and
+  [`MakieControlPlots`](https://github.com/OpenSourceAWE/MakieControlPlots.jl) are
+  available, so plotting code must now load `MakieControlPlots` (and drop
+  `set_plot_backend!`); `plot_section_polars` is rendered through `MakieControlPlots`
 
 ### Removed
 - `ObjWing` as a standalone pipeline (replaced by `ObjAdapter`); the name is
@@ -50,10 +64,12 @@
 - `PanelGroupingMethod` enum (already removed in v3.0.0 — stale docs entry cleaned up)
 - ControlPlots test run removed from CI (`plot-controlplots` arg) due to
   a `libraqm`/HarfBuzz symbol conflict in the GitHub Actions environment
-- the `ControlPlots` plotting extension, `examples_cp/`, and the `PythonCall`/Matplotlib
-  setup (`bin/install_controlplots`, CondaPkg `LocalPreferences` defaults)
-- the `PlotBackend`/`MakieBackend`/`ControlPlotsBackend` types and `set_plot_backend!`;
-  plotting works as soon as a Makie backend and `MakieControlPlots` are loaded
+- BREAKING - the `ControlPlots` plotting extension, `examples_cp/`, and the
+  `PythonCall`/Matplotlib setup (`bin/install_controlplots`, CondaPkg
+  `LocalPreferences` defaults)
+- BREAKING - the `PlotBackend`/`MakieBackend`/`ControlPlotsBackend` types and
+  `set_plot_backend!`; plotting works as soon as a Makie backend and
+  `MakieControlPlots` are loaded
 - the never-implemented `plot_circulation_distribution`
 
 ## VortexStepMethod v3.3.6 2026-06-13
