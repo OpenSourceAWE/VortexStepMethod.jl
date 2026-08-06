@@ -136,9 +136,6 @@ function airfoil_skin_geometry(body; R_b_w=nothing, T_b_w=nothing)
         n = length(sections)
         n_panels = n - 1
         n_panels < 1 && continue
-        spanwise = Point3f(wing.spanwise_direction)
-        increasing = dot(Point3f(sections[n].LE_point) -
-                         Point3f(sections[1].LE_point), spanwise) > 0
         for (i, section) in enumerate(sections)
             isnothing(section.section_aero) && continue
             panel_idx = panel_offset + min(i, n_panels)
@@ -147,9 +144,9 @@ function airfoil_skin_geometry(body; R_b_w=nothing, T_b_w=nothing)
             corners = panel.corner_points
             corner1 = Point3f(corners[:, 1]); corner3 = Point3f(corners[:, 3])
             corner2 = Point3f(corners[:, 2]); corner4 = Point3f(corners[:, 4])
-            plus_edge = i <= n_panels ? !increasing : increasing
-            leading = plus_edge ? corner1 : corner4
-            trailing = plus_edge ? corner2 : corner3
+            first_edge = i <= n_panels
+            leading = first_edge ? corner1 : corner4
+            trailing = first_edge ? corner2 : corner3
             chord = trailing - leading
             chord_len = norm(chord)
             chord_len < 1e-9 && continue
