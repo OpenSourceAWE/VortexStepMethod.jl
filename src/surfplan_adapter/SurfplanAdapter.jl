@@ -23,6 +23,8 @@ placement (`wing_sections`) and each airfoil's `.dat` path (`wing_airfoils`
 default, [`XFoilSolver`](@ref) opt-in). Sections that share an airfoil generate its
 tables once. `Re` defaults to the export's `wing_airfoils.reynolds`; `alpha_range`
 defaults to the full `-180:1:180` sweep rather than the export's narrow polar range.
+`table_format` writes the per-node surface tables as `:csv` (default, readable) or
+`:arrow` (binary, an order of magnitude faster to load).
 
 The `.txt` → adapter-YAML step (the upstream Python `SurfplanAdapter`) is the
 documented prerequisite. Load the result with `Wing(geometry_yaml_path)`.
@@ -34,7 +36,8 @@ function surfplan_to_aero_yaml(adapter_dir::AbstractString, output_dir::Abstract
         aero_solver::AbstractAirfoilSolver=NeuralFoilSolver(),
         wrap_method::ShrinkWrap=ShrinkWrap(),
         alpha_range=-180:1:180, delta_range=nothing, Re=nothing,
-        crease_frac=0.75, force::Bool=false, verbose::Bool=true)
+        crease_frac=0.75, force::Bool=false, verbose::Bool=true,
+        table_format::Symbol=:csv)
     yaml_path = joinpath(output_dir, "geometry.yaml")
     if !force && isfile(yaml_path)
         verbose && @info "Reusing existing $yaml_path (pass force=true to regenerate)"
@@ -68,7 +71,7 @@ function surfplan_to_aero_yaml(adapter_dir::AbstractString, output_dir::Abstract
     end
 
     airfoil_rows, ok = generate_airfoils(airfoils, output_dir; Re, alpha_range,
-        delta_range, aero_solver, crease_frac, verbose)
+        delta_range, aero_solver, crease_frac, verbose, table_format)
     isempty(ok) && error("No airfoil produced a valid polar from $adapter_dir")
 
     remap(id) = id in ok ? id : ok[argmin(abs.(ok .- id))]

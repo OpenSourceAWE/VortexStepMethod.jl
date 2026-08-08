@@ -110,15 +110,34 @@ end
 """
     read_node_table(path) -> (alpha, delta, values)
 
-Read a per-node aero CSV (header `alpha, delta, n0, n1, …`; angles in degrees) into
-radian `alpha`/`delta` vectors (one entry per row) and a `nrow × n_node` value matrix.
+Read a per-node aero table into radian `alpha`/`delta` vectors (one entry per row) and a
+`nrow × n_node` value matrix. The file suffix picks the format: `.arrow` (columns
+`alpha`, `delta` in degrees and a per-row list column `values`), anything else CSV
+(header `alpha, delta, n0, n1, …`, angles in degrees).
 """
 function read_node_table(path::AbstractString)
+    if endswith(String(path), ".arrow")
+        table = Arrow.Table(String(path))
+        values = Matrix{Float64}(undef, length(table.alpha), length(first(table.values)))
+        for k in axes(values, 1)
+            @inbounds values[k, :] .= table.values[k]
+        end
+        return deg2rad.(table.alpha), deg2rad.(table.delta), values
+    end
     lines = [l for l in readlines(String(path)) if !isempty(strip(l))]
-    rows = [parse.(Float64, split(l, ',')) for l in lines[2:end]]
-    alpha = deg2rad.([r[1] for r in rows])
-    delta = deg2rad.([r[2] for r in rows])
-    values = reduce(vcat, (permutedims(r[3:end]) for r in rows))
+    n_row = length(lines) - 1
+    n_col = count(==(','), lines[1]) + 1
+    alpha = Vector{Float64}(undef, n_row)
+    delta = Vector{Float64}(undef, n_row)
+    values = Matrix{Float64}(undef, n_row, n_col - 2)
+    for k in 1:n_row
+        fields = split(lines[k + 1], ',')
+        alpha[k] = deg2rad(parse(Float64, fields[1]))
+        delta[k] = deg2rad(parse(Float64, fields[2]))
+        @inbounds for j in 3:n_col
+            values[k, j - 2] = parse(Float64, fields[j])
+        end
+    end
     return alpha, delta, values
 end
 
@@ -127,8 +146,9 @@ end
 
 Assemble a [`SectionAero`](@ref) from the human-readable files: the airfoil contour
 (`dat_file`, plus `{stem}_{delta_suffix(δ)}.dat` per non-zero deflection) and the per-node `Cp`
-and `cf` tables (`alpha, delta, n0…` in the `.dat` node order). Returns `nothing` if any
-file is missing. This is the single loader for both provided and generated aero.
+and `cf` tables in the `.dat` node order, CSV or Arrow as their suffix says (see
+[`read_node_table`](@ref)). Returns `nothing` if any file is missing. This is the single
+loader for both provided and generated aero.
 """
 function read_section_aero(dat_file::AbstractString, cp_file::AbstractString,
                            cf_file::AbstractString)

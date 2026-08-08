@@ -1,5 +1,6 @@
 module VortexStepMethod
 
+using Arrow
 using LinearAlgebra
 using StaticArrays
 using Logging

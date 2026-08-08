@@ -1,5 +1,6 @@
 module AirfoilAero
 
+using Arrow
 using LinearAlgebra
 using Parameters
 using Statistics
