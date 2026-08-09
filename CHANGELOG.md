@@ -7,6 +7,10 @@
   and `surfplan_to_aero_yaml`: `:csv` (default, readable) or `:arrow` (binary, ~40×
   faster to load and 2.6× smaller). `read_section_aero` detects the format from the
   file suffix, so a geometry YAML can reference either.
+- `convert_node_table` and `write_node_rows` rewrite a per-node table in the format
+  the destination suffix names. `obj_to_yaml` migrates an existing dataset with
+  them when `table_format` differs from what the directory holds, so a dataset
+  changes format without re-running the airfoil solver that produced it.
 
 ### Changed
 - `read_node_table` parses into a preallocated matrix instead of `reduce(vcat, …)`

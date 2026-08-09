@@ -142,6 +142,42 @@ function read_node_table(path::AbstractString)
 end
 
 """
+    write_node_rows(path, alpha, delta, values) -> path
+
+Write a per-node aero table from radian `alpha`/`delta` vectors (one entry per row)
+and a `nrow × n_node` value matrix. The file suffix picks the format, matching
+[`read_node_table`](@ref): `.arrow` for the binary form, anything else CSV. Angles
+are written in degrees either way.
+"""
+function write_node_rows(path::AbstractString, alpha, delta, values)
+    if endswith(String(path), ".arrow")
+        Arrow.write(String(path),
+            (alpha=rad2deg.(alpha), delta=rad2deg.(delta),
+             values=[values[k, :] for k in axes(values, 1)]))
+        return path
+    end
+    open(String(path), "w") do io
+        println(io, "alpha,delta," * join(("n$(j - 1)" for j in axes(values, 2)), ","))
+        for k in axes(values, 1)
+            row = [rad2deg(alpha[k]), rad2deg(delta[k])]
+            append!(row, @view values[k, :])
+            println(io, join(row, ","))
+        end
+    end
+    return path
+end
+
+"""
+    convert_node_table(src, dst) -> dst
+
+Rewrite a per-node aero table in the format `dst`'s suffix names. Use to move an
+existing dataset between CSV and Arrow without re-running the (slow) airfoil solver
+that produced it.
+"""
+convert_node_table(src::AbstractString, dst::AbstractString) =
+    write_node_rows(dst, read_node_table(src)...)
+
+"""
     read_section_aero(dat_file, cp_file, cf_file) -> Union{Nothing, SectionAero}
 
 Assemble a [`SectionAero`](@ref) from the human-readable files: the airfoil contour

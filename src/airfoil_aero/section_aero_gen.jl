@@ -101,24 +101,15 @@ faster to load), anything else a human-readable CSV with header `alpha, delta, n
 (node columns in the contour node order). [`read_node_table`](@ref) reads both.
 """
 function write_node_table(path::AbstractString, aero::SectionAero, values)
-    if endswith(String(path), ".arrow")
-        grid = [(jd, ia) for jd in eachindex(aero.delta_range)
-                         for ia in eachindex(aero.alpha_range)]
-        Arrow.write(String(path),
-            (alpha=[rad2deg(aero.alpha_range[ia]) for (_, ia) in grid],
-             delta=[rad2deg(aero.delta_range[jd]) for (jd, _) in grid],
-             values=[values[:, ia, jd] for (jd, ia) in grid]))
-        return path
+    grid = [(jd, ia) for jd in eachindex(aero.delta_range)
+                     for ia in eachindex(aero.alpha_range)]
+    rows = Matrix{Float64}(undef, length(grid), size(values, 1))
+    for (k, (jd, ia)) in enumerate(grid)
+        rows[k, :] .= @view values[:, ia, jd]
     end
-    open(String(path), "w") do io
-        println(io, "alpha,delta," * join(("n$(k - 1)" for k in 1:size(values, 1)), ","))
-        for jd in eachindex(aero.delta_range), ia in eachindex(aero.alpha_range)
-            row = [rad2deg(aero.alpha_range[ia]), rad2deg(aero.delta_range[jd])]
-            append!(row, values[:, ia, jd])
-            println(io, join(row, ","))
-        end
-    end
-    return path
+    return write_node_rows(path,
+        [aero.alpha_range[ia] for (_, ia) in grid],
+        [aero.delta_range[jd] for (jd, _) in grid], rows)
 end
 
 """

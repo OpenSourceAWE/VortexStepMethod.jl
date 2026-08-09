@@ -1,6 +1,5 @@
 module AirfoilAero
 
-using Arrow
 using LinearAlgebra
 using Parameters
 using Statistics
@@ -8,7 +7,8 @@ using Interpolations
 using NPZ
 using Xfoil
 using Printf: @sprintf
-using ..VortexStepMethod: SectionAero, interpolate_matrix_nans!, delta_suffix
+using ..VortexStepMethod: SectionAero, interpolate_matrix_nans!, delta_suffix,
+                          write_node_rows
 
 include("kulfan.jl")
 include("shrink_wrap.jl")
