@@ -61,6 +61,35 @@ obj_path = normpath(joinpath(@__DIR__, "..", "..",
         @test_throws ErrorException obj_to_yaml("missing.obj", outdir; n_sections=3, Re=5e5)
     end
 
+    @testset "obj_to_yaml migrates existing node tables to another format" begin
+        outdir = mktempdir()
+        csv_yaml = obj_to_yaml(obj_path, outdir; n_sections=3, Re=5e5,
+            alpha_range=-4:2:4, aero_solver=NeuralFoilSolver(model_size="medium"),
+            verbose=false)
+        csv_info = Dict(YAML.load_file(csv_yaml)["wing_airfoils"]["data"][1][3])
+
+        arrow_yaml = obj_to_yaml(obj_path, outdir; n_sections=3, Re=5e5,
+            verbose=false, table_format=:arrow)
+        info = Dict(YAML.load_file(arrow_yaml)["wing_airfoils"]["data"][1][3])
+        @test endswith(info["cp_file"], ".arrow")
+        @test endswith(info["cf_file"], ".arrow")
+        @test isfile(joinpath(outdir, info["cp_file"]))
+        @test isfile(joinpath(outdir, info["cf_file"]))
+        @test isfile(joinpath(outdir, csv_info["cp_file"]))
+        @test Wing(arrow_yaml; n_panels=4) isa Wing
+
+        # already in that format: nothing to convert, YAML untouched
+        again = obj_to_yaml(obj_path, outdir; n_sections=3, Re=5e5,
+            verbose=false, table_format=:arrow)
+        @test Dict(YAML.load_file(again)["wing_airfoils"]["data"][1][3]) == info
+
+        @test_throws ArgumentError ObjAdapter.migrate_node_tables(arrow_yaml, outdir,
+                                                                 :parquet)
+        rm(joinpath(outdir, info["cp_file"]))
+        @test_throws ErrorException ObjAdapter.migrate_node_tables(arrow_yaml, outdir,
+                                                                  :csv)
+    end
+
     @testset "center_to_com! rejects non-triangular faces" begin
         verts = [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [1.0, 1.0, 0.0]]
         @test_throws ArgumentError center_to_com!(verts, [[1, 2, 3, 4]]; prn=false)

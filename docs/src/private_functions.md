@@ -148,7 +148,6 @@ write_polar_csv
 write_polar_matrix_csv
 write_aero_matrix
 write_node_table
-migrate_node_tables
 flat_plate_cf
 neuralfoil_contour_solution
 fill_node_nans!
@@ -178,6 +177,7 @@ airfoils_from_yaml
 write_geometry_yaml
 resolve_aero_geometry
 plot_airfoil_fit
+migrate_node_tables
 ```
 
 ## Makie plotting internals
