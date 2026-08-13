@@ -118,7 +118,8 @@ Read a per-node aero table into radian `alpha`/`delta` vectors (one entry per ro
 """
 function read_node_table(path::AbstractString)
     if endswith(String(path), ".arrow")
-        table = Arrow.Table(String(path))
+        # bytes, not the mmap Arrow.Table(path) takes: Windows locks a mapped file
+        table = Arrow.Table(read(String(path)))
         values = Matrix{Float64}(undef, length(table.alpha), length(first(table.values)))
         for k in axes(values, 1)
             @inbounds values[k, :] .= table.values[k]
