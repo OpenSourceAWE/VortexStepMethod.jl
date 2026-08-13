@@ -616,6 +616,17 @@ end
     end
 end
 
+"""
+    solve_base!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=nothing;
+                log=false)
+
+Converge the circulation distribution and leave it in `solver.lr.gamma_new`, without
+turning it into forces. Fills the solver's panel arrays, builds the AIC matrices,
+starts from `gamma_distribution` (or an elliptical/zero guess when it is `nothing` or
+`solver.use_gamma_prev` is false) and iterates; a `LOOP` solver that fails to converge
+retries once with half the relaxation factor. The circulation half of [`solve!`](@ref),
+paired with [`calc_forces!`](@ref). Returns `nothing`.
+"""
 function solve_base!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics, gamma_distribution=nothing;
                log=false) where {P, U, T}
     

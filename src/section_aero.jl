@@ -79,7 +79,8 @@ end
 Filename tag for a non-zero trailing-edge deflection `delta` [rad], e.g. `d5`, `dm3`
 (−3°), `d2p5` (2.5°). Uses millidegree precision (negatives as `m`, the decimal point
 as `p`) so sub-degree deflections get distinct `.dat` files instead of colliding.
-Shared by [`write_section_aero`](@ref) and [`read_section_aero`](@ref).
+Shared by [`write_section_aero`](@ref VortexStepMethod.AirfoilAero.write_section_aero)
+and [`read_section_aero`](@ref).
 """
 function delta_suffix(delta)
     deg = round(rad2deg(delta); digits=3)

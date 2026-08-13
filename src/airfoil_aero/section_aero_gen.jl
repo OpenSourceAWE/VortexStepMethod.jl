@@ -98,7 +98,8 @@ Write a per-node aero table (`Cp` or `cf`, shaped `n_node × n_alpha × n_delta`
 per `(alpha, delta)` with angles in degrees. The file suffix picks the format: `.arrow`
 (columns `alpha`, `delta` and a per-row list column `values`, an order of magnitude
 faster to load), anything else a human-readable CSV with header `alpha, delta, n0, n1, …`
-(node columns in the contour node order). [`read_node_table`](@ref) reads both.
+(node columns in the contour node order).
+[`read_node_table`](@ref VortexStepMethod.read_node_table) reads both.
 """
 function write_node_table(path::AbstractString, aero::SectionAero, values)
     grid = [(jd, ia) for jd in eachindex(aero.delta_range)

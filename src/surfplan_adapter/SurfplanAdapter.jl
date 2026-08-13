@@ -13,14 +13,16 @@ using ..AirfoilAero: shrink_wrap, ShrinkWrap, read_dat_coordinates,
 Generate a pressure-ready `geometry.yaml` (per-node surface `cp`/`cf` tables plus
 polars) from a SurfplanAdapter aero export, so the wing can be flown with the
 `AeroPressure` continuous coupling instead of only integrated polars. The Surfplan
-counterpart of [`obj_to_yaml`](@ref): where `.obj` slices a mesh, this reads the
+counterpart of [`obj_to_yaml`](@ref VortexStepMethod.ObjAdapter.obj_to_yaml): where
+`.obj` slices a mesh, this reads the
 already-clean per-rib airfoil `.dat` profiles the Python adapter exported.
 
 Reads `adapter_dir/aero_geometry.yaml` for each section's leading/trailing-edge
 placement (`wing_sections`) and each airfoil's `.dat` path (`wing_airfoils`
 `info_dict.dat_file_path`), shrink-wraps every unique profile, and runs the shared
 [`generate_airfoils`](@ref) core with `aero_solver` ([`NeuralFoilSolver`](@ref) by
-default, [`XFoilSolver`](@ref) opt-in). Sections that share an airfoil generate its
+default, [`XFoilSolver`](@ref VortexStepMethod.AirfoilAero.XFoilSolver) opt-in).
+Sections that share an airfoil generate its
 tables once. `Re` defaults to the export's `wing_airfoils.reynolds`; `alpha_range`
 defaults to the full `-180:1:180` sweep rather than the export's narrow polar range.
 `table_format` writes the per-node surface tables as `:csv` (default, readable) or
