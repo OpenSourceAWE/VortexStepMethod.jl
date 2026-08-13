@@ -78,6 +78,8 @@ load_matrix_polar_data
 read_aero_matrix
 read_dat
 read_node_table
+write_node_rows
+convert_node_table
 delta_suffix
 interpolate_matrix_nans!
 remove_vector_nans
@@ -175,6 +177,7 @@ airfoils_from_yaml
 write_geometry_yaml
 resolve_aero_geometry
 plot_airfoil_fit
+migrate_node_tables
 ```
 
 ## Makie plotting internals
@@ -192,6 +195,7 @@ airfoil_skin_geometry
 panel_normal
 plate_hinge_local
 panel_plate_geometry
+PLATE_FACES
 Makie.plot!(ax, panel::VortexStepMethod.Panel)
 Makie.plot!(ax, body::VortexStepMethod.BodyAerodynamics)
 Makie.plot!(body::VortexStepMethod.BodyAerodynamics)

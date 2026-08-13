@@ -13,16 +13,20 @@ using ..AirfoilAero: shrink_wrap, ShrinkWrap, read_dat_coordinates,
 Generate a pressure-ready `geometry.yaml` (per-node surface `cp`/`cf` tables plus
 polars) from a SurfplanAdapter aero export, so the wing can be flown with the
 `AeroPressure` continuous coupling instead of only integrated polars. The Surfplan
-counterpart of [`obj_to_yaml`](@ref): where `.obj` slices a mesh, this reads the
+counterpart of [`obj_to_yaml`](@ref VortexStepMethod.ObjAdapter.obj_to_yaml): where
+`.obj` slices a mesh, this reads the
 already-clean per-rib airfoil `.dat` profiles the Python adapter exported.
 
 Reads `adapter_dir/aero_geometry.yaml` for each section's leading/trailing-edge
 placement (`wing_sections`) and each airfoil's `.dat` path (`wing_airfoils`
 `info_dict.dat_file_path`), shrink-wraps every unique profile, and runs the shared
 [`generate_airfoils`](@ref) core with `aero_solver` ([`NeuralFoilSolver`](@ref) by
-default, [`XFoilSolver`](@ref) opt-in). Sections that share an airfoil generate its
+default, [`XFoilSolver`](@ref VortexStepMethod.AirfoilAero.XFoilSolver) opt-in).
+Sections that share an airfoil generate its
 tables once. `Re` defaults to the export's `wing_airfoils.reynolds`; `alpha_range`
 defaults to the full `-180:1:180` sweep rather than the export's narrow polar range.
+`table_format` writes the per-node surface tables as `:csv` (default, readable) or
+`:arrow` (binary, an order of magnitude faster to load).
 
 The `.txt` → adapter-YAML step (the upstream Python `SurfplanAdapter`) is the
 documented prerequisite. Load the result with `Wing(geometry_yaml_path)`.
@@ -34,7 +38,8 @@ function surfplan_to_aero_yaml(adapter_dir::AbstractString, output_dir::Abstract
         aero_solver::AbstractAirfoilSolver=NeuralFoilSolver(),
         wrap_method::ShrinkWrap=ShrinkWrap(),
         alpha_range=-180:1:180, delta_range=nothing, Re=nothing,
-        crease_frac=0.75, force::Bool=false, verbose::Bool=true)
+        crease_frac=0.75, force::Bool=false, verbose::Bool=true,
+        table_format::Symbol=:csv)
     yaml_path = joinpath(output_dir, "geometry.yaml")
     if !force && isfile(yaml_path)
         verbose && @info "Reusing existing $yaml_path (pass force=true to regenerate)"
@@ -68,7 +73,7 @@ function surfplan_to_aero_yaml(adapter_dir::AbstractString, output_dir::Abstract
     end
 
     airfoil_rows, ok = generate_airfoils(airfoils, output_dir; Re, alpha_range,
-        delta_range, aero_solver, crease_frac, verbose)
+        delta_range, aero_solver, crease_frac, verbose, table_format)
     isempty(ok) && error("No airfoil produced a valid polar from $adapter_dir")
 
     remap(id) = id in ok ? id : ok[argmin(abs.(ok .- id))]

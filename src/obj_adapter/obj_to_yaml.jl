@@ -81,11 +81,63 @@ share a neighbour's id):
   `{tag}` is the deflection in degrees with `m` for minus and `p` for the decimal point
   (e.g. `_dm3.dat`, `_d2p5.dat`)
 - `polars/{j}.csv`    — NeuralFoil polar (alpha, Cd, Cs, Cl, Cm)
+- `pressure/{j}_cp.{table_format}`, `_cf.{table_format}` — per-node surface pressure and
+  skin friction; `table_format` is `:csv` (default, readable) or `:arrow` (binary, an
+  order of magnitude faster to load)
 - `geometry.yaml`     — `wing_sections` + `wing_airfoils` referencing the above
 
 # Returns
 - Path to the written `geometry.yaml`.
 """
+function obj_to_yaml end
+
+"""
+    migrate_node_tables(yaml_path, output_dir, table_format; verbose=true)
+
+Rewrite a generated dataset's per-node `Cp`/`cf` tables in `table_format` and point
+`geometry.yaml` at them, when they are not in that format already. This is what lets
+an existing directory change format without re-running the airfoil solver that
+produced it — the polars are the slow part and they are untouched. The source tables
+are left in place.
+"""
+function migrate_node_tables(yaml_path::String, output_dir::String,
+                             table_format::Symbol; verbose::Bool=true)
+    table_format in (:csv, :arrow) ||
+        throw(ArgumentError("table_format must be :csv or :arrow, got :$table_format"))
+    data = YAML.load_file(yaml_path)
+    airfoils = get(data, "wing_airfoils", nothing)
+    airfoils === nothing && return yaml_path
+    headers = airfoils["headers"]
+    info_col = findfirst(==("info_dict"), headers)
+    info_col === nothing && return yaml_path
+    converted = 0
+    for row in airfoils["data"]
+        info = row[info_col]
+        info isa AbstractDict || continue
+        for key in ("cp_file", "cf_file")
+            haskey(info, key) || continue
+            relative = String(info[key])
+            endswith(relative, ".$table_format") && continue
+            fresh = string(splitext(relative)[1], ".", table_format)
+            source = joinpath(output_dir, relative)
+            isfile(source) || error("Table $source referenced by $yaml_path is missing")
+            isfile(joinpath(output_dir, fresh)) ||
+                VortexStepMethod.convert_node_table(source,
+                                                    joinpath(output_dir, fresh))
+            info[key] = fresh
+            converted += 1
+        end
+    end
+    converted == 0 && return yaml_path
+    id_col = findfirst(==("airfoil_id"), headers)
+    type_col = findfirst(==("type"), headers)
+    write_geometry_yaml(yaml_path, data["wing_sections"]["data"],
+                        [Any[row[id_col], row[type_col], row[info_col]]
+                         for row in airfoils["data"]])
+    verbose && @info "Converted $converted node tables to :$table_format" yaml_path
+    return yaml_path
+end
+
 function obj_to_yaml(obj_path::String, output_dir::String;
                      n_sections::Int, Re::Real,
                      alpha_range=-180:1:180, delta_range=nothing,
@@ -94,7 +146,7 @@ function obj_to_yaml(obj_path::String, output_dir::String;
                      reuse_valid_airfoils::Bool=true, max_thickness_ratio::Real=2.0,
                      spanwise_direction=[0.0, 1.0, 0.0], rotation=I,
                      wingtip_distance=0.05, crease_frac=0.75, force::Bool=false,
-                     verbose::Bool=true)
+                     verbose::Bool=true, table_format::Symbol=:csv)
     (!endswith(obj_path, ".obj")) && (obj_path *= ".obj")
     isfile(obj_path) || error("OBJ file not found: $obj_path")
     !isapprox(spanwise_direction, [0.0, 1.0, 0.0]) &&
@@ -103,6 +155,7 @@ function obj_to_yaml(obj_path::String, output_dir::String;
     yaml_path = joinpath(output_dir, "geometry.yaml")
     if !force && isfile(yaml_path)
         verbose && @info "Reusing existing geometry (force=true to regenerate)" yaml_path
+        migrate_node_tables(yaml_path, output_dir, table_format; verbose)
         return yaml_path
     end
 
@@ -132,7 +185,8 @@ function obj_to_yaml(obj_path::String, output_dir::String;
     airfoils = [(; id = j, x_fit = stations[j].x_fit, y_fit = stations[j].y_fit,
                  x_raw = stations[j].xa, y_raw = stations[j].ya) for j in unique(ids)]
     airfoil_rows, ok = generate_airfoils(airfoils, output_dir; Re, alpha_range,
-        delta_range, aero_solver, reuse_valid_airfoils, crease_frac, verbose)
+        delta_range, aero_solver, reuse_valid_airfoils, crease_frac, verbose,
+        table_format)
     isempty(ok) && error("No section produced a valid polar in $obj_path")
 
     # Each section uses its nearest airfoil that actually produced a polar — covering

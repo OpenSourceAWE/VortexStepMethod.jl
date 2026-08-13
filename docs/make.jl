@@ -14,7 +14,6 @@ makedocs(;
              VortexStepMethod.ObjAdapter],
     authors="Uwe Fechner <uwe.fechner.msc@gmail.com>, Bart van de Lint <bart@vandelint.net> and contributors",
     sitename="VortexStepMethod.jl",
-    warnonly=[:cross_references],
     format = Documenter.HTML(prettyurls = haskey(ENV, "CI")),
     pages=[
         "Home" => "index.md",

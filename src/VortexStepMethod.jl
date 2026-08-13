@@ -1,5 +1,6 @@
 module VortexStepMethod
 
+using Arrow
 using LinearAlgebra
 using StaticArrays
 using Logging
@@ -261,7 +262,7 @@ end
 """
     LEI_AIRFOIL_BREUKELS
 
-Deprecated alias of [`POLY`](@ref). The Breukels `(tube_diameter, camber)` → coeff
+Deprecated alias of `POLY` (see [`AeroModel`](@ref)). The Breukels `(tube_diameter, camber)` → coeff
 derivation now lives in `AirfoilAero.lei_poly_coeffs`; sections carry the resulting
 `(cl_coeffs, cd_coeffs, cm_coeffs)`.
 """

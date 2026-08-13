@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- `table_format` keyword on `write_section_aero`, `generate_airfoils`, `obj_to_yaml`
+  and `surfplan_to_aero_yaml`: `:csv` (default, readable) or `:arrow` (binary, ~40×
+  faster to load and 2.6× smaller). `read_section_aero` detects the format from the
+  file suffix, so a geometry YAML can reference either.
+- `convert_node_table` and `write_node_rows` rewrite a per-node table in the format
+  the destination suffix names. `obj_to_yaml` migrates an existing dataset with
+  them when `table_format` differs from what the directory holds, so a dataset
+  changes format without re-running the airfoil solver that produced it.
+
+### Changed
+- `read_node_table` parses into a preallocated matrix instead of `reduce(vcat, …)`
+  over a generator, which was quadratic in the row count: ~21× faster on a 16 MB
+  surface table (2.49 s → 0.12 s), benefiting every existing dataset.
+
 ## VortexStepMethod v4.0.0 2026-08-03
 
 ### Added

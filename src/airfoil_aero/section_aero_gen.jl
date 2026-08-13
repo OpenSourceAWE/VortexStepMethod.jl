@@ -94,36 +94,44 @@ end
 """
     write_node_table(path, aero, values) -> path
 
-Write a per-node aero table (`Cp` or `cf`, shaped `n_node × n_alpha × n_delta`) as a
-human-readable CSV: header `alpha, delta, n0, n1, …` (node columns in the contour node
-order), one row per `(alpha, delta)` with angles in degrees.
+Write a per-node aero table (`Cp` or `cf`, shaped `n_node × n_alpha × n_delta`), one row
+per `(alpha, delta)` with angles in degrees. The file suffix picks the format: `.arrow`
+(columns `alpha`, `delta` and a per-row list column `values`, an order of magnitude
+faster to load), anything else a human-readable CSV with header `alpha, delta, n0, n1, …`
+(node columns in the contour node order).
+[`read_node_table`](@ref VortexStepMethod.read_node_table) reads both.
 """
 function write_node_table(path::AbstractString, aero::SectionAero, values)
-    open(String(path), "w") do io
-        println(io, "alpha,delta," * join(("n$(k - 1)" for k in 1:size(values, 1)), ","))
-        for jd in eachindex(aero.delta_range), ia in eachindex(aero.alpha_range)
-            row = [rad2deg(aero.alpha_range[ia]), rad2deg(aero.delta_range[jd])]
-            append!(row, values[:, ia, jd])
-            println(io, join(row, ","))
-        end
+    grid = [(jd, ia) for jd in eachindex(aero.delta_range)
+                     for ia in eachindex(aero.alpha_range)]
+    rows = Matrix{Float64}(undef, length(grid), size(values, 1))
+    for (k, (jd, ia)) in enumerate(grid)
+        rows[k, :] .= @view values[:, ia, jd]
     end
-    return path
+    return write_node_rows(path,
+        [aero.alpha_range[ia] for (_, ia) in grid],
+        [aero.delta_range[jd] for (jd, _) in grid], rows)
 end
 
 """
-    write_section_aero(dat_prefix, aero::SectionAero; table_prefix=dat_prefix)
-        -> (dat, cp_csv, cf_csv)
+    write_section_aero(dat_prefix, aero::SectionAero; table_prefix=dat_prefix,
+                       table_format=:csv) -> (dat, cp_table, cf_table)
 
 Write a [`SectionAero`](@ref) as human-readable files. The airfoil contours share
 `dat_prefix`: `{dat_prefix}.dat` (contour at `delta=0`) plus
 `{dat_prefix}_{delta_suffix(δ)}.dat` per non-zero deflection. The per-node `Cp`/`cf`
-tables share `table_prefix` (defaults to `dat_prefix`): `{table_prefix}_cp.csv` and
-`{table_prefix}_cf.csv`. Pass a separate `table_prefix` to keep the surface tables out
-of the airfoil-shape directory. `read_section_aero` reads them back. The single writer
-for surface aero (submodule side); loading lives in the main package.
+tables share `table_prefix` (defaults to `dat_prefix`): `{table_prefix}_cp.{ext}` and
+`{table_prefix}_cf.{ext}`, where `ext` is `table_format`, either `:csv` (default,
+readable) or `:arrow` (binary, an order of magnitude faster to load). Pass a separate
+`table_prefix` to keep the surface tables out of the airfoil-shape directory.
+`read_section_aero` reads either format back, detecting it from the suffix. The single
+writer for surface aero (submodule side); loading lives in the main package.
 """
 function write_section_aero(dat_prefix::AbstractString, aero::SectionAero;
-                            table_prefix::AbstractString=dat_prefix)
+                            table_prefix::AbstractString=dat_prefix,
+                            table_format::Symbol=:csv)
+    table_format in (:csv, :arrow) ||
+        throw(ArgumentError("table_format must be :csv or :arrow, got :$table_format"))
     mkpath(dirname(dat_prefix))
     mkpath(dirname(table_prefix))
     for (jd, d) in enumerate(aero.delta_range)
@@ -136,7 +144,9 @@ function write_section_aero(dat_prefix::AbstractString, aero::SectionAero;
     jz = findfirst(iszero, aero.delta_range)
     jdat = jz !== nothing && finite(jz) ? jz : findfirst(finite, eachindex(aero.delta_range))
     write_dat("$dat_prefix.dat", "section", aero.x[:, jdat], aero.y[:, jdat])
-    write_node_table("$(table_prefix)_cp.csv", aero, aero.cp)
-    write_node_table("$(table_prefix)_cf.csv", aero, aero.cf)
-    return "$dat_prefix.dat", "$(table_prefix)_cp.csv", "$(table_prefix)_cf.csv"
+    cp_path = "$(table_prefix)_cp.$table_format"
+    cf_path = "$(table_prefix)_cf.$table_format"
+    write_node_table(cp_path, aero, aero.cp)
+    write_node_table(cf_path, aero, aero.cf)
+    return "$dat_prefix.dat", cp_path, cf_path
 end

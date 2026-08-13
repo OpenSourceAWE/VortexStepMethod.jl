@@ -13,6 +13,12 @@ const PANEL_MESH_OBSERVABLES = Ref{Union{Nothing,Dict}}(nothing)
 # Global storage for airfoil-skin observables, keyed by body objectid.
 const AIRFOIL_SKIN_OBSERVABLES = Ref{Union{Nothing,Dict}}(nothing)
 
+"""
+    PLATE_FACES
+
+The 4 triangles that mesh the 6 [`panel_plate_geometry`](@ref) vertices of a panel's
+flat-plate skin, two per side of the hinge.
+"""
 const PLATE_FACES = [Makie.GLTriangleFace(1, 2, 5), Makie.GLTriangleFace(1, 5, 6),
     Makie.GLTriangleFace(2, 3, 4), Makie.GLTriangleFace(2, 4, 5)]
 const PLATE_BORDER_IDX = [1, 2, 3, 4, 5, 6, 1]
@@ -1510,8 +1516,8 @@ end
 Shrink-wrap a section's sliced contour with `wrap_method` and map it back into 3D
 through the section's local airfoil frame, for overlaying on the 3D slice diagnostic.
 A nonzero `delta` (degrees) deflects the trailing edge and re-wraps
-([`deform_section`](@ref)), showing the geometry the solvers consume.
-Returns `nothing` for a degenerate slice.
+([`deform_section`](@ref VortexStepMethod.AirfoilAero.deform_section)), showing the
+geometry the solvers consume. Returns `nothing` for a degenerate slice.
 """
 function fitted_airfoil_3d(s, wrap_method; delta=0.0, crease_frac=0.75)
     frame = ObjAdapter.airfoil_frame(s.LE_point, s.TE_point, s.span_dir)
@@ -1551,10 +1557,13 @@ end
 """
     generated_slices(out_dir, delta, fit_pts) -> (slices, le, te)
 
-Read the stations of a generated [`obj_to_yaml`](@ref) output directory and their
-written `.dat` airfoils — raw slice, wrap, and the `delta`-degree deformed wrap when
-it was generated — assembled for [`plot_slices_3d`](@ref). Nothing is re-sliced or
-re-wrapped; only the Kulfan fits of the stored coordinates are recomputed (via
+Read the stations of a generated
+[`obj_to_yaml`](@ref VortexStepMethod.ObjAdapter.obj_to_yaml) output directory and
+their written `.dat` airfoils — raw slice, wrap, and the `delta`-degree deformed wrap
+when it was generated — assembled for
+[`plot_slices_3d`](@ref VortexStepMethod.ObjAdapter.plot_slices_3d). Nothing is
+re-sliced or re-wrapped; only the Kulfan fits of the stored coordinates are
+recomputed (via
 `fit_pts`), exactly as the polar pipeline fits them.
 """
 function generated_slices(out_dir, delta, fit_pts)
@@ -1605,14 +1614,16 @@ end
 3D slice diagnostic with a hover 2D airfoil panel: raw slice points (green), the
 shrink-wrapped airfoil (crimson) and its Kulfan fit (black dashed), and, for nonzero
 `delta` (degrees), the deflected re-wrapped airfoil (purple — the
-[`deform_section`](@ref) geometry the solvers consume) and its Kulfan fit (orange
-dashed). **Hovering a slice** updates the 2D panel.
+[`deform_section`](@ref VortexStepMethod.AirfoilAero.deform_section) geometry the
+solvers consume) and its Kulfan fit (orange dashed). **Hovering a slice** updates the
+2D panel.
 
 `path` selects the source:
 - a mesh `.obj` file: live preview — slices and wraps here with `wrap_method`
   (`n_slices`, `n_bins`, `wingtip_distance`, `crease_frac`).
-- a generated [`obj_to_yaml`](@ref) output directory: audit mode — stations and
-  airfoils are read from `geometry.yaml` and the written `.dat` files, so the plot
+- a generated [`obj_to_yaml`](@ref VortexStepMethod.ObjAdapter.obj_to_yaml) output
+  directory: audit mode — stations and airfoils are read from `geometry.yaml` and the
+  written `.dat` files, so the plot
   shows exactly what the polar pipeline analysed. `delta` must then match a
   generated deflection value; pass `obj_path` to also draw the mesh (with the same
   `rotation` used at generation).

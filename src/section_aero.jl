@@ -79,7 +79,8 @@ end
 Filename tag for a non-zero trailing-edge deflection `delta` [rad], e.g. `d5`, `dm3`
 (−3°), `d2p5` (2.5°). Uses millidegree precision (negatives as `m`, the decimal point
 as `p`) so sub-degree deflections get distinct `.dat` files instead of colliding.
-Shared by [`write_section_aero`](@ref) and [`read_section_aero`](@ref).
+Shared by [`write_section_aero`](@ref VortexStepMethod.AirfoilAero.write_section_aero)
+and [`read_section_aero`](@ref).
 """
 function delta_suffix(delta)
     deg = round(rad2deg(delta); digits=3)
@@ -110,25 +111,82 @@ end
 """
     read_node_table(path) -> (alpha, delta, values)
 
-Read a per-node aero CSV (header `alpha, delta, n0, n1, …`; angles in degrees) into
-radian `alpha`/`delta` vectors (one entry per row) and a `nrow × n_node` value matrix.
+Read a per-node aero table into radian `alpha`/`delta` vectors (one entry per row) and a
+`nrow × n_node` value matrix. The file suffix picks the format: `.arrow` (columns
+`alpha`, `delta` in degrees and a per-row list column `values`), anything else CSV
+(header `alpha, delta, n0, n1, …`, angles in degrees).
 """
 function read_node_table(path::AbstractString)
+    if endswith(String(path), ".arrow")
+        # bytes, not the mmap Arrow.Table(path) takes: Windows locks a mapped file
+        table = Arrow.Table(read(String(path)))
+        values = Matrix{Float64}(undef, length(table.alpha), length(first(table.values)))
+        for k in axes(values, 1)
+            @inbounds values[k, :] .= table.values[k]
+        end
+        return deg2rad.(table.alpha), deg2rad.(table.delta), values
+    end
     lines = [l for l in readlines(String(path)) if !isempty(strip(l))]
-    rows = [parse.(Float64, split(l, ',')) for l in lines[2:end]]
-    alpha = deg2rad.([r[1] for r in rows])
-    delta = deg2rad.([r[2] for r in rows])
-    values = reduce(vcat, (permutedims(r[3:end]) for r in rows))
+    n_row = length(lines) - 1
+    n_col = count(==(','), lines[1]) + 1
+    alpha = Vector{Float64}(undef, n_row)
+    delta = Vector{Float64}(undef, n_row)
+    values = Matrix{Float64}(undef, n_row, n_col - 2)
+    for k in 1:n_row
+        fields = split(lines[k + 1], ',')
+        alpha[k] = deg2rad(parse(Float64, fields[1]))
+        delta[k] = deg2rad(parse(Float64, fields[2]))
+        @inbounds for j in 3:n_col
+            values[k, j - 2] = parse(Float64, fields[j])
+        end
+    end
     return alpha, delta, values
 end
+
+"""
+    write_node_rows(path, alpha, delta, values) -> path
+
+Write a per-node aero table from radian `alpha`/`delta` vectors (one entry per row)
+and a `nrow × n_node` value matrix. The file suffix picks the format, matching
+[`read_node_table`](@ref): `.arrow` for the binary form, anything else CSV. Angles
+are written in degrees either way.
+"""
+function write_node_rows(path::AbstractString, alpha, delta, values)
+    if endswith(String(path), ".arrow")
+        Arrow.write(String(path),
+            (alpha=rad2deg.(alpha), delta=rad2deg.(delta),
+             values=[values[k, :] for k in axes(values, 1)]))
+        return path
+    end
+    open(String(path), "w") do io
+        println(io, "alpha,delta," * join(("n$(j - 1)" for j in axes(values, 2)), ","))
+        for k in axes(values, 1)
+            row = [rad2deg(alpha[k]), rad2deg(delta[k])]
+            append!(row, @view values[k, :])
+            println(io, join(row, ","))
+        end
+    end
+    return path
+end
+
+"""
+    convert_node_table(src, dst) -> dst
+
+Rewrite a per-node aero table in the format `dst`'s suffix names. Use to move an
+existing dataset between CSV and Arrow without re-running the (slow) airfoil solver
+that produced it.
+"""
+convert_node_table(src::AbstractString, dst::AbstractString) =
+    write_node_rows(dst, read_node_table(src)...)
 
 """
     read_section_aero(dat_file, cp_file, cf_file) -> Union{Nothing, SectionAero}
 
 Assemble a [`SectionAero`](@ref) from the human-readable files: the airfoil contour
 (`dat_file`, plus `{stem}_{delta_suffix(δ)}.dat` per non-zero deflection) and the per-node `Cp`
-and `cf` tables (`alpha, delta, n0…` in the `.dat` node order). Returns `nothing` if any
-file is missing. This is the single loader for both provided and generated aero.
+and `cf` tables in the `.dat` node order, CSV or Arrow as their suffix says (see
+[`read_node_table`](@ref)). Returns `nothing` if any file is missing. This is the single
+loader for both provided and generated aero.
 """
 function read_section_aero(dat_file::AbstractString, cp_file::AbstractString,
                            cf_file::AbstractString)

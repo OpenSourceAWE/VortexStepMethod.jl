@@ -116,7 +116,7 @@ end
     @test size(cm) == (length(alpha_range), length(delta_range))
 end
 
-@testset "SectionAero CSV round-trip and interpolation" begin
+@testset "SectionAero table round-trip and interpolation" begin
     alpha_range = deg2rad.([-5.0, 0.0, 5.0, 10.0])
     delta_range = deg2rad.([-3.0, 0.0, 3.0])
     xc = [1.0, 0.5, 0.0, 0.5, 1.0]
@@ -142,6 +142,15 @@ end
 
     _, _, cpa, _ = section_surface(aero, alpha_range[3], delta_range[2])
     @test cpa ≈ cp[:, 3, 2]
+
+    dat_a, cp_arrow, cf_arrow = write_section_aero(prefix, aero; table_format=:arrow)
+    @test endswith(cp_arrow, ".arrow") && endswith(cf_arrow, ".arrow")
+    arrow = read_section_aero(dat_a, cp_arrow, cf_arrow)
+    @test arrow.alpha_range == back.alpha_range
+    @test arrow.delta_range == back.delta_range
+    @test isequal(arrow.cp, back.cp)
+    @test isequal(arrow.cf, back.cf)
+    @test_throws ArgumentError write_section_aero(prefix, aero; table_format=:parquet)
 end
 
 @testset "generate_section_aero builds a surface table" begin
