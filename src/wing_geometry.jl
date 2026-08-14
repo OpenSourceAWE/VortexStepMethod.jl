@@ -813,6 +813,18 @@ end
 end
 
 """
+    _can_reuse_prior_refined_surface_tables(wing) -> Bool
+
+Whether every refined section already carries a [`SectionAero`](@ref), so a
+remesh can keep them instead of reblending from the unrefined sections. False on
+a wing that has none, where the blend is what fills them in the first place.
+"""
+@inline function _can_reuse_prior_refined_surface_tables(wing::AbstractWing)
+    isempty(wing.refined_sections) && return false
+    return all(s -> !isnothing(s.section_aero), wing.refined_sections)
+end
+
+"""
     copy_sections_to_refined!(wing; reuse_aero_data=false)
 
 Copy unrefined sections to refined sections 1:1 (no interpolation).
@@ -924,7 +936,7 @@ function refine!(wing::AbstractWing{T}; recompute_mapping=true, sort_sections=tr
             copy_sections_to_refined!(wing; reuse_aero_data)
             if recompute_mapping
                 compute_refined_panel_mapping!(wing)
-                compute_refined_section_interpolation!(wing)
+                compute_refined_section_interpolation!(wing; reuse_aero_data)
             end
             update_non_deformed_sections!(wing)
             return nothing
@@ -939,7 +951,7 @@ function refine!(wing::AbstractWing{T}; recompute_mapping=true, sort_sections=tr
         copy_sections_to_refined!(wing; reuse_aero_data)
         if recompute_mapping
             compute_refined_panel_mapping!(wing)
-            compute_refined_section_interpolation!(wing)
+            compute_refined_section_interpolation!(wing; reuse_aero_data)
         end
         update_non_deformed_sections!(wing)
         return nothing
@@ -959,7 +971,7 @@ function refine!(wing::AbstractWing{T}; recompute_mapping=true, sort_sections=tr
             reuse_aero_data ? nothing : s2.aero_data)
         if recompute_mapping
             compute_refined_panel_mapping!(wing)
-            compute_refined_section_interpolation!(wing)
+            compute_refined_section_interpolation!(wing; reuse_aero_data)
         end
         update_non_deformed_sections!(wing)
         return nothing
@@ -983,7 +995,7 @@ function refine!(wing::AbstractWing{T}; recompute_mapping=true, sort_sections=tr
     # Compute panel mapping by finding closest unrefined section for each refined panel
     if recompute_mapping
         compute_refined_panel_mapping!(wing)
-        compute_refined_section_interpolation!(wing)
+        compute_refined_section_interpolation!(wing; reuse_aero_data)
     end
 
     # Update n_unrefined_sections based on actual sections
@@ -1066,7 +1078,8 @@ function compute_refined_panel_mapping!(wing::AbstractWing)
 end
 
 """
-    compute_refined_section_interpolation!(wing::AbstractWing)
+    compute_refined_section_interpolation!(wing::AbstractWing;
+                                           reuse_aero_data=false)
 
 Compute per-refined-section linear-interpolation weights from the unrefined
 sections. For refined section i, the interpolated value is:
@@ -1078,8 +1091,15 @@ Positions are quarter-chord arc-length along the unrefined and refined sections.
 The first refined section is pinned to `left_idx == 1`, `weight == 1` (returns
 `unrefined[1]` exactly) and the last refined section to `left_idx == n_unref - 1`,
 `weight == 0` (returns `unrefined[end]` exactly).
+
+`reuse_aero_data` keeps the surface tables the refined sections already hold
+instead of reblending them from the unrefined ones, the same preservation
+[`refine!`](@ref) applies to `aero_data` under `use_prior_polar`. A remesh that
+replaces the unrefined sections with a coarser set would otherwise resample the
+surface tables down to that set even while the polars stay at full resolution.
 """
-function compute_refined_section_interpolation!(wing::AbstractWing{T}) where {T}
+function compute_refined_section_interpolation!(wing::AbstractWing{T};
+        reuse_aero_data::Bool=false) where {T}
     n_unref = length(wing.unrefined_sections)
     n_sections = wing.n_panels + 1
 
@@ -1147,7 +1167,8 @@ function compute_refined_section_interpolation!(wing::AbstractWing{T}) where {T}
     wing.refined_section_left_idx[n_sections] = Int16(n_unref - 1)
     wing.refined_section_weight[n_sections] = zero(T)
 
-    interpolate_section_aero_to_refined!(wing)
+    keep = reuse_aero_data && _can_reuse_prior_refined_surface_tables(wing)
+    keep || interpolate_section_aero_to_refined!(wing)
     return nothing
 end
 

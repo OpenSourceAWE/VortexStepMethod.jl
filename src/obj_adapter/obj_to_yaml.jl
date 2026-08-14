@@ -54,8 +54,13 @@ to use XFoil instead. Each section's polar is written as `POLAR_VECTORS`.
 `crease_frac` is the chordwise hinge location (0–1) about which each `delta_range`
 trailing-edge deflection pivots.
 
-With `force=false` (default) an existing `geometry.yaml` in `output_dir` is reused;
-`force=true` regenerates it (e.g. after changing `delta_range` or the mesh).
+With `force=false` (default) an existing geometry YAML is reused; `force=true`
+regenerates it (e.g. after changing `delta_range` or the mesh).
+
+`geometry_path` names the YAML itself, `output_dir/geometry.yaml` by default. Point it
+elsewhere to keep the YAML out of the table directory — the emitted table references
+then carry the path from the YAML's directory to `output_dir`, which is what the
+geometry loader resolves them against.
 
 `wrap_method` ([`ShrinkWrap`](@ref)) wraps each slice's point cloud into a clean closed
 airfoil, robust both to the noisy interior-structure points (ribs, spars) of a ram-air
@@ -99,6 +104,9 @@ Rewrite a generated dataset's per-node `Cp`/`cf` tables in `table_format` and po
 an existing directory change format without re-running the airfoil solver that
 produced it — the polars are the slow part and they are untouched. The source tables
 are left in place.
+
+`output_dir` is what the YAML's relative table references resolve against, which is
+its own directory — the rule the geometry loader follows.
 """
 function migrate_node_tables(yaml_path::String, output_dir::String,
                              table_format::Symbol; verbose::Bool=true)
@@ -138,6 +146,41 @@ function migrate_node_tables(yaml_path::String, output_dir::String,
     return yaml_path
 end
 
+"""
+    table_path_prefix(geometry_path, output_dir) -> String
+
+Path from the geometry YAML's directory to the table directory, empty when they are
+the same. Table references resolve against the YAML's own directory, so a YAML
+written outside `output_dir` has to carry this hop.
+"""
+function table_path_prefix(geometry_path::String, output_dir::String)
+    yaml_dir = dirname(abspath(geometry_path))
+    tables = abspath(output_dir)
+    yaml_dir == tables && return ""
+    return relpath(tables, yaml_dir)
+end
+
+"""
+    prefix_table_paths!(airfoil_rows, prefix) -> airfoil_rows
+
+Prepend `prefix` to every relative table reference in the `info_dict` of each row, so
+a geometry YAML written outside the table directory still resolves them. A no-op on
+an empty prefix.
+"""
+function prefix_table_paths!(airfoil_rows, prefix::String)
+    isempty(prefix) && return airfoil_rows
+    for row in airfoil_rows
+        info = row[end]
+        info isa AbstractDict || continue
+        for (key, value) in info
+            (endswith(String(key), "_file") || key == "csv_file_path") || continue
+            value isa AbstractString && !isabspath(value) &&
+                (info[key] = joinpath(prefix, value))
+        end
+    end
+    return airfoil_rows
+end
+
 function obj_to_yaml(obj_path::String, output_dir::String;
                      n_sections::Int, Re::Real,
                      alpha_range=-180:1:180, delta_range=nothing,
@@ -146,16 +189,19 @@ function obj_to_yaml(obj_path::String, output_dir::String;
                      reuse_valid_airfoils::Bool=true, max_thickness_ratio::Real=2.0,
                      spanwise_direction=[0.0, 1.0, 0.0], rotation=I,
                      wingtip_distance=0.05, crease_frac=0.75, force::Bool=false,
-                     verbose::Bool=true, table_format::Symbol=:csv)
+                     verbose::Bool=true, table_format::Symbol=:csv,
+                     geometry_path::String=joinpath(output_dir, "geometry.yaml"))
     (!endswith(obj_path, ".obj")) && (obj_path *= ".obj")
     isfile(obj_path) || error("OBJ file not found: $obj_path")
     !isapprox(spanwise_direction, [0.0, 1.0, 0.0]) &&
         throw(ArgumentError("Spanwise direction has to be [0.0, 1.0, 0.0]"))
 
-    yaml_path = joinpath(output_dir, "geometry.yaml")
+    yaml_path = geometry_path
+    mkpath(dirname(abspath(yaml_path)))
     if !force && isfile(yaml_path)
         verbose && @info "Reusing existing geometry (force=true to regenerate)" yaml_path
-        migrate_node_tables(yaml_path, output_dir, table_format; verbose)
+        migrate_node_tables(yaml_path, dirname(abspath(yaml_path)), table_format;
+                            verbose)
         return yaml_path
     end
 
@@ -188,6 +234,7 @@ function obj_to_yaml(obj_path::String, output_dir::String;
         delta_range, aero_solver, reuse_valid_airfoils, crease_frac, verbose,
         table_format)
     isempty(ok) && error("No section produced a valid polar in $obj_path")
+    prefix_table_paths!(airfoil_rows, table_path_prefix(yaml_path, output_dir))
 
     # Each section uses its nearest airfoil that actually produced a polar — covering
     # both too-thick (degenerate) fits and sections the solver could not converge.

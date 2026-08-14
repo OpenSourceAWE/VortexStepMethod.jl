@@ -7,6 +7,12 @@
   and `surfplan_to_aero_yaml`: `:csv` (default, readable) or `:arrow` (binary, ~40×
   faster to load and 2.6× smaller). `read_section_aero` detects the format from the
   file suffix, so a geometry YAML can reference either.
+- `geometry_path` keyword on `obj_to_yaml`, naming the geometry YAML itself
+  instead of always writing `output_dir/geometry.yaml`. Point it outside the
+  table directory and the emitted table references carry the path from the YAML's
+  directory to `output_dir`, which is what the geometry loader resolves them
+  against — so a generated dataset can keep its bulk in a subdirectory while the
+  geometry sits with the hand-written ones.
 - `convert_node_table` and `write_node_rows` rewrite a per-node table in the format
   the destination suffix names. `obj_to_yaml` migrates an existing dataset with
   them when `table_format` differs from what the directory holds, so a dataset
@@ -18,6 +24,13 @@
   instead of its own (`ZEROS`, `0.05`), and never said what `core_radius_fraction`
   measures. It now documents the `Solver` defaults and cites Damiani et al. (2019) for
   the 0.05 cut-off.
+- A remesh under `use_prior_polar` no longer resamples the refined sections'
+  `SectionAero` surface tables down to whatever unrefined sections survive it.
+  `compute_refined_section_interpolation!` reblended contour, `cp` and `cf` from the
+  unrefined sections unconditionally while `aero_data` was preserved, so a wing rebuilt
+  onto fewer structural stations kept full-resolution polars but lost the surface tables
+  pressure integration reads. The reblend is now skipped when the polars are preserved
+  and the refined sections already carry tables.
 
 ### Changed
 - `SolverSettings` now defaults to the same values as `Solver`: `core_radius_fraction`

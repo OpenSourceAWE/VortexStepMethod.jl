@@ -90,6 +90,29 @@ obj_path = normpath(joinpath(@__DIR__, "..", "..",
                                                                   :csv)
     end
 
+    @testset "geometry_path writes the YAML outside the table directory" begin
+        root = mktempdir()
+        tables = joinpath(root, "tables")
+        yaml_path = joinpath(root, "nf_aero_geometry.yaml")
+        written = obj_to_yaml(obj_path, tables; n_sections=3, Re=5e5,
+            verbose=false, geometry_path=yaml_path)
+        @test written == yaml_path
+        @test isfile(yaml_path)
+        @test !isfile(joinpath(tables, "geometry.yaml"))
+
+        info = Dict(YAML.load_file(yaml_path)["wing_airfoils"]["data"][1][3])
+        for key in ("csv_file_path", "dat_file")
+            @test startswith(info[key], "tables/")
+            @test isfile(joinpath(dirname(yaml_path), info[key]))
+        end
+        # The loader resolves references against the YAML's own directory, so the
+        # prefixed paths have to be what makes this work.
+        @test Wing(yaml_path; n_panels=4) isa Wing
+
+        @test ObjAdapter.table_path_prefix(joinpath(tables, "geometry.yaml"),
+                                           tables) == ""
+    end
+
     @testset "center_to_com! rejects non-triangular faces" begin
         verts = [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [1.0, 1.0, 0.0]]
         @test_throws ArgumentError center_to_com!(verts, [[1, 2, 3, 4]]; prn=false)
