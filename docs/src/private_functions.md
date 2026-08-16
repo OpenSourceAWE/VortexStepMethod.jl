@@ -45,7 +45,7 @@ update_panel_properties!
 build_interps
 panel_interp_types
 reinit!(wing::AbstractWing)
-reinit!(panel::Panel, section_1::Section, section_2::Section, aero_center, control_point, bound_point_1, bound_point_2, x_airf, y_airf, z_airf, delta, vec, spanwise_direction)
+reinit!(panel::Panel, section_1::Section, section_2::Section, aero_center, control_point, bound_point_1, bound_point_2, x_airf, y_airf, z_airf, delta, vec)
 rotated_te
 calculate_filaments_for_plotting
 ```
@@ -62,6 +62,7 @@ _apply_refined_section_thetas!
 _panel_thetas_to_section_thetas!
 _interpolate_unrefined_to_refined
 _section_sort_key
+normalize_span_order!
 refine_mesh_for_linear_cosine_distribution!
 refine_mesh_by_splitting_provided_sections!
 refine_mesh_with_billowing!
@@ -112,13 +113,13 @@ get_lower_upper
 turn_trailing_edge!
 ```
 
-### Shrink-wrap distance field
+### Shrink-wrap rolling ball
 ```@docs
-distance_parabolas!
-squared_distance_transform!
-grid_sampler
-flood_outside
-trace_level_set
+point_buckets
+turn_measure
+pivot_step
+push_arc!
+pivot_contour
 largest_linking_gap
 resample_arc
 smooth_turning!
@@ -187,6 +188,7 @@ CurrentModule = Base.get_extension(VortexStepMethod, :VortexStepMethodMakieExt)
 ```
 ```@docs
 display_named
+span_axis
 create_geometry_plot_makie
 plot_line_segment_makie!
 set_axes_equal_makie!

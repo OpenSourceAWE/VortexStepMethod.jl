@@ -41,12 +41,15 @@
   is no longer the default: `wingtip_distance` is now `0.0`, an inset on top of the
   trim for meshes whose slices just short of the tip are still too thin to analyse.
 
-- A panel's spanwise orientation is decided once per wing when `BodyAerodynamics` is
-  constructed (`wing_span_flip`) rather than per panel on every `reinit!`. Deciding it
-  from live geometry meant a deforming wing could carry one panel's `y_airf` across
-  `spanwise_direction` while its neighbours stayed put, inverting that panel's `z_airf`
-  by 180° in a single step — and inverting it back the next. Panels of one wing can no
-  longer disagree, and the orientation cannot change mid-run.
+- Wing sections are normalized to `+y` to `-y` order on load (`normalize_span_order!`),
+  and by `refine!` for wings built through `add_section!`. Panel `y_airf` and `z_airf`
+  follow the order sections are stored in, so a geometry file written the other way
+  round inverted every panel normal, and a wing whose sections were replaced after its
+  panels were built (a structural remesh) inverted them mid-run, one panel at a time as
+  each crossed `spanwise_direction`. `obj_to_yaml` and `surfplan_to_aero_yaml` emit that
+  order too; files of either order keep loading the same.
+- Spanwise distribution plots put `+y` on the left, matching that order and the kite
+  seen from the front.
 
 ### Changed
 - `SolverSettings` now defaults to the same values as `Solver`: `core_radius_fraction`
@@ -66,6 +69,17 @@
   already stores, take the core-radius cutoff from `|r1.r0|/|r0|` without forming the
   perpendicular vector, and defer the cross products that only one branch reads. Output
   is bit-identical; `solve!` is a further 1.47-1.55x faster.
+- `shrink_wrap` traces the rolling ball exactly — pivoting it around the cloud and
+  emitting the arcs its contact side sweeps (`pivot_contour`) — instead of thresholding
+  and marching-squares-tracing a distance field, so there is no grid resolution left to
+  set. `ShrinkWrap`'s `cell_size` is accordingly named `min_clearance`, still accepted
+  under the old name, and only floors `clearance` — which is what it already did for a
+  single-membrane slice. The wrap now
+  sits at exactly `clearance` from the cloud instead of a cell over it, so a V3 canopy's
+  aft strip comes out `2 * clearance` thick where the grid gave `3.5 * cell_size`.
+  `min_concave_radius` also stops costing anything, having padded the grid in both
+  directions before: one V3 slice at radius 0.4 drops from 173 ms to 10 ms, and at the
+  default radius from 15 ms to 3 ms.
 - `read_node_table` parses into a preallocated matrix instead of `reduce(vcat, …)`
   over a generator, which was quadratic in the row count: ~21× faster on a 16 MB
   surface table (2.49 s → 0.12 s), benefiting every existing dataset.

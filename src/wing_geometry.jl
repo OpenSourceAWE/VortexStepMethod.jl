@@ -56,6 +56,21 @@ Function to update a [Section](@ref) in place.
 """
 @inline _section_sort_key(s::Section) = s.LE_point[2]
 
+"""Spanwise coordinate [`normalize_span_order!`](@ref) orders on."""
+_span_order_key(s::Section) = _section_sort_key(s)
+
+"""
+    normalize_span_order!(sections) -> sections
+
+Reverse `sections` if they do not already run `+y` to `-y`, the order panel normals
+are built from. Use `refine!`'s `sort_sections` for a scrambled list.
+"""
+function normalize_span_order!(sections)
+    length(sections) > 1 && _span_order_key(last(sections)) >
+        _span_order_key(first(sections)) && reverse!(sections)
+    return sections
+end
+
 function reinit!(section::Section, LE_point, TE_point, aero_model=nothing,
                 aero_data=nothing, section_aero=nothing)
     section.LE_point .= LE_point
@@ -925,6 +940,8 @@ function refine!(wing::AbstractWing{T}; recompute_mapping=true, sort_sections=tr
         end
         sorted || sort!(wing.unrefined_sections;
             by=_section_sort_key, rev=true)
+    elseif recompute_mapping
+        normalize_span_order!(wing.unrefined_sections)
     end
 
     n_sections = wing.n_panels + 1

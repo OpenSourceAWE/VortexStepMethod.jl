@@ -704,6 +704,15 @@ function VortexStepMethod.plot_geometry(body_aero::BodyAerodynamics, title;
 end
 
 """
+    span_axis(position, title, ylabel) -> Axis
+
+Axis for a spanwise distribution, `+y` on the left, matching the kite seen from the
+front and the `+y` to `-y` order its sections are stored in.
+"""
+span_axis(position, title, ylabel) =
+    Axis(position; title, xlabel="Spanwise Position y/b", ylabel, xreversed=true)
+
+"""
     plot_distribution(y_coordinates_list, results_list, label_list;
                       title="spanwise_distribution", data_type=nothing,
                       save_path=nothing, is_save=false, is_show=true, use_tex=false)
@@ -740,28 +749,22 @@ function VortexStepMethod.plot_distribution(y_coordinates_list, results_list, la
     Label(fig[0, :], title, fontsize=20)
 
     # Row 1: CL, CD, Gamma
-    ax_cl = Axis(fig[1, 1], title="CL Distribution",
-        xlabel="Spanwise Position y/b", ylabel="Lift Coefficient CL")
-    ax_cd = Axis(fig[1, 2], title="CD Distribution",
-        xlabel="Spanwise Position y/b", ylabel="Drag Coefficient CD")
-    ax_gamma = Axis(fig[1, 3], title="Γ Distribution",
-        xlabel="Spanwise Position y/b", ylabel="Circulation Γ")
+    ax_cl = span_axis(fig[1, 1], "CL Distribution", "Lift Coefficient CL")
+    ax_cd = span_axis(fig[1, 2], "CD Distribution", "Drag Coefficient CD")
+    ax_gamma = span_axis(fig[1, 3], "Γ Distribution", "Circulation Γ")
 
     # Row 2: Alpha geometric, alpha at ac, alpha uncorrected
-    ax_alpha_geo = Axis(fig[2, 1], title="α Geometric",
-        xlabel="Spanwise Position y/b", ylabel="Angle of Attack α (deg)")
-    ax_alpha_ac = Axis(fig[2, 2], title="α result (corrected to aerodynamic center)",
-        xlabel="Spanwise Position y/b", ylabel="Angle of Attack α (deg)")
-    ax_alpha_unc = Axis(fig[2, 3], title="α Uncorrected (if VSM, at control point)",
-        xlabel="Spanwise Position y/b", ylabel="Angle of Attack α (deg)")
+    alpha_label = "Angle of Attack α (deg)"
+    ax_alpha_geo = span_axis(fig[2, 1], "α Geometric", alpha_label)
+    ax_alpha_ac = span_axis(fig[2, 2],
+        "α result (corrected to aerodynamic center)", alpha_label)
+    ax_alpha_unc = span_axis(fig[2, 3],
+        "α Uncorrected (if VSM, at control point)", alpha_label)
 
     # Row 3: Force components
-    ax_fx = Axis(fig[3, 1], title="Force in x direction",
-        xlabel="Spanwise Position y/b", ylabel="Fx")
-    ax_fy = Axis(fig[3, 2], title="Force in y direction",
-        xlabel="Spanwise Position y/b", ylabel="Fy")
-    ax_fz = Axis(fig[3, 3], title="Force in z direction",
-        xlabel="Spanwise Position y/b", ylabel="Fz")
+    ax_fx = span_axis(fig[3, 1], "Force in x direction", "Fx")
+    ax_fy = span_axis(fig[3, 2], "Force in y direction", "Fy")
+    ax_fz = span_axis(fig[3, 3], "Force in z direction", "Fz")
 
     # Plot CL
     for (y_coords, results, label) in zip(y_coordinates_list, results_list, label_list)

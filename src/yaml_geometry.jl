@@ -19,6 +19,8 @@ end
     TE_z::Float64
 end
 
+_span_order_key(section::WingSectionData) = section.LE_y
+
 @with_kw struct WingAirfoilData
     airfoil_id::Int64
     type::String
@@ -247,7 +249,8 @@ function Wing(
             TE_z = section_dict["TE_z"]
         ))
     end
-    
+    normalize_span_order!(sections)
+
     # Convert wing airfoils
     wing_airfoils_data = data["wing_airfoils"]
     airfoils = WingAirfoilData[]

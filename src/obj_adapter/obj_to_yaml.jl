@@ -252,7 +252,7 @@ function obj_to_yaml(obj_path::String, output_dir::String;
                                 s.TE_point[1], s.TE_point[2], s.TE_point[3]])
     end
 
-    sort!(section_rows; by = row -> row[3])          # clean spanwise order (by LE_y)
+    sort!(section_rows; by = row -> row[3], rev = true)   # +y to -y, by LE_y
     sort!(airfoil_rows; by = row -> row[1])          # airfoils by id
     write_geometry_yaml(yaml_path, section_rows, airfoil_rows)
     verbose && @info "Wrote geometry to $yaml_path ($(length(section_rows)) sections)"
