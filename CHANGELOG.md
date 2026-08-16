@@ -12,12 +12,20 @@
   them when `table_format` differs from what the directory holds, so a dataset
   changes format without re-running the airfoil solver that produced it.
 
+### Fixed
+- The `Solver` docstring listed `type_initial_gamma_distribution` as `ELLIPTIC` and
+  `core_radius_fraction` as `1e-20`; the defaults are `ZEROS` and `0.05`.
+
 ### Changed
 - BREAKING: `BodyAerodynamics.AIC` is stored as `(n_panels, n_panels, 3)` instead of
   `(3, n_panels, n_panels)`, so each component slice `AIC[:, :, k]` is contiguous and
   the induced-velocity products reach BLAS `gemv` instead of the generic fallback.
   `solve!` is 3.1–5.3× faster (n=120, VSM: 26.1 ms → 4.9 ms inviscid, 21.1 ms →
   6.0 ms with polars). Code reading `AIC[k, i, j]` must become `AIC[i, j, k]`.
+- The filament induced-velocity kernels reuse the `r0`/`length` each `BoundFilament`
+  already stores, take the core-radius cutoff from `|r1.r0|/|r0|` without forming the
+  perpendicular vector, and defer the cross products that only one branch reads. Output
+  is bit-identical; `solve!` is a further 1.47-1.55x faster.
 - `read_node_table` parses into a preallocated matrix instead of `reduce(vcat, …)`
   over a generator, which was quadratic in the row count: ~21× faster on a 16 MB
   surface table (2.49 s → 0.12 s), benefiting every existing dataset.
