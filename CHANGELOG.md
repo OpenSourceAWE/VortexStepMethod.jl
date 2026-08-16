@@ -66,9 +66,6 @@
   already stores, take the core-radius cutoff from `|r1.r0|/|r0|` without forming the
   perpendicular vector, and defer the cross products that only one branch reads. Output
   is bit-identical; `solve!` is a further 1.47-1.55x faster.
-- BREAKING: `reinit!(panel, …)` no longer takes `spanwise_direction`; it takes a
-  `flip::Bool` keyword instead, which the caller owns and must not derive from the
-  current geometry.
 - `read_node_table` parses into a preallocated matrix instead of `reduce(vcat, …)`
   over a generator, which was quadratic in the row count: ~21× faster on a 16 MB
   surface table (2.49 s → 0.12 s), benefiting every existing dataset.
