@@ -12,6 +12,32 @@ export plot_geometry, plot_distribution, plot_polars, save_plot, show_plot,
 const PANEL_MESH_OBSERVABLES = Ref{Union{Nothing,Dict}}(nothing)
 # Global storage for airfoil-skin observables, keyed by body objectid.
 const AIRFOIL_SKIN_OBSERVABLES = Ref{Union{Nothing,Dict}}(nothing)
+const SCREENS = Dict{String,Any}()
+
+"""
+    display_named(fig, name) -> fig
+
+Show `fig` in the window registered under `name`, opening a new titled window for
+a name that has none yet: plotting the same title again replaces its predecessor,
+while a new title gets its own window. Backends without titled screens, such as
+CairoMakie, fall back to a plain `display`.
+"""
+function display_named(fig::Makie.Figure, name::AbstractString)
+    screen = get(SCREENS, name, nothing)
+    if !isnothing(screen) && isopen(screen)
+        display(screen, fig)
+        return fig
+    end
+    screen = try
+        Makie.current_backend().Screen(; title=String(name))
+    catch
+        display(fig)
+        return fig
+    end
+    SCREENS[name] = screen
+    display(screen, fig)
+    return fig
+end
 
 """
     PLATE_FACES
@@ -465,18 +491,19 @@ function VortexStepMethod.save_plot(fig::Makie.Figure, save_path, title; data_ty
 end
 
 """
-    show_plot(fig; dpi=130)
+    show_plot(fig; name="", dpi=130)
 
-Display a Makie figure.
+Display a Makie figure in an interactive session, in the window named `name`.
 
 # Arguments
 - `fig`: Makie Figure object
 
 # Keyword arguments
+- `name`: Window to draw in; reusing a name reuses its window (default: "")
 - `dpi`: Dots per inch for the figure (default: 130) - currently unused in Makie
 """
-function VortexStepMethod.show_plot(fig::Makie.Figure; dpi=130)
-    isinteractive() && display(fig)
+function VortexStepMethod.show_plot(fig::Makie.Figure; name="", dpi=130)
+    isinteractive() && display_named(fig, name)
 end
 
 """
@@ -671,9 +698,7 @@ function VortexStepMethod.plot_geometry(body_aero::BodyAerodynamics, title;
 
     fig = create_geometry_plot_makie(body_aero, title, view_elevation, view_azimuth)
 
-    if is_show && isinteractive()
-        display(fig)
-    end
+    is_show && show_plot(fig; name=title)
 
     return fig
 end
@@ -801,9 +826,7 @@ function VortexStepMethod.plot_distribution(y_coordinates_list, results_list, la
         save_plot(fig, save_path, title, data_type=data_type)
     end
 
-    if is_show && isinteractive()
-        display(fig)
-    end
+    is_show && show_plot(fig; name=title)
 
     return fig
 end
@@ -1023,9 +1046,7 @@ function VortexStepMethod.plot_polars(
         save_plot(fig, save_path, main_title; data_type)
     end
 
-    if is_show && isinteractive()
-        display(fig)
-    end
+    is_show && show_plot(fig; name=title)
 
     return fig
 end
@@ -1082,9 +1103,7 @@ function VortexStepMethod.plot_polar_data(body_aero::BodyAerodynamics;
                 color=:blue, linewidth=0.5, transparency=true)
         end
 
-        if is_show && isinteractive()
-            display(fig)
-        end
+        is_show && show_plot(fig; name="polar data")
         return fig
     else
         throw(ArgumentError(
@@ -1454,9 +1473,7 @@ function VortexStepMethod.plot_combined_analysis(
     colsize!(fig.layout, 1, Relative(0.6))
     colsize!(fig.layout, 2, Relative(0.4))
 
-    if is_show && isinteractive()
-        display(fig)
-    end
+    is_show && show_plot(fig; name=title)
 
     return fig
 end
@@ -1651,7 +1668,7 @@ function ObjAdapter.plot_slices_3d(path::String; n_slices::Int=10, rotation=I,
         m = ObjAdapter.march_edges(vertices, faces; step=span / n_bins)
         le = reduce(hcat, m.le)
         te = reduce(hcat, m.te)
-        idx = ObjAdapter.station_indices(m.arclen, n_slices; wingtip_distance)
+        idx = ObjAdapter.station_indices(m, n_slices; wingtip_distance)
         secs = filter(!isnothing,
                       [ObjAdapter.build_section(vertices, faces, m.le[i], m.te[i],
                                                 m.point[i], m.tangent[i]) for i in idx])
@@ -1726,7 +1743,7 @@ function ObjAdapter.plot_slices_3d(path::String; n_slices::Int=10, rotation=I,
         sel[] = best
     end
 
-    is_show && display(fig)
+    is_show && display_named(fig, "slices: $(basename(rstrip(path, '/')))")
     return fig
 end
 
@@ -1780,7 +1797,7 @@ function ObjAdapter.plot_airfoil_fit(x::Vector, y::Vector; title::String="Airfoi
 
     axislegend(ax; position=:rt)
 
-    is_show && display(fig)
+    is_show && display_named(fig, title)
     return fig, params
 end
 
@@ -1845,7 +1862,7 @@ function ObjAdapter.plot_airfoils(geometry_file::String;
     if is_save && !isnothing(save_path)
         VortexStepMethod.save_plot(fig, save_path, "airfoils"; data_type)
     end
-    is_show && display(fig)
+    is_show && display_named(fig, title)
     return fig
 end
 

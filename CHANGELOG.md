@@ -32,6 +32,22 @@
   pressure integration reads. The reblend is now skipped when the polars are preserved
   and the refined sections already carry tables.
 
+- `obj_to_yaml` no longer places sections on a wingtip that has closed to a point.
+  `station_indices` spreads its targets over the stations that still have a chord,
+  so the outermost section lands on the last sliceable one. A V3 mesh sliced with
+  the default `wingtip_distance` used to put a zero-chord section at each tip,
+  whose polar was `NaN` and took the whole solve with it; working around it meant
+  guessing a `wingtip_distance` large enough to skip past the tip. That workaround
+  is no longer the default: `wingtip_distance` is now `0.0`, an inset on top of the
+  trim for meshes whose slices just short of the tip are still too thin to analyse.
+
+- A panel's spanwise orientation is decided once per wing when `BodyAerodynamics` is
+  constructed (`wing_span_flip`) rather than per panel on every `reinit!`. Deciding it
+  from live geometry meant a deforming wing could carry one panel's `y_airf` across
+  `spanwise_direction` while its neighbours stayed put, inverting that panel's `z_airf`
+  by 180° in a single step — and inverting it back the next. Panels of one wing can no
+  longer disagree, and the orientation cannot change mid-run.
+
 ### Changed
 - `SolverSettings` now defaults to the same values as `Solver`: `core_radius_fraction`
   `1e-20` → `0.05` and `type_initial_gamma_distribution` `ELLIPTIC` → `ZEROS`. The 0.05
@@ -50,9 +66,16 @@
   already stores, take the core-radius cutoff from `|r1.r0|/|r0|` without forming the
   perpendicular vector, and defer the cross products that only one branch reads. Output
   is bit-identical; `solve!` is a further 1.47-1.55x faster.
+- BREAKING: `reinit!(panel, …)` no longer takes `spanwise_direction`; it takes a
+  `flip::Bool` keyword instead, which the caller owns and must not derive from the
+  current geometry.
 - `read_node_table` parses into a preallocated matrix instead of `reduce(vcat, …)`
   over a generator, which was quadratic in the row count: ~21× faster on a 16 MB
   surface table (2.49 s → 0.12 s), benefiting every existing dataset.
+- `is_show=true` draws into a window named after the plot title instead of into
+  whichever window the backend last used, so a script showing several plots gets
+  one window each and re-running it redraws them in place. `show_plot` takes the
+  window `name` as a keyword.
 
 ## VortexStepMethod v4.0.0 2026-08-03
 

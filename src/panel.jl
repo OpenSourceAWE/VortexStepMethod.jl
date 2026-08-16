@@ -227,14 +227,14 @@ end
 
 """
     reinit!(panel, section_1, section_2, aero_center, control_point, bound_point_1,
-            bound_point_2, x_airf, y_airf, z_airf, delta, vec, spanwise_direction; kwargs...)
+            bound_point_2, x_airf, y_airf, z_airf, delta, vec; kwargs...)
 
 Reinitialize a panel's geometry, horseshoe filaments and aerodynamic interpolations.
 
-The panel is oriented so its `y_airf` (and the bound vortex `bound_2 -> bound_1`) points
-along `+spanwise_direction`, with `z_airf` pointing to the airfoil upper surface. This
-makes the aero independent of section ordering: a reversed order would otherwise flip the
-normal and make the panel look up its polar at a negated angle of attack.
+`flip` reverses the section order so `y_airf` points along `+spanwise_direction` and
+`z_airf` to the airfoil upper surface, making the aero independent of section ordering.
+The caller owns it and must not derive it from the live geometry, which would invert
+normals mid-run; [`reinit!(::BodyAerodynamics)`](@ref) decides it once per wing.
 """
 function reinit!(
     panel::Panel,
@@ -248,12 +248,11 @@ function reinit!(
     y_airf,
     z_airf,
     delta,
-    vec,
-    spanwise_direction;
+    vec;
     init_aero = true,
-    remove_nan = true
+    remove_nan = true,
+    flip::Bool = false
 )
-    flip = dot(y_airf, spanwise_direction) < 0
     if flip
         section_1, section_2 = section_2, section_1
         bound_point_1, bound_point_2 = bound_point_2, bound_point_1

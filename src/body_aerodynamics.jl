@@ -21,6 +21,7 @@ Main structure for calculating aerodynamic properties of bodies. Use the constru
 - `projected_area::Float64` = 1.0: The area projected onto the xy-plane of the kite body reference frame [m²]
 - `c_ref::Float64` = 1.0: Reference chord length (max panel chord) [m]
 - `y::MVector{P, Float64}` = MVector{P,Float64}(zeros(P))
+- `span_flip::Vector{Int8}` = Int8[]: one orientation per wing, see [`wing_span_flip`](@ref)
 - `cache::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}}` = [LazyBufferCache() for _ in 1:15]
 """
 @with_kw mutable struct BodyAerodynamics{P, W<:AbstractWing, T, PN<:Panel{T}}
@@ -40,6 +41,7 @@ Main structure for calculating aerodynamic properties of bodies. Use the constru
     projected_area::T = one(T)
     c_ref::T = one(T)
     y::MVector{P, T} = zeros(MVector{P, T})
+    span_flip::Vector{Int8} = Int8[]
     cache::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}} = [LazyBufferCache() for _ in 1:15]
 end
 
@@ -113,10 +115,23 @@ function BodyAerodynamics(
         end
     end
 
-    body_aero = BodyAerodynamics{length(panels), W, T, eltype(panels)}(; panels, wings)
+    span_flip = Int8[wing_span_flip(wing) for wing in wings]
+    body_aero = BodyAerodynamics{length(panels), W, T, eltype(panels)}(;
+        panels, wings, span_flip)
     reinit!(body_aero; va, omega)
     return body_aero
 end
+
+"""
+    wing_span_flip(wing) -> Int8
+
+`-1` when `wing`'s sections run against its `spanwise_direction`, `+1` otherwise. The
+`flip` every panel of the wing is reinitialized with ([`reinit!`](@ref)), decided once
+here because deriving it per panel from live geometry inverts normals mid-run.
+"""
+wing_span_flip(wing) =
+    dot(first(wing.refined_sections).LE_point - last(wing.refined_sections).LE_point,
+        wing.spanwise_direction) < 0 ? Int8(-1) : Int8(1)
 
 function Base.getproperty(obj::BodyAerodynamics, sym::Symbol)
     if sym === :va
@@ -248,12 +263,13 @@ function reinit!(body_aero::BodyAerodynamics{P, W, T};
 ) where {P, W, T}
     idx = 1
     vec = zeros(MVector{3, T})
-    for wing in body_aero.wings
+    for (wing_idx, wing) in enumerate(body_aero.wings)
         reinit!(wing)
         validate_section_aero(wing.refined_sections)
         panel_props = wing.panel_props
         wing_init_aero = init_aero && !_can_skip_panel_aero_reinit(wing, body_aero.panels, idx)
-        
+        wing_flip = body_aero.span_flip[wing_idx] == -1
+
         # Create panels
         for i in 1:wing.n_panels
             if length(wing.delta_dist) > 0
@@ -263,7 +279,7 @@ function reinit!(body_aero::BodyAerodynamics{P, W, T};
                 delta = zero(T)
             end
             @views reinit!(
-                body_aero.panels[idx], 
+                body_aero.panels[idx],
                 wing.refined_sections[i],
                 wing.refined_sections[i+1],
                 panel_props.aero_centers[i, :],
@@ -274,10 +290,10 @@ function reinit!(body_aero::BodyAerodynamics{P, W, T};
                 panel_props.y_airf[i, :],
                 panel_props.z_airf[i, :],
                 delta,
-                vec,
-                wing.spanwise_direction;
+                vec;
                 remove_nan=wing.remove_nan,
-                init_aero=wing_init_aero
+                init_aero=wing_init_aero,
+                flip=wing_flip
             )
             body_aero.panels[idx].crease_frac = wing.crease_frac
             idx += 1

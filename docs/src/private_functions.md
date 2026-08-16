@@ -21,6 +21,7 @@ calculate_relative_alpha_and_velocity
 calculate_relative_alpha_and_relative_velocity
 update_effective_angle_of_attack!
 calculate_stall_angle_list
+wing_span_flip
 calculate_circulation_distribution_elliptical_wing
 _compute_reference_velocity_from_distribution
 smooth_circulation!
@@ -185,6 +186,7 @@ migrate_node_tables
 CurrentModule = Base.get_extension(VortexStepMethod, :VortexStepMethodMakieExt)
 ```
 ```@docs
+display_named
 create_geometry_plot_makie
 plot_line_segment_makie!
 set_axes_equal_makie!
