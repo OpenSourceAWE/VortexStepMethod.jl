@@ -55,24 +55,23 @@ function velocity_3D_bound_vortex!(
     r1, r2, r1Xr2, r1Xr0, r2Xr0, r1r2norm, r1_proj, r2_proj,
         r1_projXr2_proj, vel_ind_proj = work_vectors
     r0 = filament.r0
+    nr0 = filament.length
     r1 .= XVP .- filament.x1
     r2 .= XVP .- filament.x2
 
-    # Cut-off radius
-    nr0 = norm3(r0)
     epsilon = core_radius_fraction * nr0
 
-    cross3!(r1Xr2, r1, r2)
     cross3!(r1Xr0, r1, r0)
-    nr1 = norm3(r1)
-    nr2 = norm3(r2)
-    @inbounds for k in 1:3
-        r1r2norm[k] = r1[k]/nr1 - r2[k]/nr2
-    end
 
     # Check point location relative to filament
     nr1Xr0 = norm3(r1Xr0)
     if nr1Xr0 / nr0 > epsilon
+        cross3!(r1Xr2, r1, r2)
+        nr1 = norm3(r1)
+        nr2 = norm3(r2)
+        @inbounds for k in 1:3
+            r1r2norm[k] = r1[k]/nr1 - r2[k]/nr2
+        end
         nr1Xr2 = norm3(r1Xr2)
         coeff = (gamma / (4π)) / (nr1Xr2^2) * dot3(r0, r1r2norm)
         @inbounds for k in 1:3
@@ -144,7 +143,6 @@ as implemented in KiteAeroDyn".
     v_a,
     work_vectors
 )
-    r0 = work_vectors[1]
     r1 = work_vectors[2]
     r2 = work_vectors[3]
     r_perp = work_vectors[4]
@@ -153,34 +151,29 @@ as implemented in KiteAeroDyn".
     r2Xr0 = work_vectors[7]
     normr1r2 = work_vectors[8]
 
-    r0 .= filament.x2 .- filament.x1
+    r0 = filament.r0
+    nr0 = filament.length
     r1 .= XVP .- filament.x1
     r2 .= XVP .- filament.x2
 
-    # Vector perpendicular to core radius
-    nr0 = norm3(r0)
     nr0sq = nr0 * nr0
     d_r1_r0 = dot3(r1, r0)
-    @inbounds for k in 1:3
-        r_perp[k] = d_r1_r0 * r0[k] / nr0sq
-    end
 
-    # Cut-off radius
-    epsilon = sqrt(4 * ALPHA0 * NU * norm3(r_perp) / v_a)
+    # Cut-off radius. The perpendicular component has length |r1.r0|/|r0|, so the
+    # vector itself is only needed inside the core.
+    epsilon = sqrt(4 * ALPHA0 * NU * abs(d_r1_r0) / nr0 / v_a)
 
-    cross3!(r1Xr2, r1, r2)
     cross3!(r1Xr0, r1, r0)
-    cross3!(r2Xr0, r2, r0)
-
-    nr1 = norm3(r1)
-    nr2 = norm3(r2)
-    @inbounds for k in 1:3
-        normr1r2[k] = r1[k]/nr1 - r2[k]/nr2
-    end
 
     # Check point location relative to filament
     nr1Xr0 = norm3(r1Xr0)
     if nr1Xr0 / nr0 > epsilon
+        cross3!(r1Xr2, r1, r2)
+        nr1 = norm3(r1)
+        nr2 = norm3(r2)
+        @inbounds for k in 1:3
+            normr1r2[k] = r1[k]/nr1 - r2[k]/nr2
+        end
         nr1Xr2 = norm3(r1Xr2)
         coeff = (gamma / (4π)) / (nr1Xr2^2) * dot3(r0, normr1r2)
         @inbounds for k in 1:3
@@ -192,6 +185,7 @@ as implemented in KiteAeroDyn".
         # Project onto core radius — reuse r_perp, normr1r2
         r1_proj = r_perp
         r2_proj = normr1r2
+        cross3!(r2Xr0, r2, r0)
         nr2Xr0 = norm3(r2Xr0)
         d_r2_r0 = dot3(r2, r0)
         @inbounds for k in 1:3
@@ -264,22 +258,19 @@ function velocity_3D_trailing_vortex_semiinfinite!(
     work_vectors
 )
     r1 = work_vectors[1]
-    r_perp = work_vectors[2]
     r1XVf = work_vectors[3]
     GAMMA = -GAMMA * filament.filament_direction
     r1 .= XVP .- filament.x1
 
-    # Calculate core radius
+    # Core radius. `r_perp` is `(r1.Vf) Vf`, so its length is `|r1.Vf| |Vf|` and
+    # the vector itself is only needed inside the core.
     d_r1_Vf = dot3(r1, Vf)
-    @inbounds for k in 1:3
-        r_perp[k] = d_r1_Vf * Vf[k]
-    end
-    epsilon = sqrt(4 * ALPHA0 * NU * norm3(r_perp) / v_a)
+    nVf = norm3(Vf)
+    epsilon = sqrt(4 * ALPHA0 * NU * abs(d_r1_Vf) * nVf / v_a)
 
     cross3!(r1XVf, r1, Vf)
 
     nr1XVf = norm3(r1XVf)
-    nVf = norm3(Vf)
     nr1 = norm3(r1)
     if nr1XVf / nVf > epsilon
         K = GAMMA / (4π) / (nr1XVf^2) * (1 + d_r1_Vf / nr1)

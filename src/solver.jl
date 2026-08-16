@@ -130,9 +130,9 @@ Main solver structure for the Vortex Step Method.See also: [solve](@ref)
     (the conservative envelope from the paper)
 
 ## Additional settings
-- `type_initial_gamma_distribution`::InitialGammaDistribution = ELLIPTIC: see: [InitialGammaDistribution](@ref)
+- `type_initial_gamma_distribution`::InitialGammaDistribution = ZEROS: see: [InitialGammaDistribution](@ref)
 - `use_gamma_prev`::Bool = true: reuse provided previous gamma as initial guess when available
-- `core_radius_fraction`::Float64 = 1e-20: 
+- `core_radius_fraction`::Float64 = 0.05:
 - mu::Float64 = 1.81e-5: Dynamic viscosity [N·s/m²]
 - `is_only_f_and_gamma_output`::Bool = false: Whether to only output f and gamma
 - `reference_point`::MVec3 = [0.0, 0.0, 0.0]: Moment reference point in body frame
