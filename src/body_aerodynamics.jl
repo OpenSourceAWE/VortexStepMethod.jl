@@ -16,7 +16,8 @@ Main structure for calculating aerodynamic properties of bodies. Use the constru
 - `alpha_dist::MVector{P, Float64}` = zeros(Float64, P)
 - `v_a_dist::MVector{P, Float64}` = zeros(Float64, P)
 - `work_vectors`::NTuple{10, MVec3} = ntuple(_ -> zeros(MVec3), 10)
-- `AIC::Array{Float64, 3}` = zeros(3, P, P)
+- `AIC::Array{Float64, 3}` = zeros(P, P, 3): influence coefficients, component last so
+                        that each `AIC[:, :, k]` slice is a contiguous BLAS matrix
 - `projected_area::Float64` = 1.0: The area projected onto the xy-plane of the kite body reference frame [m²]
 - `c_ref::Float64` = 1.0: Reference chord length (max panel chord) [m]
 - `y::MVector{P, Float64}` = MVector{P,Float64}(zeros(P))
@@ -35,7 +36,7 @@ Main structure for calculating aerodynamic properties of bodies. Use the constru
     alpha_dist::MVector{P, T} = zeros(MVector{P, T})
     v_a_dist::MVector{P, T} = zeros(MVector{P, T})
     work_vectors::NTuple{10, MVector{3, T}} = ntuple(_ -> zeros(MVector{3, T}), 10)
-    AIC::Array{T, 3} = zeros(T, 3, P, P)
+    AIC::Array{T, 3} = zeros(T, P, P, 3)
     projected_area::T = one(T)
     c_ref::T = one(T)
     y::MVector{P, T} = zeros(MVector{P, T})
@@ -397,12 +398,13 @@ Returns: nothing
     va_norm = wake_speed
     
     # Calculate influence coefficients
-    for icp in eachindex(body_aero.panels)
-        panel_icp = body_aero.panels[icp]
-        ep = evaluation_point == :control_point ? panel_icp.control_point : panel_icp.aero_center
-        for jring in eachindex(body_aero.panels)
-            panel_jring = body_aero.panels[jring]
-            filaments = panel_jring.filaments
+    for jring in eachindex(body_aero.panels)
+        panel_jring = body_aero.panels[jring]
+        filaments = panel_jring.filaments
+        for icp in eachindex(body_aero.panels)
+            panel_icp = body_aero.panels[icp]
+            ep = evaluation_point == :control_point ? panel_icp.control_point :
+                 panel_icp.aero_center
             calculate_velocity_induced_single_ring_semiinfinite!(
                 velocity_induced,
                 tempvel,
@@ -421,7 +423,9 @@ Returns: nothing
                 calculate_velocity_induced_bound_2D!(U_2D, panel_jring, ep, body_aero.work_vectors)
                 velocity_induced .-= U_2D
             end
-            body_aero.AIC[:, icp, jring] .= velocity_induced
+            @inbounds for k in 1:3
+                body_aero.AIC[icp, jring, k] = velocity_induced[k]
+            end
         end
     end
     return nothing
@@ -478,25 +482,11 @@ function update_effective_angle_of_attack!(alpha_corrected,
     va_norm_array,
     va_unit_array)
 
-    # Calculate AIC matrices (keep existing optimized view)
     calculate_AIC_matrices!(body_aero, LLT, core_radius_fraction, va_norm_array, va_unit_array)
 
-    # Get dimensions from existing data
-    n_rows = size(body_aero.AIC, 2)
-    n_cols = size(body_aero.AIC, 3)
-
-    # Preallocate induced velocity array
     induced_velocity = body_aero.cache[1][va_array]
-
-    # Calculate each component with explicit loops
-    for j in 1:3  # For each x/y/z component
-        for i in 1:n_rows
-            acc = zero(eltype(induced_velocity))  # Type-stable accumulator
-            for k in 1:n_cols
-                acc += body_aero.AIC[j, i, k] * gamma[k]
-            end
-            induced_velocity[i, j] = acc
-        end
+    for k in 1:3
+        mul!(view(induced_velocity, :, k), view(body_aero.AIC, :, :, k), gamma)
     end
 
     # In-place relative velocity calculation
@@ -762,9 +752,8 @@ function calculate_results(
     cl_prescribed_va = body_aero.cache[10][alpha_dist]
     cd_prescribed_va = body_aero.cache[11][alpha_dist]
     cs_prescribed_va = body_aero.cache[12][alpha_dist]
-    panel_view_3xn = @view body_aero.AIC[:, :, 1]
-    f_body_3D = body_aero.cache[13][panel_view_3xn]
-    m_body_3D = body_aero.cache[14][panel_view_3xn]
+    f_body_3D = body_aero.cache[13][alpha_dist, (3, length(alpha_dist))]
+    m_body_3D = body_aero.cache[14][alpha_dist, (3, length(alpha_dist))]
     alpha_geometric = body_aero.cache[15][alpha_dist]
 
     fill!(f_body_3D, 0.0)

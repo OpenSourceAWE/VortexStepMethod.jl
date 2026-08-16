@@ -13,6 +13,11 @@
   changes format without re-running the airfoil solver that produced it.
 
 ### Changed
+- BREAKING: `BodyAerodynamics.AIC` is stored as `(n_panels, n_panels, 3)` instead of
+  `(3, n_panels, n_panels)`, so each component slice `AIC[:, :, k]` is contiguous and
+  the induced-velocity products reach BLAS `gemv` instead of the generic fallback.
+  `solve!` is 3.1–5.3× faster (n=120, VSM: 26.1 ms → 4.9 ms inviscid, 21.1 ms →
+  6.0 ms with polars). Code reading `AIC[k, i, j]` must become `AIC[i, j, k]`.
 - `read_node_table` parses into a preallocated matrix instead of `reduce(vcat, …)`
   over a generator, which was quadratic in the row count: ~21× faster on a 16 MB
   surface table (2.49 s → 0.12 s), benefiting every existing dataset.

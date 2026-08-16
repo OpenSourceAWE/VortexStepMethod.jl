@@ -904,9 +904,9 @@ function gamma_loop!(
     v_normal_array           = solver.cache[10][solver.lr.gamma_new]
     v_tangential_array       = solver.cache[11][solver.lr.gamma_new]
 
-    AIC_x = @view body_aero.AIC[1, :, :]
-    AIC_y = @view body_aero.AIC[2, :, :]
-    AIC_z = @view body_aero.AIC[3, :, :]
+    AIC_x = @view body_aero.AIC[:, :, 1]
+    AIC_y = @view body_aero.AIC[:, :, 2]
+    AIC_z = @view body_aero.AIC[:, :, 3]
 
     velocity_view_x = @view induced_velocity_all[:, 1]
     velocity_view_y = @view induced_velocity_all[:, 2]

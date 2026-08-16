@@ -72,7 +72,7 @@ end
             va_norm_array,
             va_unit_array
         )
-        AIC_x, AIC_y, AIC_z = @views body_aero.AIC[1, :, :], body_aero.AIC[2, :, :], body_aero.AIC[3, :, :]
+        AIC_x, AIC_y, AIC_z = @views body_aero.AIC[:, :, 1], body_aero.AIC[:, :, 2], body_aero.AIC[:, :, 3]
 
         # Compare matrices
         @test isapprox(MatrixU, AIC_x, atol=1e-5)
@@ -107,7 +107,7 @@ end
             va_norm_array,
             va_unit_array
         )
-        AIC_x, AIC_y, AIC_z = body_aero.AIC[1, :, :], body_aero.AIC[2, :, :], body_aero.AIC[3, :, :]
+        AIC_x, AIC_y, AIC_z = body_aero.AIC[:, :, 1], body_aero.AIC[:, :, 2], body_aero.AIC[:, :, 3]
 
         # Compare matrices with higher precision for VSM
         @test isapprox(MatrixU, AIC_x, atol=1e-8)
