@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## VortexStepMethod v4.1.0 2026-08-17
 
 ### Added
 - `table_format` keyword on `write_section_aero`, `generate_airfoils`, `obj_to_yaml`
@@ -55,7 +55,11 @@
   onto fewer structural stations kept full-resolution polars but lost the surface tables
   pressure integration reads. The reblend is now skipped when the polars are preserved
   and the refined sections already carry tables.
-
+- The angle-of-attack correction (`correct_aoa=true`) no longer overwrites
+  `body_aero.AIC` with the aerodynamic-centre (LLT) matrix. It builds that matrix in
+  its own `AIC_aero_center` field, so `AIC` keeps holding the control-point matrix the
+  circulation was solved against, which is what anything reading it after a solve
+  expects. Costs a second `n_panels × n_panels × 3` buffer.
 - `obj_to_yaml` no longer places sections on a wingtip that has closed to a point.
   `station_indices` spreads its targets over the stations that still have a chord,
   so the outermost section lands on the last sliceable one. A V3 mesh sliced with
@@ -64,7 +68,6 @@
   guessing a `wingtip_distance` large enough to skip past the tip. That workaround
   is no longer the default: `wingtip_distance` is now `0.0`, an inset on top of the
   trim for meshes whose slices just short of the tip are still too thin to analyse.
-
 - Wing sections are normalized to `+y` to `-y` order on load (`normalize_span_order!`),
   and by `refine!` for wings built through `add_section!`. Panel `y_airf` and `z_airf`
   follow the order sections are stored in, so a geometry file written the other way
@@ -74,6 +77,11 @@
   order too; files of either order keep loading the same.
 - Spanwise distribution plots put `+y` on the left, matching that order and the kite
   seen from the front.
+- The lofted airfoil skin in `plot_geometry` draws each section's contour on its own
+  panel edge (#256). The edge was picked from the wing's span order rather than from
+  the panel index, so a wing whose sections ran `-y` to `+y` got every rib drawn at its
+  neighbour's station, one tip bare and the other doubled, while the panels themselves
+  rendered correctly.
 
 ### Changed
 - `SolverSettings` now defaults to the same values as `Solver`: `core_radius_fraction`
@@ -100,6 +108,11 @@
   whichever window the backend last used, so a script showing several plots gets
   one window each and re-running it redraws them in place. `show_plot` takes the
   window `name` as a keyword.
+- `examples/V3_kite.jl` builds its wing from `VSMSettings` and adds a second sweep on
+  polars generated from `V3_25.obj` with NeuralFoil (`NEURALFOIL`, on by default), so
+  the plots compare CAD-derived polars against the checked-in CFD tables.
+- `bin/run_julia` starts Julia with `JULIA_NUM_THREADS=auto` unless the environment
+  already sets it.
 
 ## VortexStepMethod v4.0.0 2026-08-03
 
