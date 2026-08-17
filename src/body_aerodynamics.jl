@@ -16,8 +16,11 @@ Main structure for calculating aerodynamic properties of bodies. Use the constru
 - `alpha_dist::MVector{P, Float64}` = zeros(Float64, P)
 - `v_a_dist::MVector{P, Float64}` = zeros(Float64, P)
 - `work_vectors`::NTuple{10, MVec3} = ntuple(_ -> zeros(MVec3), 10)
-- `AIC::Array{Float64, 3}` = zeros(P, P, 3): influence coefficients, component last so
-                        that each `AIC[:, :, k]` slice is a contiguous BLAS matrix
+- `AIC::Array{Float64, 3}` = zeros(P, P, 3): control-point influence coefficients, the
+                        matrix the circulation is solved against; component last so that
+                        each `AIC[:, :, k]` slice is a contiguous BLAS matrix
+- `AIC_aero_center::Array{Float64, 3}` = zeros(P, P, 3): aerodynamic-centre (LLT)
+                        influence coefficients, used only for the corrected angle of attack
 - `projected_area::Float64` = 1.0: The area projected onto the xy-plane of the kite body reference frame [m²]
 - `c_ref::Float64` = 1.0: Reference chord length (max panel chord) [m]
 - `y::MVector{P, Float64}` = MVector{P,Float64}(zeros(P))
@@ -37,6 +40,7 @@ Main structure for calculating aerodynamic properties of bodies. Use the constru
     v_a_dist::MVector{P, T} = zeros(MVector{P, T})
     work_vectors::NTuple{10, MVector{3, T}} = ntuple(_ -> zeros(MVector{3, T}), 10)
     AIC::Array{T, 3} = zeros(T, P, P, 3)
+    AIC_aero_center::Array{T, 3} = zeros(T, P, P, 3)
     projected_area::T = one(T)
     c_ref::T = one(T)
     y::MVector{P, T} = zeros(MVector{P, T})
@@ -382,7 +386,8 @@ Returns: nothing
 @inline function calculate_AIC_matrices!(body_aero::BodyAerodynamics{P, W, T}, model::Model,
                               core_radius_fraction,
                               va_norm_array::AbstractVector{T},
-                              va_unit_array::AbstractMatrix{T}) where {P, W, T}
+                              va_unit_array::AbstractMatrix{T},
+                              target::AbstractArray{T, 3}=body_aero.AIC) where {P, W, T}
     # Determine evaluation point based on model
     evaluation_point = model == VSM ? :control_point : :aero_center
     evaluation_point_on_bound = model == LLT
@@ -436,7 +441,7 @@ Returns: nothing
                 velocity_induced .-= U_2D
             end
             @inbounds for k in 1:3
-                body_aero.AIC[icp, jring, k] = velocity_induced[k]
+                target[icp, jring, k] = velocity_induced[k]
             end
         end
     end
@@ -494,11 +499,14 @@ function update_effective_angle_of_attack!(alpha_corrected,
     va_norm_array,
     va_unit_array)
 
-    calculate_AIC_matrices!(body_aero, LLT, core_radius_fraction, va_norm_array, va_unit_array)
+    # Its own buffer: `AIC` holds the control-point matrix the circulation was solved
+    # against, so overwriting it here would leave post-solve readers on the LLT one.
+    calculate_AIC_matrices!(body_aero, LLT, core_radius_fraction, va_norm_array,
+                            va_unit_array, body_aero.AIC_aero_center)
 
     induced_velocity = body_aero.cache[1][va_array]
     for k in 1:3
-        mul!(view(induced_velocity, :, k), view(body_aero.AIC, :, :, k), gamma)
+        mul!(view(induced_velocity, :, k), view(body_aero.AIC_aero_center, :, :, k), gamma)
     end
 
     # In-place relative velocity calculation
