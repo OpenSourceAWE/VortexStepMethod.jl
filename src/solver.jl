@@ -136,6 +136,8 @@ Main solver structure for the Vortex Step Method.See also: [solve](@ref)
     filament length, following Damiani et al. (2019)
 - mu::Float64 = 1.81e-5: Dynamic viscosity [N·s/m²]
 - `is_only_f_and_gamma_output`::Bool = false: Whether to only output f and gamma
+- `flow_curvature`::Bool = false: Add the thin-airfoil pitch-rate moment
+    increment `-(π/4) q̂` to each section, see: [`flow_curvature_cm`](@ref)
 - `reference_point`::MVec3 = [0.0, 0.0, 0.0]: Moment reference point in body frame
 
 ## Solution
@@ -174,6 +176,7 @@ sol::VSMSolution = VSMSolution(): The result of calling [solve!](@ref)
     mu::T = T(1.81e-5)
     is_only_f_and_gamma_output::Bool = false
     correct_aoa::Bool = false
+    flow_curvature::Bool = false
     reference_point::MVector{3, T} = zeros(MVector{3, T})
 
     # Intermediate results
@@ -215,6 +218,7 @@ function Solver(body_aero, settings::VSMSettings)
         mu=ss.mu,
         is_only_f_and_gamma_output=ss.calc_only_f_and_gamma,
         correct_aoa=ss.correct_aoa,
+        flow_curvature=ss.flow_curvature,
         reference_point=reference_point,
     )
 end
@@ -289,6 +293,11 @@ function calc_forces!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics;
     for (i, panel) in enumerate(panels)                                               # zero bytes
         cl_dist[i] = calculate_cl(panel, alpha_dist[i])
         cd_dist[i], cm_dist[i] = calculate_cd_cm(panel, alpha_dist[i])
+        if solver.flow_curvature
+            cm_dist[i] += flow_curvature_cm(
+                body_aero.pitch_rate_dist[i], solver.sol._chord_dist[i],
+                v_a_dist[i])
+        end
         width_dist[i] = panel.width
 
         # Geometric AoA using panel-local axes and prescribed
@@ -600,7 +609,8 @@ function solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=n
         solver.br.va_unit_dist,
         body_aero.panels,
         solver.is_only_f_and_gamma_output;
-        correct_aoa=solver.correct_aoa
+        correct_aoa=solver.correct_aoa,
+        flow_curvature=solver.flow_curvature
     )
     # Attach geometric AoA (already computed in calculate_results) to solver.sol
     if haskey(results, "alpha_geometric")
@@ -1230,6 +1240,7 @@ function make_dual_shadow(solver::Solver{P, U, Float64},
         mu = TD(solver.mu),
         is_only_f_and_gamma_output = solver.is_only_f_and_gamma_output,
         correct_aoa = solver.correct_aoa,
+        flow_curvature = solver.flow_curvature,
         reference_point = MVector{3, TD}(solver.reference_point),
     )
     return body_aero_d, solver_d

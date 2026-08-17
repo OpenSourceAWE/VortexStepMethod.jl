@@ -17,6 +17,30 @@
   the destination suffix names. `obj_to_yaml` migrates an existing dataset with
   them when `table_format` differs from what the directory holds, so a dataset
   changes format without re-running the airfoil solver that produced it.
+- `flow_curvature` solver setting (default `false`). When enabled, each section
+  gets the thin-airfoil pitch-rate moment increment `Δcm = -(π/4) q̂` with
+  `q̂ = q c / (2 v_rel)`. A section rotating about its own spanwise axis sees an
+  incidence that varies linearly along the chord, which is equivalent to
+  parabolic camber and produces a quarter-chord moment that a single control
+  point cannot represent. The lift response to `q` was already exact because the
+  inflow is sampled at the three-quarter-chord point, so only the moment was
+  missing.
+- `pitch_rate_dist` field on `BodyAerodynamics`, holding the `q` above per panel.
+  `set_va!(body_aero, va, omega)` fills it by projecting `omega` onto every
+  panel's `y_airf`, so panels at different dihedral see different rates from one
+  body rate. The distributed `set_va!(body_aero, va_distribution;
+  pitch_rate_dist)` takes it directly, so twist and flapping rates of a deforming
+  wing — which no single body rate can express — reach the moment. Omitting the
+  keyword zeroes it rather than reusing a stale `omega`, which the distributed
+  form never sets.
+- `section_pitch_rate(velocity_leading, velocity_trailing, z_airf, chord)` builds
+  one entry of that distribution from a section's edge velocities, and reduces to
+  `ω ⋅ y_airf` for rigid motion.
+- `bin/update_default_manifests` regenerates both checked-in default manifests in
+  one command, and `bin/install` takes `+X.Y` / `--version X.Y` to pick a Julia
+  channel without prompting. Selecting a version no longer moves the juliaup
+  default, so regenerating the 1.11 manifest leaves the shell on whatever channel
+  it was using.
 
 ### Fixed
 - The `Solver` docstring quoted the `SolverSettings` defaults for
