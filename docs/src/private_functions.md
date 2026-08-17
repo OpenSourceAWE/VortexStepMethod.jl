@@ -17,6 +17,8 @@ calculate_cl
 calculate_cd
 calculate_cm
 calculate_cd_cm
+flow_curvature_cm
+set_pitch_rate_dist!
 calculate_relative_alpha_and_velocity
 calculate_relative_alpha_and_relative_velocity
 update_effective_angle_of_attack!

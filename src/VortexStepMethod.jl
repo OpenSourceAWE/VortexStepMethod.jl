@@ -31,7 +31,7 @@ export ObjWing, Section, Wing, refine!, reinit!
 export BodyAerodynamics
 export Solver, VSMSolution, linearize, solve, solve!, solve_base!, calc_forces!
 export calculate_results
-export add_section!, set_va!
+export add_section!, set_va!, section_pitch_rate
 export calculate_projected_area, calculate_span
 export MVec3
 

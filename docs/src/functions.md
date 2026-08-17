@@ -82,6 +82,7 @@ CurrentModule = VortexStepMethod
 ## Setting the inflow conditions and solving
 ```@docs
 set_va!
+section_pitch_rate
 solve
 solve!
 solve_base!
