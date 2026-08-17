@@ -45,7 +45,6 @@ update_panel_properties!
 build_interps
 panel_interp_types
 reinit!(wing::AbstractWing)
-reinit!(section::Section, LE_point, TE_point, aero_model, aero_data, section_aero)
 reinit!(panel::Panel, section_1::Section, section_2::Section, aero_center, control_point, bound_point_1, bound_point_2, x_airf, y_airf, z_airf, delta, vec)
 rotated_te
 calculate_filaments_for_plotting

@@ -69,12 +69,6 @@ function normalize_span_order!(sections)
     return sections
 end
 
-"""
-    reinit!(section::Section, LE_point, TE_point, aero_model=nothing, aero_data=nothing,
-            section_aero=nothing)
-
-Update a [Section](@ref) in place.
-"""
 function reinit!(section::Section, LE_point, TE_point, aero_model=nothing,
                 aero_data=nothing, section_aero=nothing)
     section.LE_point .= LE_point
