@@ -64,6 +64,10 @@ jobs:
       - uses: julia-actions/julia-runtest@v1
         env:
           BUILD_IS_PRODUCTION_BUILD: ${{ matrix.build_is_production_build }}
+          # Only Linux gets a virtual display, so runtests.jl skips the plotting tests
+          # elsewhere. Julia 1.12.7 precompiles the whole test environment up front,
+          # which loads GLMakie before that guard runs; keep it lazy off Linux.
+          JULIA_PKG_PRECOMPILE_AUTO: ${{ runner.os == 'Linux' && '1' || '0' }}
         with:
           coverage: false
           prefix: ${{ runner.os == 'Linux' && 'xvfb-run -a' || '' }}
