@@ -3,6 +3,60 @@ using VortexStepMethod: flow_curvature_cm
 using LinearAlgebra
 using Test
 
+"""
+    naca4_fourier_coefficients(max_camber, camber_position; n=20_001)
+
+Thin-airfoil Fourier coefficients `A1`, `A2` and the zero-lift angle [rad] of a
+NACA 4-digit mean line, by quadrature over `x = (1 - cos θ)/2`. Used to check the
+moment relation that [`flow_curvature_cm`](@ref) rests on against measured
+section data.
+"""
+function naca4_fourier_coefficients(max_camber, camber_position; n=20_001)
+    theta = collect(range(0, π; length=n))
+    x = @. (1 - cos(theta)) / 2
+    slope = @. ifelse(x <= camber_position,
+        2max_camber / camber_position^2 * (camber_position - x),
+        2max_camber / (1 - camber_position)^2 * (camber_position - x))
+    integrate(f) = sum((f[i] + f[i + 1]) * (theta[i + 1] - theta[i]) / 2
+                       for i in 1:(n - 1))
+    return (2 / π * integrate(slope .* cos.(theta)),
+            2 / π * integrate(slope .* cos.(2 .* theta)),
+            1 / π * integrate(slope .* (1 .- cos.(theta))))
+end
+
+@testset "thin-airfoil moment relation behind flow_curvature_cm" begin
+    # cm_c/4 = (π/4)(A2 - A1), with A0 = α - (1/π)∫(dZ/dx)dθ and
+    # An = (2/π)∫(dZ/dx)cos(nθ)dθ: MIT OCW 16.01 Unified Engineering, Fluids
+    # Lecture 3 notes pp. 2-3 (reading: Anderson, Fundamentals of Aerodynamics 4.8).
+    cm_quarter_chord(A1, A2) = 0.25π * (A2 - A1)
+
+    @testset "the shipped function is that relation" begin
+        # a section rotating at q induces A1 = q c / (2 v_rel) and A2 = 0, since
+        # the rotation is equivalent to a parabolic-arc camber line
+        q, chord, v_rel = 0.7, 1.6, 18.0
+        @test flow_curvature_cm(q, chord, v_rel) ≈
+              cm_quarter_chord(q * chord / (2v_rel), 0.0)
+    end
+
+    @testset "the relation matches measured section data" begin
+        # measured section values from Abbott & von Doenhoff, Theory of Wing
+        # Sections; thin airfoil theory is expected to land within ~0.015 of them
+        for (name, max_camber, camber_position, cm_measured) in (
+                ("NACA 0012", 0.00, 0.4, 0.0),
+                ("NACA 2412", 0.02, 0.4, -0.047),
+                ("NACA 4412", 0.04, 0.4, -0.093))
+            A1, A2, _ = naca4_fourier_coefficients(max_camber, camber_position)
+            @test cm_quarter_chord(A1, A2) ≈ cm_measured atol = 0.015
+            @test cm_quarter_chord(A1, A2) <= 0.0
+        end
+
+        # the same coefficients also have to reproduce the measured zero-lift
+        # angle, so a sign or factor error cannot hide in the moment alone
+        _, _, zero_lift_angle = naca4_fourier_coefficients(0.02, 0.4)
+        @test rad2deg(zero_lift_angle) ≈ -2.1 atol = 0.2
+    end
+end
+
 @testset "section_pitch_rate reduces to the rigid-body rate" begin
     # a rigid section rotating at q about y_airf must give back exactly q, which
     # is what lets one expression serve both rigid and deforming wings
