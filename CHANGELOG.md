@@ -13,8 +13,11 @@
   changes format without re-running the airfoil solver that produced it.
 
 ### Fixed
-- The `Solver` docstring listed `type_initial_gamma_distribution` as `ELLIPTIC` and
-  `core_radius_fraction` as `1e-20`; the defaults are `ZEROS` and `0.05`.
+- The `Solver` docstring quoted the `SolverSettings` defaults for
+  `type_initial_gamma_distribution` and `core_radius_fraction` (`ELLIPTIC`, `1e-20`)
+  instead of its own (`ZEROS`, `0.05`), and never said what `core_radius_fraction`
+  measures. It now documents the `Solver` defaults and cites Damiani et al. (2019) for
+  the 0.05 cut-off. The two structs still disagree on both values.
 
 ### Changed
 - BREAKING: `BodyAerodynamics.AIC` is stored as `(n_panels, n_panels, 3)` instead of
