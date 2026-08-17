@@ -137,7 +137,7 @@ Main solver structure for the Vortex Step Method.See also: [solve](@ref)
 - mu::Float64 = 1.81e-5: Dynamic viscosity [N·s/m²]
 - `is_only_f_and_gamma_output`::Bool = false: Whether to only output f and gamma
 - `flow_curvature`::Bool = false: Add the thin-airfoil pitch-rate moment
-    increment `-(π/4) q̂` to each section, see: [flow_curvature_cm](@ref)
+    increment `-(π/4) q̂` to each section, see: [`flow_curvature_cm`](@ref)
 - `reference_point`::MVec3 = [0.0, 0.0, 0.0]: Moment reference point in body frame
 
 ## Solution

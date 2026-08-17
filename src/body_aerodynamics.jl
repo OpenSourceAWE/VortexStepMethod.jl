@@ -17,7 +17,7 @@ Main structure for calculating aerodynamic properties of bodies. Use the constru
 - `v_a_dist::MVector{P, Float64}` = zeros(Float64, P)
 - `pitch_rate_dist::MVector{P, Float64}` = zeros(Float64, P): rotation rate of each
     panel about its own spanwise axis, positive nose-up [rad/s]; set by
-    [set_va!](@ref) and read when the solver has `flow_curvature` enabled
+    [`set_va!`](@ref) and read when the solver has `flow_curvature` enabled
 - `work_vectors`::NTuple{10, MVec3} = ntuple(_ -> zeros(MVec3), 10)
 - `AIC::Array{Float64, 3}` = zeros(P, P, 3): influence coefficients, component last so
                         that each `AIC[:, :, k]` slice is a contiguous BLAS matrix
