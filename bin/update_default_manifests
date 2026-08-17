@@ -1,0 +1,6 @@
+#!/bin/bash -eu
+# Regenerate both checked-in default manifests. Each run resolves under its own
+# Julia channel without touching the juliaup default.
+
+./bin/install --update --no-precompile --version 1.11
+./bin/install --update --no-precompile --version 1.12

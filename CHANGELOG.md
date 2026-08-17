@@ -30,6 +30,11 @@
 - `section_pitch_rate(velocity_leading, velocity_trailing, z_airf, chord)` builds
   one entry of that distribution from a section's edge velocities, and reduces to
   `ω ⋅ y_airf` for rigid motion.
+- `bin/update_default_manifests` regenerates both checked-in default manifests in
+  one command, and `bin/install` takes `+X.Y` / `--version X.Y` to pick a Julia
+  channel without prompting. Selecting a version no longer moves the juliaup
+  default, so regenerating the 1.11 manifest leaves the shell on whatever channel
+  it was using.
 
 ### Fixed
 - The `Solver` docstring quoted the `SolverSettings` defaults for
