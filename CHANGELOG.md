@@ -28,7 +28,7 @@
   never engaged. Coefficients are unchanged for well-separated geometry, since the guard
   only triggers where a control point falls within 5% of a filament length of a bound
   vortex, and every settings file shipped in `data/` sets both keys explicitly.
-- BREAKING: `BodyAerodynamics.AIC` is stored as `(n_panels, n_panels, 3)` instead of
+- `BodyAerodynamics.AIC` is stored as `(n_panels, n_panels, 3)` instead of
   `(3, n_panels, n_panels)`, so each component slice `AIC[:, :, k]` is contiguous and
   the induced-velocity products reach BLAS `gemv` instead of the generic fallback.
   `solve!` is 3.1–5.3× faster (n=120, VSM: 26.1 ms → 4.9 ms inviscid, 21.1 ms →
