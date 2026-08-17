@@ -48,8 +48,8 @@ N_SECTIONS = 10
 # wingtips, which slice to degenerate airfoils that XFoil cannot analyse.
 WINGTIP_DISTANCE = 0.1
 
-# Shrink-wrap each raw slice into a clean closed airfoil: the distance-field wrap
-# hugs the cloud at `clearance` (floored at one grid `cell_size`) with a round nose.
+# Shrink-wrap each raw slice into a clean closed airfoil: the rolling-ball wrap
+# hugs the cloud at `clearance` (floored at `min_clearance`) with a round nose.
 WRAP = ShrinkWrap(clearance=0.0)
 
 # 3D slice diagnostic (live preview): mesh + LE/TE curves + section contours, their
