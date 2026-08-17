@@ -10,9 +10,18 @@
   equivalent to parabolic camber and produces a quarter-chord moment that a
   single control point cannot represent. The lift response to `q` was already
   exact because the inflow is sampled at the three-quarter-chord point, so only
-  the moment was missing. Read from `body_aero.omega`, so it is only meaningful
-  after `set_va!(body_aero, va, omega)`; the matrix form of `set_va!` does not
-  set `omega`.
+  the moment was missing.
+- `pitch_rate_dist` field on `BodyAerodynamics`: each panel's rotation rate about
+  its own spanwise axis, which is what `flow_curvature` reads. `set_va!(body_aero,
+  va, omega)` fills it by projecting `omega` onto every panel's `y_airf`, so
+  panels at different dihedral see different rates from one body rate. The
+  distributed `set_va!(body_aero, va_distribution; pitch_rate_dist)` takes it
+  directly, so twist and flapping rates of a deforming wing — which no single
+  body rate can express — reach the moment. Omitting the keyword zeroes it rather
+  than reusing a stale `omega`.
+- `section_pitch_rate(velocity_leading, velocity_trailing, z_airf, chord)` builds
+  one entry of that distribution from a section's edge velocities, and reduces to
+  `ω ⋅ y_airf` for rigid motion.
 
 ## VortexStepMethod v4.0.0 2026-08-03
 

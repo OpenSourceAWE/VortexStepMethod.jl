@@ -3,6 +3,20 @@ using VortexStepMethod: flow_curvature_cm
 using LinearAlgebra
 using Test
 
+@testset "section_pitch_rate reduces to the rigid-body rate" begin
+    # a rigid section rotating at q about y_airf must give back exactly q, which
+    # is what lets one expression serve both rigid and deforming wings
+    x_airf, y_airf, z_airf = [1.0, 0, 0], [0, 1.0, 0], [0, 0, 1.0]
+    chord, q = 1.7, 0.8
+    omega = q * y_airf
+    leading = [0.0, 0.0, 0.0]
+    trailing = chord * x_airf
+    @test section_pitch_rate(cross(omega, leading), cross(omega, trailing),
+                             z_airf, chord) ≈ q
+    @test section_pitch_rate([0.0, 0, 0], [0.0, 0, 0], z_airf, chord) == 0.0
+    @test section_pitch_rate([0.0, 0, 0], [0.0, 0, 1.0], z_airf, 0.0) == 0.0
+end
+
 @testset "Flow curvature pitch-rate moment" begin
     chord, span, V, q = 1.0, 8.0, 20.0, 0.5
 
@@ -18,10 +32,11 @@ using Test
     q_local = dot(body_aero.omega, panel.y_airf)
 
     @testset "increment matches thin airfoil theory" begin
-        @test flow_curvature_cm(body_aero.omega, panel, chord, V) ≈
+        @test body_aero.pitch_rate_dist[6] ≈ q_local
+        @test flow_curvature_cm(q_local, chord, V) ≈
               -0.25π * q_local * chord / (2V)
-        @test flow_curvature_cm(zeros(3), panel, chord, V) == 0.0
-        @test flow_curvature_cm(body_aero.omega, panel, chord, 0.0) == 0.0
+        @test flow_curvature_cm(0.0, chord, V) == 0.0
+        @test flow_curvature_cm(q_local, chord, 0.0) == 0.0
     end
 
     @testset "positive rate about y_airf raises aft incidence" begin
@@ -61,5 +76,33 @@ using Test
     @testset "defaults to off" begin
         @test Solver(body_aero).flow_curvature == false
         @test VortexStepMethod.SolverSettings().flow_curvature == false
+    end
+
+    @testset "distributed rates drive a deformation mode" begin
+        n = length(body_aero.panels)
+        va_dist = repeat([V 0.0 0.0], n)
+
+        set_va!(body_aero, va_dist)
+        @test all(iszero, body_aero.pitch_rate_dist)
+        solve!(solver_on, body_aero)
+        base = copy(solver_on.sol.cm_dist)
+
+        # antisymmetric twist rate: no rigid-body omega can express this
+        rates = [panel.aero_center[2] > 0 ? 1.0 : -1.0 for panel in body_aero.panels]
+        set_va!(body_aero, va_dist; pitch_rate_dist=rates)
+        @test body_aero.pitch_rate_dist ≈ rates
+        solve!(solver_on, body_aero)
+
+        for i in 1:n
+            @test solver_on.sol.cm_dist[i] - base[i] ≈
+                  flow_curvature_cm(rates[i], solver_on.sol._chord_dist[i],
+                                    solver_on.lr.v_a_dist[i])
+        end
+        # the two half-wings must be driven in opposite senses
+        @test sign(solver_on.sol.cm_dist[1] - base[1]) ==
+              -sign(solver_on.sol.cm_dist[n] - base[n])
+
+        @test_throws ArgumentError set_va!(body_aero, va_dist;
+                                           pitch_rate_dist=rates[1:end-1])
     end
 end

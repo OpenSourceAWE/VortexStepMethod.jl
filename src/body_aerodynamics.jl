@@ -15,6 +15,9 @@ Main structure for calculating aerodynamic properties of bodies. Use the constru
 - `stall_angle_list`=zeros(Float64, P):  stall angle per panel
 - `alpha_dist::MVector{P, Float64}` = zeros(Float64, P)
 - `v_a_dist::MVector{P, Float64}` = zeros(Float64, P)
+- `pitch_rate_dist::MVector{P, Float64}` = zeros(Float64, P): rotation rate of each
+    panel about its own spanwise axis, positive nose-up [rad/s]; set by
+    [set_va!](@ref) and read when the solver has `flow_curvature` enabled
 - `work_vectors`::NTuple{10, MVec3} = ntuple(_ -> zeros(MVec3), 10)
 - `AIC::Array{Float64, 3}` = zeros(3, P, P)
 - `projected_area::Float64` = 1.0: The area projected onto the xy-plane of the kite body reference frame [m²]
@@ -34,6 +37,7 @@ Main structure for calculating aerodynamic properties of bodies. Use the constru
     stall_angle_list::MVector{P, T} = zeros(MVector{P, T})
     alpha_dist::MVector{P, T} = zeros(MVector{P, T})
     v_a_dist::MVector{P, T} = zeros(MVector{P, T})
+    pitch_rate_dist::MVector{P, T} = zeros(MVector{P, T})
     work_vectors::NTuple{10, MVector{3, T}} = ntuple(_ -> zeros(MVector{3, T}), 10)
     AIC::Array{T, 3} = zeros(T, 3, P, P)
     projected_area::T = one(T)
@@ -714,19 +718,49 @@ function compute_panel_center_of_pressures(
 end
 
 """
-    flow_curvature_cm(omega, panel, chord, v_rel)
+    flow_curvature_cm(pitch_rate, chord, v_rel)
 
 Quarter-chord moment increment of a section rotating about its own spanwise axis,
 from thin airfoil theory. The rotation makes the local incidence vary linearly
 along the chord, which is equivalent to parabolic camber and yields
-`Δcm = -(π/4) q̂` with `q̂ = q c / (2 v_rel)` and `q = ω ⋅ y_airf` positive
-nose-up. Independent of the pivot location; the lift response to `q` needs no
-correction because the inflow is already sampled at the three-quarter-chord
-control point.
+`Δcm = -(π/4) q̂` with `q̂ = q c / (2 v_rel)` and `q` positive nose-up.
+Independent of the pivot location; the lift response to `q` needs no correction
+because the inflow is already sampled at the three-quarter-chord control point.
 """
-@inline function flow_curvature_cm(omega, panel, chord, v_rel)
+@inline function flow_curvature_cm(pitch_rate, chord, v_rel)
     v_rel > 0 || return zero(chord)
-    return -0.25π * dot3(omega, panel.y_airf) * chord / (2v_rel)
+    return -0.25π * pitch_rate * chord / (2v_rel)
+end
+
+"""
+    section_pitch_rate(velocity_leading, velocity_trailing, z_airf, chord)
+
+Rate at which a section rotates about its own spanwise axis, from the velocities
+of its leading and trailing edge. Positive nose-up, matching
+[`flow_curvature_cm`](@ref). Use this to build a `pitch_rate_dist` for
+[`set_va!`](@ref) from a deforming structure, where twist and flapping rates
+differ per section and no single body rate describes them.
+"""
+@inline function section_pitch_rate(velocity_leading, velocity_trailing,
+                                    z_airf, chord)
+    chord > 0 || return zero(chord)
+    normal_rate = dot3(velocity_trailing, z_airf) -
+                  dot3(velocity_leading, z_airf)
+    return -normal_rate / chord
+end
+
+"""
+    set_pitch_rate_dist!(body_aero, omega)
+
+Fill `body_aero.pitch_rate_dist` from a rigid-body turn rate by projecting it
+onto each panel's own spanwise axis. Panels with different dihedral see
+different rates from the same `omega`.
+"""
+function set_pitch_rate_dist!(body_aero::BodyAerodynamics, omega)
+    for (i, panel) in enumerate(body_aero.panels)
+        body_aero.pitch_rate_dist[i] = dot3(omega, panel.y_airf)
+    end
+    return nothing
 end
 
 """
@@ -797,7 +831,7 @@ function calculate_results(
             panel, alpha_dist[i])
         if flow_curvature
             cm_array[i] += flow_curvature_cm(
-                body_aero.omega, panel, chord_array[i], v_a_dist[i])
+                body_aero.pitch_rate_dist[i], chord_array[i], v_a_dist[i])
         end
         panel_width_array[i] = panel.width
         va_norm = va_norm_array[i]
@@ -1082,11 +1116,15 @@ Set velocity array and update wake filaments.
 - body_aero::BodyAerodynamics: The [BodyAerodynamics](@ref) struct to modify
 - `va::VelVector`: Velocity vector of the apparent wind speed           [m/s]
 - `omega::VelVector`: Turn rate vector around x y and z axis            [rad/s]
+
+`omega` is also projected onto each panel's spanwise axis into
+`pitch_rate_dist`, which the solver reads when `flow_curvature` is enabled.
 """
 function set_va!(body_aero::BodyAerodynamics{P, W, T}, va::AbstractVector, omega=zeros(MVector{3, T})) where {P, W, T}
     n_panels = length(body_aero.panels)
     va_distribution = zeros(T, n_panels, 3)
     body_aero.omega .= omega
+    set_pitch_rate_dist!(body_aero, omega)
 
     if all(iszero, omega)
         va_distribution .= reshape(va, 1, 3)
@@ -1116,9 +1154,28 @@ function set_va!(body_aero::BodyAerodynamics{P, W, T}, va::AbstractVector, omega
     return nothing
 end
 
-function set_va!(body_aero::BodyAerodynamics, va_distribution::AbstractMatrix)
+"""
+    set_va!(body_aero::BodyAerodynamics, va_distribution::AbstractMatrix;
+            pitch_rate_dist=nothing)
+
+Set a per-panel inflow distribution. `pitch_rate_dist` gives each panel's rotation
+rate about its own spanwise axis [rad/s], positive nose-up; build it with
+[`section_pitch_rate`](@ref) when the structure deforms, since twist and flapping
+rates differ per section and no single body rate describes them. It is reset to
+zero when omitted, because this method takes no `omega` and a stale one would
+silently feed the `flow_curvature` moment.
+"""
+function set_va!(body_aero::BodyAerodynamics, va_distribution::AbstractMatrix;
+                 pitch_rate_dist=nothing)
     size(va_distribution, 1) != length(body_aero.panels) &&
         throw(ArgumentError("Number of rows in va distribution should be equal to number of panels."))
+    if isnothing(pitch_rate_dist)
+        body_aero.pitch_rate_dist .= 0
+    else
+        length(pitch_rate_dist) != length(body_aero.panels) &&
+            throw(ArgumentError("Length of pitch rate distribution should be equal to number of panels."))
+        body_aero.pitch_rate_dist .= pitch_rate_dist
+    end
 
     for (i, panel) in enumerate(body_aero.panels)
         panel.va .= va_distribution[i, :]

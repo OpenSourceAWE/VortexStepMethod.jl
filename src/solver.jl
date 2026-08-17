@@ -294,7 +294,8 @@ function calc_forces!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics;
         cd_dist[i], cm_dist[i] = calculate_cd_cm(panel, alpha_dist[i])
         if solver.flow_curvature
             cm_dist[i] += flow_curvature_cm(
-                body_aero.omega, panel, solver.sol._chord_dist[i], v_a_dist[i])
+                body_aero.pitch_rate_dist[i], solver.sol._chord_dist[i],
+                v_a_dist[i])
         end
         width_dist[i] = panel.width
 
