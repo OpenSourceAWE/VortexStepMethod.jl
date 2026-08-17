@@ -69,17 +69,6 @@
   already stores, take the core-radius cutoff from `|r1.r0|/|r0|` without forming the
   perpendicular vector, and defer the cross products that only one branch reads. Output
   is bit-identical; `solve!` is a further 1.47-1.55x faster.
-- `shrink_wrap` traces the rolling ball exactly — pivoting it around the cloud and
-  emitting the arcs its contact side sweeps (`pivot_contour`) — instead of thresholding
-  and marching-squares-tracing a distance field, so there is no grid resolution left to
-  set. `ShrinkWrap`'s `cell_size` is accordingly named `min_clearance`, still accepted
-  under the old name, and only floors `clearance` — which is what it already did for a
-  single-membrane slice. The wrap now
-  sits at exactly `clearance` from the cloud instead of a cell over it, so a V3 canopy's
-  aft strip comes out `2 * clearance` thick where the grid gave `3.5 * cell_size`.
-  `min_concave_radius` also stops costing anything, having padded the grid in both
-  directions before: one V3 slice at radius 0.4 drops from 173 ms to 10 ms, and at the
-  default radius from 15 ms to 3 ms.
 - `read_node_table` parses into a preallocated matrix instead of `reduce(vcat, …)`
   over a generator, which was quadratic in the row count: ~21× faster on a 16 MB
   surface table (2.49 s → 0.12 s), benefiting every existing dataset.

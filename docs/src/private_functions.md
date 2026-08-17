@@ -115,13 +115,13 @@ get_lower_upper
 turn_trailing_edge!
 ```
 
-### Shrink-wrap rolling ball
+### Shrink-wrap distance field
 ```@docs
-point_buckets
-turn_measure
-pivot_step
-push_arc!
-pivot_contour
+distance_parabolas!
+squared_distance_transform!
+grid_sampler
+flood_outside
+trace_level_set
 largest_linking_gap
 resample_arc
 smooth_turning!

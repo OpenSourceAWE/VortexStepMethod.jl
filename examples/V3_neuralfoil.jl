@@ -46,8 +46,8 @@ ROTATION = I
 # Marched leading-edge stations across the span (finer => smoother edge trace).
 N_BINS = 100
 
-# Shrink-wrap each raw slice into a clean closed airfoil: the rolling-ball wrap
-# hugs the cloud at `clearance` (floored at `min_clearance`); a single-skin
+# Shrink-wrap each raw slice into a clean closed airfoil: the distance-field wrap
+# hugs the cloud at `clearance` (floored at one grid `cell_size`); a single-skin
 # canopy becomes a thin capsule. `min_concave_radius` sets the fillet bridging the
 # concave tube-canopy junction: 0.2 smooths the neck over entirely; the default
 # (0.02) traces it, which NeuralFoil also handles fine.
