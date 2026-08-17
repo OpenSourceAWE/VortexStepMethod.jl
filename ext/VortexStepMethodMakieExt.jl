@@ -12,6 +12,32 @@ export plot_geometry, plot_distribution, plot_polars, save_plot, show_plot,
 const PANEL_MESH_OBSERVABLES = Ref{Union{Nothing,Dict}}(nothing)
 # Global storage for airfoil-skin observables, keyed by body objectid.
 const AIRFOIL_SKIN_OBSERVABLES = Ref{Union{Nothing,Dict}}(nothing)
+const SCREENS = Dict{String,Any}()
+
+"""
+    display_named(fig, name) -> fig
+
+Show `fig` in the window registered under `name`, opening a new titled window for
+a name that has none yet: plotting the same title again replaces its predecessor,
+while a new title gets its own window. Backends without titled screens, such as
+CairoMakie, fall back to a plain `display`.
+"""
+function display_named(fig::Makie.Figure, name::AbstractString)
+    screen = get(SCREENS, name, nothing)
+    if !isnothing(screen) && isopen(screen)
+        display(screen, fig)
+        return fig
+    end
+    screen = try
+        Makie.current_backend().Screen(; title=String(name))
+    catch
+        display(fig)
+        return fig
+    end
+    SCREENS[name] = screen
+    display(screen, fig)
+    return fig
+end
 
 """
     PLATE_FACES
@@ -465,18 +491,19 @@ function VortexStepMethod.save_plot(fig::Makie.Figure, save_path, title; data_ty
 end
 
 """
-    show_plot(fig; dpi=130)
+    show_plot(fig; name="", dpi=130)
 
-Display a Makie figure.
+Display a Makie figure in an interactive session, in the window named `name`.
 
 # Arguments
 - `fig`: Makie Figure object
 
 # Keyword arguments
+- `name`: Window to draw in; reusing a name reuses its window (default: "")
 - `dpi`: Dots per inch for the figure (default: 130) - currently unused in Makie
 """
-function VortexStepMethod.show_plot(fig::Makie.Figure; dpi=130)
-    isinteractive() && display(fig)
+function VortexStepMethod.show_plot(fig::Makie.Figure; name="", dpi=130)
+    isinteractive() && display_named(fig, name)
 end
 
 """
@@ -671,12 +698,19 @@ function VortexStepMethod.plot_geometry(body_aero::BodyAerodynamics, title;
 
     fig = create_geometry_plot_makie(body_aero, title, view_elevation, view_azimuth)
 
-    if is_show && isinteractive()
-        display(fig)
-    end
+    is_show && show_plot(fig; name=title)
 
     return fig
 end
+
+"""
+    span_axis(position, title, ylabel) -> Axis
+
+Axis for a spanwise distribution, `+y` on the left, matching the kite seen from the
+front and the `+y` to `-y` order its sections are stored in.
+"""
+span_axis(position, title, ylabel) =
+    Axis(position; title, xlabel="Spanwise Position y/b", ylabel, xreversed=true)
 
 """
     plot_distribution(y_coordinates_list, results_list, label_list;
@@ -715,28 +749,22 @@ function VortexStepMethod.plot_distribution(y_coordinates_list, results_list, la
     Label(fig[0, :], title, fontsize=20)
 
     # Row 1: CL, CD, Gamma
-    ax_cl = Axis(fig[1, 1], title="CL Distribution",
-        xlabel="Spanwise Position y/b", ylabel="Lift Coefficient CL")
-    ax_cd = Axis(fig[1, 2], title="CD Distribution",
-        xlabel="Spanwise Position y/b", ylabel="Drag Coefficient CD")
-    ax_gamma = Axis(fig[1, 3], title="Γ Distribution",
-        xlabel="Spanwise Position y/b", ylabel="Circulation Γ")
+    ax_cl = span_axis(fig[1, 1], "CL Distribution", "Lift Coefficient CL")
+    ax_cd = span_axis(fig[1, 2], "CD Distribution", "Drag Coefficient CD")
+    ax_gamma = span_axis(fig[1, 3], "Γ Distribution", "Circulation Γ")
 
     # Row 2: Alpha geometric, alpha at ac, alpha uncorrected
-    ax_alpha_geo = Axis(fig[2, 1], title="α Geometric",
-        xlabel="Spanwise Position y/b", ylabel="Angle of Attack α (deg)")
-    ax_alpha_ac = Axis(fig[2, 2], title="α result (corrected to aerodynamic center)",
-        xlabel="Spanwise Position y/b", ylabel="Angle of Attack α (deg)")
-    ax_alpha_unc = Axis(fig[2, 3], title="α Uncorrected (if VSM, at control point)",
-        xlabel="Spanwise Position y/b", ylabel="Angle of Attack α (deg)")
+    alpha_label = "Angle of Attack α (deg)"
+    ax_alpha_geo = span_axis(fig[2, 1], "α Geometric", alpha_label)
+    ax_alpha_ac = span_axis(fig[2, 2],
+        "α result (corrected to aerodynamic center)", alpha_label)
+    ax_alpha_unc = span_axis(fig[2, 3],
+        "α Uncorrected (if VSM, at control point)", alpha_label)
 
     # Row 3: Force components
-    ax_fx = Axis(fig[3, 1], title="Force in x direction",
-        xlabel="Spanwise Position y/b", ylabel="Fx")
-    ax_fy = Axis(fig[3, 2], title="Force in y direction",
-        xlabel="Spanwise Position y/b", ylabel="Fy")
-    ax_fz = Axis(fig[3, 3], title="Force in z direction",
-        xlabel="Spanwise Position y/b", ylabel="Fz")
+    ax_fx = span_axis(fig[3, 1], "Force in x direction", "Fx")
+    ax_fy = span_axis(fig[3, 2], "Force in y direction", "Fy")
+    ax_fz = span_axis(fig[3, 3], "Force in z direction", "Fz")
 
     # Plot CL
     for (y_coords, results, label) in zip(y_coordinates_list, results_list, label_list)
@@ -801,9 +829,7 @@ function VortexStepMethod.plot_distribution(y_coordinates_list, results_list, la
         save_plot(fig, save_path, title, data_type=data_type)
     end
 
-    if is_show && isinteractive()
-        display(fig)
-    end
+    is_show && show_plot(fig; name=title)
 
     return fig
 end
@@ -1023,9 +1049,7 @@ function VortexStepMethod.plot_polars(
         save_plot(fig, save_path, main_title; data_type)
     end
 
-    if is_show && isinteractive()
-        display(fig)
-    end
+    is_show && show_plot(fig; name=title)
 
     return fig
 end
@@ -1082,9 +1106,7 @@ function VortexStepMethod.plot_polar_data(body_aero::BodyAerodynamics;
                 color=:blue, linewidth=0.5, transparency=true)
         end
 
-        if is_show && isinteractive()
-            display(fig)
-        end
+        is_show && show_plot(fig; name="polar data")
         return fig
     else
         throw(ArgumentError(
@@ -1454,9 +1476,7 @@ function VortexStepMethod.plot_combined_analysis(
     colsize!(fig.layout, 1, Relative(0.6))
     colsize!(fig.layout, 2, Relative(0.4))
 
-    if is_show && isinteractive()
-        display(fig)
-    end
+    is_show && show_plot(fig; name=title)
 
     return fig
 end
@@ -1651,7 +1671,7 @@ function ObjAdapter.plot_slices_3d(path::String; n_slices::Int=10, rotation=I,
         m = ObjAdapter.march_edges(vertices, faces; step=span / n_bins)
         le = reduce(hcat, m.le)
         te = reduce(hcat, m.te)
-        idx = ObjAdapter.station_indices(m.arclen, n_slices; wingtip_distance)
+        idx = ObjAdapter.station_indices(m, n_slices; wingtip_distance)
         secs = filter(!isnothing,
                       [ObjAdapter.build_section(vertices, faces, m.le[i], m.te[i],
                                                 m.point[i], m.tangent[i]) for i in idx])
@@ -1726,7 +1746,7 @@ function ObjAdapter.plot_slices_3d(path::String; n_slices::Int=10, rotation=I,
         sel[] = best
     end
 
-    is_show && display(fig)
+    is_show && display_named(fig, "slices: $(basename(rstrip(path, '/')))")
     return fig
 end
 
@@ -1780,7 +1800,7 @@ function ObjAdapter.plot_airfoil_fit(x::Vector, y::Vector; title::String="Airfoi
 
     axislegend(ax; position=:rt)
 
-    is_show && display(fig)
+    is_show && display_named(fig, title)
     return fig, params
 end
 
@@ -1845,7 +1865,7 @@ function ObjAdapter.plot_airfoils(geometry_file::String;
     if is_save && !isnothing(save_path)
         VortexStepMethod.save_plot(fig, save_path, "airfoils"; data_type)
     end
-    is_show && display(fig)
+    is_show && display_named(fig, title)
     return fig
 end
 

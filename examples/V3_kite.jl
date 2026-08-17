@@ -2,16 +2,21 @@ using Pkg
 if Base.active_project() != joinpath(@__DIR__, "Project.toml")
     Pkg.activate(@__DIR__)
 end
-using LinearAlgebra
 using GLMakie
 using MakieControlPlots
 using VortexStepMethod
+using VortexStepMethod.ObjAdapter
+using VortexStepMethod.AirfoilAero: ShrinkWrap, NeuralFoilSolver
 
 PLOT = true
 SAVE_ALL = false
 USE_TEX = false
 DEFORM = false
+NEURALFOIL = true
+# Rolling-ball radius of the shrink wrap; fillets the concave tube-canopy junction.
+MIN_CONCAVE_RADIUS = 0.4
 OUTPUT_DIR = joinpath(dirname(@__DIR__), "output")
+REFERENCE_POINT = [0.422646, 0.0, 9.3667]
 
 project_dir = dirname(@__DIR__)
 literature_paths = [
@@ -24,43 +29,21 @@ literature_paths = [
     joinpath(project_dir, "data", "TUDELFT_V3_KITE", "literature_results",
         "windtunnel_alpha_sweep_beta_00_0_Poland_2025_Rey_5e5.csv"),
 ]
-labels = [
-    "VSM Julia Re=5e5",
-    "CFD Re=5e5",
-    "CFD Re=10e5", #with struts
-    "VSM Python Re=5e5",
-    "WindTunnel Re=5e5" #with struts
-]
 beta_literature_paths = [
     joinpath(project_dir, "data", "TUDELFT_V3_KITE", "literature_results",
         "windtunnel_beta_sweep_alpha_07_4_Poland_2025_Rey_5e5.csv"),
 ]
-beta_labels = [
-    labels[1],
-    "Wind Tunnel Re=5e5 beta sweep alpha=7.4",
-]
 
-# Load YAML settings directly
-settings_path = joinpath(
-    project_dir, "data", "TUDELFT_V3_KITE", "vsm_settings.yaml")
-settings_data = VortexStepMethod.YAML.load_file(settings_path)
-condition_cfg = settings_data["condition"]
-wing_cfg = settings_data["wings"][1]
-solver_cfg = settings_data["solver_settings"]
-
-# Create wing, body_aero, and solver objects using settings
-wing = Wing(
-    joinpath(project_dir, wing_cfg["geometry_file"]);
-    n_panels=wing_cfg["n_panels"],
-    spanwise_distribution=getproperty(
-        VortexStepMethod,
-        Symbol(wing_cfg["spanwise_panel_distribution"])),
-    spanwise_direction=Float64.(wing_cfg["spanwise_direction"]),
-    remove_nan=wing_cfg["remove_nan"],
-)
+settings = VSMSettings(joinpath(project_dir, "data", "TUDELFT_V3_KITE",
+    "vsm_settings.yaml"); data_prefix=false)
+settings.wings[1].geometry_file = joinpath(project_dir,
+    settings.wings[1].geometry_file)
+wing = Wing(settings)
 refine!(wing)
 body_aero = BodyAerodynamics([wing])
 VortexStepMethod.reinit!(body_aero)
+solver = Solver(body_aero, settings)
+solver.reference_point .= REFERENCE_POINT
 
 if DEFORM
     VortexStepMethod.unrefined_deform!(
@@ -72,52 +55,56 @@ if DEFORM
     VortexStepMethod.reinit!(body_aero; init_aero=false)
 end
 
-# Construct Solver using keyword arguments from solver settings
-solver = Solver(body_aero;
-    solver_type=(solver_cfg["solver_type"] == "NONLIN" ? NONLIN : LOOP),
-    aerodynamic_model_type=getproperty(
-        VortexStepMethod,
-        Symbol(solver_cfg["aerodynamic_model_type"])),
-    density=solver_cfg["density"],
-    max_iterations=solver_cfg["max_iterations"],
-    rtol=solver_cfg["rtol"],
-    tol_reference_error=solver_cfg["tol_reference_error"],
-    relaxation_factor=solver_cfg["relaxation_factor"],
-    is_with_artificial_damping=solver_cfg["artificial_damping"],
-    artificial_damping=(k2=solver_cfg["k2"], k4=solver_cfg["k4"]),
-    type_initial_gamma_distribution=getproperty(
-        VortexStepMethod,
-        Symbol(solver_cfg["type_initial_gamma_distribution"])),
-    use_gamma_prev=get(solver_cfg, "use_gamma_prev",
-        get(solver_cfg, "use_gamme_prev", true)),
-    core_radius_fraction=solver_cfg["core_radius_fraction"],
-    mu=solver_cfg["mu"],
-    is_only_f_and_gamma_output=get(
-        solver_cfg, "calc_only_f_and_gamma", false),
-    correct_aoa=get(solver_cfg, "correct_aoa", false),
-    reference_point=get(solver_cfg, "reference_point",
-        [0.422646, 0.0, 9.3667]),
-)
+# Second sweep on generated polars: slice V3_25.obj, shrink-wrap every section into a
+# closed airfoil and sweep it with NeuralFoil, so the same kite flies on polars derived
+# from its own CAD surface instead of the checked-in CFD tables.
+if NEURALFOIL
+    obj_file = joinpath(project_dir, "data", "TUDELFT_V3_KITE", "V3_25.obj")
+    generated_dir = joinpath(project_dir, "data", "TUDELFT_V3_KITE",
+        "generated_neuralfoil")
+    nf_yaml = obj_to_yaml(obj_file, generated_dir;
+        n_sections=settings.wings[1].n_panels, Re=1e6, force=false,
+        aero_solver=NeuralFoilSolver(model_size="large", n_crit=4.0,
+            xtr_upper=0.05, xtr_lower=0.05),
+        wrap_method=ShrinkWrap(clearance=0.0,
+            min_concave_radius=MIN_CONCAVE_RADIUS),
+    )
+    settings_nf = deepcopy(settings)
+    settings_nf.wings[1].geometry_file = nf_yaml
+    wing_nf = Wing(settings_nf)
+    refine!(wing_nf)
+    body_nf = BodyAerodynamics([wing_nf])
+    VortexStepMethod.reinit!(body_nf)
+    solver_nf = Solver(body_nf, settings_nf)
+    solver_nf.reference_point .= REFERENCE_POINT
 
-# Extract values for plotting
-wind_speed = condition_cfg["wind_speed"]
-angle_of_attack_deg = condition_cfg["alpha"]
-sideslip_deg = condition_cfg["beta"]
-yaw_rate = condition_cfg["yaw_rate"]
+    # Reading the generated directory instead of the OBJ shows the airfoils the polar
+    # pipeline actually analysed. Hover a slice to inspect its 2D fit.
+    PLOT && plot_slices_3d(generated_dir; obj_path=obj_file)
+end
 
-# Set flight conditions from settings
-α0 = deg2rad(angle_of_attack_deg)
-β0 = deg2rad(sideslip_deg)
-set_va!(body_aero,
-    wind_speed .* [cos(α0) * cos(β0), sin(β0), sin(α0) * cos(β0)])
+solvers = NEURALFOIL ? [solver, solver_nf] : [solver]
+bodies = NEURALFOIL ? [body_aero, body_nf] : [body_aero]
+solver_labels = NEURALFOIL ? ["VSM Julia CFD", "VSM Julia NeuralFoil"] :
+                ["VSM Julia CFD"]
+labels = [solver_labels;
+    ["CFD Re=5e5",
+     "CFD Re=10e5", #with struts
+     "VSM Python Re=5e5",
+     "WindTunnel Re=5e5"]] #with struts
+beta_labels = [solver_labels; ["Wind Tunnel Re=5e5 beta sweep alpha=7.4"]]
 
-# Solve
+wind_speed = settings.condition.wind_speed
+angle_of_attack_deg = settings.condition.alpha
+sideslip_deg = settings.condition.beta
+yaw_rate = settings.condition.yaw_rate
+
+set_va!(body_aero, settings)
 results = VortexStepMethod.solve(solver, body_aero; log=true)
 
-# Plotting polars with moment coefficients
 PLOT && plot_polars(
-    [solver],
-    [body_aero],
+    solvers,
+    bodies,
     labels,
     literature_path_list=literature_paths,
     angle_range=range(-5, 25, length=31),
@@ -130,7 +117,8 @@ PLOT && plot_polars(
     is_save=false || SAVE_ALL,
     is_show=true,
     use_tex=USE_TEX,
-    show_moments=true
+    show_moments=false,
+    cl_over_cd=true
 )
 
 # Plotting geometry
@@ -160,56 +148,10 @@ PLOT && plot_distribution(
     use_tex=USE_TEX
 )
 
-# --- Dual solver comparison: NONLIN vs LOOP ---
-solver_cfg["solver_type"] = "LOOP"
-solver_loop = Solver(body_aero;
-    solver_type=LOOP,
-    aerodynamic_model_type=getproperty(
-        VortexStepMethod,
-        Symbol(solver_cfg["aerodynamic_model_type"])),
-    density=solver_cfg["density"],
-    max_iterations=solver_cfg["max_iterations"],
-    rtol=solver_cfg["rtol"],
-    tol_reference_error=solver_cfg["tol_reference_error"],
-    relaxation_factor=solver_cfg["relaxation_factor"],
-    is_with_artificial_damping=solver_cfg["artificial_damping"],
-    artificial_damping=(k2=solver_cfg["k2"], k4=solver_cfg["k4"]),
-    type_initial_gamma_distribution=getproperty(
-        VortexStepMethod,
-        Symbol(solver_cfg["type_initial_gamma_distribution"])),
-    use_gamma_prev=get(solver_cfg, "use_gamma_prev",
-        get(solver_cfg, "use_gamme_prev", true)),
-    core_radius_fraction=solver_cfg["core_radius_fraction"],
-    mu=solver_cfg["mu"],
-    is_only_f_and_gamma_output=get(
-        solver_cfg, "calc_only_f_and_gamma", false),
-    correct_aoa=get(solver_cfg, "correct_aoa", false),
-    reference_point=get(solver_cfg, "reference_point",
-        [0.422646, 0.0, 9.3667]),
-)
-
-PLOT && plot_polars(
-    [solver_loop],
-    [body_aero],
-    labels;
-    literature_path_list=literature_paths,
-    angle_range=range(-5, 20, step=1),
-    angle_type="angle_of_attack",
-    angle_of_attack=angle_of_attack_deg,
-    side_slip=sideslip_deg,
-    v_a=wind_speed,
-    title="LOOP solver",
-    show_moments=true,
-    save_path=OUTPUT_DIR,
-    is_save=false || SAVE_ALL,
-    is_show=true,
-    use_tex=USE_TEX
-)
-
 # --- Beta sweep ---
 PLOT && plot_polars(
-    [solver_loop],
-    [body_aero],
+    solvers,
+    bodies,
     beta_labels;
     literature_path_list=beta_literature_paths,
     angle_range=range(0, 12, step=1),

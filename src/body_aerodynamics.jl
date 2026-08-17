@@ -16,8 +16,11 @@ Main structure for calculating aerodynamic properties of bodies. Use the constru
 - `alpha_dist::MVector{P, Float64}` = zeros(Float64, P)
 - `v_a_dist::MVector{P, Float64}` = zeros(Float64, P)
 - `work_vectors`::NTuple{10, MVec3} = ntuple(_ -> zeros(MVec3), 10)
-- `AIC::Array{Float64, 3}` = zeros(P, P, 3): influence coefficients, component last so
-                        that each `AIC[:, :, k]` slice is a contiguous BLAS matrix
+- `AIC::Array{Float64, 3}` = zeros(P, P, 3): control-point influence coefficients, the
+                        matrix the circulation is solved against; component last so that
+                        each `AIC[:, :, k]` slice is a contiguous BLAS matrix
+- `AIC_aero_center::Array{Float64, 3}` = zeros(P, P, 3): aerodynamic-centre (LLT)
+                        influence coefficients, used only for the corrected angle of attack
 - `projected_area::Float64` = 1.0: The area projected onto the xy-plane of the kite body reference frame [m²]
 - `c_ref::Float64` = 1.0: Reference chord length (max panel chord) [m]
 - `y::MVector{P, Float64}` = MVector{P,Float64}(zeros(P))
@@ -37,6 +40,7 @@ Main structure for calculating aerodynamic properties of bodies. Use the constru
     v_a_dist::MVector{P, T} = zeros(MVector{P, T})
     work_vectors::NTuple{10, MVector{3, T}} = ntuple(_ -> zeros(MVector{3, T}), 10)
     AIC::Array{T, 3} = zeros(T, P, P, 3)
+    AIC_aero_center::Array{T, 3} = zeros(T, P, P, 3)
     projected_area::T = one(T)
     c_ref::T = one(T)
     y::MVector{P, T} = zeros(MVector{P, T})
@@ -117,6 +121,17 @@ function BodyAerodynamics(
     reinit!(body_aero; va, omega)
     return body_aero
 end
+
+"""
+    wing_span_flip(wing) -> Int8
+
+`-1` when `wing`'s sections run against its `spanwise_direction`, `+1` otherwise: the
+`flip` every panel of the wing is reinitialized with ([`reinit!`](@ref)). One answer per
+wing, so neighbouring panels cannot disagree and invert a single normal by 180°.
+"""
+wing_span_flip(wing) =
+    dot(first(wing.refined_sections).LE_point - last(wing.refined_sections).LE_point,
+        wing.spanwise_direction) < 0 ? Int8(-1) : Int8(1)
 
 function Base.getproperty(obj::BodyAerodynamics, sym::Symbol)
     if sym === :va
@@ -248,12 +263,13 @@ function reinit!(body_aero::BodyAerodynamics{P, W, T};
 ) where {P, W, T}
     idx = 1
     vec = zeros(MVector{3, T})
-    for wing in body_aero.wings
+    for (wing_idx, wing) in enumerate(body_aero.wings)
         reinit!(wing)
         validate_section_aero(wing.refined_sections)
         panel_props = wing.panel_props
         wing_init_aero = init_aero && !_can_skip_panel_aero_reinit(wing, body_aero.panels, idx)
-        
+        wing_flip = wing_span_flip(wing) == -1
+
         # Create panels
         for i in 1:wing.n_panels
             if length(wing.delta_dist) > 0
@@ -263,7 +279,7 @@ function reinit!(body_aero::BodyAerodynamics{P, W, T};
                 delta = zero(T)
             end
             @views reinit!(
-                body_aero.panels[idx], 
+                body_aero.panels[idx],
                 wing.refined_sections[i],
                 wing.refined_sections[i+1],
                 panel_props.aero_centers[i, :],
@@ -274,10 +290,10 @@ function reinit!(body_aero::BodyAerodynamics{P, W, T};
                 panel_props.y_airf[i, :],
                 panel_props.z_airf[i, :],
                 delta,
-                vec,
-                wing.spanwise_direction;
+                vec;
                 remove_nan=wing.remove_nan,
-                init_aero=wing_init_aero
+                init_aero=wing_init_aero,
+                flip=wing_flip
             )
             body_aero.panels[idx].crease_frac = wing.crease_frac
             idx += 1
@@ -370,7 +386,8 @@ Returns: nothing
 @inline function calculate_AIC_matrices!(body_aero::BodyAerodynamics{P, W, T}, model::Model,
                               core_radius_fraction,
                               va_norm_array::AbstractVector{T},
-                              va_unit_array::AbstractMatrix{T}) where {P, W, T}
+                              va_unit_array::AbstractMatrix{T},
+                              target::AbstractArray{T, 3}=body_aero.AIC) where {P, W, T}
     # Determine evaluation point based on model
     evaluation_point = model == VSM ? :control_point : :aero_center
     evaluation_point_on_bound = model == LLT
@@ -424,7 +441,7 @@ Returns: nothing
                 velocity_induced .-= U_2D
             end
             @inbounds for k in 1:3
-                body_aero.AIC[icp, jring, k] = velocity_induced[k]
+                target[icp, jring, k] = velocity_induced[k]
             end
         end
     end
@@ -482,11 +499,14 @@ function update_effective_angle_of_attack!(alpha_corrected,
     va_norm_array,
     va_unit_array)
 
-    calculate_AIC_matrices!(body_aero, LLT, core_radius_fraction, va_norm_array, va_unit_array)
+    # Its own buffer: `AIC` holds the control-point matrix the circulation was solved
+    # against, so overwriting it here would leave post-solve readers on the LLT one.
+    calculate_AIC_matrices!(body_aero, LLT, core_radius_fraction, va_norm_array,
+                            va_unit_array, body_aero.AIC_aero_center)
 
     induced_velocity = body_aero.cache[1][va_array]
     for k in 1:3
-        mul!(view(induced_velocity, :, k), view(body_aero.AIC, :, :, k), gamma)
+        mul!(view(induced_velocity, :, k), view(body_aero.AIC_aero_center, :, :, k), gamma)
     end
 
     # In-place relative velocity calculation

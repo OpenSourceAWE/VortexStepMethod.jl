@@ -21,6 +21,7 @@ calculate_relative_alpha_and_velocity
 calculate_relative_alpha_and_relative_velocity
 update_effective_angle_of_attack!
 calculate_stall_angle_list
+wing_span_flip
 calculate_circulation_distribution_elliptical_wing
 _compute_reference_velocity_from_distribution
 smooth_circulation!
@@ -44,7 +45,7 @@ update_panel_properties!
 build_interps
 panel_interp_types
 reinit!(wing::AbstractWing)
-reinit!(panel::Panel, section_1::Section, section_2::Section, aero_center, control_point, bound_point_1, bound_point_2, x_airf, y_airf, z_airf, delta, vec, spanwise_direction)
+reinit!(panel::Panel, section_1::Section, section_2::Section, aero_center, control_point, bound_point_1, bound_point_2, x_airf, y_airf, z_airf, delta, vec)
 rotated_te
 calculate_filaments_for_plotting
 ```
@@ -60,7 +61,9 @@ copy_sections_to_refined!
 _apply_refined_section_thetas!
 _panel_thetas_to_section_thetas!
 _interpolate_unrefined_to_refined
-_section_sort_key
+span_order_key
+normalize_span_order!
+can_reuse_prior_refined_surface_tables
 refine_mesh_for_linear_cosine_distribution!
 refine_mesh_by_splitting_provided_sections!
 refine_mesh_with_billowing!
@@ -176,6 +179,8 @@ center_to_com!
 airfoils_from_yaml
 write_geometry_yaml
 resolve_aero_geometry
+table_path_prefix
+prefix_table_paths!
 plot_airfoil_fit
 migrate_node_tables
 ```
@@ -185,6 +190,8 @@ migrate_node_tables
 CurrentModule = Base.get_extension(VortexStepMethod, :VortexStepMethodMakieExt)
 ```
 ```@docs
+display_named
+span_axis
 create_geometry_plot_makie
 plot_line_segment_makie!
 set_axes_equal_makie!

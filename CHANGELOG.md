@@ -7,6 +7,12 @@
   and `surfplan_to_aero_yaml`: `:csv` (default, readable) or `:arrow` (binary, ~40×
   faster to load and 2.6× smaller). `read_section_aero` detects the format from the
   file suffix, so a geometry YAML can reference either.
+- `geometry_path` keyword on `obj_to_yaml`, naming the geometry YAML itself
+  instead of always writing `output_dir/geometry.yaml`. Point it outside the
+  table directory and the emitted table references carry the path from the YAML's
+  directory to `output_dir`, which is what the geometry loader resolves them
+  against — so a generated dataset can keep its bulk in a subdirectory while the
+  geometry sits with the hand-written ones.
 - `convert_node_table` and `write_node_rows` rewrite a per-node table in the format
   the destination suffix names. `obj_to_yaml` migrates an existing dataset with
   them when `table_format` differs from what the directory holds, so a dataset
@@ -18,6 +24,32 @@
   instead of its own (`ZEROS`, `0.05`), and never said what `core_radius_fraction`
   measures. It now documents the `Solver` defaults and cites Damiani et al. (2019) for
   the 0.05 cut-off.
+- A remesh under `use_prior_polar` no longer resamples the refined sections'
+  `SectionAero` surface tables down to whatever unrefined sections survive it.
+  `compute_refined_section_interpolation!` reblended contour, `cp` and `cf` from the
+  unrefined sections unconditionally while `aero_data` was preserved, so a wing rebuilt
+  onto fewer structural stations kept full-resolution polars but lost the surface tables
+  pressure integration reads. The reblend is now skipped when the polars are preserved
+  and the refined sections already carry tables.
+
+- `obj_to_yaml` no longer places sections on a wingtip that has closed to a point.
+  `station_indices` spreads its targets over the stations that still have a chord,
+  so the outermost section lands on the last sliceable one. A V3 mesh sliced with
+  the default `wingtip_distance` used to put a zero-chord section at each tip,
+  whose polar was `NaN` and took the whole solve with it; working around it meant
+  guessing a `wingtip_distance` large enough to skip past the tip. That workaround
+  is no longer the default: `wingtip_distance` is now `0.0`, an inset on top of the
+  trim for meshes whose slices just short of the tip are still too thin to analyse.
+
+- Wing sections are normalized to `+y` to `-y` order on load (`normalize_span_order!`),
+  and by `refine!` for wings built through `add_section!`. Panel `y_airf` and `z_airf`
+  follow the order sections are stored in, so a geometry file written the other way
+  round inverted every panel normal, and a wing whose sections were replaced after its
+  panels were built (a structural remesh) inverted them mid-run, one panel at a time as
+  each crossed `spanwise_direction`. `obj_to_yaml` and `surfplan_to_aero_yaml` emit that
+  order too; files of either order keep loading the same.
+- Spanwise distribution plots put `+y` on the left, matching that order and the kite
+  seen from the front.
 
 ### Changed
 - `SolverSettings` now defaults to the same values as `Solver`: `core_radius_fraction`
@@ -40,6 +72,10 @@
 - `read_node_table` parses into a preallocated matrix instead of `reduce(vcat, …)`
   over a generator, which was quadratic in the row count: ~21× faster on a 16 MB
   surface table (2.49 s → 0.12 s), benefiting every existing dataset.
+- `is_show=true` draws into a window named after the plot title instead of into
+  whichever window the backend last used, so a script showing several plots gets
+  one window each and re-running it redraws them in place. `show_plot` takes the
+  window `name` as a keyword.
 
 ## VortexStepMethod v4.0.0 2026-08-03
 

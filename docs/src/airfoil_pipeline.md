@@ -100,9 +100,12 @@ For each unique airfoil id `j`, `obj_to_yaml` writes into `output_dir`:
 - `geometry.yaml` — `wing_sections` (leading/trailing-edge points) plus `wing_airfoils`
   (each section's `type` and the `.dat`/`.csv` paths above)
 
-A near-vanishing wingtip slice can shrink-wrap to an implausibly thick blob; such a
-degenerate section reuses its nearest valid neighbour's airfoil and polar while keeping its
-own edge positions, and a warning lists the reuse. All floats are rounded to millimetre
+A tip that tapers to a point has no airfoil to slice, so the outermost stations stop at
+the last slice that still has a chord; `wingtip_distance` moves them a further arc length
+inboard when the slices just short of the tip are still too thin to analyse. A
+near-vanishing slice that does get through can shrink-wrap to an implausibly thick blob;
+such a degenerate section reuses its nearest valid neighbour's airfoil and polar while
+keeping its own edge positions, and a warning lists the reuse. All floats are rounded to millimetre
 precision by the single [`write_yaml`](@ref VortexStepMethod.ObjAdapter.write_yaml) writer,
 so generated geometry files stay diff-friendly and consistent.
 

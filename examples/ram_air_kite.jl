@@ -44,8 +44,7 @@ alpha_range = -8:2:26
 delta_range = 0:1
 N_SECTIONS = 10
 
-# Inset the tip stations 10 cm along the leading edge so they avoid the near-zero-chord
-# wingtips, which slice to degenerate airfoils that XFoil cannot analyse.
+# At 0.0 XFoil only converges above 16 deg on the near-tip slice this mesh still has.
 WINGTIP_DISTANCE = 0.1
 
 # Shrink-wrap each raw slice into a clean closed airfoil: the distance-field wrap

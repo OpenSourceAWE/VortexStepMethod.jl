@@ -433,6 +433,60 @@ end
         @test wing_no_reuse.refined_sections[3].aero_data != no_reuse_baseline
     end
 
+    @testset "Surface tables across a coarsening remesh" begin
+        surface_table(scale) = VortexStepMethod.SectionAero(
+            deg2rad.([-5.0, 0.0, 5.0]), [0.0],
+            reshape(collect(range(0.0, 1.0; length=4)), 4, 1),
+            fill(0.05, 4, 1), fill(scale, 4, 3, 1), fill(0.1 * scale, 4, 3, 1))
+
+        alpha = deg2rad.([-5.0, 0.0, 5.0])
+        polar = (collect(alpha), [1.0, 1.2, 1.4], [0.1, 0.11, 0.12],
+                 [0.01, 0.02, 0.03])
+        span_ys = [1.0, 0.5, 0.0, -0.5, -1.0]
+        scales = [1.0, 2.0, 10.0, 4.0, 5.0]
+
+        function fine_wing(; use_prior_polar, tables=true)
+            wing = Wing(8; spanwise_distribution=LINEAR, use_prior_polar)
+            for (y, scale) in zip(span_ys, scales)
+                add_section!(wing, [0.0, y, 0.0], [1.0, y, 0.0], POLAR_VECTORS,
+                             polar, tables ? surface_table(scale) : nothing)
+            end
+            refine!(wing)
+            return wing
+        end
+
+        function keep_endpoints!(wing)
+            wing.unrefined_sections = [wing.unrefined_sections[1],
+                                       wing.unrefined_sections[end]]
+            wing.n_unrefined_sections = Int16(2)
+            refine!(wing; recompute_mapping=true, sort_sections=false)
+            return wing
+        end
+
+        peak(wing) = maximum(maximum(s.section_aero.cp)
+                             for s in wing.refined_sections)
+
+        wing = fine_wing(use_prior_polar=true)
+        baseline = [copy(s.section_aero.cp) for s in wing.refined_sections]
+        @test peak(wing) > 5.0
+
+        keep_endpoints!(wing)
+        @test [s.section_aero.cp for s in wing.refined_sections] == baseline
+        # Only the dropped mid section carries a cp above 5; blending the two
+        # surviving endpoints cannot reach one.
+        @test peak(wing) > 5.0
+
+        @test peak(keep_endpoints!(fine_wing(use_prior_polar=false))) <= 5.0 + 1e-9
+
+        bare = fine_wing(use_prior_polar=true, tables=false)
+        @test all(isnothing(s.section_aero) for s in bare.refined_sections)
+        for (section, scale) in zip(bare.unrefined_sections, scales)
+            section.section_aero = surface_table(scale)
+        end
+        refine!(bare; recompute_mapping=true, sort_sections=false)
+        @test all(!isnothing(s.section_aero) for s in bare.refined_sections)
+        @test peak(bare) > 5.0
+    end
 
     @testset "Refined panel mapping" begin
         # Test that refined panel mapping actually maps each panel to its closest unrefined panel
