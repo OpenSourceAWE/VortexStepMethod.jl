@@ -17,9 +17,17 @@
   `type_initial_gamma_distribution` and `core_radius_fraction` (`ELLIPTIC`, `1e-20`)
   instead of its own (`ZEROS`, `0.05`), and never said what `core_radius_fraction`
   measures. It now documents the `Solver` defaults and cites Damiani et al. (2019) for
-  the 0.05 cut-off. The two structs still disagree on both values.
+  the 0.05 cut-off.
 
 ### Changed
+- `SolverSettings` now defaults to the same values as `Solver`: `core_radius_fraction`
+  `1e-20` → `0.05` and `type_initial_gamma_distribution` `ELLIPTIC` → `ZEROS`. The 0.05
+  bound vortex core cut-off follows Damiani et al. (2019), "A Vortex Step Method for
+  Nonlinear Airfoil Polar Data as Implemented in KiteAeroDyn", and matches the upstream
+  `awegroup/Vortex-Step-Method` default; at `1e-20` the Biot-Savart singularity guard
+  never engaged. Coefficients are unchanged for well-separated geometry, since the guard
+  only triggers where a control point falls within 5% of a filament length of a bound
+  vortex, and every settings file shipped in `data/` sets both keys explicitly.
 - BREAKING: `BodyAerodynamics.AIC` is stored as `(n_panels, n_panels, 3)` instead of
   `(3, n_panels, n_panels)`, so each component slice `AIC[:, :, k]` is contiguous and
   the induced-velocity products reach BLAS `gemv` instead of the generic fallback.
