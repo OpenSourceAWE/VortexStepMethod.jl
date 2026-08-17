@@ -79,11 +79,11 @@ Solver configuration, used within [`VSMSettings`](@ref).
     (default `0.035`)
 - `type_initial_gamma_distribution`:
     [`ELLIPTIC`](@ref InitialGammaDistribution) or `ZEROS`
-    (default `ELLIPTIC`)
+    (default `ZEROS`)
 - `use_gamma_prev`: Reuse provided previous gamma as initial guess when
     available (default `true`)
-- `core_radius_fraction`: Vortex core radius fraction
-    (default `1e-20`)
+- `core_radius_fraction`: Bound vortex core cut-off, as a fraction of the filament
+    length, following Damiani et al. (2019) (default `0.05`)
 - `mu`: Dynamic viscosity (N*s/m^2) (default `1.81e-5`)
 - `calc_only_f_and_gamma`: Only output forces and circulation
     (default `false`)
@@ -104,9 +104,9 @@ Solver configuration, used within [`VSMSettings`](@ref).
     k4::Float64 = 0.0                       # artificial damping parameter
     is_with_artificial_viscosity::Bool = false  # Li/Gaunaa post-stall artificial viscosity
     artificial_viscosity_factor::Float64 = 0.035 # viscosity scaling coefficient k
-    type_initial_gamma_distribution::InitialGammaDistribution = ELLIPTIC # see: [InitialGammaDistribution](@ref)
+    type_initial_gamma_distribution::InitialGammaDistribution = ZEROS # see: [InitialGammaDistribution](@ref)
     use_gamma_prev::Bool = true             # if false, always reinitialize gamma from type_initial_gamma_distribution
-    core_radius_fraction::Float64 = 1e-20
+    core_radius_fraction::Float64 = 0.05
     mu::Float64 = 1.81e-5                   # dynamic viscosity [N·s/m²]
     calc_only_f_and_gamma::Bool=false       # whether to only output f and gamma
     correct_aoa::Bool=false                 # perform aoa correction

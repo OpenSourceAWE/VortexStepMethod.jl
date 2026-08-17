@@ -12,7 +12,31 @@
   them when `table_format` differs from what the directory holds, so a dataset
   changes format without re-running the airfoil solver that produced it.
 
+### Fixed
+- The `Solver` docstring quoted the `SolverSettings` defaults for
+  `type_initial_gamma_distribution` and `core_radius_fraction` (`ELLIPTIC`, `1e-20`)
+  instead of its own (`ZEROS`, `0.05`), and never said what `core_radius_fraction`
+  measures. It now documents the `Solver` defaults and cites Damiani et al. (2019) for
+  the 0.05 cut-off.
+
 ### Changed
+- `SolverSettings` now defaults to the same values as `Solver`: `core_radius_fraction`
+  `1e-20` → `0.05` and `type_initial_gamma_distribution` `ELLIPTIC` → `ZEROS`. The 0.05
+  bound vortex core cut-off follows Damiani et al. (2019), "A Vortex Step Method for
+  Nonlinear Airfoil Polar Data as Implemented in KiteAeroDyn", and matches the upstream
+  `awegroup/Vortex-Step-Method` default; at `1e-20` the Biot-Savart singularity guard
+  never engaged. Coefficients are unchanged for well-separated geometry, since the guard
+  only triggers where a control point falls within 5% of a filament length of a bound
+  vortex, and every settings file shipped in `data/` sets both keys explicitly.
+- `BodyAerodynamics.AIC` is stored as `(n_panels, n_panels, 3)` instead of
+  `(3, n_panels, n_panels)`, so each component slice `AIC[:, :, k]` is contiguous and
+  the induced-velocity products reach BLAS `gemv` instead of the generic fallback.
+  `solve!` is 3.1–5.3× faster (n=120, VSM: 26.1 ms → 4.9 ms inviscid, 21.1 ms →
+  6.0 ms with polars). Code reading `AIC[k, i, j]` must become `AIC[i, j, k]`.
+- The filament induced-velocity kernels reuse the `r0`/`length` each `BoundFilament`
+  already stores, take the core-radius cutoff from `|r1.r0|/|r0|` without forming the
+  perpendicular vector, and defer the cross products that only one branch reads. Output
+  is bit-identical; `solve!` is a further 1.47-1.55x faster.
 - `read_node_table` parses into a preallocated matrix instead of `reduce(vcat, …)`
   over a generator, which was quadratic in the row count: ~21× faster on a 16 MB
   surface table (2.49 s → 0.12 s), benefiting every existing dataset.
