@@ -714,7 +714,23 @@ function compute_panel_center_of_pressures(
 end
 
 """
-    calculate_results(body_aero::BodyAerodynamics, gamma_new, 
+    flow_curvature_cm(omega, panel, chord, v_rel)
+
+Quarter-chord moment increment of a section rotating about its own spanwise axis,
+from thin airfoil theory. The rotation makes the local incidence vary linearly
+along the chord, which is equivalent to parabolic camber and yields
+`Δcm = -(π/4) q̂` with `q̂ = q c / (2 v_rel)` and `q = ω ⋅ y_airf` positive
+nose-up. Independent of the pivot location; the lift response to `q` needs no
+correction because the inflow is already sampled at the three-quarter-chord
+control point.
+"""
+@inline function flow_curvature_cm(omega, panel, chord, v_rel)
+    v_rel > 0 || return zero(chord)
+    return -0.25π * dot3(omega, panel.y_airf) * chord / (2v_rel)
+end
+
+"""
+    calculate_results(body_aero::BodyAerodynamics, gamma_new,
                      density,
                      core_radius_fraction, mu,
                      alpha_dist, v_a_dist,
@@ -725,6 +741,9 @@ end
                      is_only_f_and_gamma_output::Bool)
 
 Calculate final aerodynamic results. Reference point is in the kite body (KB) frame.
+
+`flow_curvature` adds [`flow_curvature_cm`](@ref) to every section moment, read
+from `body_aero.omega`.
 
 Returns:
     Dict: Results including forces, coefficients and distributions
@@ -747,6 +766,7 @@ function calculate_results(
     panels::Vector{<:Panel},
     is_only_f_and_gamma_output::Bool;
     correct_aoa::Bool=false,
+    flow_curvature::Bool=false,
 )
 
     n_panels = length(panels)
@@ -775,6 +795,10 @@ function calculate_results(
         cl_array[i] = calculate_cl(panel, alpha_dist[i])
         cd_array[i], cm_array[i] = calculate_cd_cm(
             panel, alpha_dist[i])
+        if flow_curvature
+            cm_array[i] += flow_curvature_cm(
+                body_aero.omega, panel, chord_array[i], v_a_dist[i])
+        end
         panel_width_array[i] = panel.width
         va_norm = va_norm_array[i]
         x_norm = norm3(panel.x_airf)

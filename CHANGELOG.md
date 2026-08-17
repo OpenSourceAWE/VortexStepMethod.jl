@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- `flow_curvature` solver setting (default `false`). When enabled, each section
+  gets the thin-airfoil pitch-rate moment increment `Δcm = -(π/4) q̂` with
+  `q̂ = q c / (2 v_rel)` and `q = ω ⋅ y_airf`. A section rotating about its own
+  spanwise axis sees an incidence that varies linearly along the chord, which is
+  equivalent to parabolic camber and produces a quarter-chord moment that a
+  single control point cannot represent. The lift response to `q` was already
+  exact because the inflow is sampled at the three-quarter-chord point, so only
+  the moment was missing. Read from `body_aero.omega`, so it is only meaningful
+  after `set_va!(body_aero, va, omega)`; the matrix form of `set_va!` does not
+  set `omega`.
+
 ## VortexStepMethod v4.0.0 2026-08-03
 
 ### Added
