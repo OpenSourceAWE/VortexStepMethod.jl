@@ -19,7 +19,7 @@ end
     TE_z::Float64
 end
 
-_span_order_key(section::WingSectionData) = section.LE_y
+span_order_key(section::WingSectionData) = section.LE_y
 
 @with_kw struct WingAirfoilData
     airfoil_id::Int64
