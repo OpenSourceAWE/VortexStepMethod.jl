@@ -634,6 +634,10 @@ end
 
 Rotate each refined section's TE point around its LE point by the given per-section
 twist angle, using `wing.non_deformed_sections` as the reference geometry.
+
+The rotation is a full Rodrigues rotation about the spanwise axis. A swept or
+dihedral section has a chord component along that axis, and dropping the axial
+term would scale it by `cos(theta)`, shortening the chord and tilting it.
 """
 function _apply_refined_section_thetas!(wing::Wing{P, T}, section_thetas) where {P, T}
     local_y = zeros(MVector{3, T})
@@ -677,8 +681,10 @@ function _apply_refined_section_thetas!(wing::Wing{P, T}, section_thetas) where 
 
         chord .= section.TE_point .- le
         normal .= chord × local_y
+        axial = local_y ⋅ chord
         @. wing.refined_sections[i].TE_point = le +
-            cos(theta) * chord - sin(theta) * normal
+            cos(theta) * chord - sin(theta) * normal +
+            (1 - cos(theta)) * axial * local_y
     end
     return nothing
 end

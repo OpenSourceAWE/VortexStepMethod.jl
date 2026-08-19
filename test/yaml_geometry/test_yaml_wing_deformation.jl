@@ -271,4 +271,20 @@ using Test
         @test wing.refined_section_weight[1] ≈ 1.0
         @test wing.refined_section_weight[end] ≈ 0.0
     end
+
+    @testset "Twist rotates a swept chord rigidly" begin
+        # A swept or dihedral section's chord has a component along the twist
+        # axis, which only a full rotation carries through unchanged.
+        wing = Wing(8; n_unrefined_sections=3)
+        add_section!(wing, [0.0, 5.0, 1.0], [1.0, 4.6, 1.0], INVISCID)
+        add_section!(wing, [0.0, 0.0, 0.0], [1.0, 0.0, 0.0], INVISCID)
+        add_section!(wing, [0.0, -5.0, 1.0], [1.0, -4.6, 1.0], INVISCID)
+        refine!(wing)
+        chords = [norm(s.TE_point - s.LE_point) for s in wing.refined_sections]
+        for theta in (0.05, 0.2, 0.5)
+            VortexStepMethod.unrefined_deform!(wing, fill(theta, 3), nothing)
+            twisted = [norm(s.TE_point - s.LE_point) for s in wing.refined_sections]
+            @test maximum(abs.(twisted .- chords) ./ chords) < 1e-12
+        end
+    end
 end

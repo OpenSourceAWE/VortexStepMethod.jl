@@ -1,5 +1,13 @@
 # Changelog
 
+## VortexStepMethod v4.1.1 2026-08-19
+
+### Fixed
+- Section twist now rotates the chord fully about the spanwise axis. The axial
+  Rodrigues term was missing, so a swept or dihedral section's along-span chord
+  component was scaled by `cos(theta)`: the chord shortened and tilted out of the
+  twist plane, growing as `theta^2`.
+
 ## VortexStepMethod v4.1.0 2026-08-17
 
 ### Added
