@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+- Billowing now takes its rotation axis from the section pair itself instead of
+  projecting the leading-edge span vector on `spanwise_direction`. Sections run
+  `+y` to `-y`, so the pair already fixes the sign. The projection was decided by
+  3 % of the vector on a C-shaped kite's tip panels — 11 mm of span between the
+  outermost sections — so a deforming tip could flip that one panel's billow.
+
 ## VortexStepMethod v4.1.1 2026-08-19
 
 ### Fixed

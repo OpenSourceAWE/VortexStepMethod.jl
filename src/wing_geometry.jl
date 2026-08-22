@@ -1535,18 +1535,14 @@ function refine_mesh_by_splitting_provided_sections!(
             # Apply billowing by rotating chords around LE.
             if billowing_percentage > 0 && idx > start_idx
                 s_l = sections[li]; s_r = sections[li + 1]
-                if dot(s_l.LE_point - s_r.LE_point, wing.spanwise_direction) >= 0
-                    le_neg, le_pos = s_r.LE_point, s_l.LE_point
-                else
-                    le_neg, le_pos = s_l.LE_point, s_r.LE_point
-                end
-                diff_vec = le_pos - le_neg
+                # Sections run +y to -y, so the pair fixes the axis sign on its own.
+                diff_vec = s_l.LE_point - s_r.LE_point
                 span_len = norm(diff_vec)
                 y_hat = diff_vec / span_len
                 apply_billowing_to_pair!(
                     wing.refined_sections,
                     start_idx, idx - 1,
-                    y_hat, span_len, le_neg,
+                    y_hat, span_len, s_r.LE_point,
                     s_l.TE_point, s_r.TE_point,
                     billowing_percentage)
             end
