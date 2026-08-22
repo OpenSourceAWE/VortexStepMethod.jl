@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## VortexStepMethod v4.1.2 2026-08-22
 
 ### Fixed
 - Billowing now takes its rotation axis from the section pair itself instead of
