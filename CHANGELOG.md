@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+- The NeuralFoil surface pressure is now reconstructed from the predicted edge
+  velocities in arc length, not by interpolating `Cp` in chord fraction.
+  NeuralFoil samples at the cell centres of a uniform grid, so it reports nothing
+  over the first and last `1/2N` of chord; the old code extrapolated `Cp` off the
+  end of each surface independently. Through a stagnation point `ue` is linear in
+  arc length while `Cp` is quadratic, so that extrapolated a parabola through its
+  own turning point: on an SK100 section it put `Cp = -1.60` at the leading edge,
+  where it has to approach `+1`, and the two surfaces disagreed at the trailing
+  edge in violation of the Kutta condition. Signing the lower surface negative
+  makes both surfaces one continuous curve through stagnation, so the nose is
+  interpolated rather than extrapolated, and the trailing edge takes one speed for
+  both surfaces. Integrating that section's surface traction now recovers 98% of
+  NeuralFoil's own reported drag where it previously came out with the wrong sign.
+  `neuralfoil_section` returns `ue_upper`/`ue_lower` alongside the pressures.
+
 ## VortexStepMethod v4.2.0 2026-08-25
 
 ### Added

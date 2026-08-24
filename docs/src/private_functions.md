@@ -175,6 +175,10 @@ write_aero_matrix
 write_node_table
 flat_plate_cf
 neuralfoil_contour_solution
+contour_arc
+arc_at_chord
+trailing_edge_speed
+velocity_knots
 fill_node_nans!
 ```
 

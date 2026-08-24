@@ -365,8 +365,10 @@ Full NeuralFoil evaluation returning integrated coefficients and the surface
 pressure distribution reconstructed from the predicted edge-velocity ratios
 (`Cp = 1 - (ue/vinf)^2`) at NeuralFoil's `N` fixed station x/c.
 
-Returns `(; alpha, cl, cd, cm, confidence, x, cp_upper, cp_lower)`, with `x` of
-length `N` and `cp_upper`/`cp_lower` sized `N × n_alpha`.
+Returns `(; alpha, cl, cd, cm, confidence, x, cp_upper, cp_lower, ue_upper,
+ue_lower)`, with `x` of length `N` and the four matrices sized `N × n_alpha`. A
+reconstruction should interpolate `ue` and square afterwards: it is linear in arc
+length through a stagnation point, where `Cp` is quadratic.
 """
 function neuralfoil_section(params::KulfanParameters, alpha, Re;
                             model_size::String="large", weights_dir=nothing,
@@ -384,7 +386,9 @@ function neuralfoil_section(params::KulfanParameters, alpha, Re;
             confidence = Vector{Float64}(sigmoid.(y[1, :])),
             x = compute_optimal_x_points(N),
             cp_upper = Matrix{Float64}(1 .- upper_ue .^ 2),
-            cp_lower = Matrix{Float64}(1 .- lower_ue .^ 2))
+            cp_lower = Matrix{Float64}(1 .- lower_ue .^ 2),
+            ue_upper = Matrix{Float64}(upper_ue),
+            ue_lower = Matrix{Float64}(lower_ue))
 end
 
 """
