@@ -17,7 +17,6 @@ calculate_cl
 calculate_cd
 calculate_cm
 calculate_cd_cm
-flow_curvature_cm
 set_pitch_rate_dist!
 calculate_relative_alpha_and_velocity
 calculate_relative_alpha_and_relative_velocity
@@ -29,6 +28,27 @@ _compute_reference_velocity_from_distribution
 smooth_circulation!
 smooth_distribution!
 make_dual_shadow
+```
+
+### Panel aerodynamics
+The per-panel aerodynamics, written once as pure, branch-free functions of the
+section geometry and the flow. `SymbolicAWEModels` traces the same functions with
+symbolic arguments to build its equations, so both packages evaluate one
+definition of the physics.
+```@docs
+SMOOTH_FLOOR
+smooth_norm
+panel_span_vector
+panel_chord_weight
+panel_axes
+effective_alpha
+panel_inflow
+dynamic_pressure
+flow_curvature_cm
+panel_force_directions
+panel_moment
+panel_couple_force
+panel_loads
 ```
 
 ### Induced velocities

@@ -728,38 +728,6 @@ function compute_panel_center_of_pressures(
 end
 
 """
-    flow_curvature_cm(pitch_rate, chord, v_rel)
-
-Quarter-chord moment increment of a section rotating about its own spanwise axis,
-from thin airfoil theory. The rotation makes the local incidence vary linearly
-along the chord, which is equivalent to parabolic camber and yields
-`Δcm = -(π/4) q̂` with `q̂ = q c / (2 v_rel)` and `q` positive nose-up.
-Independent of the pivot location; the lift response to `q` needs no correction
-because the inflow is already sampled at the three-quarter-chord control point.
-"""
-@inline function flow_curvature_cm(pitch_rate, chord, v_rel)
-    v_rel > 0 || return zero(chord)
-    return -0.25π * pitch_rate * chord / (2v_rel)
-end
-
-"""
-    section_pitch_rate(velocity_leading, velocity_trailing, z_airf, chord)
-
-Rate at which a section rotates about its own spanwise axis, from the velocities
-of its leading and trailing edge. Positive nose-up, matching
-[`flow_curvature_cm`](@ref). Use this to build a `pitch_rate_dist` for
-[`set_va!`](@ref) from a deforming structure, where twist and flapping rates
-differ per section and no single body rate describes them.
-"""
-@inline function section_pitch_rate(velocity_leading, velocity_trailing,
-                                    z_airf, chord)
-    chord > 0 || return zero(chord)
-    normal_rate = dot3(velocity_trailing, z_airf) -
-                  dot3(velocity_leading, z_airf)
-    return -normal_rate / chord
-end
-
-"""
     set_pitch_rate_dist!(body_aero, omega)
 
 Fill `body_aero.pitch_rate_dist` from a rigid-body turn rate by projecting it
@@ -927,43 +895,26 @@ function calculate_results(
     cross3!(dir_side_ref, dir_lift_ref, va_ref_unit)
     q_ref = 0.5 * density * va_ref_mag^2
 
-    induced_va_airfoil = body_aero.work_vectors[4]
-    dir_lift_induced_va = body_aero.work_vectors[5]
-    dir_drag_induced_va = body_aero.work_vectors[6]
     lift_induced_va = body_aero.work_vectors[7]
     drag_induced_va = body_aero.work_vectors[8]
     dir_lift_prescribed_va = body_aero.work_vectors[9]
     temp_vec = body_aero.work_vectors[10]
+    spanwise_unit = SVector{3}(spanwise_direction)
 
     # Main calculation loop
     for (i, panel) in enumerate(panels)
         panel_area = panel.chord * panel.width
         area_all_panels += panel_area
 
-        alpha_corrected_i = alpha_corrected[i]
-        c_alpha = cos(alpha_corrected_i)
-        s_alpha = sin(alpha_corrected_i)
+        axes = panel_axes(panel)
+        dirs = panel_force_directions(axes, alpha_corrected[i], spanwise_unit)
+        loads = panel_loads(axes, dirs,
+            dynamic_pressure(density, density, v_a_dist[i]),
+            cl_array[i], cd_array[i], cm_array[i])
+        moment_i = loads.moment
         @inbounds for k in 1:3
-            induced_va_airfoil[k] = c_alpha * panel.x_airf[k] +
-                                    s_alpha * panel.z_airf[k]
-        end
-        normalize3!(induced_va_airfoil)
-
-        cross3!(dir_lift_induced_va,
-                induced_va_airfoil, panel.y_airf)
-        normalize3!(dir_lift_induced_va)
-        cross3!(dir_drag_induced_va,
-                spanwise_direction, dir_lift_induced_va)
-        normalize3!(dir_drag_induced_va)
-
-        q_lift = 0.5 * density * v_a_dist[i]^2
-        lift_i = cl_array[i] * q_lift * chord_array[i]
-        drag_i = cd_array[i] * q_lift * chord_array[i]
-        moment_i = cm_array[i] * q_lift * chord_array[i]^2
-
-        @inbounds for k in 1:3
-            lift_induced_va[k] = lift_i * dir_lift_induced_va[k]
-            drag_induced_va[k] = drag_i * dir_drag_induced_va[k]
+            lift_induced_va[k] = loads.lift * dirs.dir_lift[k]
+            drag_induced_va[k] = loads.drag * dirs.dir_drag[k]
         end
 
         va_panel_mag = va_norm_array[i]

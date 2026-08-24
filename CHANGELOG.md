@@ -1,5 +1,31 @@
 # Changelog
 
+## Unreleased
+
+### Added
+- Shared panel aerodynamics (`src/panel_aerodynamics.jl`): the per-panel physics
+  written once as pure, branch-free, number-type-generic functions of the section
+  geometry and the flow — `panel_axes`, `panel_inflow`, `panel_force_directions`,
+  `panel_loads` and the small helpers around them. `update_panel_properties!`,
+  `init_pos!`, `calc_forces!` and `calculate_results` now call them instead of
+  spelling the algebra out three times, and `SymbolicAWEModels` traces the same
+  functions with symbolic arguments to build its equations, so the two packages
+  can no longer drift apart. Panel geometry is unchanged bit for bit; forces,
+  moments and coefficients agree to within 1 ulp, the products having been
+  reassociated. `calc_forces!` stays zero-allocation.
+- `effective_alpha` and the `deficiency` argument of `panel_inflow` carry an
+  unsteady lag (a Wagner indicial deficiency) into the angle the polars are read
+  at, while the geometric angle still turns the force. Unused by the solver,
+  which has no unsteady state; it is shared so a symbolic consumer that does have
+  one reads the same definition.
+
+### Changed
+- `section_pitch_rate` gained a three-argument form taking the trailing minus
+  leading edge apparent wind directly. The four-argument form is unchanged.
+- Norms inside the shared panel aerodynamics are floored (`smooth_norm`) rather
+  than guarded by branches, so the expressions are differentiable and traceable.
+  The floor is `1e-12` m, which moves no reported quantity.
+
 ## VortexStepMethod v4.1.2 2026-08-22
 
 ### Fixed

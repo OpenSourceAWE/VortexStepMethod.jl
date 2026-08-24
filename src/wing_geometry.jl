@@ -147,6 +147,7 @@ Structure to hold calculated panel properties.
 - `x_airf`::Matrix{Float64}: Vector of unit vectors tangential to chord line
 - `y_airf`::Matrix{Float64}: Vector of unit vectors in spanwise direction
 - `z_airf`::Matrix{Float64}: Vector of unit vectors pointing up (cross of x_airf and y_airf)
+- `widths`::Vector{Float64}: Span width of each panel
 """
 @with_kw mutable struct PanelProperties{P, T}
     aero_centers::Matrix{T} = zeros(T, P, 3)
@@ -156,6 +157,7 @@ Structure to hold calculated panel properties.
     x_airf::Matrix{T} = zeros(T, P, 3)
     y_airf::Matrix{T} = zeros(T, P, 3)
     z_airf::Matrix{T} = zeros(T, P, 3)
+    widths::Vector{T} = zeros(T, P)
     coords::Matrix{T} = zeros(T, 2(P+1), 3)
 end
 
@@ -180,76 +182,47 @@ function update_panel_properties!(panel_props::PanelProperties{P,T}, section_lis
     x_airf = panel_props.x_airf
     y_airf = panel_props.y_airf
     z_airf = panel_props.z_airf
-    vec = zeros(MVector{3, T})
-    vec2 = zeros(MVector{3, T})
+    widths = panel_props.widths
     @debug "Shape of coordinates: $(size(coords))"
-    
+
     for i in 1:n_panels
         coords[2i-1, :] .= section_list[i].LE_point
         coords[2i, :]   .= section_list[i].TE_point
         coords[2i+1, :] .= section_list[i+1].LE_point
         coords[2i+2, :] .= section_list[i+1].TE_point
     end
-    
+
     @debug "Coordinates: $coords"
-    
+
+    point(row) = SVector{3, T}(coords[row, 1], coords[row, 2], coords[row, 3])
+    section_points(i) = (point(2i-1), point(2i), point(2i+1), point(2i+2))
+
     for i in 1:n_panels
-        # Define panel points
-        @views begin
-            LE_1 = coords[2i-1, :]     # LE_1
-            LE_2 = coords[2i+1, :]     # LE_2
-            TE_2 = coords[2i+2, :]     # TE_2
-            TE_1 = coords[2i, :]       # TE_1
-        end
-        
-        # Calculate control point position
-        @views @. vec = coords[2i-1, :] * 0.75 + coords[2i, :] * 0.25 - 
-            (coords[2i+1, :] * 0.75 + coords[2i+2, :] * 0.25)
-        di = norm(vec)
-        
-        ncp = if i == 1
-            @views @. vec = coords[2i+1, :] * 0.75 + coords[2i+2, :] * 0.25 - 
-                            (coords[2i+3, :] * 0.75 + coords[2i+4, :] * 0.25)
-            diplus = norm(vec)
-            di / (di + diplus)
+        widths[i] = smooth_norm(panel_span_vector(section_points(i)...))
+    end
+
+    for i in 1:n_panels
+        le_1, te_1, le_2, te_2 = section_points(i)
+        weight = if n_panels == 1
+            panel_chord_weight(nothing, widths[1], nothing)
+        elseif i == 1
+            panel_chord_weight(nothing, widths[1], widths[2])
         elseif i == n_panels
-            @views @. vec = coords[2i-3, :] * 0.75 + coords[2i-2, :] * 0.25 - 
-                            (coords[2i-1, :] * 0.75 + coords[2i, :] * 0.25)
-            dimin = norm(vec)
-            dimin / (dimin + di)
+            panel_chord_weight(widths[i-1], widths[i], nothing)
         else
-            @views @. vec = coords[2i-3, :] * 0.75 + coords[2i-2, :] * 0.25 - 
-                            (coords[2i-1, :] * 0.75 + coords[2i, :] * 0.25)
-            dimin = norm(vec)
-            @views @. vec = coords[2i+1, :] * 0.75 + coords[2i+2, :] * 0.25 - 
-                            (coords[2i+3, :] * 0.75 + coords[2i+4, :] * 0.25)
-            diplus = norm(vec)
-            0.25 * (dimin / (dimin + di) + di / (di + diplus) + 1)
+            panel_chord_weight(widths[i-1], widths[i], widths[i+1])
         end
-        ncp = 1 - ncp
-        
-        # Calculate points
-        @. begin
-            aero_centers[i, :] = (LE_2 * (1 - ncp) + LE_1 * ncp) * 0.75 +
-                    (TE_2 * (1 - ncp) + TE_1 * ncp) * 0.25        
-            control_points[i, :] = (LE_2 * (1 - ncp) + LE_1 * ncp) * 0.25 +
-                        (TE_2 * (1 - ncp) + TE_1 * ncp) * 0.75
-            
-            bound_points_1[i, :] = LE_1 * 0.75 + TE_1 * 0.25
-            bound_points_2[i, :] = LE_2 * 0.75 + TE_2 * 0.25
-        end
-        
-        # Calculate reference frame vectors
-        @views begin
-            @. vec = (control_points[i, :] - aero_centers[i, :])
-            @. vec2 = (LE_1 - LE_2)
-            vec .= vec × vec2 
-            z_airf[i, :] .= normalize(vec)
-            @. vec = control_points[i, :] .- aero_centers[i, :]
-            x_airf[i, :] .= normalize(vec)
-            @. vec = bound_points_1[i, :] - bound_points_2[i, :]
-            y_airf[i, :] .= normalize(vec)
-        end
+        axes = panel_axes(le_1, te_1, le_2, te_2, weight)
+
+        le_blend = weight .* le_1 .+ (1 - weight) .* le_2
+        te_blend = weight .* te_1 .+ (1 - weight) .* te_2
+        aero_centers[i, :] .= 0.75 .* le_blend .+ 0.25 .* te_blend
+        control_points[i, :] .= 0.25 .* le_blend .+ 0.75 .* te_blend
+        bound_points_1[i, :] .= 0.75 .* le_1 .+ 0.25 .* te_1
+        bound_points_2[i, :] .= 0.75 .* le_2 .+ 0.25 .* te_2
+        x_airf[i, :] .= axes.x_airf
+        y_airf[i, :] .= axes.y_airf
+        z_airf[i, :] .= axes.z_airf
     end
     return nothing
 end

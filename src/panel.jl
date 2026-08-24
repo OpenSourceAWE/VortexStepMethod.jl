@@ -100,16 +100,15 @@ function init_pos!(
     panel.LE_point_1 .= section_1.LE_point
     panel.TE_point_2 .= section_2.TE_point
     panel.LE_point_2 .= section_2.LE_point
-    panel.chord = (
-        norm(panel.TE_point_1 - panel.LE_point_1) +
-        norm(panel.TE_point_2 - panel.LE_point_2)
-    ) / 2
+    panel.chord = panel_chord(
+        SVector{3}(section_1.LE_point), SVector{3}(section_1.TE_point),
+        SVector{3}(section_2.LE_point), SVector{3}(section_2.TE_point))
     panel.corner_points[:, 1] = panel.LE_point_1
     panel.corner_points[:, 2] = panel.TE_point_1
     panel.corner_points[:, 3] = panel.TE_point_2
     panel.corner_points[:, 4] = panel.LE_point_2
     vec .= bound_point_2 .- bound_point_1
-    panel.width = norm(vec)
+    panel.width = smooth_norm(vec)
     reinit!(panel.filaments[1], bound_point_2, bound_point_1, vec)
     reinit!(panel.filaments[2], bound_point_1, panel.TE_point_1, vec)
     reinit!(panel.filaments[3], panel.TE_point_2, bound_point_2, vec)
@@ -269,6 +268,18 @@ end
 
 
 """
+    panel_axes(panel::Panel)
+
+The panel's stored airfoil frame and size in the shape [`panel_axes`](@ref)
+returns, so a panel built by the geometry pass feeds the same functions as one built
+straight from section points.
+"""
+@inline panel_axes(panel::Panel) =
+    (x_airf = SVector{3}(panel.x_airf), y_airf = SVector{3}(panel.y_airf),
+     z_airf = SVector{3}(panel.z_airf), chord = panel.chord,
+     width = panel.width)
+
+"""
     calculate_relative_alpha_and_relative_velocity(panel::Panel, induced_velocity::Vector{Float64})
 
 Calculate the relative angle of attack and relative velocity of the panel.
@@ -286,14 +297,8 @@ function calculate_relative_alpha_and_relative_velocity(
     panel::Panel{T},
     induced_velocity::AbstractVector{T}
 ) where T
-    # Calculate relative velocity and angle of attack
-    # Constants throughout iterations: panel.va, panel.x_airf, panel.y_airf
-    relative_velocity = panel.va .+ induced_velocity
-    v_normal = dot(panel.z_airf, relative_velocity)
-    v_tangential = dot(panel.x_airf, relative_velocity)
-    alpha = atan(v_normal, v_tangential)
-    
-    return alpha, relative_velocity
+    flow = panel_inflow(panel_axes(panel), panel.va, panel.va, induced_velocity)
+    return flow.alpha, flow.v_eff
 end
 
 """
@@ -302,11 +307,8 @@ end
 Calculate relative angle of attack and relative velocity of the panel.
 """
 function calculate_relative_alpha_and_velocity(panel::Panel, induced_velocity)
-    relative_velocity = panel.va + induced_velocity
-    v_normal = dot(panel.z_airf, relative_velocity)
-    v_tangential = dot(panel.x_airf, relative_velocity)
-    alpha = atan(v_normal, v_tangential)
-    return alpha, relative_velocity
+    flow = panel_inflow(panel_axes(panel), panel.va, panel.va, induced_velocity)
+    return flow.alpha, flow.v_eff
 end
 
 """
