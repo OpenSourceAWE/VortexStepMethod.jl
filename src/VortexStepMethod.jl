@@ -414,6 +414,7 @@ function help(url)
 end
 
 # Include core functionality
+include("panel_aerodynamics.jl")
 include("settings.jl")
 include("section_aero.jl")
 include("wing_geometry.jl")

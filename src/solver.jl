@@ -331,15 +331,9 @@ function calc_forces!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics;
 
     end
 
-    # create an alias for the three vertical output vectors
     lift = solver.sol.lift_dist
     drag = solver.sol.drag_dist
     panel_moment_dist = solver.sol.panel_moment_dist
-
-    # Compute using fused broadcasting (no intermediate allocations)
-    @. lift = cl_dist * 0.5 * density * v_a_dist^2 * solver.sol._chord_dist
-    @. drag = cd_dist * 0.5 * density * v_a_dist^2 * solver.sol._chord_dist
-    @. panel_moment_dist = cm_dist * 0.5 * density * v_a_dist^2 * solver.sol._chord_dist^2
 
     # Calculate alpha corrections based on model type
     if solver.correct_aoa && aerodynamic_model_type == VSM      # 64 bytes
@@ -369,76 +363,32 @@ function calc_forces!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics;
     projected_area = body_aero.projected_area
     c_ref = body_aero.c_ref
     
-    wv = body_aero.work_vectors
-    dir_iva = wv[1]
-    dir_lift = wv[2]
-    dir_drag = wv[3]
-    lift_va = wv[4]
-    drag_va = wv[5]
-    r_vec = wv[6]
-    f_tmp = wv[7]
-    cross_tmp = wv[8]
+    spanwise_unit = SVector{3, T}(spanwise_direction)
 
     for (i, panel) in enumerate(panels)
-
-        ### Lift and Drag ###
         panel_area = panel.chord * panel.width
         area_all_panels += panel_area
         panel_areas[i] = panel_area
 
-        # Calculate induced velocity direction
-        alpha_corrected_i = alpha_corrected[i]
-        c_alpha = cos(alpha_corrected_i)
-        s_alpha = sin(alpha_corrected_i)
-        @inbounds for k in 1:3
-            dir_iva[k] = c_alpha * panel.x_airf[k] +
-                         s_alpha * panel.z_airf[k]
-        end
-        normalize3!(dir_iva)
+        axes = panel_axes(panel)
+        dirs = panel_force_directions(axes, alpha_corrected[i], spanwise_unit)
+        loads = panel_loads(axes, dirs,
+            dynamic_pressure(density, density, v_a_dist[i]),
+            cl_dist[i], cd_dist[i], cm_dist[i])
+        lift[i] = loads.lift
+        drag[i] = loads.drag
+        panel_moment_dist[i] = loads.moment
 
-        # Calculate lift and drag directions
-        cross3!(dir_lift, dir_iva, panel.y_airf)
-        normalize3!(dir_lift)
-        cross3!(dir_drag, spanwise_direction, dir_lift)
-        normalize3!(dir_drag)
-
-        # Calculate force vectors
-        li = lift[i]
-        di = drag[i]
+        force = loads.force
+        arm_vec = SVector{3, T}(panel.aero_center) - SVector{3, T}(reference_point)
+        moment = loads.pitching_moment .* axes.y_airf .+ cross(arm_vec, force)
         @inbounds for k in 1:3
-            lift_va[k] = li * dir_lift[k]
-            drag_va[k] = di * dir_drag[k]
+            solver.sol.f_body_3D[k, i] = force[k]
+            solver.sol.m_body_3D[k, i] = moment[k]
         end
 
-        # Body frame forces
-        width = panel.width
-        @inbounds for k in 1:3
-            solver.sol.f_body_3D[k, i] = (lift_va[k] +
-                                          drag_va[k]) * width
-        end
-
-        # Calculate the moments
-        m_scale = panel_moment_dist[i] * width
-        @inbounds for k in 1:3
-            r_vec[k] = panel.aero_center[k] -
-                       reference_point[k]
-            f_tmp[k] = solver.sol.f_body_3D[k, i]
-        end
-        cross3!(cross_tmp, r_vec, f_tmp)
-        @inbounds for k in 1:3
-            solver.sol.m_body_3D[k, i] = m_scale *
-                panel.y_airf[k] + cross_tmp[k]
-        end
-
-        # Moment distribution (moment on each panel)
         arm = (moment_frac - 0.25) * panel.chord
-        ftotal_dot_z = 0.0
-        @inbounds for k in 1:3
-            ftotal_dot_z += (lift_va[k] + drag_va[k]) *
-                            panel.z_airf[k]
-        end
-        moment_dist[i] = (ftotal_dot_z * arm +
-                          panel_moment_dist[i]) * width
+        moment_dist[i] = dot(force, axes.z_airf) * arm + loads.pitching_moment
     end
 
     # Python parity: normalize with area-weighted reference velocity for distributed inflow.
