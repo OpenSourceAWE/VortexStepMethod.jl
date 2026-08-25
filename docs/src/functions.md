@@ -42,6 +42,8 @@ analyze_section
 analyze_sweep
 neuralfoil_aero
 deform_kulfan
+chord_residual
+chord_line
 control_point_deflection
 panel_kulfan_parameters
 refresh_live_polars!

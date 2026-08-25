@@ -250,6 +250,11 @@ polynomial's own value and slope there carry it on instead. That keeps a solve s
 outside the window convergent and honest about being extrapolated, rather than chasing a
 parabola to infinity; the caller's drift guard is what puts the fit back where the solve
 went. `window = 0` leaves the polynomial unbounded.
+
+The continuation is a straight line, so it says nothing about stall and can carry a
+coefficient somewhere physically impossible. [`calculate_cd`](@ref) therefore floors
+its result at zero: every other coefficient may be extrapolated, but a negative drag
+would feed energy into whatever reads it.
 """
 @inline function taylor_value(coeffs, delta_alpha, window)
     if window > 0 && abs(delta_alpha) > window
@@ -437,8 +442,11 @@ function calculate_cd(panel::Panel{Tp}, alpha::Ta, delta::Td) where {Tp, Ta, Td}
         end
         return R(evalpoly(rad2deg(alpha), panel.cd_coeffs))
     elseif panel.aero_model == TAYLOR
-        return R(taylor_value(panel.cd_coeffs, alpha - panel.alpha_ref,
-                              panel.alpha_window))
+        # A drag fit has its minimum inside the window, so the slope at the lower
+        # edge points down and the continuation would carry it through zero into a
+        # negative drag — an energy source, not an extrapolation.
+        return R(max(zero(R), taylor_value(panel.cd_coeffs, alpha - panel.alpha_ref,
+                                           panel.alpha_window)))
     elseif panel.aero_model in (POLAR_VECTORS, POLAR_MATRICES)
         cd_interp = panel.cd_interp
         cd_interp === nothing &&
