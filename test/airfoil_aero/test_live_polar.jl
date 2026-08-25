@@ -37,6 +37,20 @@ end
     slope = (calculate_cl(panel, window + 1e-7) - edge) / 1e-7
     inner = (edge - calculate_cl(panel, window - 1e-7)) / 1e-7
     @test slope ≈ inner rtol = 1e-4
+    # Drag is the exception: its fit has a minimum inside the window, so continuing
+    # the lower edge's slope would take it through zero. A negative drag coefficient
+    # is an energy source, and on the SK100 it drove the apparent wind from 12 to
+    # 21.8 m/s inside one step before the solve died.
+    drag = Panel{Float64}()
+    set_taylor_polar!(drag, 0.0, [0.5, 0.0, 0.0], [0.02, 0.4, 6.0],
+                      [-0.05, 0.0, 0.0]; window)
+    @test calculate_cd(drag, -0.5window) < calculate_cd(drag, 0.0)  # still falling
+    @test calculate_cd(drag, -window) >= 0.0
+    @test calculate_cd(drag, -4window) >= 0.0
+    @test calculate_cd(drag, -20window) >= 0.0
+    # Above the window the continuation is untouched, drag grows.
+    @test calculate_cd(drag, 4window) > calculate_cd(drag, window) > 0.0
+
     # And it stays linear rather than falling off with the parabola's arm, on both
     # sides: the unbounded quadratic would be 0.6 + 5·d − 20·d² far out.
     @test calculate_cl(panel, 4window) ≈ edge + slope * 3window rtol = 1e-5
@@ -68,6 +82,36 @@ end
           (base.upper_weights .- base.lower_weights)
 
     @test_throws ArgumentError deform_kulfan(basis, base, camber[1:end-1])
+end
+
+@testset "an unrepresentable chord line is removed, not projected" begin
+    basis = KulfanBasis()
+    base = KulfanParameters(fill(0.15, 8), fill(-0.05, 8), 0.0, 0.0)
+    camber = @. 0.02 * basis.x * (1 - basis.x)
+
+    # A deflection whose ends are off zero is a chord rotation and translation. The
+    # basis cannot hold either, and projecting one anyway used to answer a 2.5% chord
+    # deflection with weights four times the ones it was correcting.
+    tilted = camber .+ 0.03 .* basis.x .+ 0.01
+    offset, slope = chord_line(basis, tilted)
+    @test offset ≈ 0.01 atol = 1e-12
+    @test slope ≈ 0.03 atol = 1e-12
+    residual = chord_residual(basis, tilted)
+    @test residual ≈ camber atol = 1e-12
+    @test abs(residual[1]) < 1e-12 && abs(residual[end]) < 1e-12
+
+    # So the tilted deflection has to give the same airfoil as the pure camber, and
+    # weights of the order of the camber rather than of the tilt.
+    pure = deform_kulfan(basis, base, camber)
+    tilt = deform_kulfan(basis, base, tilted)
+    @test tilt.upper_weights ≈ pure.upper_weights
+    @test maximum(abs, tilt.upper_weights .- base.upper_weights) <
+          10 * maximum(abs, camber)
+
+    # A pure chord rotation is no shape change at all.
+    rotation = deform_kulfan(basis, base, 0.05 .* basis.x)
+    @test rotation.upper_weights ≈ base.upper_weights atol = 1e-12
+    @test rotation.lower_weights ≈ base.lower_weights atol = 1e-12
 end
 
 @testset "control point deflection" begin

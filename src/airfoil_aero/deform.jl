@@ -43,6 +43,12 @@ deflection to both surfaces, leaving the thickness distribution untouched; the
 four-argument form deforms the surfaces independently, which is what a double-skin
 membrane with its own upper and lower control points needs.
 
+Each deflection is first reduced to the part the basis can carry, see
+[`chord_residual`](@ref): the straight line through its own endpoints is a chord
+rotation and translation, which the basis cannot express and `pinv` answers with
+runaway weights. Take that line from [`chord_line`](@ref) if the frame the deflection
+was measured in has not already absorbed it.
+
 The leading-edge weight and the trailing-edge thickness are carried over unchanged:
 they are the two shape freedoms a chord-referenced deflection cannot resolve.
 """
@@ -55,9 +61,42 @@ function deform_kulfan(basis::KulfanBasis, base::KulfanParameters,
     (length(upper_deflection) == length(basis.x) &&
      length(lower_deflection) == length(basis.x)) || throw(ArgumentError(
         "Deflections must be sampled on the basis' $(length(basis.x)) stations."))
-    return KulfanParameters(base.upper_weights .+ basis.projection * upper_deflection,
-                            base.lower_weights .+ basis.projection * lower_deflection,
-                            base.leading_edge_weight, base.TE_thickness)
+    return KulfanParameters(
+        base.upper_weights .+ basis.projection * chord_residual(basis, upper_deflection),
+        base.lower_weights .+ basis.projection * chord_residual(basis, lower_deflection),
+        base.leading_edge_weight, base.TE_thickness)
+end
+
+"""
+    chord_residual(basis, deflection) -> Vector{Float64}
+    chord_line(basis, deflection) -> (offset, slope)
+
+The part of a deflection the CST basis can represent, and the part it cannot. `C(x)`
+vanishes at both chord ends, so the basis can put neither the leading nor the trailing
+edge off the chord line: a deflection that does not end at zero is asking for a chord
+**rotation and translation**, not a camber change. Projecting it anyway is not merely
+inexact, it is unstable — `pinv` answers an unrepresentable end displacement with
+weights an order of magnitude past the ones it is correcting, and the airfoil that
+comes back is not one.
+
+[`chord_residual`](@ref) removes the straight line through the deflection's own
+endpoints and returns what is left. [`chord_line`](@ref) returns that line as
+`(offset, slope)`, both over chord: `offset` moves the leading edge and `slope` is the
+chord rotation `atan(slope)` [rad] the caller owes its angle of attack, when the frame
+it measured the deflection in has not already absorbed it.
+"""
+function chord_residual(basis::KulfanBasis, deflection::AbstractVector)
+    offset, slope = chord_line(basis, deflection)
+    return deflection .- (offset .+ slope .* basis.x)
+end
+
+function chord_line(basis::KulfanBasis, deflection::AbstractVector)
+    length(deflection) == length(basis.x) || throw(ArgumentError(
+        "Deflection must be sampled on the basis' $(length(basis.x)) stations."))
+    span = basis.x[end] - basis.x[1]
+    abs(span) < eps() && return (deflection[1], 0.0)
+    slope = (deflection[end] - deflection[1]) / span
+    return (deflection[1] - slope * basis.x[1], slope)
 end
 
 deform_kulfan(basis::KulfanBasis, base::KulfanParameters,

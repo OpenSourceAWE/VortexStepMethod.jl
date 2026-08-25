@@ -33,6 +33,7 @@ export fit_kulfan_parameters, kulfan_to_coordinates
 export NeuralFoilModel, NeuralFoilResult, load_neuralfoil_model
 export neuralfoil_aero, neuralfoil_section
 export KulfanBasis, deform_kulfan, control_point_deflection
+export chord_residual, chord_line
 export LivePolarSettings, LivePolars, panel_kulfan_parameters
 export refresh_live_polars!, polar_drift
 export AbstractAirfoilSolver, XFoilSolver, NeuralFoilSolver
