@@ -35,7 +35,10 @@
   NeuralFoil at a few angles per panel in one batched forward pass and
   least-squares fit each panel's `TAYLOR` polar, so a chordwise deformation
   reaches the aerodynamics as a shape change rather than a flap angle.
-  `polar_drift` reports how far the solve has left the fit window.
+  `polar_drift` reports how far the solve has left the fit window, and past that
+  window a `TAYLOR` polar is continued linearly off its edge value and slope
+  rather than following the polynomial's diverging arms, so a solve that steps
+  outside still converges and is corrected by the next refit.
 - `prepare_inputs` accepts one Kulfan shape per case, so a whole wing goes
   through NeuralFoil in a single forward pass.
 - Shared panel aerodynamics (`src/panel_aerodynamics.jl`): the per-panel physics
