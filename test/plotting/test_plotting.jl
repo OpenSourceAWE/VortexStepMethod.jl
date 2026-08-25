@@ -521,6 +521,28 @@ end
     # In-place update refreshes the registered skin observables without error.
     @test_nowarn Makie.plot!(body_aero)
 
+    # Live polars: the skin has to draw the panel's stored deformed shape, not the
+    # tabulated contour, or a deformation bug is invisible in the picture.
+    basis = VortexStepMethod.AirfoilAero.KulfanBasis()
+    base = VortexStepMethod.KulfanParameters(fill(0.15, 8), fill(-0.05, 8), 0.0, 0.0)
+    cambered = VortexStepMethod.AirfoilAero.deform_kulfan(basis, base,
+        @. 0.08 * basis.x * (1 - basis.x))
+    for panel in body_aero.panels
+        VortexStepMethod.set_taylor_polar!(panel, 0.0, [0.5, 5.0, 0.0],
+            [0.02, 0.0, 0.0], [-0.05, 0.0, 0.0]; window=deg2rad(4), shape=cambered)
+    end
+    @test body_aero.panels[1].live_shape === cambered
+    v_live, f_live, ribs_live = airfoil_skin_geometry(body_aero)
+    live_nodes = length(VortexStepMethod.AirfoilAero.kulfan_to_coordinates(cambered)[1])
+    @test live_nodes != n_node                       # the two routes are distinguishable
+    @test all(rib -> length(rib) == live_nodes, ribs_live)
+    @test length(f_live) == 2 * (n_sections - 1) * (live_nodes - 1)
+    @test_nowarn Makie.plot!(Axis3(Figure()[1, 1]), body_aero; airfoils=true)
+    for panel in body_aero.panels
+        panel.live_shape = nothing
+    end
+    @test all(rib -> length(rib) == n_node, airfoil_skin_geometry(body_aero)[3])
+
     # A body without any surface aero yields no skin geometry, but still plots.
     plain_body = create_body_aero()
     v_plain, f_plain, ribs_plain = airfoil_skin_geometry(plain_body)
