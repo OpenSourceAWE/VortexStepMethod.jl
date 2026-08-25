@@ -37,9 +37,10 @@ end
     LivePolars(base; settings=LivePolarSettings(), n_stations=60)
 
 Live polar source for a wing whose panels each carry one undeformed airfoil in `base`.
-Holds the fixed CST basis, the per-panel expansion points and the scratch the refresh
-reuses, so a steady-state refresh allocates nothing beyond the network's own forward
-pass. Drive it with [`refresh_live_polars!`](@ref).
+Holds the fixed CST basis, the per-panel expansion points and the network input scratch.
+A refresh is dominated by the forward pass itself; the deformation is a matvec against
+the constant basis, about half a microsecond a panel. Drive it with
+[`refresh_live_polars!`](@ref).
 """
 mutable struct LivePolars
     "Sampling and fitting configuration."
