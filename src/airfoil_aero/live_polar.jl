@@ -81,15 +81,21 @@ end
     panel_kulfan_parameters(panels; delta=0.0) -> Vector{KulfanParameters}
 
 Fit the undeformed Kulfan parameters of every panel from the surface contour its
-`section_aero` carries, the starting point [`LivePolars`](@ref) deforms. Fitted once at
-build time, never inside the loop.
+`section_aero` carries, the starting point [`LivePolars`](@ref) deforms.
+
+The contour is [`shrink_wrap`](@ref)ped first, the same route the offline polar
+generator takes: fitting a raw slice directly returns weights that oscillate by an
+order of magnitude more than the deformation ever will, and neighbouring panels then
+disagree enough to cost the VSM solve its convergence. The wrap costs ~15 ms a panel,
+which is why this is done once at build time and never inside the loop.
 """
 function panel_kulfan_parameters(panels; delta=0.0)
     return map(panels) do panel
         panel.section_aero === nothing && throw(ArgumentError(
             "Live polars need a section_aero contour on every panel."))
         x, y, _, _ = section_surface(panel.section_aero, 0.0, delta)
-        fit_kulfan_parameters(collect(float.(x)), collect(float.(y)))
+        xw, yw = shrink_wrap(collect(float.(x)), collect(float.(y)), ShrinkWrap())
+        return fit_kulfan_parameters(xw, yw, LeastSquaresFit())
     end
 end
 
@@ -150,9 +156,10 @@ function refresh_live_polars!(live::LivePolars, panels, alpha_ref, reynolds;
     cl, cd, cm, confidence = decode_coefficients(fused_output(live.inputs, model))
 
     for i in 1:n_panels
-        window = ((i - 1) * n_samples + 1):(i * n_samples)
-        set_taylor_polar!(panels[i], alpha_vec[i], live.fit * cl[window],
-                          live.fit * cd[window], live.fit * cm[window])
+        samples = ((i - 1) * n_samples + 1):(i * n_samples)
+        set_taylor_polar!(panels[i], alpha_vec[i], live.fit * cl[samples],
+                          live.fit * cd[samples], live.fit * cm[samples];
+                          window=live.settings.half_window)
     end
     return minimum(confidence)
 end

@@ -37,6 +37,7 @@ Represents a panel in a vortex step method simulation. All points and vectors ar
 - `delta`::T=0: flap trailing-edge deflection [rad]
 - `crease_frac`::T=0: chordwise flap-hinge fraction (0–1); 0 disables the plate kink
 - `alpha_ref`::Float64=0: expansion point [rad] of the `TAYLOR` coefficients
+- `alpha_window`::Float64=0: half width [rad] the `TAYLOR` fit is valid over; 0 = unbounded
 """
 @with_kw mutable struct Panel{T, CL, CD, CM, SA}
     TE_point_1::MVector{3, T} = zeros(MVector{3, T})
@@ -72,6 +73,7 @@ Represents a panel in a vortex step method simulation. All points and vectors ar
     delta::T = zero(T)
     crease_frac::T = zero(T)
     alpha_ref::Float64 = 0.0
+    alpha_window::Float64 = 0.0
 end
 
 """
@@ -237,16 +239,41 @@ function init_aero!(panel::Panel, section_1::Section, section_2::Section;
 end
 
 """
-    set_taylor_polar!(panel, alpha_ref, cl_coeffs, cd_coeffs, cm_coeffs)
+    taylor_value(coeffs, delta_alpha, window)
 
-Overwrite a `TAYLOR` panel's local polar: the expansion point `alpha_ref` [rad] and the
-ascending coefficients of the polynomials in `α - alpha_ref`. Copies into the panel's
-existing coefficient vectors when the order is unchanged, so a live polar source can
-refit every solve without allocating. The panel's aero model is set to `TAYLOR`.
+A `TAYLOR` polar's coefficient at `delta_alpha = α - α_ref` [rad], continued linearly
+beyond `±window`. A local expansion's arms diverge fast outside the range it was fitted
+over — an order-2 fit is worse than useless a few degrees out — so past the edge the
+polynomial's own value and slope there carry it on instead. That keeps a solve stepping
+outside the window convergent and honest about being extrapolated, rather than chasing a
+parabola to infinity; the caller's drift guard is what puts the fit back where the solve
+went. `window = 0` leaves the polynomial unbounded.
 """
-function set_taylor_polar!(panel::Panel, alpha_ref, cl_coeffs, cd_coeffs, cm_coeffs)
+@inline function taylor_value(coeffs, delta_alpha, window)
+    if window > 0 && abs(delta_alpha) > window
+        edge = delta_alpha >= 0 ? window : -window
+        slope = sum((k - 1) * coeffs[k] * edge^(k - 2) for k in 2:length(coeffs);
+                    init = 0.0)
+        return evalpoly(edge, coeffs) + slope * (delta_alpha - edge)
+    end
+    return evalpoly(delta_alpha, coeffs)
+end
+
+"""
+    set_taylor_polar!(panel, alpha_ref, cl_coeffs, cd_coeffs, cm_coeffs; window=0.0)
+
+Overwrite a `TAYLOR` panel's local polar: the expansion point `alpha_ref` [rad], the
+ascending coefficients of the polynomials in `α - alpha_ref`, and the half width
+`window` [rad] the fit is valid over, past which it is continued linearly (see
+[`taylor_value`](@ref)). Copies into the panel's existing coefficient vectors when the
+order is unchanged, so a live polar source can refit every solve without allocating.
+The panel's aero model is set to `TAYLOR`.
+"""
+function set_taylor_polar!(panel::Panel, alpha_ref, cl_coeffs, cd_coeffs, cm_coeffs;
+                           window=0.0)
     panel.aero_model = TAYLOR
     panel.alpha_ref = Float64(alpha_ref)
+    panel.alpha_window = Float64(window)
     for (dst_sym, src) in ((:cl_coeffs, cl_coeffs), (:cd_coeffs, cd_coeffs),
                            (:cm_coeffs, cm_coeffs))
         dst = getfield(panel, dst_sym)
@@ -369,7 +396,8 @@ function calculate_cl(panel::Panel{Tp}, alpha::Ta, delta::Td) where {Tp, Ta, Td}
         end
         return R(cl)
     elseif panel.aero_model == TAYLOR
-        return R(evalpoly(alpha - panel.alpha_ref, panel.cl_coeffs))
+        return R(taylor_value(panel.cl_coeffs, alpha - panel.alpha_ref,
+                              panel.alpha_window))
     elseif panel.aero_model == INVISCID
         return R(2π * alpha)
     end
@@ -399,7 +427,8 @@ function calculate_cd(panel::Panel{Tp}, alpha::Ta, delta::Td) where {Tp, Ta, Td}
         end
         return R(evalpoly(rad2deg(alpha), panel.cd_coeffs))
     elseif panel.aero_model == TAYLOR
-        return R(evalpoly(alpha - panel.alpha_ref, panel.cd_coeffs))
+        return R(taylor_value(panel.cd_coeffs, alpha - panel.alpha_ref,
+                              panel.alpha_window))
     elseif panel.aero_model in (POLAR_VECTORS, POLAR_MATRICES)
         cd_interp = panel.cd_interp
         cd_interp === nothing &&
@@ -427,7 +456,8 @@ function calculate_cm(panel::Panel{Tp}, alpha::Ta, delta::Td) where {Tp, Ta, Td}
     if panel.aero_model == POLY
         return R(evalpoly(rad2deg(alpha), panel.cm_coeffs))
     elseif panel.aero_model == TAYLOR
-        return R(evalpoly(alpha - panel.alpha_ref, panel.cm_coeffs))
+        return R(taylor_value(panel.cm_coeffs, alpha - panel.alpha_ref,
+                              panel.alpha_window))
     elseif panel.aero_model in (POLAR_VECTORS, POLAR_MATRICES)
         cm_interp = panel.cm_interp
         cm_interp === nothing &&

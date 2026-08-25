@@ -25,6 +25,27 @@ using VortexStepMethod: Panel, calculate_cl, calculate_cd, calculate_cm,
     @test panel.cl_coeffs === coeffs  # same order refits in place
 end
 
+@testset "TAYLOR window is continued linearly" begin
+    window = deg2rad(4.0)
+    panel = Panel{Float64}()
+    set_taylor_polar!(panel, 0.0, [0.6, 5.0, -20.0], [0.02, 0.0, 0.0],
+                      [-0.1, 0.0, 0.0]; window)
+    # Inside the window the polynomial is untouched.
+    @test calculate_cl(panel, 0.5window) ≈ 0.6 + 5.0 * 0.5window - 20.0 * (0.5window)^2
+    # At the edge value and slope match, so the continuation is smooth.
+    edge = calculate_cl(panel, window)
+    slope = (calculate_cl(panel, window + 1e-7) - edge) / 1e-7
+    inner = (edge - calculate_cl(panel, window - 1e-7)) / 1e-7
+    @test slope ≈ inner rtol = 1e-4
+    # And it stays linear rather than falling off with the parabola's arm, on both
+    # sides: the unbounded quadratic would be 0.6 + 5·d − 20·d² far out.
+    @test calculate_cl(panel, 4window) ≈ edge + slope * 3window rtol = 1e-5
+    lower_edge = calculate_cl(panel, -window)
+    lower_slope = 5.0 - 2 * 20.0 * (-window)
+    @test calculate_cl(panel, -4window) ≈ lower_edge - lower_slope * 3window rtol = 1e-5
+    @test calculate_cl(panel, 4window) > 0.6 + 5.0 * 4window - 20.0 * (4window)^2
+end
+
 @testset "Kulfan deformation" begin
     basis = KulfanBasis()
     base = KulfanParameters(fill(0.15, 8), fill(-0.05, 8), 0.0, 0.0)
