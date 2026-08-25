@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## VortexStepMethod v4.2.0 2026-08-25
 
 ### Added
 - Shared panel aerodynamics (`src/panel_aerodynamics.jl`): the per-panel physics
