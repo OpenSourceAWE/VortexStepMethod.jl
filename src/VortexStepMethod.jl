@@ -37,6 +37,7 @@ export MVec3
 
 export LLT, Model, VSM
 export AeroModel, INVISCID, POLY, LEI_AIRFOIL_BREUKELS, POLAR_MATRICES, POLAR_VECTORS, TAYLOR
+export KulfanParameters
 export BILLOWING, COSINE, LINEAR, PanelDistribution, SPLIT_PROVIDED, UNCHANGED
 export ELLIPTIC, InitialGammaDistribution, ZEROS
 export FAILURE, FEASIBLE, INFEASIBLE, SolverStatus

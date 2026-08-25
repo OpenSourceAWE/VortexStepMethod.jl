@@ -230,6 +230,7 @@ map_airfoil_3d
 fitted_airfoil_3d
 generated_slices
 airfoil_skin_geometry
+panel_contour
 panel_normal
 plate_hinge_local
 panel_plate_geometry

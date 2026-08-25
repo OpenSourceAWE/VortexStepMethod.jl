@@ -149,15 +149,34 @@ end
 """
     airfoil_skin_geometry(body; R_b_w=nothing, T_b_w=nothing) -> (vertices, faces, ribs)
 
-Lofted airfoil skin of a `BodyAerodynamics`: each section's deflected contour
-(`section_surface` at the panel's `delta`) is fitted between the panel's `corner_points`
-by a 2D similarity, TE pinned so a deflection bulges the fore body up. The skin reflects
-`delta` only when the geometry carries per-`delta` slices (`obj_to_yaml` with a
-`delta_range`); with δ=0-only data it renders undeflected, a deliberate cue that the
-deflected slices are missing. Transformed to world by `R_b_w`/`T_b_w`.
+Lofted airfoil skin of a `BodyAerodynamics`: each section's contour is fitted between
+the panel's `corner_points` by a 2D similarity, TE pinned so a deflection bulges the
+fore body up.
+
+The contour is the panel's own `live_shape` when it has one — the very
+[`KulfanParameters`](@ref) object the live polar source deformed and handed to the
+airfoil solver, not a re-derivation of it, so a deformation bug shows up in the picture
+instead of being papered over. Otherwise it is `section_surface` at the panel's `delta`,
+which reflects `delta` only when the geometry carries per-`delta` slices (`obj_to_yaml`
+with a `delta_range`); with δ=0-only data it renders undeflected, a deliberate cue that
+the deflected slices are missing. Transformed to world by `R_b_w`/`T_b_w`.
 `vertices`/`faces` triangulate the skin between consecutive equal-node sections; `ribs` is
 one closed contour polyline per section. Sections without contour data are skipped.
 """
+"""
+    panel_contour(panel, section) -> (x, y)
+
+The airfoil contour to draw a panel with: coordinates of its `live_shape` when a live
+polar source has put one there, else the section's tabulated contour at the panel's
+`delta`. The live branch reads the stored shape object itself, so what is drawn is what
+was flown.
+"""
+function panel_contour(panel, section)
+    shape = panel.live_shape
+    isnothing(shape) || return VortexStepMethod.AirfoilAero.kulfan_to_coordinates(shape)
+    return VortexStepMethod.section_surface(section.section_aero, 0.0, panel.delta)[1:2]
+end
+
 function airfoil_skin_geometry(body; R_b_w=nothing, T_b_w=nothing)
     to_world(p) = (isnothing(R_b_w) || isnothing(T_b_w)) ? Point3f(p) :
         Point3f(R_b_w * p + T_b_w)
@@ -169,10 +188,10 @@ function airfoil_skin_geometry(body; R_b_w=nothing, T_b_w=nothing)
         n_panels = n - 1
         n_panels < 1 && continue
         for (i, section) in enumerate(sections)
-            isnothing(section.section_aero) && continue
             panel_idx = panel_offset + min(i, n_panels)
             panel_idx <= length(body.panels) || continue
             panel = body.panels[panel_idx]
+            (isnothing(section.section_aero) && isnothing(panel.live_shape)) && continue
             corners = panel.corner_points
             corner1 = Point3f(corners[:, 1]); corner3 = Point3f(corners[:, 3])
             corner2 = Point3f(corners[:, 2]); corner4 = Point3f(corners[:, 4])
@@ -183,8 +202,7 @@ function airfoil_skin_geometry(body; R_b_w=nothing, T_b_w=nothing)
             chord_len = norm(chord)
             chord_len < 1e-9 && continue
             up = panel_normal(panel)
-            xs, ys, _, _ = VortexStepMethod.section_surface(section.section_aero,
-                                                            0.0, panel.delta)
+            xs, ys = panel_contour(panel, section)
             le_i = argmin(xs)
             le_x = xs[le_i]; le_y = ys[le_i]
             te_x = 0.5 * (xs[1] + xs[end]); te_y = 0.5 * (ys[1] + ys[end])

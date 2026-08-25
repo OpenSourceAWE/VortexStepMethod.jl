@@ -7,6 +7,7 @@ CurrentModule = VortexStepMethod
 ### Wing Geometry, Panel and Aerodynamics
 ```@docs
 Panel
+KulfanParameters
 PanelProperties
 Filament
 BoundFilament
@@ -23,7 +24,6 @@ LEI_AIRFOIL_BREUKELS
 CurrentModule = VortexStepMethod.AirfoilAero
 ```
 ```@docs
-KulfanParameters
 KulfanBasis
 LivePolarSettings
 LivePolars

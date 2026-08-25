@@ -41,6 +41,12 @@
   outside still converges and is corrected by the next refit.
 - `prepare_inputs` accepts one Kulfan shape per case, so a whole wing goes
   through NeuralFoil in a single forward pass.
+- A panel carries the deformed airfoil its polar was generated from as
+  `live_shape`, and the Makie lofted-airfoil skin draws that object rather than
+  the tabulated `delta` contour when it is there. It is the shape the solver was
+  handed, not a re-derivation, so a deformation bug is visible in the picture.
+  `KulfanParameters` moved from `AirfoilAero` into the core module for it; it is
+  still exported from both.
 - Shared panel aerodynamics (`src/panel_aerodynamics.jl`): the per-panel physics
   written once as pure, branch-free, number-type-generic functions of the section
   geometry and the flow — `panel_axes`, `panel_inflow`, `panel_force_directions`,

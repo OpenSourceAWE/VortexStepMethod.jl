@@ -110,6 +110,15 @@ end
                          deflection=fill(camber, n_panels))
     @test calculate_cl(panels[1], deg2rad(6.0)) > flat
 
+    # The panel keeps the object that was sampled, not a copy of it: a plot of
+    # live_shape has to be a picture of what the solve flew.
+    @test panels[1].live_shape === live.deformed[1]
+    @test panels[1].live_shape.upper_weights !=
+          live.base[1].upper_weights           # the deformation reached it
+    refresh_live_polars!(live, panels, deg2rad(6.0), 3e6)
+    @test panels[1].live_shape === live.deformed[1]
+    @test panels[1].live_shape.upper_weights ≈ live.base[1].upper_weights
+
     @test_throws ArgumentError refresh_live_polars!(live, panels[1:2], 0.0, 3e6)
     @test_throws ArgumentError LivePolars(fill(base, 2);
         settings=LivePolarSettings(; order=4, n_samples=3))
