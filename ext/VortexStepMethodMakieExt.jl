@@ -147,6 +147,20 @@ function Makie.plot!(ax, panel::VortexStepMethod.Panel; color=(:red, 0.2), R_b_w
 end
 
 """
+    panel_contour(panel, section) -> (x, y)
+
+The airfoil contour to draw a panel with: coordinates of its `live_shape` when a live
+polar source has put one there, else the section's tabulated contour at the panel's
+`delta`. The live branch reads the stored shape object itself, so what is drawn is what
+was flown.
+"""
+function panel_contour(panel, section)
+    shape = panel.live_shape
+    isnothing(shape) || return VortexStepMethod.AirfoilAero.kulfan_to_coordinates(shape)
+    return VortexStepMethod.section_surface(section.section_aero, 0.0, panel.delta)[1:2]
+end
+
+"""
     airfoil_skin_geometry(body; R_b_w=nothing, T_b_w=nothing) -> (vertices, faces, ribs)
 
 Lofted airfoil skin of a `BodyAerodynamics`: each section's contour is fitted between
@@ -163,20 +177,6 @@ the deflected slices are missing. Transformed to world by `R_b_w`/`T_b_w`.
 `vertices`/`faces` triangulate the skin between consecutive equal-node sections; `ribs` is
 one closed contour polyline per section. Sections without contour data are skipped.
 """
-"""
-    panel_contour(panel, section) -> (x, y)
-
-The airfoil contour to draw a panel with: coordinates of its `live_shape` when a live
-polar source has put one there, else the section's tabulated contour at the panel's
-`delta`. The live branch reads the stored shape object itself, so what is drawn is what
-was flown.
-"""
-function panel_contour(panel, section)
-    shape = panel.live_shape
-    isnothing(shape) || return VortexStepMethod.AirfoilAero.kulfan_to_coordinates(shape)
-    return VortexStepMethod.section_surface(section.section_aero, 0.0, panel.delta)[1:2]
-end
-
 function airfoil_skin_geometry(body; R_b_w=nothing, T_b_w=nothing)
     to_world(p) = (isnothing(R_b_w) || isnothing(T_b_w)) ? Point3f(p) :
         Point3f(R_b_w * p + T_b_w)
