@@ -224,6 +224,13 @@ function calculate_stall_angle_list!(stall_angles::AbstractVector,
         # Default stall angle if none found
         panel_stall = stall_angle_if_none_detected
 
+        # A local expansion says nothing outside its fit window, so its curvature must
+        # not be read as a stall peak far from the operating point.
+        if panel.aero_model == TAYLOR
+            stall_angles[idx] = panel_stall
+            continue
+        end
+
         # Start with minimum cl
         cl_old = cl_initial
 

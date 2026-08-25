@@ -36,6 +36,7 @@ Represents a panel in a vortex step method simulation. All points and vectors ar
     ): Panel filaments, see: [BoundFilament](@ref)
 - `delta`::T=0: flap trailing-edge deflection [rad]
 - `crease_frac`::T=0: chordwise flap-hinge fraction (0–1); 0 disables the plate kink
+- `alpha_ref`::Float64=0: expansion point [rad] of the `TAYLOR` coefficients
 """
 @with_kw mutable struct Panel{T, CL, CD, CM, SA}
     TE_point_1::MVector{3, T} = zeros(MVector{3, T})
@@ -70,6 +71,7 @@ Represents a panel in a vortex step method simulation. All points and vectors ar
     )
     delta::T = zero(T)
     crease_frac::T = zero(T)
+    alpha_ref::Float64 = 0.0
 end
 
 """
@@ -216,11 +218,44 @@ function init_aero!(panel::Panel, section_1::Section, section_2::Section;
         panel.cl_coeffs = (c1[1] .+ c2[1]) ./ 2
         panel.cd_coeffs = (c1[2] .+ c2[2]) ./ 2
         panel.cm_coeffs = (c1[3] .+ c2[3]) ./ 2
+    elseif panel.aero_model == TAYLOR
+        c1, c2 = section_1.aero_data, section_2.aero_data
+        (c1 isa Tuple{Float64, Vector{Float64}, Vector{Float64}, Vector{Float64}} &&
+         c2 isa Tuple{Float64, Vector{Float64}, Vector{Float64}, Vector{Float64}}) ||
+            throw(ArgumentError("TAYLOR requires aero_data = " *
+                "(alpha_ref, cl_coeffs, cd_coeffs, cm_coeffs)."))
+        all(length.(c1[2:4]) .== length.(c2[2:4])) ||
+            throw(ArgumentError("TAYLOR coefficient vectors must have equal length."))
+        set_taylor_polar!(panel, (c1[1] + c2[1]) / 2, (c1[2] .+ c2[2]) ./ 2,
+                          (c1[3] .+ c2[3]) ./ 2, (c1[4] .+ c2[4]) ./ 2)
     elseif !(panel.aero_model in (POLAR_VECTORS, POLAR_MATRICES, INVISCID))
         throw(ArgumentError("Unsupported aero model: $(panel.aero_model)"))
     end
     panel.cl_interp, panel.cd_interp, panel.cm_interp, panel.section_aero =
         build_interps(section_1, section_2, remove_nan)
+    return nothing
+end
+
+"""
+    set_taylor_polar!(panel, alpha_ref, cl_coeffs, cd_coeffs, cm_coeffs)
+
+Overwrite a `TAYLOR` panel's local polar: the expansion point `alpha_ref` [rad] and the
+ascending coefficients of the polynomials in `α - alpha_ref`. Copies into the panel's
+existing coefficient vectors when the order is unchanged, so a live polar source can
+refit every solve without allocating. The panel's aero model is set to `TAYLOR`.
+"""
+function set_taylor_polar!(panel::Panel, alpha_ref, cl_coeffs, cd_coeffs, cm_coeffs)
+    panel.aero_model = TAYLOR
+    panel.alpha_ref = Float64(alpha_ref)
+    for (dst_sym, src) in ((:cl_coeffs, cl_coeffs), (:cd_coeffs, cd_coeffs),
+                           (:cm_coeffs, cm_coeffs))
+        dst = getfield(panel, dst_sym)
+        if length(dst) == length(src)
+            dst .= src
+        else
+            setfield!(panel, dst_sym, Vector{Float64}(src))
+        end
+    end
     return nothing
 end
 
@@ -333,6 +368,8 @@ function calculate_cl(panel::Panel{Tp}, alpha::Ta, delta::Td) where {Tp, Ta, Td}
             cl = 2 * cos(alpha) * sin(alpha)^2
         end
         return R(cl)
+    elseif panel.aero_model == TAYLOR
+        return R(evalpoly(alpha - panel.alpha_ref, panel.cl_coeffs))
     elseif panel.aero_model == INVISCID
         return R(2π * alpha)
     end
@@ -361,6 +398,8 @@ function calculate_cd(panel::Panel{Tp}, alpha::Ta, delta::Td) where {Tp, Ta, Td}
             return R(2 * sin(alpha)^3)
         end
         return R(evalpoly(rad2deg(alpha), panel.cd_coeffs))
+    elseif panel.aero_model == TAYLOR
+        return R(evalpoly(alpha - panel.alpha_ref, panel.cd_coeffs))
     elseif panel.aero_model in (POLAR_VECTORS, POLAR_MATRICES)
         cd_interp = panel.cd_interp
         cd_interp === nothing &&
@@ -387,6 +426,8 @@ function calculate_cm(panel::Panel{Tp}, alpha::Ta, delta::Td) where {Tp, Ta, Td}
     isnan(alpha) && return R(NaN)
     if panel.aero_model == POLY
         return R(evalpoly(rad2deg(alpha), panel.cm_coeffs))
+    elseif panel.aero_model == TAYLOR
+        return R(evalpoly(alpha - panel.alpha_ref, panel.cm_coeffs))
     elseif panel.aero_model in (POLAR_VECTORS, POLAR_MATRICES)
         cm_interp = panel.cm_interp
         cm_interp === nothing &&

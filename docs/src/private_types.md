@@ -24,6 +24,9 @@ CurrentModule = VortexStepMethod.AirfoilAero
 ```
 ```@docs
 KulfanParameters
+KulfanBasis
+LivePolarSettings
+LivePolars
 NeuralFoilModel
 NeuralFoilResult
 ```

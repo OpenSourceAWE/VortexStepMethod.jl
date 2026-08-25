@@ -166,10 +166,39 @@ function squared_mahalanobis_distance(x::AbstractMatrix, model::NeuralFoilModel)
 end
 
 """
+    fill_case_input!(x, case, params::KulfanParameters, alpha_deg, Re, n_crit,
+                     xtr_upper, xtr_lower)
+
+Write one NeuralFoil input column: rows 1–18 the Kulfan shape, rows 19–25 the flow
+condition (`alpha_deg` in degrees). The single point where the network's input layout
+is defined, shared by every `prepare_inputs` method.
+"""
+function fill_case_input!(x::AbstractMatrix, case::Int, params::KulfanParameters,
+                          alpha_deg, Re, n_crit, xtr_upper, xtr_lower)
+    for i in 1:8
+        x[i, case] = params.upper_weights[i]
+        x[8 + i, case] = params.lower_weights[i]
+    end
+    x[17, case] = params.leading_edge_weight
+    x[18, case] = params.TE_thickness * 50  # Scale factor from NeuralFoil
+    x[19, case] = sind(2 * alpha_deg)
+    x[20, case] = cosd(alpha_deg)
+    x[21, case] = 1 - cosd(alpha_deg)^2
+    x[22, case] = (log(Re) - 12.5) / 3.5
+    x[23, case] = (n_crit - 9) / 4.5
+    x[24, case] = xtr_upper
+    x[25, case] = xtr_lower
+    return nothing
+end
+
+"""
     prepare_inputs(params::KulfanParameters, alpha, Re;
                    n_crit=9.0, xtr_upper=1.0, xtr_lower=1.0)
+    prepare_inputs(params::AbstractVector{KulfanParameters}, alpha, Re; kwargs...)
 
-Prepare neural network inputs from Kulfan parameters and flow conditions.
+Prepare neural network inputs from Kulfan parameters and flow conditions. The vector
+form takes one shape per case, so a whole wing's panels go through the network in a
+single forward pass.
 
 # Arguments
 - `params`: Kulfan CST parameters
@@ -184,39 +213,27 @@ Prepare neural network inputs from Kulfan parameters and flow conditions.
 """
 function prepare_inputs(params::KulfanParameters, alpha, Re;
                         n_crit=9.0, xtr_upper=1.0, xtr_lower=1.0)
-    # Ensure vectors
     alpha_vec = alpha isa Number ? [alpha] : collect(alpha)
-    Re_vec = Re isa Number ? fill(Re, length(alpha_vec)) : collect(Re)
     n_cases = length(alpha_vec)
+    return prepare_inputs(fill(params, n_cases), alpha_vec, Re;
+                          n_crit, xtr_upper, xtr_lower)
+end
 
-    # Broadcast other parameters
-    n_crit_vec = n_crit isa Number ? fill(n_crit, n_cases) : collect(n_crit)
-    xtr_upper_vec = xtr_upper isa Number ? fill(xtr_upper, n_cases) : collect(xtr_upper)
-    xtr_lower_vec = xtr_lower isa Number ? fill(xtr_lower, n_cases) : collect(xtr_lower)
+function prepare_inputs(params::AbstractVector{KulfanParameters}, alpha, Re;
+                        n_crit=9.0, xtr_upper=1.0, xtr_lower=1.0)
+    alpha_vec = alpha isa Number ? fill(alpha, length(params)) : collect(alpha)
+    n_cases = length(alpha_vec)
+    length(params) == n_cases || throw(ArgumentError(
+        "prepare_inputs: $(length(params)) shapes for $n_cases angles of attack."))
+    per_case(v) = v isa Number ? fill(v, n_cases) : collect(v)
+    Re_vec, n_crit_vec = per_case(Re), per_case(n_crit)
+    xtr_upper_vec, xtr_lower_vec = per_case(xtr_upper), per_case(xtr_lower)
 
-    # Build input matrix (25 x n_cases)
     x = zeros(Float32, 25, n_cases)
-
-    # Kulfan parameters (same for all cases)
-    for i in 1:8
-        x[i, :] .= params.upper_weights[i]
-        x[8+i, :] .= params.lower_weights[i]
-    end
-    x[17, :] .= params.leading_edge_weight
-    x[18, :] .= params.TE_thickness * 50  # Scale factor from NeuralFoil
-
-    # Flow conditions (vary per case)
     for i in 1:n_cases
-        a = alpha_vec[i]
-        x[19, i] = sind(2 * a)
-        x[20, i] = cosd(a)
-        x[21, i] = 1 - cosd(a)^2
-        x[22, i] = (log(Re_vec[i]) - 12.5) / 3.5
-        x[23, i] = (n_crit_vec[i] - 9) / 4.5
-        x[24, i] = xtr_upper_vec[i]
-        x[25, i] = xtr_lower_vec[i]
+        fill_case_input!(x, i, params[i], alpha_vec[i], Re_vec[i], n_crit_vec[i],
+                         xtr_upper_vec[i], xtr_lower_vec[i])
     end
-
     return x
 end
 
@@ -323,15 +340,22 @@ function neuralfoil_aero(params::KulfanParameters, alpha, Re;
                          n_crit=9.0, xtr_upper=1.0, xtr_lower=1.0)
     y = neuralfoil_fused_output(params, alpha, Re; model_size, weights_dir,
                                 n_crit, xtr_upper, xtr_lower)
-    analysis_confidence = sigmoid.(y[1, :])
-    CL = y[2, :] ./ 2
-    CD = clamp.(exp.((y[3, :] .- 2) .* 2), 0.0, 1.0)
-    CM = y[4, :] ./ 20
-
+    cl, cd, cm, confidence = decode_coefficients(y)
     alpha_vec = alpha isa Number ? [Float64(alpha)] : Float64.(collect(alpha))
+    return NeuralFoilResult(alpha_vec, cl, cd, cm, confidence)
+end
 
-    return NeuralFoilResult(alpha_vec, Vector{Float64}(CL), Vector{Float64}(CD),
-                           Vector{Float64}(CM), Vector{Float64}(analysis_confidence))
+"""
+    decode_coefficients(y) -> (cl, cd, cm, confidence)
+
+Turn a fused network output matrix into the integrated coefficients per case, undoing
+NeuralFoil's output scaling. The single place that scaling is written down.
+"""
+function decode_coefficients(y::AbstractMatrix)
+    return (Vector{Float64}(y[2, :] ./ 2),
+            Vector{Float64}(clamp.(exp.((y[3, :] .- 2) .* 2), 0.0, 1.0)),
+            Vector{Float64}(y[4, :] ./ 20),
+            Vector{Float64}(sigmoid.(y[1, :])))
 end
 
 """
@@ -343,11 +367,21 @@ top/bottom-flipped case, flip its outputs back, and average. Returns the fused
 output matrix (`n_outputs × n_cases`), with the Mahalanobis penalty already
 applied to the confidence logit (row 1).
 """
-function neuralfoil_fused_output(params::KulfanParameters, alpha, Re;
+function neuralfoil_fused_output(params, alpha, Re;
                                  model_size::String="xlarge", weights_dir=nothing,
                                  n_crit=9.0, xtr_upper=1.0, xtr_lower=1.0)
-    model = load_neuralfoil_model(model_size; weights_dir)
     x = prepare_inputs(params, alpha, Re; n_crit, xtr_upper, xtr_lower)
+    return fused_output(x, load_neuralfoil_model(model_size; weights_dir))
+end
+
+"""
+    fused_output(x, model) -> Matrix
+
+Symmetry-fused forward pass over a prepared input matrix, see
+[`neuralfoil_fused_output`](@ref). Takes the inputs already built so a caller that
+assembles its own batch does not go back through [`prepare_inputs`](@ref).
+"""
+function fused_output(x::AbstractMatrix, model::NeuralFoilModel)
     y = nn_forward(x, model)
     y[1, :] .-= squared_mahalanobis_distance(x, model) ./ (2 * model.n_inputs)
 

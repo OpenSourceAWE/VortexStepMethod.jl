@@ -21,6 +21,23 @@
 ## VortexStepMethod v4.2.0 2026-08-25
 
 ### Added
+- `TAYLOR` aero model: a per-panel polynomial of arbitrary order in `α - α_ref`
+  [rad], the local expansion a live polar source refits every solve. Sections
+  carry `aero_data = (alpha_ref, cl_coeffs, cd_coeffs, cm_coeffs)` and blend
+  spanwise like any other model; `set_taylor_polar!` rewrites a panel's fit in
+  place. It is valid only inside its fit window, so it ignores `delta` and is
+  skipped by the stall-angle scan.
+- Live in-memory polars in `AirfoilAero`: `KulfanBasis` and `deform_kulfan`
+  deform a fixed Kulfan fit analytically (a matvec against a constant CST basis,
+  never a refit, which is non-unique); `control_point_deflection` resamples a
+  deflection given at arbitrary chord fractions — beam nodes, membrane nodes —
+  onto that basis. `LivePolars` and `refresh_live_polars!` then evaluate
+  NeuralFoil at a few angles per panel in one batched forward pass and
+  least-squares fit each panel's `TAYLOR` polar, so a chordwise deformation
+  reaches the aerodynamics as a shape change rather than a flap angle.
+  `polar_drift` reports how far the solve has left the fit window.
+- `prepare_inputs` accepts one Kulfan shape per case, so a whole wing goes
+  through NeuralFoil in a single forward pass.
 - Shared panel aerodynamics (`src/panel_aerodynamics.jl`): the per-panel physics
   written once as pure, branch-free, number-type-generic functions of the section
   geometry and the flow — `panel_axes`, `panel_inflow`, `panel_force_directions`,
