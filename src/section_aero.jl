@@ -1,4 +1,28 @@
 """
+    KulfanParameters
+
+Kulfan CST parameters for an airfoil: the weights of the class-shape transformation
+each surface is built from, the shared leading-edge modification weight and the
+trailing-edge thickness. Lives here rather than in `AirfoilAero` because a
+[`Panel`](@ref) carries the shape it is currently flying (`live_shape`), which a
+plot or a traction pattern reads without knowing how the shape was produced. Fit one
+with `AirfoilAero.fit_kulfan_parameters`, deform one with `AirfoilAero.deform_kulfan`
+and turn one into coordinates with `AirfoilAero.kulfan_to_coordinates`.
+
+# Fields
+- `upper_weights::Vector{Float64}`: weights for upper surface
+- `lower_weights::Vector{Float64}`: weights for lower surface
+- `leading_edge_weight::Float64`: Leading edge modification weight
+- `TE_thickness::Float64`: Trailing edge thickness
+"""
+struct KulfanParameters
+    upper_weights::Vector{Float64}
+    lower_weights::Vector{Float64}
+    leading_edge_weight::Float64
+    TE_thickness::Float64
+end
+
+"""
     SectionAero
 
 Per-2D-section surface aerodynamics at native airfoil resolution: the closed contour

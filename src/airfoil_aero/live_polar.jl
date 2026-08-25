@@ -124,6 +124,9 @@ deform the base airfoil by `deflection` (a chord-normalized deflection on
 `live.basis.x`, or `nothing` to keep the base shape), evaluate NeuralFoil at
 `alpha_ref ± half_window`, and least-squares fit the polynomial.
 
+Each panel keeps the deformed shape it was evaluated at as its `live_shape`, so a plot
+draws the airfoil the network actually saw.
+
 `alpha_ref` [rad] and `reynolds` are per panel or scalar. Every panel and sample goes
 through the network in one forward pass. Returns the lowest analysis confidence over
 the batch, a value near zero meaning the deformed shape has left the region the network
@@ -160,7 +163,7 @@ function refresh_live_polars!(live::LivePolars, panels, alpha_ref, reynolds;
         samples = ((i - 1) * n_samples + 1):(i * n_samples)
         set_taylor_polar!(panels[i], alpha_vec[i], live.fit * cl[samples],
                           live.fit * cd[samples], live.fit * cm[samples];
-                          window=live.settings.half_window)
+                          window=live.settings.half_window, shape=live.deformed[i])
     end
     return minimum(confidence)
 end

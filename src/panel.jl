@@ -38,6 +38,7 @@ Represents a panel in a vortex step method simulation. All points and vectors ar
 - `crease_frac`::T=0: chordwise flap-hinge fraction (0–1); 0 disables the plate kink
 - `alpha_ref`::Float64=0: expansion point [rad] of the `TAYLOR` coefficients
 - `alpha_window`::Float64=0: half width [rad] the `TAYLOR` fit is valid over; 0 = unbounded
+- `live_shape`::Union{Nothing, KulfanParameters}=nothing: the deformed airfoil the polar was generated from
 """
 @with_kw mutable struct Panel{T, CL, CD, CM, SA}
     TE_point_1::MVector{3, T} = zeros(MVector{3, T})
@@ -74,6 +75,7 @@ Represents a panel in a vortex step method simulation. All points and vectors ar
     crease_frac::T = zero(T)
     alpha_ref::Float64 = 0.0
     alpha_window::Float64 = 0.0
+    live_shape::Union{Nothing, KulfanParameters} = nothing
 end
 
 """
@@ -260,7 +262,8 @@ went. `window = 0` leaves the polynomial unbounded.
 end
 
 """
-    set_taylor_polar!(panel, alpha_ref, cl_coeffs, cd_coeffs, cm_coeffs; window=0.0)
+    set_taylor_polar!(panel, alpha_ref, cl_coeffs, cd_coeffs, cm_coeffs; window=0.0,
+                      shape=nothing)
 
 Overwrite a `TAYLOR` panel's local polar: the expansion point `alpha_ref` [rad], the
 ascending coefficients of the polynomials in `α - alpha_ref`, and the half width
@@ -268,12 +271,19 @@ ascending coefficients of the polynomials in `α - alpha_ref`, and the half widt
 [`taylor_value`](@ref)). Copies into the panel's existing coefficient vectors when the
 order is unchanged, so a live polar source can refit every solve without allocating.
 The panel's aero model is set to `TAYLOR`.
+
+`shape` is the [`KulfanParameters`](@ref) the coefficients were generated from, stored
+on the panel as `live_shape`. It is the object that was sampled, not a copy or a
+re-derivation, and it is written here so a panel's polar and the shape behind it are
+set together and cannot drift apart — which is what makes a plot of `live_shape` a
+picture of what the solve actually flew rather than of what it should have.
 """
 function set_taylor_polar!(panel::Panel, alpha_ref, cl_coeffs, cd_coeffs, cm_coeffs;
-                           window=0.0)
+                           window=0.0, shape=nothing)
     panel.aero_model = TAYLOR
     panel.alpha_ref = Float64(alpha_ref)
     panel.alpha_window = Float64(window)
+    panel.live_shape = shape
     for (dst_sym, src) in ((:cl_coeffs, cl_coeffs), (:cd_coeffs, cd_coeffs),
                            (:cm_coeffs, cm_coeffs))
         dst = getfield(panel, dst_sym)
