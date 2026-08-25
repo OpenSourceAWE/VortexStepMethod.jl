@@ -59,3 +59,6 @@ lib/**/Manifest.toml
 
 # Generated test geometries (regenerated on demand by ram_air_matrix_wing)
 test/generated/
+
+# Generated aero tables and run logs
+*.arrow
