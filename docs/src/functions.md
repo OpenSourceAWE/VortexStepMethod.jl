@@ -41,6 +41,11 @@ deform_section
 analyze_section
 analyze_sweep
 neuralfoil_aero
+deform_kulfan
+control_point_deflection
+panel_kulfan_parameters
+refresh_live_polars!
+polar_drift
 generate_aero_matrices
 generate_polar_from_coordinates
 generate_polar_from_dat

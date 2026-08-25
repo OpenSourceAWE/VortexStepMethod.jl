@@ -98,6 +98,7 @@ update_non_deformed_sections!
 ### Aerodynamic data and Cp
 ```@docs
 calculate_new_aero_data
+set_taylor_polar!
 assemble_polar_matrix
 load_matrix_polar_data
 read_aero_matrix
@@ -153,8 +154,11 @@ smooth_turning!
 load_neuralfoil_model
 neuralfoil_section
 neuralfoil_fused_output
+fused_output
+decode_coefficients
 nn_forward
 prepare_inputs
+fill_case_input!
 flip_inputs
 flip_outputs
 squared_mahalanobis_distance
