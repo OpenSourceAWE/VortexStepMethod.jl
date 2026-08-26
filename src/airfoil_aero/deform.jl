@@ -1,9 +1,17 @@
 """
-    KulfanBasis(; n_stations=60, n_weights=8)
+    KulfanBasis(; n_stations=60, n_weights=8, ridge=1e-3)
 
 The fixed CST basis a shape deformation is projected onto: chord stations `x` in
-`[0, 1]` and the pseudoinverse `projection` of the class-times-Bernstein matrix
-`C(x)·B(x)` those stations span.
+`[0, 1]` and the ridge-regularised inverse `projection` of the class-times-Bernstein
+matrix `C(x)·B(x)` those stations span.
+
+`ridge` is the Tikhonov weight, relative to the basis' own largest singular value, that
+keeps the projection from answering a deflection it cannot represent with weights far
+larger than the airfoil they correct. A plain pseudoinverse has no such bound: a kinked
+deflection — a strut buckling is one — lands on the basis' weakest directions and comes
+back amplified a hundredfold and alternating in sign, which is not an airfoil. The ridge
+trades a small, measured under-response on deflections the basis *can* hold for a bounded
+answer on the ones it cannot.
 
 CST is linear in its weights, so a surface displacement is a matvec against this
 constant matrix — never a refit. Refitting inside a loop is not an option: the Kulfan
@@ -18,19 +26,25 @@ the representable residual.
 struct KulfanBasis
     "Chord stations the deflection is sampled on, ascending in `[0, 1]`."
     x::Vector{Float64}
-    "`n_weights × length(x)` pseudoinverse of `C(x)·B(x)`, mapping deflection to weights."
+    "`n_weights × length(x)` regularised inverse of `C(x)·B(x)`, mapping deflection to weights."
     projection::Matrix{Float64}
     "Number of CST weights per surface, matching the airfoil being deformed."
     n_weights::Int
+    "Tikhonov weight the projection was built with, relative to the basis' largest singular value."
+    ridge::Float64
 end
 
-function KulfanBasis(; n_stations::Int=60, n_weights::Int=8)
+function KulfanBasis(; n_stations::Int=60, n_weights::Int=8, ridge::Real=1e-3)
     n_stations > n_weights || throw(ArgumentError(
         "KulfanBasis needs more stations than weights; got $n_stations and $n_weights."))
+    ridge >= 0 || throw(ArgumentError("KulfanBasis ridge must not be negative."))
     theta = range(0, pi, n_stations)
     x = @. (1 - cos(theta)) / 2
     shape = class_function(x) .* bernstein_basis(x, n_weights - 1)
-    return KulfanBasis(collect(x), pinv(shape), n_weights)
+    scale = maximum(svdvals(shape))^2
+    projection = iszero(ridge) ? pinv(shape) :
+        (shape' * shape + ridge * scale * I) \ shape'
+    return KulfanBasis(collect(x), projection, n_weights, Float64(ridge))
 end
 
 """

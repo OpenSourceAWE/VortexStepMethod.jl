@@ -528,8 +528,9 @@ end
     cambered = VortexStepMethod.AirfoilAero.deform_kulfan(basis, base,
         @. 0.08 * basis.x * (1 - basis.x))
     for panel in body_aero.panels
-        VortexStepMethod.set_taylor_polar!(panel, 0.0, [0.5, 5.0, 0.0],
-            [0.02, 0.0, 0.0], [-0.05, 0.0, 0.0]; window=deg2rad(4), shape=cambered)
+        VortexStepMethod.set_sampled_polar!(panel, deg2rad.([-4.0, 0.0, 4.0]),
+            [0.3, 0.5, 0.7], [0.02, 0.02, 0.03], [-0.05, -0.05, -0.05];
+            shape=cambered)
     end
     @test body_aero.panels[1].live_shape === cambered
     v_live, f_live, ribs_live = airfoil_skin_geometry(body_aero)
