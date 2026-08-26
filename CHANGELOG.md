@@ -21,24 +21,38 @@
 ## VortexStepMethod v4.2.0 2026-08-25
 
 ### Added
-- `TAYLOR` aero model: a per-panel polynomial of arbitrary order in `α - α_ref`
-  [rad], the local expansion a live polar source refits every solve. Sections
-  carry `aero_data = (alpha_ref, cl_coeffs, cd_coeffs, cm_coeffs)` and blend
-  spanwise like any other model; `set_taylor_polar!` rewrites a panel's fit in
-  place. It is valid only inside its fit window, so it ignores `delta` and is
-  skipped by the stall-angle scan.
+
+- `SAMPLED` aero model: cl/cd/cm sampled at ascending angles of attack per
+  panel, interpolated between them and held flat past either end. This is what a
+  live polar source writes every solve; `set_sampled_polar!` rewrites a panel's
+  knots and values in place. It spans only the angles it was sampled over, so it
+  ignores `delta` and is skipped by the stall-angle scan — but inside that range
+  it represents a stall, which is what a local fit cannot do.
 - Live in-memory polars in `AirfoilAero`: `KulfanBasis` and `deform_kulfan`
   deform a fixed Kulfan fit analytically (a matvec against a constant CST basis,
   never a refit, which is non-unique); `control_point_deflection` resamples a
   deflection given at arbitrary chord fractions — beam nodes, membrane nodes —
   onto that basis. `LivePolars` and `refresh_live_polars!` then evaluate
-  NeuralFoil at a few angles per panel in one batched forward pass and
-  least-squares fit each panel's `TAYLOR` polar, so a chordwise deformation
-  reaches the aerodynamics as a shape change rather than a flap angle.
-  `polar_drift` reports how far the solve has left the fit window, and past that
-  window a `TAYLOR` polar is continued linearly off its edge value and slope
-  rather than following the polynomial's diverging arms, so a solve that steps
-  outside still converges and is corrected by the next refit.
+  NeuralFoil on a grid of angles per panel in one batched forward pass and write
+  those values in as each panel's `SAMPLED` polar, so a chordwise deformation
+  reaches the aerodynamics as a shape change rather than a flap angle. The grid
+  moves with the panel — `LivePolarSettings` carries the offsets off its current
+  angle of attack — and `polar_drift` reports how far the solve has left it,
+  past which the polar holds its last sampled value instead of extrapolating.
+- Live surface pressure in `AirfoilAero`: `refresh_live_pressure!` regenerates
+  every panel's `Cp` from its deformed shape in one batched forward pass at the
+  converged angle of attack, resampled onto the panel's own contour nodes by
+  `contour_pressure`; `live_surface_friction!` gives the matching skin friction
+  from the flat-plate closure at the panel's live Reynolds. A caller that
+  spreads panel forces over a surface can now make the pattern track the
+  deformation the forces already do. `contour_shape_matrix` and
+  `live_shape_offset!` move the contour itself by the same camber increment the
+  airfoil was deformed by, so the normals and segment areas a traction is built
+  from are the deformed section's rather than the reference one's — the chord
+  fractions never move, only the offsets, so a surface→point map built on that
+  contour stays valid. `decode_surface_pressure` and `contour_pressure` also
+  back the `NeuralFoilSolver` contour assembly, so the live path and the offline
+  table generator are one implementation.
 - `prepare_inputs` accepts one Kulfan shape per case, so a whole wing goes
   through NeuralFoil in a single forward pass.
 - A panel carries the deformed airfoil its polar was generated from as
@@ -48,22 +62,24 @@
   `KulfanParameters` moved from `AirfoilAero` into the core module for it; it is
   still exported from both.
 - Shared panel aerodynamics (`src/panel_aerodynamics.jl`): the per-panel physics
-  written once as pure, branch-free, number-type-generic functions of the section
-  geometry and the flow — `panel_axes`, `panel_inflow`, `panel_force_directions`,
-  `panel_loads` and the small helpers around them. `update_panel_properties!`,
-  `init_pos!`, `calc_forces!` and `calculate_results` now call them instead of
-  spelling the algebra out three times, and `SymbolicAWEModels` traces the same
-  functions with symbolic arguments to build its equations, so the two packages
-  can no longer drift apart. Panel geometry is unchanged bit for bit; forces,
-  moments and coefficients agree to within 1 ulp, the products having been
-  reassociated. `calc_forces!` stays zero-allocation.
+  written once as pure, branch-free, number-type-generic functions of the
+  section geometry and the flow — `panel_axes`, `panel_inflow`,
+  `panel_force_directions`, `panel_loads` and the small helpers around them.
+  `update_panel_properties!`, `init_pos!`, `calc_forces!` and
+  `calculate_results` now call them instead of spelling the algebra out three
+  times, and `SymbolicAWEModels` traces the same functions with symbolic
+  arguments to build its equations, so the two packages can no longer drift
+  apart. Panel geometry is unchanged bit for bit; forces, moments and
+  coefficients agree to within 1 ulp, the products having been reassociated.
+  `calc_forces!` stays zero-allocation.
 - `effective_alpha` and the `deficiency` argument of `panel_inflow` carry an
   unsteady lag (a Wagner indicial deficiency) into the angle the polars are read
   at, while the geometric angle still turns the force. Unused by the solver,
-  which has no unsteady state; it is shared so a symbolic consumer that does have
-  one reads the same definition.
+  which has no unsteady state; it is shared so a symbolic consumer that does
+  have one reads the same definition.
 
 ### Changed
+
 - `section_pitch_rate` gained a three-argument form taking the trailing minus
   leading edge apparent wind directly. The four-argument form is unchanged.
 - Norms inside the shared panel aerodynamics are floored (`smooth_norm`) rather
@@ -73,37 +89,43 @@
 ## VortexStepMethod v4.1.2 2026-08-22
 
 ### Fixed
+
 - Billowing now takes its rotation axis from the section pair itself instead of
   projecting the leading-edge span vector on `spanwise_direction`. Sections run
-  `+y` to `-y`, so the pair already fixes the sign. The projection was decided by
-  3 % of the vector on a C-shaped kite's tip panels — 11 mm of span between the
-  outermost sections — so a deforming tip could flip that one panel's billow.
+  `+y` to `-y`, so the pair already fixes the sign. The projection was decided
+  by 3 % of the vector on a C-shaped kite's tip panels — 11 mm of span between
+  the outermost sections — so a deforming tip could flip that one panel's
+  billow.
 
 ## VortexStepMethod v4.1.1 2026-08-19
 
 ### Fixed
+
 - Section twist now rotates the chord fully about the spanwise axis. The axial
   Rodrigues term was missing, so a swept or dihedral section's along-span chord
-  component was scaled by `cos(theta)`: the chord shortened and tilted out of the
-  twist plane, growing as `theta^2`.
+  component was scaled by `cos(theta)`: the chord shortened and tilted out of
+  the twist plane, growing as `theta^2`.
 
 ## VortexStepMethod v4.1.0 2026-08-17
 
 ### Added
-- `table_format` keyword on `write_section_aero`, `generate_airfoils`, `obj_to_yaml`
-  and `surfplan_to_aero_yaml`: `:csv` (default, readable) or `:arrow` (binary, ~40×
-  faster to load and 2.6× smaller). `read_section_aero` detects the format from the
-  file suffix, so a geometry YAML can reference either.
+
+- `table_format` keyword on `write_section_aero`, `generate_airfoils`,
+  `obj_to_yaml` and `surfplan_to_aero_yaml`: `:csv` (default, readable) or
+  `:arrow` (binary, ~40× faster to load and 2.6× smaller). `read_section_aero`
+  detects the format from the file suffix, so a geometry YAML can reference
+  either.
 - `geometry_path` keyword on `obj_to_yaml`, naming the geometry YAML itself
   instead of always writing `output_dir/geometry.yaml`. Point it outside the
-  table directory and the emitted table references carry the path from the YAML's
-  directory to `output_dir`, which is what the geometry loader resolves them
-  against — so a generated dataset can keep its bulk in a subdirectory while the
-  geometry sits with the hand-written ones.
-- `convert_node_table` and `write_node_rows` rewrite a per-node table in the format
-  the destination suffix names. `obj_to_yaml` migrates an existing dataset with
-  them when `table_format` differs from what the directory holds, so a dataset
-  changes format without re-running the airfoil solver that produced it.
+  table directory and the emitted table references carry the path from the
+  YAML's directory to `output_dir`, which is what the geometry loader resolves
+  them against — so a generated dataset can keep its bulk in a subdirectory
+  while the geometry sits with the hand-written ones.
+- `convert_node_table` and `write_node_rows` rewrite a per-node table in the
+  format the destination suffix names. `obj_to_yaml` migrates an existing
+  dataset with them when `table_format` differs from what the directory holds,
+  so a dataset changes format without re-running the airfoil solver that
+  produced it.
 - `flow_curvature` solver setting (default `false`). When enabled, each section
   gets the thin-airfoil pitch-rate moment increment `Δcm = -(π/4) q̂` with
   `q̂ = q c / (2 v_rel)`. A section rotating about its own spanwise axis sees an
@@ -112,131 +134,146 @@
   point cannot represent. The lift response to `q` was already exact because the
   inflow is sampled at the three-quarter-chord point, so only the moment was
   missing.
-- `pitch_rate_dist` field on `BodyAerodynamics`, holding the `q` above per panel.
-  `set_va!(body_aero, va, omega)` fills it by projecting `omega` onto every
-  panel's `y_airf`, so panels at different dihedral see different rates from one
-  body rate. The distributed `set_va!(body_aero, va_distribution;
-  pitch_rate_dist)` takes it directly, so twist and flapping rates of a deforming
-  wing — which no single body rate can express — reach the moment. Omitting the
-  keyword zeroes it rather than reusing a stale `omega`, which the distributed
-  form never sets.
-- `section_pitch_rate(velocity_leading, velocity_trailing, z_airf, chord)` builds
-  one entry of that distribution from a section's edge velocities, and reduces to
-  `ω ⋅ y_airf` for rigid motion.
-- `bin/update_default_manifests` regenerates both checked-in default manifests in
-  one command, and `bin/install` takes `+X.Y` / `--version X.Y` to pick a Julia
-  channel without prompting. Selecting a version no longer moves the juliaup
-  default, so regenerating the 1.11 manifest leaves the shell on whatever channel
-  it was using.
+- `pitch_rate_dist` field on `BodyAerodynamics`, holding the `q` above per
+  panel. `set_va!(body_aero, va, omega)` fills it by projecting `omega` onto
+  every panel's `y_airf`, so panels at different dihedral see different rates
+  from one body rate. The distributed
+  `set_va!(body_aero, va_distribution;
+  pitch_rate_dist)` takes it directly, so
+  twist and flapping rates of a deforming wing — which no single body rate can
+  express — reach the moment. Omitting the keyword zeroes it rather than reusing
+  a stale `omega`, which the distributed form never sets.
+- `section_pitch_rate(velocity_leading, velocity_trailing, z_airf, chord)`
+  builds one entry of that distribution from a section's edge velocities, and
+  reduces to `ω ⋅ y_airf` for rigid motion.
+- `bin/update_default_manifests` regenerates both checked-in default manifests
+  in one command, and `bin/install` takes `+X.Y` / `--version X.Y` to pick a
+  Julia channel without prompting. Selecting a version no longer moves the
+  juliaup default, so regenerating the 1.11 manifest leaves the shell on
+  whatever channel it was using.
 
 ### Fixed
+
 - The `Solver` docstring quoted the `SolverSettings` defaults for
-  `type_initial_gamma_distribution` and `core_radius_fraction` (`ELLIPTIC`, `1e-20`)
-  instead of its own (`ZEROS`, `0.05`), and never said what `core_radius_fraction`
-  measures. It now documents the `Solver` defaults and cites Damiani et al. (2019) for
-  the 0.05 cut-off.
+  `type_initial_gamma_distribution` and `core_radius_fraction` (`ELLIPTIC`,
+  `1e-20`) instead of its own (`ZEROS`, `0.05`), and never said what
+  `core_radius_fraction` measures. It now documents the `Solver` defaults and
+  cites Damiani et al. (2019) for the 0.05 cut-off.
 - A remesh under `use_prior_polar` no longer resamples the refined sections'
   `SectionAero` surface tables down to whatever unrefined sections survive it.
-  `compute_refined_section_interpolation!` reblended contour, `cp` and `cf` from the
-  unrefined sections unconditionally while `aero_data` was preserved, so a wing rebuilt
-  onto fewer structural stations kept full-resolution polars but lost the surface tables
-  pressure integration reads. The reblend is now skipped when the polars are preserved
-  and the refined sections already carry tables.
+  `compute_refined_section_interpolation!` reblended contour, `cp` and `cf` from
+  the unrefined sections unconditionally while `aero_data` was preserved, so a
+  wing rebuilt onto fewer structural stations kept full-resolution polars but
+  lost the surface tables pressure integration reads. The reblend is now skipped
+  when the polars are preserved and the refined sections already carry tables.
 - The angle-of-attack correction (`correct_aoa=true`) no longer overwrites
-  `body_aero.AIC` with the aerodynamic-centre (LLT) matrix. It builds that matrix in
-  its own `AIC_aero_center` field, so `AIC` keeps holding the control-point matrix the
-  circulation was solved against, which is what anything reading it after a solve
-  expects. Costs a second `n_panels × n_panels × 3` buffer.
-- `obj_to_yaml` no longer places sections on a wingtip that has closed to a point.
-  `station_indices` spreads its targets over the stations that still have a chord,
-  so the outermost section lands on the last sliceable one. A V3 mesh sliced with
-  the default `wingtip_distance` used to put a zero-chord section at each tip,
-  whose polar was `NaN` and took the whole solve with it; working around it meant
-  guessing a `wingtip_distance` large enough to skip past the tip. That workaround
-  is no longer the default: `wingtip_distance` is now `0.0`, an inset on top of the
-  trim for meshes whose slices just short of the tip are still too thin to analyse.
-- Wing sections are normalized to `+y` to `-y` order on load (`normalize_span_order!`),
-  and by `refine!` for wings built through `add_section!`. Panel `y_airf` and `z_airf`
-  follow the order sections are stored in, so a geometry file written the other way
-  round inverted every panel normal, and a wing whose sections were replaced after its
-  panels were built (a structural remesh) inverted them mid-run, one panel at a time as
-  each crossed `spanwise_direction`. `obj_to_yaml` and `surfplan_to_aero_yaml` emit that
+  `body_aero.AIC` with the aerodynamic-centre (LLT) matrix. It builds that
+  matrix in its own `AIC_aero_center` field, so `AIC` keeps holding the
+  control-point matrix the circulation was solved against, which is what
+  anything reading it after a solve expects. Costs a second
+  `n_panels × n_panels × 3` buffer.
+- `obj_to_yaml` no longer places sections on a wingtip that has closed to a
+  point. `station_indices` spreads its targets over the stations that still have
+  a chord, so the outermost section lands on the last sliceable one. A V3 mesh
+  sliced with the default `wingtip_distance` used to put a zero-chord section at
+  each tip, whose polar was `NaN` and took the whole solve with it; working
+  around it meant guessing a `wingtip_distance` large enough to skip past the
+  tip. That workaround is no longer the default: `wingtip_distance` is now
+  `0.0`, an inset on top of the trim for meshes whose slices just short of the
+  tip are still too thin to analyse.
+- Wing sections are normalized to `+y` to `-y` order on load
+  (`normalize_span_order!`), and by `refine!` for wings built through
+  `add_section!`. Panel `y_airf` and `z_airf` follow the order sections are
+  stored in, so a geometry file written the other way round inverted every panel
+  normal, and a wing whose sections were replaced after its panels were built (a
+  structural remesh) inverted them mid-run, one panel at a time as each crossed
+  `spanwise_direction`. `obj_to_yaml` and `surfplan_to_aero_yaml` emit that
   order too; files of either order keep loading the same.
-- Spanwise distribution plots put `+y` on the left, matching that order and the kite
-  seen from the front.
-- The lofted airfoil skin in `plot_geometry` draws each section's contour on its own
-  panel edge (#256). The edge was picked from the wing's span order rather than from
-  the panel index, so a wing whose sections ran `-y` to `+y` got every rib drawn at its
-  neighbour's station, one tip bare and the other doubled, while the panels themselves
-  rendered correctly.
+- Spanwise distribution plots put `+y` on the left, matching that order and the
+  kite seen from the front.
+- The lofted airfoil skin in `plot_geometry` draws each section's contour on its
+  own panel edge (#256). The edge was picked from the wing's span order rather
+  than from the panel index, so a wing whose sections ran `-y` to `+y` got every
+  rib drawn at its neighbour's station, one tip bare and the other doubled,
+  while the panels themselves rendered correctly.
 
 ### Changed
-- `SolverSettings` now defaults to the same values as `Solver`: `core_radius_fraction`
-  `1e-20` → `0.05` and `type_initial_gamma_distribution` `ELLIPTIC` → `ZEROS`. The 0.05
-  bound vortex core cut-off follows Damiani et al. (2019), "A Vortex Step Method for
-  Nonlinear Airfoil Polar Data as Implemented in KiteAeroDyn", and matches the upstream
-  `awegroup/Vortex-Step-Method` default; at `1e-20` the Biot-Savart singularity guard
-  never engaged. Coefficients are unchanged for well-separated geometry, since the guard
-  only triggers where a control point falls within 5% of a filament length of a bound
-  vortex, and every settings file shipped in `data/` sets both keys explicitly.
+
+- `SolverSettings` now defaults to the same values as `Solver`:
+  `core_radius_fraction` `1e-20` → `0.05` and `type_initial_gamma_distribution`
+  `ELLIPTIC` → `ZEROS`. The 0.05 bound vortex core cut-off follows Damiani et
+  al. (2019), "A Vortex Step Method for Nonlinear Airfoil Polar Data as
+  Implemented in KiteAeroDyn", and matches the upstream
+  `awegroup/Vortex-Step-Method` default; at `1e-20` the Biot-Savart singularity
+  guard never engaged. Coefficients are unchanged for well-separated geometry,
+  since the guard only triggers where a control point falls within 5% of a
+  filament length of a bound vortex, and every settings file shipped in `data/`
+  sets both keys explicitly.
 - `BodyAerodynamics.AIC` is stored as `(n_panels, n_panels, 3)` instead of
-  `(3, n_panels, n_panels)`, so each component slice `AIC[:, :, k]` is contiguous and
-  the induced-velocity products reach BLAS `gemv` instead of the generic fallback.
-  `solve!` is 3.1–5.3× faster (n=120, VSM: 26.1 ms → 4.9 ms inviscid, 21.1 ms →
-  6.0 ms with polars). Code reading `AIC[k, i, j]` must become `AIC[i, j, k]`.
-- The filament induced-velocity kernels reuse the `r0`/`length` each `BoundFilament`
-  already stores, take the core-radius cutoff from `|r1.r0|/|r0|` without forming the
-  perpendicular vector, and defer the cross products that only one branch reads. Output
-  is bit-identical; `solve!` is a further 1.47-1.55x faster.
-- `read_node_table` parses into a preallocated matrix instead of `reduce(vcat, …)`
-  over a generator, which was quadratic in the row count: ~21× faster on a 16 MB
-  surface table (2.49 s → 0.12 s), benefiting every existing dataset.
+  `(3, n_panels, n_panels)`, so each component slice `AIC[:, :, k]` is
+  contiguous and the induced-velocity products reach BLAS `gemv` instead of the
+  generic fallback. `solve!` is 3.1–5.3× faster (n=120, VSM: 26.1 ms → 4.9 ms
+  inviscid, 21.1 ms → 6.0 ms with polars). Code reading `AIC[k, i, j]` must
+  become `AIC[i, j, k]`.
+- The filament induced-velocity kernels reuse the `r0`/`length` each
+  `BoundFilament` already stores, take the core-radius cutoff from
+  `|r1.r0|/|r0|` without forming the perpendicular vector, and defer the cross
+  products that only one branch reads. Output is bit-identical; `solve!` is a
+  further 1.47-1.55x faster.
+- `read_node_table` parses into a preallocated matrix instead of
+  `reduce(vcat, …)` over a generator, which was quadratic in the row count: ~21×
+  faster on a 16 MB surface table (2.49 s → 0.12 s), benefiting every existing
+  dataset.
 - `is_show=true` draws into a window named after the plot title instead of into
   whichever window the backend last used, so a script showing several plots gets
   one window each and re-running it redraws them in place. `show_plot` takes the
   window `name` as a keyword.
-- `examples/V3_kite.jl` builds its wing from `VSMSettings` and adds a second sweep on
-  polars generated from `V3_25.obj` with NeuralFoil (`NEURALFOIL`, on by default), so
-  the plots compare CAD-derived polars against the checked-in CFD tables.
-- `bin/run_julia` starts Julia with `JULIA_NUM_THREADS=auto` unless the environment
-  already sets it.
+- `examples/V3_kite.jl` builds its wing from `VSMSettings` and adds a second
+  sweep on polars generated from `V3_25.obj` with NeuralFoil (`NEURALFOIL`, on
+  by default), so the plots compare CAD-derived polars against the checked-in
+  CFD tables.
+- `bin/run_julia` starts Julia with `JULIA_NUM_THREADS=auto` unless the
+  environment already sets it.
 
 ## VortexStepMethod v4.0.0 2026-08-03
 
 ### Added
-- `NeuralFoil`-based airfoil polar generation via the new `AirfoilAero` submodule
-  (`NeuralFoilSolver`, `XFoilSolver`, `analyze_section`, `analyze_sweep`,
-  `fit_kulfan_parameters`, `shrink_wrap`, `ShrinkWrap`)
+
+- `NeuralFoil`-based airfoil polar generation via the new `AirfoilAero`
+  submodule (`NeuralFoilSolver`, `XFoilSolver`, `analyze_section`,
+  `analyze_sweep`, `fit_kulfan_parameters`, `shrink_wrap`, `ShrinkWrap`)
 - `ObjAdapter` submodule: converts a 3D wing `.obj` mesh to the native YAML/CSV
-  geometry format (`obj_to_yaml`, `perpendicular_sections`,
-  `write_yaml`, `plot_slices_3d`, `plot_airfoils`)
-- `SurfplanAdapter` submodule: `surfplan_to_aero_yaml` turns a SurfplanAdapter aero
-  export into the native pressure-ready YAML/CSV geometry (shared `generate_airfoils`
-  core with `ObjAdapter`)
-- `ObjWing(obj_path[, dat_path]; Re, n_panels, aero_solver, remake, ...)` convenience
-  constructor restored for backward compatibility — internally calls
+  geometry format (`obj_to_yaml`, `perpendicular_sections`, `write_yaml`,
+  `plot_slices_3d`, `plot_airfoils`)
+- `SurfplanAdapter` submodule: `surfplan_to_aero_yaml` turns a SurfplanAdapter
+  aero export into the native pressure-ready YAML/CSV geometry (shared
+  `generate_airfoils` core with `ObjAdapter`)
+- `ObjWing(obj_path[, dat_path]; Re, n_panels, aero_solver, remake, ...)`
+  convenience constructor restored for backward compatibility — internally calls
   `ObjAdapter.obj_to_yaml` then `Wing`; `aero_solver` selects the polar backend
   (default `NeuralFoilSolver()`; pass `XFoilSolver()` for old behavior);
-  `remake=false` (default) reuses an existing `geometry.yaml` in `output_dir` to skip
-  expensive polar generation when only `n_panels` changes; set `remake=true` to force
-  regeneration
-- Per-section surface aero tables: `SectionAero` (full contour + surface pressure
-  `cp` + skin friction `cf` per node over an `(α, δ)` grid), `section_surface`,
-  `read_section_aero` / `write_section_aero`; surface aero propagates through
-  `Section` and `Wing` and is spanwise-interpolated during `refine!`
+  `remake=false` (default) reuses an existing `geometry.yaml` in `output_dir` to
+  skip expensive polar generation when only `n_panels` changes; set
+  `remake=true` to force regeneration
+- Per-section surface aero tables: `SectionAero` (full contour + surface
+  pressure `cp` + skin friction `cf` per node over an `(α, δ)` grid),
+  `section_surface`, `read_section_aero` / `write_section_aero`; surface aero
+  propagates through `Section` and `Wing` and is spanwise-interpolated during
+  `refine!`
 - `POLY` aero model for polynomial cl/cd/cm (exported)
-- `lei_poly_coeffs(tube_diameter, camber)` (exported from `AirfoilAero`) returning
-  the Breukels α-polynomial cl/cd/cm coefficients
+- `lei_poly_coeffs(tube_diameter, camber)` (exported from `AirfoilAero`)
+  returning the Breukels α-polynomial cl/cd/cm coefficients
 - Li/Gaunaa spanwise artificial viscosity (Li, Gaunaa, Pirrung & Lønbæk,
   TORQUE 2026) for the LOOP solver, stabilizing post-stall circulation
   distributions that otherwise develop non-physical sawtooth oscillations;
   opt-in via `is_with_artificial_viscosity` (default `false`) and
   `artificial_viscosity_factor` (default `0.035`) on the solver settings
-- `crease_frac` wing setting (chordwise flap-hinge fraction, default `0.75`)
-  for drawing the δ-deflected plate/skin, readable from YAML
+- `crease_frac` wing setting (chordwise flap-hinge fraction, default `0.75`) for
+  drawing the δ-deflected plate/skin, readable from YAML
 - `examples/V3_neuralfoil.jl` and `examples/obj_to_yaml_kite.jl`
 
 ### Changed
+
 - BREAKING - `ObjWing` polar generation now uses NeuralFoil (via
   `ObjAdapter.obj_to_yaml`) instead of XFoil + a user-supplied `.dat` file. The
   constructor signature is backward-compatible (`dat_path` is accepted and
@@ -245,26 +282,29 @@
   `aero_solver=XFoilSolver()` to `ObjAdapter.obj_to_yaml` and call `Wing`
   directly.
 - OBJ-based wings are now built via `ObjAdapter.obj_to_yaml` + `Wing(yaml_path)`
-  instead of the old `ObjWing` pipeline (XFoil + single `.dat` file);
-  `ObjWing` is kept as a shim that accepts but ignores `dat_path`
+  instead of the old `ObjWing` pipeline (XFoil + single `.dat` file); `ObjWing`
+  is kept as a shim that accepts but ignores `dat_path`
 - BREAKING - `LEI_AIRFOIL_BREUKELS` is now a deprecated alias of `POLY`, and the
   built-in Breukels regression no longer runs at solve time. Sections must carry
   the α-polynomial coefficients directly instead of `(tube_diameter, camber)`;
   compute them up front with `lei_poly_coeffs(tube_diameter, camber)`
 - `Section` and `add_section!` accept an optional `section_aero` argument
-- BREAKING - plotting is now Makie-only; the `VortexStepMethodMakieExt` extension
-  loads once a Makie backend and
-  [`MakieControlPlots`](https://github.com/OpenSourceAWE/MakieControlPlots.jl) are
-  available, so plotting code must now load `MakieControlPlots` (and drop
-  `set_plot_backend!`); `plot_section_polars` is rendered through `MakieControlPlots`
+- BREAKING - plotting is now Makie-only; the `VortexStepMethodMakieExt`
+  extension loads once a Makie backend and
+  [`MakieControlPlots`](https://github.com/OpenSourceAWE/MakieControlPlots.jl)
+  are available, so plotting code must now load `MakieControlPlots` (and drop
+  `set_plot_backend!`); `plot_section_polars` is rendered through
+  `MakieControlPlots`
 
 ### Removed
+
 - `ObjWing` as a standalone pipeline (replaced by `ObjAdapter`); the name is
   re-exported as a compatibility wrapper
 - `auto_rotation` helper (internal, removed from public API)
-- `PanelGroupingMethod` enum (already removed in v3.0.0 — stale docs entry cleaned up)
-- ControlPlots test run removed from CI (`plot-controlplots` arg) due to
-  a `libraqm`/HarfBuzz symbol conflict in the GitHub Actions environment
+- `PanelGroupingMethod` enum (already removed in v3.0.0 — stale docs entry
+  cleaned up)
+- ControlPlots test run removed from CI (`plot-controlplots` arg) due to a
+  `libraqm`/HarfBuzz symbol conflict in the GitHub Actions environment
 - BREAKING - the `ControlPlots` plotting extension, `examples_cp/`, and the
   `PythonCall`/Matplotlib setup (`bin/install_controlplots`, CondaPkg
   `LocalPreferences` defaults)
@@ -276,6 +316,7 @@
 ## VortexStepMethod v3.3.6 2026-06-13
 
 ### Added
+
 - `calc_forces!` and `solve_base!` (both exported): `solve!` is now
   `solve_base!` followed by `calc_forces!`, so a frozen circulation can be
   mapped to forces without re-running the nonlinear gamma solve (#245)
@@ -284,10 +325,12 @@
   kept as a thin wrapper (#246)
 
 ### Changed
-- `calc_forces!` is now allocation-free in the per-step hot path
-  (preallocated `panel_area_dist` and `unrefined_count_dist` buffers) (#245)
+
+- `calc_forces!` is now allocation-free in the per-step hot path (preallocated
+  `panel_area_dist` and `unrefined_count_dist` buffers) (#245)
 
 ### Fixed
+
 - 3D polar plotting (#245)
 - flaky Aqua `persistent_tasks` test now actually disabled via
   `persistent_tasks=false` (`()` did not disable it) (#246)
@@ -295,19 +338,22 @@
 ## VortexStepMethod v3.3.5 2026-06-05
 
 ### Added
+
 - `moment_coeff_unrefined_dist` field in `VSMSolution`: the summed
   `moment_frac`-referenced pitching-moment coefficient per unrefined section [-]
 
 ## VortexStepMethod v3.3.4 2026-05-31
 
 ### Added
-- `PlotBackend`, `MakieBackend`, `ControlPlotsBackend`, and
-  `set_plot_backend!` so applications can explicitly choose which plotting
-  extension the backend-agnostic plotting API should use
-- `PythonCall` added as a weak dependency to support the `ControlPlots`
-  backend with PythonPlot
+
+- `PlotBackend`, `MakieBackend`, `ControlPlotsBackend`, and `set_plot_backend!`
+  so applications can explicitly choose which plotting extension the
+  backend-agnostic plotting API should use
+- `PythonCall` added as a weak dependency to support the `ControlPlots` backend
+  with PythonPlot
 
 ### Changed
+
 - backend-agnostic plotting wrappers now route through the active plotting
   backend, and each plotting extension initializes itself as the default only
   when no backend has been selected yet
@@ -315,6 +361,7 @@
 - improved `bin/install` and `bin/install_controlplots` scripts
 
 ### Fixed
+
 - corrected projection onto core radius in `velocity_3D_bound_vortex!` and
   semi-infinite trailing vortex projection so that the radial direction is
   always measured from the filament axis, not from the origin (#241)
@@ -325,6 +372,7 @@
 ## VortexStepMethod v3.3.3 2026-05-21
 
 ### Fixed
+
 - `MakieExt` and `ControlPlotsExt` no longer both define
   `VortexStepMethod.plot_geometry` for the same type, resolving a method
   ambiguity when both extensions were loaded (#236)
@@ -334,33 +382,39 @@
 ## VortexStepMethod v3.3.2 2026-05-18
 
 ### Changed
+
 - use 2-arg version of atan to avoid possible NaN
 
 ## VortexStepMethod v3.3.1 2026-05-13
 
 ### Changed
+
 - `unrefined_deform!` linearly interpolates twist and TE deflection between
   unrefined sections and rotates each refined section about the average of its
   adjacent local airfoil normals (#234)
 
 ### Fixed
-- `smooth_sqrt` in the solver hot loop keeps gradients defined at zero
-  velocity magnitude
+
+- `smooth_sqrt` in the solver hot loop keeps gradients defined at zero velocity
+  magnitude
 
 ## VortexStepMethod v3.3.0 2026-05-05
 
 ### Added
+
 - `ForwardDiff` compatibility, used by default in `linearize` (#232)
 - `backend` keyword argument for `linearize`
 - example `linearize_check.jl` comparing FiniteDiff and ForwardDiff tangents
 
 ### Changed
+
 - core structs are parameterized on the scalar type `T` so dual numbers can
   propagate through them; public constructors are unchanged
 
 ## VortexStepMethod v3.2.0 2026-05-02
 
 ### Added
+
 - support for both CairoMakie and GLMakie in the example `menu()` via new
   `CairoMakie.activate()` / `GLMakie.activate()` entries (#222)
 - plots are saved as PDF when CairoMakie is active
@@ -368,18 +422,21 @@
   generated plots
 
 ### Changed
+
 - examples write plots into the shared `output` folder instead of the working
   directory
 - example plot file names are sanitized: spaces replaced with `_` and `%`
   replaced with `pct`
 
 ### Fixed
+
 - NONLIN solver no longer returns stale `gamma` on repeated `solve!` calls
   (#228)
 
 ## VortexStepMethod v3.1.3 2026-04-23
 
 ### Fixed
+
 - bug in `linearize` where `body_aero.va` was used instead of `body_aero._va`,
   causing incorrect initial velocity storage (#227)
 - `set_va!` no longer overwrites `_va` with a computed reference velocity when
@@ -388,46 +445,63 @@
 - linearize now correctly preserves and restores `omega` across perturbations
 
 ## VortexStepMethod v3.1.2 2025-04-20
+
 ### Added
+
 - add back compat entry v2 for SciMLBase
 
 ## VortexStepMethod v3.1.1 2025-04-20
+
 ### Added
+
 - add back compat entry v3 for RecursiveArrayTools
 
 ## VortexStepMethod v3.1.0 2025-04-19
 
 ### Breaking
+
 - `billowing_angle` replaced by `billowing_percentage` on `Wing` and
   `WingSettings` (percentage of arc length, not radians)
 - `billowing_angle_from_percentage()` removed
 - `BILLOWING` distribution now uses sinusoidal rotation instead of circular arc
 
 ### Added
+
 - `billowing.jl` example comparing flat vs billowed V3 kite
 - Coarse V3 kite geometry, settings, and combined CFD polar data
 - `cl_over_cd` keyword for `plot_polars` and `plot_combined_analysis`
-- the function `menu_cp()` can now be used to run the examples with the ControlPlots backend
-- the script `bin/install` can and should be used to instantiate the project and all sub-projects after git checkout
-- the files `Manifest-v1.11.toml.default` and `Manifest-v12.toml.default` for enhanced reproducibility
-- the scripts `bin/jetls` and `bin/jetls_examples` for running a static check of the source code
-- the script `test_bench.jl` for benchmarking the refinement method and measuring allocations
+- the function `menu_cp()` can now be used to run the examples with the
+  ControlPlots backend
+- the script `bin/install` can and should be used to instantiate the project and
+  all sub-projects after git checkout
+- the files `Manifest-v1.11.toml.default` and `Manifest-v12.toml.default` for
+  enhanced reproducibility
+- the scripts `bin/jetls` and `bin/jetls_examples` for running a static check of
+  the source code
+- the script `test_bench.jl` for benchmarking the refinement method and
+  measuring allocations
 
 ### Changed
+
 - Plot legends moved to shared horizontal legend at bottom of grid layouts
 - the script bin/run_julia now can be called with a script name as parameter
-- fixed all JETLS warnings in the source code for improved performance and stability
+- fixed all JETLS warnings in the source code for improved performance and
+  stability
 
 ### Fixed errors
-- Domain error in elliptical gamma distribution when control points lie
-  outside the nominal span envelope
+
+- Domain error in elliptical gamma distribution when control points lie outside
+  the nominal span envelope
 
 ## VortexStepMethod v3.0.1 2025-04-04
 
 ### Changed
+
 - the file `CITATION.cff`
 - compat entry for RecursiveArrayTools
+
 ### Added
+
 - the file `.zenodo.json`
 
 ## VortexStepMethod v3.0.0

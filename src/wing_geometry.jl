@@ -1287,20 +1287,6 @@ function calculate_new_aero_data(aero_model,
         
         return (alpha_left, delta_left, CL_data, CD_data, CM_data)
 
-    elseif isequal(model_type, TAYLOR)
-        data_left = aero_data[section_index]
-        data_right = aero_data[section_index + 1]
-        (data_left isa Tuple{Float64, Vector{Float64}, Vector{Float64}, Vector{Float64}} &&
-         data_right isa Tuple{Float64, Vector{Float64}, Vector{Float64}, Vector{Float64}}) ||
-            throw(ArgumentError("TAYLOR requires aero_data = " *
-                "(alpha_ref, cl_coeffs, cd_coeffs, cm_coeffs)."))
-        return (
-            data_left[1] * left_weight + data_right[1] * right_weight,
-            data_left[2] .* left_weight .+ data_right[2] .* right_weight,
-            data_left[3] .* left_weight .+ data_right[3] .* right_weight,
-            data_left[4] .* left_weight .+ data_right[4] .* right_weight,
-        )
-
     elseif isequal(model_type, POLY)
         data_left = aero_data[section_index]
         data_right = aero_data[section_index + 1]

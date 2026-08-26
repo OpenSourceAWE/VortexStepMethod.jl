@@ -409,20 +409,32 @@ function neuralfoil_section(params::KulfanParameters, alpha, Re;
                             n_crit=9.0, xtr_upper=1.0, xtr_lower=1.0)
     y = neuralfoil_fused_output(params, alpha, Re; model_size, weights_dir,
                                 n_crit, xtr_upper, xtr_lower)
-    N = (size(y, 1) - 6) ÷ 6
-    upper_ue = y[(7 + 2N):(6 + 3N), :]
-    lower_ue = y[(7 + 5N):(6 + 6N), :]
     alpha_vec = alpha isa Number ? [Float64(alpha)] : Float64.(collect(alpha))
+    station_x, ue_upper, ue_lower = decode_surface_velocity(y)
     return (; alpha = alpha_vec,
             cl = Vector{Float64}(y[2, :] ./ 2),
             cd = Vector{Float64}(clamp.(exp.((y[3, :] .- 2) .* 2), 0.0, 1.0)),
             cm = Vector{Float64}(y[4, :] ./ 20),
             confidence = Vector{Float64}(sigmoid.(y[1, :])),
-            x = compute_optimal_x_points(N),
-            cp_upper = Matrix{Float64}(1 .- upper_ue .^ 2),
-            cp_lower = Matrix{Float64}(1 .- lower_ue .^ 2),
-            ue_upper = Matrix{Float64}(upper_ue),
-            ue_lower = Matrix{Float64}(lower_ue))
+            x = station_x,
+            cp_upper = Matrix{Float64}(1 .- ue_upper .^ 2),
+            cp_lower = Matrix{Float64}(1 .- ue_lower .^ 2),
+            ue_upper, ue_lower)
+end
+
+"""
+    decode_surface_velocity(y) -> (station_x, ue_upper, ue_lower)
+
+The edge-velocity ratios a fused output matrix carries, at NeuralFoil's own `N`
+fixed stations. Each `ue` matrix is `N × n_cases`. Interpolate these rather than
+`Cp = 1 - ue²`: `ue` is linear in arc length through a stagnation point, where
+`Cp` is quadratic.
+"""
+function decode_surface_velocity(y::AbstractMatrix)
+    N = (size(y, 1) - 6) ÷ 6
+    return (compute_optimal_x_points(N),
+            Matrix{Float64}(y[(7 + 2N):(6 + 3N), :]),
+            Matrix{Float64}(y[(7 + 5N):(6 + 6N), :]))
 end
 
 """

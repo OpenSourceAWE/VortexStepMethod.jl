@@ -36,8 +36,9 @@ Represents a panel in a vortex step method simulation. All points and vectors ar
     ): Panel filaments, see: [BoundFilament](@ref)
 - `delta`::T=0: flap trailing-edge deflection [rad]
 - `crease_frac`::T=0: chordwise flap-hinge fraction (0–1); 0 disables the plate kink
-- `alpha_ref`::Float64=0: expansion point [rad] of the `TAYLOR` coefficients
-- `alpha_window`::Float64=0: half width [rad] the `TAYLOR` fit is valid over; 0 = unbounded
+- `alpha_ref`::Float64=0: reference angle [rad] of the `SAMPLED` polar
+- `alpha_window`::Float64=0: half width [rad] that polar reaches; 0 = unbounded
+- `alpha_knots`::Vector{Float64}=Float64[]: ascending angles [rad] a `SAMPLED` polar holds values at
 - `live_shape`::Union{Nothing, KulfanParameters}=nothing: the deformed airfoil the polar was generated from
 """
 @with_kw mutable struct Panel{T, CL, CD, CM, SA}
@@ -75,6 +76,7 @@ Represents a panel in a vortex step method simulation. All points and vectors ar
     crease_frac::T = zero(T)
     alpha_ref::Float64 = 0.0
     alpha_window::Float64 = 0.0
+    alpha_knots::Vector{Float64} = Float64[]
     live_shape::Union{Nothing, KulfanParameters} = nothing
 end
 
@@ -222,16 +224,6 @@ function init_aero!(panel::Panel, section_1::Section, section_2::Section;
         panel.cl_coeffs = (c1[1] .+ c2[1]) ./ 2
         panel.cd_coeffs = (c1[2] .+ c2[2]) ./ 2
         panel.cm_coeffs = (c1[3] .+ c2[3]) ./ 2
-    elseif panel.aero_model == TAYLOR
-        c1, c2 = section_1.aero_data, section_2.aero_data
-        (c1 isa Tuple{Float64, Vector{Float64}, Vector{Float64}, Vector{Float64}} &&
-         c2 isa Tuple{Float64, Vector{Float64}, Vector{Float64}, Vector{Float64}}) ||
-            throw(ArgumentError("TAYLOR requires aero_data = " *
-                "(alpha_ref, cl_coeffs, cd_coeffs, cm_coeffs)."))
-        all(length.(c1[2:4]) .== length.(c2[2:4])) ||
-            throw(ArgumentError("TAYLOR coefficient vectors must have equal length."))
-        set_taylor_polar!(panel, (c1[1] + c2[1]) / 2, (c1[2] .+ c2[2]) ./ 2,
-                          (c1[3] .+ c2[3]) ./ 2, (c1[4] .+ c2[4]) ./ 2)
     elseif !(panel.aero_model in (POLAR_VECTORS, POLAR_MATRICES, INVISCID))
         throw(ArgumentError("Unsupported aero model: $(panel.aero_model)"))
     end
@@ -241,61 +233,69 @@ function init_aero!(panel::Panel, section_1::Section, section_2::Section;
 end
 
 """
-    taylor_value(coeffs, delta_alpha, window)
+    sampled_value(knots, values, alpha)
 
-A `TAYLOR` polar's coefficient at `delta_alpha = α - α_ref` [rad], continued linearly
-beyond `±window`. A local expansion's arms diverge fast outside the range it was fitted
-over — an order-2 fit is worse than useless a few degrees out — so past the edge the
-polynomial's own value and slope there carry it on instead. That keeps a solve stepping
-outside the window convergent and honest about being extrapolated, rather than chasing a
-parabola to infinity; the caller's drift guard is what puts the fit back where the solve
-went. `window = 0` leaves the polynomial unbounded.
+A `SAMPLED` polar's coefficient at `alpha` [rad]: linear between the knots it was
+sampled on, and the end value beyond either end. Flat ends are the point — the
+polar of a stalled section has a knee that no polynomial holds, and a coefficient
+carried on past the samples must stay bounded rather than follow a slope out.
 
-The continuation is a straight line, so it says nothing about stall and can carry a
-coefficient somewhere physically impossible. [`calculate_cd`](@ref) therefore floors
-its result at zero: every other coefficient may be extrapolated, but a negative drag
-would feed energy into whatever reads it.
+`knots` is ascending; a single knot is a constant polar.
 """
-@inline function taylor_value(coeffs, delta_alpha, window)
-    if window > 0 && abs(delta_alpha) > window
-        edge = delta_alpha >= 0 ? window : -window
-        slope = sum((k - 1) * coeffs[k] * edge^(k - 2) for k in 2:length(coeffs);
-                    init = 0.0)
-        return evalpoly(edge, coeffs) + slope * (delta_alpha - edge)
+@inline function sampled_value(knots, values, alpha)
+    n = length(knots)
+    n == 0 && throw(ArgumentError("A SAMPLED polar has no knots."))
+    alpha <= knots[1] && return values[1]
+    alpha >= knots[n] && return values[n]
+    hi = 2
+    @inbounds while alpha > knots[hi]
+        hi += 1
     end
-    return evalpoly(delta_alpha, coeffs)
+    @inbounds begin
+        span = knots[hi] - knots[hi - 1]
+        blend = span > 0 ? (alpha - knots[hi - 1]) / span : zero(alpha)
+        return values[hi - 1] + blend * (values[hi] - values[hi - 1])
+    end
 end
 
 """
-    set_taylor_polar!(panel, alpha_ref, cl_coeffs, cd_coeffs, cm_coeffs; window=0.0,
-                      shape=nothing)
+    set_sampled_polar!(panel, alphas, cl, cd, cm; shape=nothing)
 
-Overwrite a `TAYLOR` panel's local polar: the expansion point `alpha_ref` [rad], the
-ascending coefficients of the polynomials in `α - alpha_ref`, and the half width
-`window` [rad] the fit is valid over, past which it is continued linearly (see
-[`taylor_value`](@ref)). Copies into the panel's existing coefficient vectors when the
-order is unchanged, so a live polar source can refit every solve without allocating.
-The panel's aero model is set to `TAYLOR`.
+Overwrite a panel's local polar with values sampled at `alphas` [rad], ascending.
+The panel's aero model is set to `SAMPLED`.
 
-`shape` is the [`KulfanParameters`](@ref) the coefficients were generated from, stored
-on the panel as `live_shape`. It is the object that was sampled, not a copy or a
-re-derivation, and it is written here so a panel's polar and the shape behind it are
-set together and cannot drift apart — which is what makes a plot of `live_shape` a
-picture of what the solve actually flew rather than of what it should have.
+Written in place: the knots and the three value vectors reuse the panel's own
+`alpha_knots` and `cl_coeffs`/`cd_coeffs`/`cm_coeffs` storage whenever the sample
+count is unchanged, which is what lets a live polar source refresh every solve
+without allocating. The vectors hold sampled values here rather than polynomial
+coefficients — the aero model is what says which.
+
+The samples are the polar, so a stall knee between two of them is represented rather
+than smoothed into a slope — which is the whole reason a live source samples instead
+of fitting.
+
+`shape` is the [`KulfanParameters`](@ref) the values were generated from, stored on
+the panel as `live_shape` so a panel's polar and the shape behind it are set
+together and cannot drift apart.
 """
-function set_taylor_polar!(panel::Panel, alpha_ref, cl_coeffs, cd_coeffs, cm_coeffs;
-                           window=0.0, shape=nothing)
-    panel.aero_model = TAYLOR
-    panel.alpha_ref = Float64(alpha_ref)
-    panel.alpha_window = Float64(window)
+function set_sampled_polar!(panel::Panel, alphas, cl, cd, cm; shape=nothing)
+    length(alphas) == length(cl) == length(cd) == length(cm) ||
+        throw(ArgumentError("A SAMPLED polar needs one value per angle; got " *
+            "$(length(alphas)) angles and $(length(cl))/$(length(cd))/" *
+            "$(length(cm)) values."))
+    issorted(alphas) ||
+        throw(ArgumentError("A SAMPLED polar needs ascending angles."))
+    panel.aero_model = SAMPLED
+    panel.alpha_ref = alphas[(length(alphas) + 1) ÷ 2]
+    panel.alpha_window = maximum(abs, alphas .- panel.alpha_ref)
     panel.live_shape = shape
-    for (dst_sym, src) in ((:cl_coeffs, cl_coeffs), (:cd_coeffs, cd_coeffs),
-                           (:cm_coeffs, cm_coeffs))
+    for (dst_sym, src) in ((:alpha_knots, alphas), (:cl_coeffs, cl),
+                           (:cd_coeffs, cd), (:cm_coeffs, cm))
         dst = getfield(panel, dst_sym)
         if length(dst) == length(src)
             dst .= src
         else
-            setfield!(panel, dst_sym, Vector{Float64}(src))
+            setfield!(panel, dst_sym, collect(Float64, src))
         end
     end
     return nothing
@@ -410,9 +410,8 @@ function calculate_cl(panel::Panel{Tp}, alpha::Ta, delta::Td) where {Tp, Ta, Td}
             cl = 2 * cos(alpha) * sin(alpha)^2
         end
         return R(cl)
-    elseif panel.aero_model == TAYLOR
-        return R(taylor_value(panel.cl_coeffs, alpha - panel.alpha_ref,
-                              panel.alpha_window))
+    elseif panel.aero_model == SAMPLED
+        return R(sampled_value(panel.alpha_knots, panel.cl_coeffs, alpha))
     elseif panel.aero_model == INVISCID
         return R(2π * alpha)
     end
@@ -441,12 +440,9 @@ function calculate_cd(panel::Panel{Tp}, alpha::Ta, delta::Td) where {Tp, Ta, Td}
             return R(2 * sin(alpha)^3)
         end
         return R(evalpoly(rad2deg(alpha), panel.cd_coeffs))
-    elseif panel.aero_model == TAYLOR
-        # A drag fit has its minimum inside the window, so the slope at the lower
-        # edge points down and the continuation would carry it through zero into a
-        # negative drag — an energy source, not an extrapolation.
-        return R(max(zero(R), taylor_value(panel.cd_coeffs, alpha - panel.alpha_ref,
-                                           panel.alpha_window)))
+    elseif panel.aero_model == SAMPLED
+        return R(max(zero(R),
+                     sampled_value(panel.alpha_knots, panel.cd_coeffs, alpha)))
     elseif panel.aero_model in (POLAR_VECTORS, POLAR_MATRICES)
         cd_interp = panel.cd_interp
         cd_interp === nothing &&
@@ -473,9 +469,8 @@ function calculate_cm(panel::Panel{Tp}, alpha::Ta, delta::Td) where {Tp, Ta, Td}
     isnan(alpha) && return R(NaN)
     if panel.aero_model == POLY
         return R(evalpoly(rad2deg(alpha), panel.cm_coeffs))
-    elseif panel.aero_model == TAYLOR
-        return R(taylor_value(panel.cm_coeffs, alpha - panel.alpha_ref,
-                              panel.alpha_window))
+    elseif panel.aero_model == SAMPLED
+        return R(sampled_value(panel.alpha_knots, panel.cm_coeffs, alpha))
     elseif panel.aero_model in (POLAR_VECTORS, POLAR_MATRICES)
         cm_interp = panel.cm_interp
         cm_interp === nothing &&

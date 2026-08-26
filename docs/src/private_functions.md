@@ -98,8 +98,9 @@ update_non_deformed_sections!
 ### Aerodynamic data and Cp
 ```@docs
 calculate_new_aero_data
-set_taylor_polar!
-taylor_value
+set_sampled_polar!
+decode_surface_velocity
+sampled_value
 assemble_polar_matrix
 load_matrix_polar_data
 read_aero_matrix
@@ -184,6 +185,7 @@ contour_arc
 arc_at_chord
 trailing_edge_speed
 velocity_knots
+contour_pressure
 fill_node_nans!
 ```
 

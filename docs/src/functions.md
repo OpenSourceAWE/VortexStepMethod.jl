@@ -47,7 +47,13 @@ chord_line
 control_point_deflection
 panel_kulfan_parameters
 refresh_live_polars!
+deform_live_shapes!
+apply_live_shapes!
 polar_drift
+refresh_live_pressure!
+live_surface_friction!
+contour_shape_matrix
+live_shape_offset!
 generate_aero_matrices
 generate_polar_from_coordinates
 generate_polar_from_dat

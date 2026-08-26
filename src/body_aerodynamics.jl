@@ -224,9 +224,9 @@ function calculate_stall_angle_list!(stall_angles::AbstractVector,
         # Default stall angle if none found
         panel_stall = stall_angle_if_none_detected
 
-        # A local expansion says nothing outside its fit window, so its curvature must
-        # not be read as a stall peak far from the operating point.
-        if panel.aero_model == TAYLOR
+        # A live polar only spans the window it was sampled over, so neither its
+        # curvature nor its flat ends may be read as a stall peak outside that.
+        if panel.aero_model == SAMPLED
             stall_angles[idx] = panel_stall
             continue
         end
