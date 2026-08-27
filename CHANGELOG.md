@@ -3,25 +3,31 @@
 ## Unreleased
 
 ### Fixed
+
 - The NeuralFoil surface pressure is now reconstructed from the predicted edge
   velocities in arc length, not by interpolating `Cp` in chord fraction.
-  NeuralFoil samples at the cell centres of a uniform grid, so it reports nothing
-  over the first and last `1/2N` of chord; the old code extrapolated `Cp` off the
-  end of each surface independently. Through a stagnation point `ue` is linear in
-  arc length while `Cp` is quadratic, so that extrapolated a parabola through its
-  own turning point: on an SK100 section it put `Cp = -1.60` at the leading edge,
-  where it has to approach `+1`, and the two surfaces disagreed at the trailing
-  edge in violation of the Kutta condition. Signing the lower surface negative
-  makes both surfaces one continuous curve through stagnation, so the nose is
-  interpolated rather than extrapolated, and the trailing edge takes one speed for
-  both surfaces. Integrating that section's surface traction now recovers 98% of
-  NeuralFoil's own reported drag where it previously came out with the wrong sign.
-  `neuralfoil_section` returns `ue_upper`/`ue_lower` alongside the pressures.
-
-## VortexStepMethod v4.2.0 2026-08-25
+  NeuralFoil samples at the cell centres of a uniform grid, so it reports
+  nothing over the first and last `1/2N` of chord; the old code extrapolated
+  `Cp` off the end of each surface independently. Through a stagnation point
+  `ue` is linear in arc length while `Cp` is quadratic, so that extrapolated a
+  parabola through its own turning point: on an SK100 section it put
+  `Cp = -1.60` at the leading edge, where it has to approach `+1`, and the two
+  surfaces disagreed at the trailing edge in violation of the Kutta condition.
+  Signing the lower surface negative makes both surfaces one continuous curve
+  through stagnation, so the nose is interpolated rather than extrapolated, and
+  the trailing edge takes one speed for both surfaces. Integrating that
+  section's surface traction now recovers 98% of NeuralFoil's own reported drag
+  where it previously came out with the wrong sign. `neuralfoil_section` returns
+  `ue_upper`/`ue_lower` alongside the pressures.
 
 ### Added
 
+- BREAKING: the `TAYLOR` aero model is gone, with `taylor_value` and
+  `set_taylor_polar!`. An order-2 polynomial cannot hold a stall knee: fitted
+  over a window wider than the knee it averages across it, narrower and it never
+  reaches it, and past the window it continued on whatever edge slope it ended
+  with — which on an SK100 tip panel was negative where the local slope was
+  `+0.05`/deg, and took the circulation solve to `NaN`. `SAMPLED` replaces it.
 - `SAMPLED` aero model: cl/cd/cm sampled at ascending angles of attack per
   panel, interpolated between them and held flat past either end. This is what a
   live polar source writes every solve; `set_sampled_polar!` rewrites a panel's
@@ -50,9 +56,16 @@
   airfoil was deformed by, so the normals and segment areas a traction is built
   from are the deformed section's rather than the reference one's — the chord
   fractions never move, only the offsets, so a surface→point map built on that
-  contour stays valid. `decode_surface_pressure` and `contour_pressure` also
+  contour stays valid. `decode_surface_velocity` and `contour_pressure` also
   back the `NeuralFoilSolver` contour assembly, so the live path and the offline
-  table generator are one implementation.
+  table generator reconstruct pressure the same way.
+- `compare_live_polar` solves one panel's current deformed shape in XFoil and
+  puts the answer next to the live polar the panel is flying, at the same angle
+  and Reynolds and under `live_xfoil_solver`'s matched transition settings. A
+  `LivePolars` now keeps each panel's analysis confidence, so the panel worth
+  asking about is the one to hand. NeuralFoil's confidence scores the input
+  shape rather than the answer, so a deformed section far from its training set
+  reads low whether or not the polar is wrong; this is what tells the two apart.
 - `prepare_inputs` accepts one Kulfan shape per case, so a whole wing goes
   through NeuralFoil in a single forward pass.
 - A panel carries the deformed airfoil its polar was generated from as
@@ -61,6 +74,11 @@
   handed, not a re-derivation, so a deformation bug is visible in the picture.
   `KulfanParameters` moved from `AirfoilAero` into the core module for it; it is
   still exported from both.
+
+## VortexStepMethod v4.2.0 2026-08-25
+
+### Added
+
 - Shared panel aerodynamics (`src/panel_aerodynamics.jl`): the per-panel physics
   written once as pure, branch-free, number-type-generic functions of the
   section geometry and the flow — `panel_axes`, `panel_inflow`,

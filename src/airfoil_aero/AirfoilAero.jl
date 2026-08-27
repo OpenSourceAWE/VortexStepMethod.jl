@@ -9,7 +9,8 @@ using Xfoil
 using Printf: @sprintf
 using ..VortexStepMethod: SectionAero, interpolate_matrix_nans!, delta_suffix,
                           write_node_rows, section_surface, set_sampled_polar!,
-                          KulfanParameters
+                          KulfanParameters, calculate_cl, calculate_cd,
+                          calculate_cm
 
 include("kulfan.jl")
 include("deform.jl")
@@ -37,7 +38,7 @@ export chord_residual, chord_line
 export LivePolarSettings, LivePolars, panel_kulfan_parameters
 export refresh_live_polars!, refresh_live_pressure!, live_surface_friction!
 export contour_shape_matrix, live_shape_offset!
-export polar_drift
+export polar_drift, compare_live_polar
 export AbstractAirfoilSolver, XFoilSolver, NeuralFoilSolver
 export SectionSolution, DeformedSection, deform_section, analyze_section, analyze_sweep
 export create_2d_polars, generate_aero_matrices, generate_section_aero, lei_poly_coeffs
