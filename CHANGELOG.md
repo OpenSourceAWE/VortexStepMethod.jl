@@ -61,7 +61,11 @@
   table generator reconstruct pressure the same way.
 - `compare_live_polar` solves one panel's current deformed shape in XFoil and
   puts the answer next to the live polar the panel is flying, at the same angle
-  and Reynolds and under `live_xfoil_solver`'s matched transition settings. A
+  and Reynolds and under `live_xfoil_solver`'s matched transition settings. XFoil
+  is marched out from zero rather than jumped to the angle — the viscous march
+  refuses a blunt inflated section otherwise, and on the SK100's deformed
+  mid-span it refused every one — and the comparison is made at the nearest angle
+  it reached, reported as `alpha` beside the `requested` one. A
   `LivePolars` now keeps each panel's analysis confidence, so the panel worth
   asking about is the one to hand. NeuralFoil's confidence scores the input
   shape rather than the answer, so a deformed section far from its training set

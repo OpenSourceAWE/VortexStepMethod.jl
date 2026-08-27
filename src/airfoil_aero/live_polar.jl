@@ -228,8 +228,13 @@ live_xfoil_solver(live::LivePolars) =
 
 One viscous solve of panel `panel_idx`'s current deformed shape against the live polar
 that panel is flying, at the same angle and Reynolds. Returns
-`(; panel_idx, alpha, reynolds, confidence, cl, cd, cm)`, each coefficient a
+`(; panel_idx, alpha, requested, reynolds, confidence, cl, cd, cm)`, each coefficient a
 `(live, reference)` pair.
+
+XFoil is marched out from zero in `ramp_step` increments rather than jumped to the
+angle, and the comparison is made at the nearest angle it converged at — `alpha` is
+that angle and `requested` the one asked for. Both coefficients are read there, so the
+pair stays like for like even when the march stops short.
 
 Run it when `confidence` is low. A confidence is the network's opinion of its own
 inputs — a shape far from what it was trained on scores badly whether or not the answer
@@ -237,19 +242,42 @@ is wrong — so it says to go and check, not what the check will find. `cl` here
 off the panel's `SAMPLED` polar rather than from a fresh network call, so what is
 compared is what the solver actually flew.
 
-A non-converged reference point comes back `NaN` rather than throwing, so a sweep over
-panels does not stop at the first one that fails.
+A reference that will not converge anywhere on the ramp comes back `NaN` rather than
+throwing, so a sweep over panels does not stop at the first one that fails.
 """
 function compare_live_polar(live::LivePolars, panel, panel_idx, alpha, reynolds;
-                            solver=live_xfoil_solver(live))
+                            solver=live_xfoil_solver(live), ramp_step=deg2rad(1.0))
     shape = live.deformed[panel_idx]
     x, y = kulfan_to_coordinates(shape)
     section = DeformedSection(shape, collect(float.(x)), collect(float.(y)))
-    reference = analyze_section(solver, section, alpha, reynolds)
-    return (; panel_idx, alpha, reynolds, confidence=live.confidence[panel_idx],
-            cl=(calculate_cl(panel, alpha), reference.cl),
-            cd=(calculate_cd(panel, alpha), reference.cd),
-            cm=(calculate_cm(panel, alpha), reference.cm))
+    angles = xfoil_ramp(alpha, ramp_step)
+    solutions = analyze_sweep(solver, section, angles, reynolds)
+    usable = [k for k in eachindex(angles) if !isnan(solutions[k].cl)]
+    k = isempty(usable) ? length(angles) :
+        usable[argmin(abs.(angles[usable] .- alpha))]
+    at, reference = angles[k], solutions[k]
+    return (; panel_idx, alpha=at, requested=alpha, reynolds,
+            confidence=live.confidence[panel_idx],
+            cl=(calculate_cl(panel, at), reference.cl),
+            cd=(calculate_cd(panel, at), reference.cd),
+            cm=(calculate_cm(panel, at), reference.cm))
+end
+
+"""
+    xfoil_ramp(alpha, step) -> Vector{Float64}
+
+Angles [rad] from zero out to `alpha` in `step` increments, `alpha` itself last. The
+viscous march refuses a blunt inflated section jumped straight to its angle, and
+`analyze_sweep` reinitialises at zero and walks outward, so handing it the whole ramp
+is what gets the reference solved at all.
+"""
+function xfoil_ramp(alpha, step)
+    step = abs(step)
+    (step <= 0 || !isfinite(alpha)) && return [float(alpha)]
+    angles = collect(range(0.0, float(alpha); step=alpha < 0 ? -step : step))
+    isempty(angles) && return [float(alpha)]
+    last(angles) ≈ alpha || push!(angles, float(alpha))
+    return angles
 end
 
 """
