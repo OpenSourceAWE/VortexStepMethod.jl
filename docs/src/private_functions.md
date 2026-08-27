@@ -101,6 +101,7 @@ calculate_new_aero_data
 set_sampled_polar!
 decode_surface_velocity
 live_xfoil_solver
+xfoil_ramp
 sampled_value
 assemble_polar_matrix
 load_matrix_polar_data
