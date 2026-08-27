@@ -138,6 +138,16 @@ end
     @test sweep(range(-12, 6, 37)) < 0.02
     @test sweep(range(-12, 12, 49)) < 0.08
 
+    # The confidence is kept per panel, so the comparison can pick the panel worth
+    # asking about. It reads the polar the panel flies rather than re-running the
+    # network, and on an undeformed section XFoil has to agree with it.
+    @test length(live.confidence) == n_panels
+    @test all(0.0 .< live.confidence .<= 1.0)
+    check = compare_live_polar(live, panels[1], 1, deg2rad(6.0), 3e6)
+    @test check.confidence == live.confidence[1]
+    @test check.cl[1] ≈ calculate_cl(panels[1], deg2rad(6.0))
+    @test isapprox(check.cl[1], check.cl[2]; atol=0.05)
+
     @test polar_drift(live, fill(deg2rad(6.0), n_panels)) ≈ 0.0 atol = 1e-12
     @test polar_drift(live, fill(deg2rad(18.0), n_panels)) ≈ 1.0
 

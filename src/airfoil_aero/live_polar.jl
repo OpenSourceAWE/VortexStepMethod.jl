@@ -54,6 +54,8 @@ mutable struct LivePolars
     inputs::Matrix{Float32}
     "`25 × n_panels` network input scratch for the surface-pressure pass."
     pressure_inputs::Matrix{Float32}
+    "Lowest confidence NeuralFoil reported over each panel's samples, last refresh."
+    confidence::Vector{Float64}
 end
 
 function LivePolars(base::AbstractVector{KulfanParameters};
@@ -73,7 +75,7 @@ function LivePolars(base::AbstractVector{KulfanParameters};
                       collect(base), collect(base), zeros(n_panels),
                       zeros(length(offsets)),
                       zeros(Float32, 25, n_panels * length(offsets)),
-                      zeros(Float32, 25, n_panels))
+                      zeros(Float32, 25, n_panels), zeros(n_panels))
 end
 
 """
@@ -201,11 +203,53 @@ function refresh_live_polars!(live::LivePolars, panels, alpha_ref, reynolds;
     for i in 1:n_panels
         samples = ((i - 1) * n_samples + 1):(i * n_samples)
         live.knots .= alpha_vec[i] .+ offsets
+        live.confidence[i] = minimum(view(confidence, samples))
         set_sampled_polar!(panels[i], live.knots, view(cl, samples),
                            view(cd, samples), view(cm, samples);
                            shape=live.deformed[i])
     end
     return minimum(confidence)
+end
+
+"""
+    live_xfoil_solver(live::LivePolars) -> XFoilSolver
+
+XFoil settings matching the ones the live polars were evaluated at: the same critical
+amplification factor, and free transition on both surfaces, which is what
+[`refresh_live_polars!`](@ref) feeds the network. A comparison run at other settings
+measures the settings rather than the network.
+"""
+live_xfoil_solver(live::LivePolars) =
+    XFoilSolver(; ncrit=live.settings.n_crit, xtrip=(1.0, 1.0))
+
+"""
+    compare_live_polar(live::LivePolars, panel, panel_idx, alpha, reynolds;
+                       solver=live_xfoil_solver(live)) -> NamedTuple
+
+One viscous solve of panel `panel_idx`'s current deformed shape against the live polar
+that panel is flying, at the same angle and Reynolds. Returns
+`(; panel_idx, alpha, reynolds, confidence, cl, cd, cm)`, each coefficient a
+`(live, reference)` pair.
+
+Run it when `confidence` is low. A confidence is the network's opinion of its own
+inputs — a shape far from what it was trained on scores badly whether or not the answer
+is wrong — so it says to go and check, not what the check will find. `cl` here is read
+off the panel's `SAMPLED` polar rather than from a fresh network call, so what is
+compared is what the solver actually flew.
+
+A non-converged reference point comes back `NaN` rather than throwing, so a sweep over
+panels does not stop at the first one that fails.
+"""
+function compare_live_polar(live::LivePolars, panel, panel_idx, alpha, reynolds;
+                            solver=live_xfoil_solver(live))
+    shape = live.deformed[panel_idx]
+    x, y = kulfan_to_coordinates(shape)
+    section = DeformedSection(shape, collect(float.(x)), collect(float.(y)))
+    reference = analyze_section(solver, section, alpha, reynolds)
+    return (; panel_idx, alpha, reynolds, confidence=live.confidence[panel_idx],
+            cl=(calculate_cl(panel, alpha), reference.cl),
+            cd=(calculate_cd(panel, alpha), reference.cd),
+            cm=(calculate_cm(panel, alpha), reference.cm))
 end
 
 """

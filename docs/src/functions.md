@@ -50,6 +50,7 @@ refresh_live_polars!
 deform_live_shapes!
 apply_live_shapes!
 polar_drift
+compare_live_polar
 refresh_live_pressure!
 live_surface_friction!
 contour_shape_matrix
