@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## VortexStepMethod v4.3.0 2026-08-31
 
 ### Fixed
 
