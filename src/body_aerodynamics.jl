@@ -4,9 +4,9 @@
 Main structure for calculating aerodynamic properties of bodies. Use the constructor to initialize.
 
 # Fields
-- panels::Vector{<:Panel}: Vector of refined [Panel](@ref) structs
+- panels::Vector{<:Panel}: Vector of refined [`Panel`](@ref) structs
 - wings::Vector{W}: A vector of wings of type `W <: AbstractWing`; a body can have multiple wings
-- `va::MVec3` = zeros(MVec3):   A vector of the apparent wind speed, see: [MVec3](@ref)
+- `va::MVec3` = zeros(MVec3):   A vector of the apparent wind speed, see: [`MVec3`](@ref)
 - `omega`::MVec3 = zeros(MVec3): A vector of the turn rates around the kite body axes
 - `gamma_distribution`=zeros(Float64, P): A vector of the circulation
                         of the velocity field; Length: Number of segments. [m²/s]
@@ -55,7 +55,7 @@ end
     BodyAerodynamics(wings::Vector{T}; 
                      kite_body_origin=zeros(MVec3)) where T <: AbstractWing
 
-Construct a [BodyAerodynamics](@ref) object for aerodynamic calculations.
+Construct a [`BodyAerodynamics`](@ref) object for aerodynamic calculations.
 
 This constructor handles initialization of panels, coordinate transformations, and
 aerodynamic properties, returning a fully initialized structure ready for simulation.
@@ -69,7 +69,7 @@ aerodynamic properties, returning a fully initialized structure ready for simula
 - `omega=zeros(3)`: Turn rate in kite body frame x y and z
 
 # Returns
-- [BodyAerodynamics](@ref) object initialized with panels and wings
+- [`BodyAerodynamics`](@ref) object initialized with panels and wings
 
 # Example
 ```julia
@@ -390,7 +390,7 @@ end
 
 Calculate Aerodynamic Influence Coefficient matrices.
 
-See also: [BodyAerodynamics](@ref), [Model](@ref)
+See also: [`BodyAerodynamics`](@ref), [`Model`](@ref)
 
 Returns: nothing
 """
@@ -1080,7 +1080,7 @@ end
 Set velocity array and update wake filaments.
 
 # Arguments
-- body_aero::BodyAerodynamics: The [BodyAerodynamics](@ref) struct to modify
+- body_aero::BodyAerodynamics: The [`BodyAerodynamics`](@ref) struct to modify
 - `va::VelVector`: Velocity vector of the apparent wind speed           [m/s]
 - `omega::VelVector`: Turn rate vector around x y and z axis            [rad/s]
 

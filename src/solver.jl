@@ -2,7 +2,7 @@
 """
     VSMSolution
 
-Struct for storing the solution of the [solve!](@ref) function. Must contain all info needed by `KiteModels.jl`.
+Struct for storing the solution of the [`solve!`](@ref) function. Must contain all info needed by `KiteModels.jl`.
 
 # Naming Convention
 - Variables ending in `_dist`: Per-panel distributions (length P, one value per panel)
@@ -32,7 +32,7 @@ Struct for storing the solution of the [solve!](@ref) function. Must contain all
 - `cm_unrefined_dist`::MVector{U, Float64}: Averaged airfoil moment coefficients for unrefined sections [-]
 - `moment_coeff_unrefined_dist`::MVector{U, Float64}: Summed `moment_frac`-referenced pitching-moment coefficient per unrefined section [-]
 - `alpha_unrefined_dist`::MVector{U, Float64}: Averaged angles of attack for unrefined sections [rad]
-- `solver_status`::SolverStatus: enum, see [SolverStatus](@ref)
+- `solver_status`::SolverStatus: enum, see [`SolverStatus`](@ref)
 """
 @with_kw mutable struct VSMSolution{P, U, T}
     ### private vectors of solve_base!
@@ -107,12 +107,12 @@ end
 """
     Solver
 
-Main solver structure for the Vortex Step Method.See also: [solve](@ref)
+Main solver structure for the Vortex Step Method.See also: [`solve`](@ref)
 
 # Attributes
 
 ## General settings
-- `aerodynamic_model_type`::Model = VSM: The model type, see: [Model](@ref)
+- `aerodynamic_model_type`::Model = VSM: The model type, see: [`Model`](@ref)
 - density::Float64 = 1.225: Air density [kg/m³] 
 - `max_iterations`::Int64 = 1500
 - `rtol`::Float64 = 1e-5: relative error
@@ -130,7 +130,7 @@ Main solver structure for the Vortex Step Method.See also: [solve](@ref)
     (the conservative envelope from the paper)
 
 ## Additional settings
-- `type_initial_gamma_distribution`::InitialGammaDistribution = ZEROS: see: [InitialGammaDistribution](@ref)
+- `type_initial_gamma_distribution`::InitialGammaDistribution = ZEROS: see: [`InitialGammaDistribution`](@ref)
 - `use_gamma_prev`::Bool = true: reuse provided previous gamma as initial guess when available
 - `core_radius_fraction`::Float64 = 0.05: Bound vortex core cut-off, as a fraction of the
     filament length, following Damiani et al. (2019)
@@ -141,7 +141,7 @@ Main solver structure for the Vortex Step Method.See also: [solve](@ref)
 - `reference_point`::MVec3 = [0.0, 0.0, 0.0]: Moment reference point in body frame
 
 ## Solution
-sol::VSMSolution = VSMSolution(): The result of calling [solve!](@ref) 
+sol::VSMSolution = VSMSolution(): The result of calling [`solve!`](@ref) 
 """
 @with_kw mutable struct Solver{P, U, T}
     # General settings
@@ -232,8 +232,8 @@ This version is modifying the `solver.sol` struct and is faster than the `solve`
 a dictionary.
 
 # Arguments:
-- solver::Solver: The solver to use, could be a VSM or LLT solver. See: [Solver](@ref)
-- body_aero::BodyAerodynamics: The aerodynamic body. See: [BodyAerodynamics](@ref)
+- solver::Solver: The solver to use, could be a VSM or LLT solver. See: [`Solver`](@ref)
+- body_aero::BodyAerodynamics: The aerodynamic body. See: [`BodyAerodynamics`](@ref)
 - gamma_distribution: Initial circulation vector or nothing; Length: Number of segments. [m²/s]
 
 # Keyword Arguments:
@@ -242,7 +242,7 @@ a dictionary.
 - moment_frac=0.1: X-coordinate of normalized panel around which the moment distribution should be calculated.
 
 # Returns
-The solution of type [VSMSolution](@ref)
+The solution of type [`VSMSolution`](@ref)
 """
 function solve!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics, gamma_distribution=solver.sol.gamma_distribution;
         log=false, reference_point=solver.reference_point, moment_frac=0.1) where {P, U, T}
@@ -521,11 +521,11 @@ end
           log=false, reference_point=solver.reference_point)
 
 Main solving routine for the aerodynamic model. Reference point is in the kite body (KB) frame.
-See also: [solve!](@ref)
+See also: [`solve!`](@ref)
 
 # Arguments:
-- solver::Solver: The solver to use, could be a VSM or LLT solver. See: [Solver](@ref)
-- body_aero::BodyAerodynamics: The aerodynamic body. See: [BodyAerodynamics](@ref)
+- solver::Solver: The solver to use, could be a VSM or LLT solver. See: [`Solver`](@ref)
+- body_aero::BodyAerodynamics: The aerodynamic body. See: [`BodyAerodynamics`](@ref)
 - gamma_distribution: Initial circulation vector or nothing; Length: Number of segments. [m²/s]
 
 # Keyword Arguments:

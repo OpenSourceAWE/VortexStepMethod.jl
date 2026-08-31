@@ -8,7 +8,7 @@ Uses one shared wake vector computed from area-weighted distributed inflow.
 Replaces older filaments if present by checking length of filaments.
 
 # Arguments
-- `body_aero`::BodyAerodynamics: see: [BodyAerodynamics](@ref) 
+- `body_aero`::BodyAerodynamics: see: [`BodyAerodynamics`](@ref) 
 - `va_distribution::Matrix{Float64}`: Array of velocity vectors at each panel
 
 # Returns

@@ -11,7 +11,7 @@ Represents a panel in a vortex step method simulation. All points and vectors ar
 - `chord`::Float64=0: Panel chord length
 - `va`::MVec3=zeros(MVec3): Panel velocity
 - `corner_points`::MMatrix{3, 4, Float64}=zeros(MMatrix{3, 4, Float64}: Panel corner points
-- `aero_model`::AeroModel=INVISCID: Aerodynamic model type [AeroModel](@ref)
+- `aero_model`::AeroModel=INVISCID: Aerodynamic model type [`AeroModel`](@ref)
 - `aero_center::Vector{Float64}`: Panel aerodynamic center
 - cl_coeffs::Vector{Float64}=zeros(Float64, 3)
 - cd_coeffs::Vector{Float64}=zeros(Float64, 3)
@@ -19,7 +19,7 @@ Represents a panel in a vortex step method simulation. All points and vectors ar
 - cl_interp::CL = nothing: lift interpolation (its type is a struct parameter)
 - cd_interp::CD = nothing: drag interpolation
 - cm_interp::CM = nothing: moment interpolation
-- section_aero::SA = nothing: optional surface aero table, see [SectionAero](@ref)
+- section_aero::SA = nothing: optional surface aero table, see [`SectionAero`](@ref)
 - `control_point`::Vector{MVec3}: Panel control point
 - `bound_point_1`::Vector{MVec3}: First bound point
 - `bound_point_2`::Vector{MVec3}: Second bound point
@@ -33,7 +33,7 @@ Represents a panel in a vortex step method simulation. All points and vectors ar
         BoundFilament(),
         SemiInfiniteFilament(),
         SemiInfiniteFilament()
-    ): Panel filaments, see: [BoundFilament](@ref)
+    ): Panel filaments, see: [`BoundFilament`](@ref)
 - `delta`::T=0: flap trailing-edge deflection [rad]
 - `crease_frac`::T=0: chordwise flap-hinge fraction (0–1); 0 disables the plate kink
 - `alpha_ref`::Float64=0: reference angle [rad] of the `SAMPLED` polar

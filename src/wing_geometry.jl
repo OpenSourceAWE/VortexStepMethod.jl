@@ -6,10 +6,10 @@ Represents a wing section with leading edge, trailing edge, and aerodynamic prop
 # Fields
 - `LE_point::MVector{3, T}`: Leading edge point coordinates
 - `TE_point::MVector{3, T}`: Trailing edge point coordinates
-- `aero_model::AeroModel`: [AeroModel](@ref)
-- `aero_data::AeroData`: See: [AeroData](@ref)
+- `aero_model::AeroModel`: [`AeroModel`](@ref)
+- `aero_data::AeroData`: See: [`AeroData`](@ref)
 - `section_aero::Union{Nothing, SectionAero}`: optional surface aero table, see
-  [SectionAero](@ref)
+  [`SectionAero`](@ref)
 """
 mutable struct Section{T}
     LE_point::MVector{3, T}
@@ -167,11 +167,11 @@ end
 Update geometric properties for each panel.
 
 # Arguments
-- section_list::Vector{Section}: List of [Section](@ref)s
-- `n_panels`::Int: Number of [Panel](@ref)s
+- section_list::Vector{Section}: List of [`Section`](@ref)s
+- `n_panels`::Int: Number of [`Panel`](@ref)s
 
 # Returns:
-`nothing`, updates the [PanelProperties](@ref) in-place
+`nothing`, updates the [`PanelProperties`](@ref) in-place
 """
 function update_panel_properties!(panel_props::PanelProperties{P,T}, section_list::AbstractVector{<:Section}, n_panels) where {P,T}
     coords = panel_props.coords
@@ -236,10 +236,10 @@ Represents a wing composed of multiple sections with aerodynamic properties.
 # Core Fields (all wings)
 - `n_panels::Int16`: Number of panels in aerodynamic mesh
 - `n_unrefined_sections::Int16`: Number of unrefined sections (sections before mesh refinement)
-- `spanwise_distribution`::PanelDistribution: [PanelDistribution](@ref)
+- `spanwise_distribution`::PanelDistribution: [`PanelDistribution`](@ref)
 - `spanwise_direction::MVec3`: Wing span direction vector
-- `sections::AbstractVector{<:Section}`: Vector of wing sections, see: [Section](@ref)
-- `refined_sections::AbstractVector{<:Section}`: Vector of refined wing sections, see: [Section](@ref)
+- `sections::AbstractVector{<:Section}`: Vector of wing sections, see: [`Section`](@ref)
+- `refined_sections::AbstractVector{<:Section}`: Vector of refined wing sections, see: [`Section`](@ref)
 - `remove_nan::Bool`: Wether to remove the NaNs from interpolations or not
 - `use_prior_polar::Bool`: Keep previously-initialized section/panel polar data when refining geometry updates
 - `crease_frac::Float64`: chordwise flap-hinge fraction (0–1) used when plotting the deflected plate
@@ -330,13 +330,13 @@ end
          use_prior_polar::Bool=false,
          billowing_percentage::Float64=0.0)
 
-Constructor for a [Wing](@ref) struct with default values that initializes the sections
+Constructor for a [`Wing`](@ref) struct with default values that initializes the sections
 and refined sections as empty arrays. Creates a basic wing suitable for YAML-based construction.
 
 # Parameters
 - `n_panels::Int`: Number of panels in aerodynamic mesh
 - `n_unrefined_sections::Int`: Number of unrefined sections (inferred from added sections for YAML wings)
-- `spanwise_distribution`::PanelDistribution = LINEAR: [PanelDistribution](@ref)
+- `spanwise_distribution`::PanelDistribution = LINEAR: [`PanelDistribution`](@ref)
 - `spanwise_direction::MVec3` = MVec3([0.0, 1.0, 0.0]): Wing span direction vector
 - `remove_nan::Bool`: Whether to remove the NaNs from interpolations or not
 - `use_prior_polar::Bool`: Reuse prior refined/panel polar mapping during geometry-only updates
@@ -718,13 +718,13 @@ end
 Add a new section to the wing.
 
 # Arguments:
-- wing::Wing: The [Wing](@ref) to which a section shall be added
-- LE_point::PosVector: [PosVector](@ref) of the point on the side of the leading edge
-- TE_point::PosVector: [PosVector](@ref) of the point on the side of the trailing edge
-- `aero_model`::AeroModel: [AeroModel](@ref)
-- `aero_data`::AeroData: See [AeroData](@ref)
+- wing::Wing: The [`Wing`](@ref) to which a section shall be added
+- LE_point::PosVector: [`PosVector`](@ref) of the point on the side of the leading edge
+- TE_point::PosVector: [`PosVector`](@ref) of the point on the side of the trailing edge
+- `aero_model`::AeroModel: [`AeroModel`](@ref)
+- `aero_data`::AeroData: See [`AeroData`](@ref)
 - `section_aero`::Union{Nothing, SectionAero}: optional surface aero table, see
-  [SectionAero](@ref)
+  [`SectionAero`](@ref)
 """
 function add_section!(wing::Wing{P, T}, LE_point, TE_point, aero_model::AeroModel,
                      aero_data::AeroData=nothing,

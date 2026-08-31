@@ -240,7 +240,7 @@ Enumeration of the implemented wing types.
 """
    AeroModel `POLY` `POLAR_VECTORS` `POLAR_MATRICES` `INVISCID` `SAMPLED`
 
-Enumeration of the implemented aerodynamic models. See also: [AeroData](@ref)
+Enumeration of the implemented aerodynamic models. See also: [`AeroData`](@ref)
 
 # Elements
 - `POLY`: α-polynomial coefficients for cl/cd/cm (e.g. Breukels LEI coeffs, generated
@@ -310,7 +310,7 @@ Enumeration of the implemented initial gamma distributions.
    SolverStatus FEASIBLE INFEASIBLE FAILURE
 
 Enumeration to report back the validity of the result of the solve! function.
-Used in the [VSMSolution](@ref) struct.
+Used in the [`VSMSolution`](@ref) struct.
 
 # Elements
 - FEASIBLE: The gamma distribution is physically feasible
@@ -340,7 +340,7 @@ abstract type AbstractWing{T} end
         Tuple{Vector{Float64}, Vector{Float64}, Matrix{Float64}, Matrix{Float64}, Matrix{Float64}}
     }
 
-Union of different definitions of the aerodynamic properties of a wing section. See also: [AeroModel](@ref)
+Union of different definitions of the aerodynamic properties of a wing section. See also: [`AeroModel`](@ref)
   - nothing for INVISCID
   - (`cl_coeffs`, `cd_coeffs`, `cm_coeffs`) α-polynomial coefficients for `POLY`
   - (`alpha_range`, `cl_vector`, `cd_vector`, `cm_vector`) for `POLAR_VECTORS`
