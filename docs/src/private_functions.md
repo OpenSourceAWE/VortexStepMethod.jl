@@ -99,9 +99,6 @@ update_non_deformed_sections!
 ```@docs
 calculate_new_aero_data
 set_sampled_polar!
-decode_surface_velocity
-live_xfoil_solver
-xfoil_ramp
 sampled_value
 assemble_polar_matrix
 load_matrix_polar_data
@@ -159,6 +156,7 @@ load_neuralfoil_model
 neuralfoil_section
 neuralfoil_fused_output
 fused_output
+decode_surface_velocity
 decode_coefficients
 nn_forward
 prepare_inputs
@@ -189,6 +187,8 @@ trailing_edge_speed
 velocity_knots
 contour_pressure
 fill_node_nans!
+live_xfoil_solver
+xfoil_ramp
 ```
 
 ## OBJ mesh conversion (ObjAdapter)
