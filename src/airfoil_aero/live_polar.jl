@@ -4,7 +4,7 @@
 
 How a live polar is sampled. Every solve, each panel's deformed shape is evaluated at
 its reference angle of attack plus each of `offsets`, and those values become the
-panel's `SAMPLED` polar directly — there is no fit in between.
+panel's polar table directly — there is no fit in between.
 
 Sampling rather than fitting is what lets a panel hold a stall. A polynomial over the
 same window averages the knee into a slope and past the peak returns a lift slope of
@@ -156,14 +156,15 @@ end
     refresh_live_polars!(live, panels, alpha_ref, reynolds; deflection=nothing)
         -> Float64
 
-Regenerate every panel's polar from its current shape and write it in as a `SAMPLED`
-polar (see [`set_sampled_polar!`](@ref VortexStepMethod.set_sampled_polar!)). Per panel:
+Regenerate every panel's polar table from its current shape and write it in
+(see [`set_polar!`](@ref VortexStepMethod.set_polar!)). Per panel:
 deform the base airfoil by `deflection` (a chord-normalized deflection on `live.basis.x`,
 or `nothing` to keep the base shape), evaluate NeuralFoil at `alpha_ref .+ offsets`, and
 hand those values straight to the panel.
 
 The write is in place — same knot count, same vectors — so a refresh every solve costs
-the forward pass and nothing else.
+the forward pass and the three interpolation rebuilds `Interpolations` needs to take the
+new values, which it copies rather than references.
 
 Each panel keeps the deformed shape it was evaluated at as its `live_shape`, so a plot
 draws the airfoil the network actually saw.
@@ -204,9 +205,8 @@ function refresh_live_polars!(live::LivePolars, panels, alpha_ref, reynolds;
         samples = ((i - 1) * n_samples + 1):(i * n_samples)
         live.knots .= alpha_vec[i] .+ offsets
         live.confidence[i] = minimum(view(confidence, samples))
-        set_sampled_polar!(panels[i], live.knots, view(cl, samples),
-                           view(cd, samples), view(cm, samples);
-                           shape=live.deformed[i])
+        set_polar!(panels[i], live.knots, view(cl, samples), view(cd, samples),
+                   view(cm, samples); shape=live.deformed[i])
     end
     return minimum(confidence)
 end
@@ -239,7 +239,7 @@ pair stays like for like even when the march stops short.
 Run it when `confidence` is low. A confidence is the network's opinion of its own
 inputs — a shape far from what it was trained on scores badly whether or not the answer
 is wrong — so it says to go and check, not what the check will find. `cl` here is read
-off the panel's `SAMPLED` polar rather than from a fresh network call, so what is
+off the panel's polar table rather than from a fresh network call, so what is
 compared is what the solver actually flew.
 
 A reference that will not converge anywhere on the ramp comes back `NaN` rather than

@@ -36,7 +36,7 @@ export calculate_projected_area, calculate_span
 export MVec3
 
 export LLT, Model, VSM
-export AeroModel, INVISCID, POLY, LEI_AIRFOIL_BREUKELS, POLAR_MATRICES, POLAR_VECTORS, SAMPLED
+export AeroModel, INVISCID, POLY, LEI_AIRFOIL_BREUKELS, POLAR_MATRICES, POLAR_VECTORS
 export KulfanParameters
 export BILLOWING, COSINE, LINEAR, PanelDistribution, SPLIT_PROVIDED, UNCHANGED
 export ELLIPTIC, InitialGammaDistribution, ZEROS
@@ -238,21 +238,19 @@ Enumeration of the implemented wing types.
 @enum WingType  RECTANGULAR CURVED ELLIPTICAL
 
 """
-   AeroModel `POLY` `POLAR_VECTORS` `POLAR_MATRICES` `INVISCID` `SAMPLED`
+   AeroModel `POLY` `POLAR_VECTORS` `POLAR_MATRICES` `INVISCID`
 
 Enumeration of the implemented aerodynamic models. See also: [`AeroData`](@ref)
 
 # Elements
 - `POLY`: α-polynomial coefficients for cl/cd/cm (e.g. Breukels LEI coeffs, generated
   by the `AirfoilAero` package). Core only evaluates the polynomial.
-- `POLAR_VECTORS`: Polar vectors as function of alpha (lookup tables with interpolation)
+- `POLAR_VECTORS`: Polar vectors as function of alpha (lookup tables with interpolation).
+  A panel's table may be rewritten at run time by [`set_polar!`](@ref
+  VortexStepMethod.set_polar!), which is how a live polar source regenerates it from the
+  panel's deformed shape each solve.
 - `POLAR_MATRICES`: Polar matrices as function of alpha and delta (lookup tables with interpolation)
 - INVISCID
-- `SAMPLED`: cl/cd/cm sampled at ascending angles of attack per panel, interpolated
-  between them and held flat past either end. This is what a live polar source writes
-  each solve, see [`refresh_live_polars!`](@ref
-  VortexStepMethod.AirfoilAero.refresh_live_polars!). Samples are the polar, so a stall
-  knee inside the sampled range is represented rather than smoothed. Ignores `delta`.
 
 `LEI_AIRFOIL_BREUKELS` is a deprecated alias of `POLY`.
 
@@ -263,7 +261,6 @@ where `alpha` is the angle of attack, `delta` is trailing edge angle.
    POLAR_VECTORS
    POLAR_MATRICES
    INVISCID
-   SAMPLED
 end
 
 """
@@ -345,9 +342,6 @@ Union of different definitions of the aerodynamic properties of a wing section. 
   - (`cl_coeffs`, `cd_coeffs`, `cm_coeffs`) α-polynomial coefficients for `POLY`
   - (`alpha_range`, `cl_vector`, `cd_vector`, `cm_vector`) for `POLAR_VECTORS`
   - (`alpha_range`, `delta_range`, `cl_matrix`, `cd_matrix`, `cm_matrix`) for `POLAR_MATRICES`
-
-`SAMPLED` carries no section-level data: it is written onto a panel at run time by a
-live polar source, never read from a section.
 
 where `alpha` is the angle of attack [rad], `delta` is trailing edge angle [rad], `cl` the lift coefficient,
 `cd` the drag coefficient and `cm` the pitching moment coefficient. The camber of a kite refers to 

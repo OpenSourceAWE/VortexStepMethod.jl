@@ -224,9 +224,10 @@ function calculate_stall_angle_list!(stall_angles::AbstractVector,
         # Default stall angle if none found
         panel_stall = stall_angle_if_none_detected
 
-        # A live polar only spans the window it was sampled over, so neither its
-        # curvature nor its flat ends may be read as a stall peak outside that.
-        if panel.aero_model == SAMPLED
+        # A table that stops short of the scan says nothing about a stall in it:
+        # past its end it is held flat, which is not a peak.
+        if panel.alpha_window > 0 &&
+           panel.alpha_ref + panel.alpha_window < deg2rad(begin_aoa)
             stall_angles[idx] = panel_stall
             continue
         end
