@@ -293,8 +293,11 @@ set_polar!(panel::Panel{<:Any, Nothing}, alphas, cl, cd, cm; shape=nothing) =
 """
     set_polar!(panel, alphas, cl, cd, cm; shape=nothing)
 
-Rewrite a panel's `POLAR_VECTORS` table with values at `alphas` [rad], ascending, and
-rebuild its interpolations. The panel's `alpha_ref` and `alpha_window` are taken from the
+Rewrite a panel's polar table with values at `alphas` [rad], ascending, and rebuild its
+interpolations. The table keeps the shape the panel was built with: a `POLAR_VECTORS`
+panel takes the angles as they are, and a `POLAR_MATRICES` panel takes them at every
+`delta` it already spans, since a regenerated polar carries its deflection as shape
+rather than as a flap angle and so says the same thing at each. The panel's `alpha_ref` and `alpha_window` are taken from the
 angles, so a table covering only a window around one angle is held at its ends rather than
 extrapolated past them (see [`window_alpha`](@ref)).
 
@@ -317,7 +320,7 @@ function set_polar!(panel::Panel, alphas, cl, cd, cm; shape=nothing)
         throw(ArgumentError("A polar table needs at least two angles."))
     issorted(alphas) ||
         throw(ArgumentError("A polar table needs ascending angles."))
-    panel.aero_model = POLAR_VECTORS
+    panel.aero_model = polar_model(panel.cl_interp)
     panel.alpha_ref = (alphas[1] + alphas[end]) / 2
     panel.alpha_window = (alphas[end] - alphas[1]) / 2
     panel.live_shape = shape
@@ -344,13 +347,29 @@ container, so the rebuilt object has the type the panel's field was parameterise
 Only the values need rebuilding — `Interpolations` holds the knots by reference — but
 they are what it copies, so the object is rebuilt until it can take them in place.
 """
-rebuild_polar(old, knots, values) =
+rebuild_polar(old::Interpolations.Extrapolation{<:Any, 1}, knots, values) =
     linear_interpolation(same_knots(old.itp.knots[1], knots), values;
                          extrapolation_bc=old.et)
+
+function rebuild_polar(old::Interpolations.Extrapolation{<:Any, 2}, knots, values)
+    deltas = old.itp.knots[2]
+    return linear_interpolation((same_knots(old.itp.knots[1], knots), deltas),
+                                repeat(values, 1, length(deltas));
+                                extrapolation_bc=old.et)
+end
 
 "The angles in the container the panel's interpolations were parameterised with."
 same_knots(::ScanKnots, knots) = ScanKnots(knots)
 same_knots(::AbstractVector, knots) = knots
+
+"""
+    polar_model(interp) -> AeroModel
+
+The model a rewritten table leaves the panel on: the one its interpolations were built
+with, since their shape is fixed by the panel's type.
+"""
+polar_model(::Interpolations.Extrapolation{<:Any, 1}) = POLAR_VECTORS
+polar_model(::Interpolations.Extrapolation{<:Any, 2}) = POLAR_MATRICES
 
 """
     reinit!(panel, section_1, section_2, aero_center, control_point, bound_point_1,
