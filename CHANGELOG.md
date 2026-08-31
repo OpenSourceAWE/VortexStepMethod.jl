@@ -10,7 +10,7 @@
   nothing over the first and last `1/2N` of chord; the old code extrapolated
   `Cp` off the end of each surface independently. Through a stagnation point
   `ue` is linear in arc length while `Cp` is quadratic, so that extrapolated a
-  parabola through its own turning point: on an SK100 section it put
+  parabola through its own turning point: on an inflated section it put
   `Cp = -1.60` at the leading edge, where it has to approach `+1`, and the two
   surfaces disagreed at the trailing edge in violation of the Kutta condition.
   Signing the lower surface negative makes both surfaces one continuous curve
@@ -22,29 +22,31 @@
 
 ### Added
 
-- BREAKING: the `TAYLOR` aero model is gone, with `taylor_value` and
-  `set_taylor_polar!`. An order-2 polynomial cannot hold a stall knee: fitted
-  over a window wider than the knee it averages across it, narrower and it never
-  reaches it, and past the window it continued on whatever edge slope it ended
-  with — which on an SK100 tip panel was negative where the local slope was
-  `+0.05`/deg, and took the circulation solve to `NaN`. `SAMPLED` replaces it.
-- `SAMPLED` aero model: cl/cd/cm sampled at ascending angles of attack per
-  panel, interpolated between them and held flat past either end. This is what a
-  live polar source writes every solve; `set_sampled_polar!` rewrites a panel's
-  knots and values in place. It spans only the angles it was sampled over, so it
-  ignores `delta` and is skipped by the stall-angle scan — but inside that range
-  it represents a stall, which is what a local fit cannot do.
+- A `POLAR_VECTORS` panel's table can be rewritten at run time by `set_polar!`,
+  which is what a live polar source does every solve. The knots and values reuse
+  the panel's own storage, and the panel records the range the table covers, so
+  a table generated over a window around one angle of attack is held at its end
+  values rather than extrapolated past them, and the stall-angle scan skips a
+  table that stops short of it. A rewritten table is an ordinary polar in every
+  other way: same evaluation, same `delta` handling, no separate aero model.
 - Live in-memory polars in `AirfoilAero`: `KulfanBasis` and `deform_kulfan`
   deform a fixed Kulfan fit analytically (a matvec against a constant CST basis,
   never a refit, which is non-unique); `control_point_deflection` resamples a
   deflection given at arbitrary chord fractions — beam nodes, membrane nodes —
-  onto that basis. `LivePolars` and `refresh_live_polars!` then evaluate
-  NeuralFoil on a grid of angles per panel in one batched forward pass and write
-  those values in as each panel's `SAMPLED` polar, so a chordwise deformation
-  reaches the aerodynamics as a shape change rather than a flap angle. The grid
-  moves with the panel — `LivePolarSettings` carries the offsets off its current
-  angle of attack — and `polar_drift` reports how far the solve has left it,
-  past which the polar holds its last sampled value instead of extrapolating.
+  onto that basis. `chord_residual` first takes the straight line through the
+  deflection's own endpoints off it, which the basis cannot express and answers
+  with runaway weights; `chord_line` returns that line, since its rotation is
+  one the caller may still owe its angle of attack. `panel_kulfan_parameters`
+  fits each panel's contour once at build time, shrink-wrapped first because a
+  raw slice fits to weights that oscillate far more than any deformation will
+  and leave neighbouring panels disagreeing enough to cost the solve its
+  convergence. `LivePolars` and `refresh_live_polars!` then evaluate NeuralFoil
+  on a grid of angles per panel in one batched forward pass and write those
+  values in as each panel's polar table, so a chordwise deformation reaches the
+  aerodynamics as a shape change rather than a flap angle. The grid moves with
+  the panel — `LivePolarSettings` carries the offsets off its current angle of
+  attack — and `polar_drift` reports how far the solve has left it, past which
+  the polar holds its last sampled value instead of extrapolating.
 - Live surface pressure in `AirfoilAero`: `refresh_live_pressure!` regenerates
   every panel's `Cp` from its deformed shape in one batched forward pass at the
   converged angle of attack, resampled onto the panel's own contour nodes by
@@ -61,15 +63,15 @@
   table generator reconstruct pressure the same way.
 - `compare_live_polar` solves one panel's current deformed shape in XFoil and
   puts the answer next to the live polar the panel is flying, at the same angle
-  and Reynolds and under `live_xfoil_solver`'s matched transition settings. XFoil
-  is marched out from zero rather than jumped to the angle — the viscous march
-  refuses a blunt inflated section otherwise, and on the SK100's deformed
-  mid-span it refused every one — and the comparison is made at the nearest angle
-  it reached, reported as `alpha` beside the `requested` one. A
-  `LivePolars` now keeps each panel's analysis confidence, so the panel worth
-  asking about is the one to hand. NeuralFoil's confidence scores the input
-  shape rather than the answer, so a deformed section far from its training set
-  reads low whether or not the polar is wrong; this is what tells the two apart.
+  and Reynolds and under `live_xfoil_solver`'s matched transition settings.
+  XFoil is marched out from zero rather than jumped to the angle — the viscous
+  march refuses a blunt inflated section otherwise, and on a deformed mid-span
+  panel it refused every one — and the comparison is made at the nearest angle
+  it reached, reported as `alpha` beside the `requested` one. A `LivePolars` now
+  keeps each panel's analysis confidence, so the panel worth asking about is the
+  one to hand. NeuralFoil's confidence scores the input shape rather than the
+  answer, so a deformed section far from its training set reads low whether or
+  not the polar is wrong; this is what tells the two apart.
 - `prepare_inputs` accepts one Kulfan shape per case, so a whole wing goes
   through NeuralFoil in a single forward pass.
 - A panel carries the deformed airfoil its polar was generated from as

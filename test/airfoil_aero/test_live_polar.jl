@@ -3,8 +3,21 @@ using LinearAlgebra
 using Statistics
 using VortexStepMethod
 using VortexStepMethod.AirfoilAero
-using VortexStepMethod: Panel, calculate_cl, calculate_cd, calculate_cm,
-                        set_sampled_polar!
+using VortexStepMethod: Panel, Section, calculate_cl, calculate_cd, calculate_cm,
+                        set_polar!, panel_interp_types, init_aero!
+
+"""Panels carrying the interpolations a `POLAR_VECTORS` table is rewritten into."""
+function polar_panels(n_panels; n_samples=5)
+    alphas = collect(range(deg2rad(-6.0), deg2rad(6.0), n_samples))
+    data = (alphas, zeros(n_samples), fill(0.01, n_samples), zeros(n_samples))
+    section = Section([0.0, 0.0, 0.0], [1.0, 0.0, 0.0], POLAR_VECTORS, data)
+    CL, CD, CM, CP = panel_interp_types(section, true)
+    return map(1:n_panels) do _
+        panel = Panel{Float64, CL, CD, CM, CP}()
+        init_aero!(panel, section, section)
+        panel
+    end
+end
 
 @testset "Kulfan deformation" begin
     basis = KulfanBasis()
@@ -75,12 +88,12 @@ end
     @test_throws ArgumentError control_point_deflection(basis, [0.0, 0.0], [1.0, 2.0])
 end
 
-@testset "SAMPLED panel polar" begin
-    panel = Panel{Float64}()
+@testset "rewritten panel polar" begin
+    panel = only(polar_panels(1))
     alphas = deg2rad.([-6.0, -3.0, 0.0, 3.0, 6.0])
-    set_sampled_polar!(panel, alphas, [0.0, 0.3, 0.6, 0.9, 0.8],
+    set_polar!(panel, alphas, [0.0, 0.3, 0.6, 0.9, 0.8],
                        [0.03, 0.02, 0.02, 0.03, 0.06], [-0.1, -0.1, -0.1, -0.1, 0.0])
-    @test panel.aero_model == SAMPLED
+    @test panel.aero_model == POLAR_VECTORS
     @test panel.alpha_ref ≈ 0.0
     @test panel.alpha_window ≈ deg2rad(6.0)
 
@@ -104,23 +117,28 @@ end
           calculate_cl(panel, deg2rad(1.5))
 
     knots, coeffs = panel.alpha_knots, panel.cl_coeffs
-    set_sampled_polar!(panel, alphas .+ deg2rad(2.0), [0.2, 0.5, 0.8, 1.1, 1.0],
+    set_polar!(panel, alphas .+ deg2rad(2.0), [0.2, 0.5, 0.8, 1.1, 1.0],
                        [0.03, 0.02, 0.02, 0.03, 0.06], zeros(5))
     @test panel.alpha_knots === knots && panel.cl_coeffs === coeffs
 
-    @test_throws ArgumentError set_sampled_polar!(panel, alphas, [0.0], [0.0], [0.0])
-    @test_throws ArgumentError set_sampled_polar!(panel, reverse(alphas), zeros(5),
-                                                  zeros(5), zeros(5))
+    @test_throws ArgumentError set_polar!(panel, alphas, [0.0], [0.0], [0.0])
+    @test_throws ArgumentError set_polar!(panel, reverse(alphas), zeros(5),
+                                          zeros(5), zeros(5))
+    @test_throws ArgumentError set_polar!(panel, alphas[1:1], [0.5], [0.02], [-0.1])
+
+    # A panel built without interpolations says so rather than failing on a field type.
+    @test_throws ArgumentError set_polar!(Panel{Float64}(), alphas, zeros(5), zeros(5),
+                                          zeros(5))
 end
 
 @testset "live polars" begin
     base = KulfanParameters(fill(0.15, 8), fill(-0.05, 8), 0.0, 0.0)
     n_panels = 3
-    panels = [Panel{Float64}() for _ in 1:n_panels]
+    panels = polar_panels(n_panels)
     live = LivePolars(fill(base, n_panels))
     confidence = refresh_live_polars!(live, panels, deg2rad(6.0), 3e6)
     @test 0.0 < confidence <= 1.0
-    @test all(p -> p.aero_model == SAMPLED, panels)
+    @test all(p -> p.aero_model == POLAR_VECTORS, panels)
 
     # Every sample is the network's own answer, not a fit through it.
     for (k, offset) in enumerate(live.settings.offsets)
@@ -179,7 +197,7 @@ end
 @testset "live surface pressure" begin
     base = KulfanParameters(fill(0.15, 8), fill(-0.05, 8), 0.0, 0.0)
     n_panels = 2
-    panels = [Panel{Float64}() for _ in 1:n_panels]
+    panels = polar_panels(n_panels)
     settings = LivePolarSettings(; model_size="large")
     live = LivePolars(fill(base, n_panels); settings)
     refresh_live_polars!(live, panels, deg2rad(6.0), 3e6)
@@ -232,7 +250,7 @@ end
 
 @testset "the contour follows the deformation" begin
     base = KulfanParameters(fill(0.15, 8), fill(-0.05, 8), 0.0, 0.0)
-    panels = [Panel{Float64}() for _ in 1:2]
+    panels = polar_panels(2)
     live = LivePolars(fill(base, 2))
     shape = [contour_shape_matrix(live.basis.x, 8) for _ in 1:2]
     offset = [zeros(length(live.basis.x)) for _ in 1:2]

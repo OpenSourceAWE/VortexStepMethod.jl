@@ -98,8 +98,9 @@ update_non_deformed_sections!
 ### Aerodynamic data and Cp
 ```@docs
 calculate_new_aero_data
-set_sampled_polar!
-sampled_value
+set_polar!
+rebuild_polar
+window_alpha
 assemble_polar_matrix
 load_matrix_polar_data
 read_aero_matrix

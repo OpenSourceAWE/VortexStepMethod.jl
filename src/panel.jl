@@ -36,9 +36,9 @@ Represents a panel in a vortex step method simulation. All points and vectors ar
     ): Panel filaments, see: [`BoundFilament`](@ref)
 - `delta`::T=0: flap trailing-edge deflection [rad]
 - `crease_frac`::T=0: chordwise flap-hinge fraction (0–1); 0 disables the plate kink
-- `alpha_ref`::Float64=0: reference angle [rad] of the `SAMPLED` polar
-- `alpha_window`::Float64=0: half width [rad] that polar reaches; 0 = unbounded
-- `alpha_knots`::Vector{Float64}=Float64[]: ascending angles [rad] a `SAMPLED` polar holds values at
+- `alpha_ref`::Float64=0: centre angle [rad] of the range the polar table covers
+- `alpha_window`::Float64=0: half width [rad] the table reaches; 0 = unbounded
+- `alpha_knots`::Vector{Float64}=Float64[]: ascending angles [rad] the panel's own table holds values at
 - `live_shape`::Union{Nothing, KulfanParameters}=nothing: the deformed airfoil the polar was generated from
 """
 @with_kw mutable struct Panel{T, CL, CD, CM, SA}
@@ -214,6 +214,8 @@ end
 function init_aero!(panel::Panel, section_1::Section, section_2::Section;
                     remove_nan = true)
     panel.aero_model = section_1.aero_model
+    panel.alpha_ref, panel.alpha_window = 0.0, 0.0
+    panel.live_shape = nothing
     section_1.aero_model == section_2.aero_model ||
         throw(ArgumentError("Both sections must have the same aero model, not " *
             "$(section_1.aero_model) and $(section_2.aero_model)"))
@@ -233,61 +235,54 @@ function init_aero!(panel::Panel, section_1::Section, section_2::Section;
 end
 
 """
-    sampled_value(knots, values, alpha)
+    window_alpha(panel, alpha)
 
-A `SAMPLED` polar's coefficient at `alpha` [rad]: linear between the knots it was
-sampled on, and the end value beyond either end. Flat ends are the point — the
-polar of a stalled section has a knee that no polynomial holds, and a coefficient
-carried on past the samples must stay bounded rather than follow a slope out.
-
-`knots` is ascending; a single knot is a constant polar.
+`alpha` [rad] clamped into the range the panel's polar was built over. A table generated
+over a window around one angle of attack says nothing past its ends, so it is held at its
+end values rather than extrapolated out of them; `alpha_window` of `0` means unbounded and
+leaves `alpha` alone, which is what a full-range polar wants.
 """
-@inline function sampled_value(knots, values, alpha)
-    n = length(knots)
-    n == 0 && throw(ArgumentError("A SAMPLED polar has no knots."))
-    alpha <= knots[1] && return values[1]
-    alpha >= knots[n] && return values[n]
-    hi = 2
-    @inbounds while alpha > knots[hi]
-        hi += 1
-    end
-    @inbounds begin
-        span = knots[hi] - knots[hi - 1]
-        blend = span > 0 ? (alpha - knots[hi - 1]) / span : zero(alpha)
-        return values[hi - 1] + blend * (values[hi] - values[hi - 1])
-    end
+@inline function window_alpha(panel::Panel, alpha)
+    panel.alpha_window > 0 || return alpha
+    return clamp(alpha, panel.alpha_ref - panel.alpha_window,
+                 panel.alpha_ref + panel.alpha_window)
 end
 
-"""
-    set_sampled_polar!(panel, alphas, cl, cd, cm; shape=nothing)
+set_polar!(panel::Panel{<:Any, Nothing}, alphas, cl, cd, cm; shape=nothing) =
+    throw(ArgumentError("set_polar! needs a panel that carries interpolations. This one " *
+        "was built without them (INVISCID or POLY sections); build the wing from " *
+        "POLAR_VECTORS sections so its panels have the interpolation types."))
 
-Overwrite a panel's local polar with values sampled at `alphas` [rad], ascending.
-The panel's aero model is set to `SAMPLED`.
+"""
+    set_polar!(panel, alphas, cl, cd, cm; shape=nothing)
+
+Rewrite a panel's `POLAR_VECTORS` table with values at `alphas` [rad], ascending, and
+rebuild its interpolations. The panel's `alpha_ref` and `alpha_window` are taken from the
+angles, so a table covering only a window around one angle is held at its ends rather than
+extrapolated past them (see [`window_alpha`](@ref)).
 
 Written in place: the knots and the three value vectors reuse the panel's own
-`alpha_knots` and `cl_coeffs`/`cd_coeffs`/`cm_coeffs` storage whenever the sample
-count is unchanged, which is what lets a live polar source refresh every solve
-without allocating. The vectors hold sampled values here rather than polynomial
-coefficients — the aero model is what says which.
+`alpha_knots` and `cl_coeffs`/`cd_coeffs`/`cm_coeffs` storage whenever the sample count is
+unchanged, which is what lets a live polar source refresh every solve without growing the
+panel. The interpolations themselves are rebuilt, since `Interpolations` copies the values
+it is handed; they keep the extrapolation the panel was built with.
 
-The samples are the polar, so a stall knee between two of them is represented rather
-than smoothed into a slope — which is the whole reason a live source samples instead
-of fitting.
-
-`shape` is the [`KulfanParameters`](@ref) the values were generated from, stored on
-the panel as `live_shape` so a panel's polar and the shape behind it are set
-together and cannot drift apart.
+`shape` is the [`KulfanParameters`](@ref) the values were generated from, stored on the
+panel as `live_shape` so a panel's polar and the shape behind it are set together and
+cannot drift apart.
 """
-function set_sampled_polar!(panel::Panel, alphas, cl, cd, cm; shape=nothing)
+function set_polar!(panel::Panel, alphas, cl, cd, cm; shape=nothing)
     length(alphas) == length(cl) == length(cd) == length(cm) ||
-        throw(ArgumentError("A SAMPLED polar needs one value per angle; got " *
+        throw(ArgumentError("A polar table needs one value per angle; got " *
             "$(length(alphas)) angles and $(length(cl))/$(length(cd))/" *
             "$(length(cm)) values."))
+    length(alphas) >= 2 ||
+        throw(ArgumentError("A polar table needs at least two angles."))
     issorted(alphas) ||
-        throw(ArgumentError("A SAMPLED polar needs ascending angles."))
-    panel.aero_model = SAMPLED
-    panel.alpha_ref = alphas[(length(alphas) + 1) ÷ 2]
-    panel.alpha_window = maximum(abs, alphas .- panel.alpha_ref)
+        throw(ArgumentError("A polar table needs ascending angles."))
+    panel.aero_model = POLAR_VECTORS
+    panel.alpha_ref = (alphas[1] + alphas[end]) / 2
+    panel.alpha_window = (alphas[end] - alphas[1]) / 2
     panel.live_shape = shape
     for (dst_sym, src) in ((:alpha_knots, alphas), (:cl_coeffs, cl),
                            (:cd_coeffs, cd), (:cm_coeffs, cm))
@@ -298,8 +293,20 @@ function set_sampled_polar!(panel::Panel, alphas, cl, cd, cm; shape=nothing)
             setfield!(panel, dst_sym, collect(Float64, src))
         end
     end
+    panel.cl_interp = rebuild_polar(panel.cl_interp, panel.alpha_knots, panel.cl_coeffs)
+    panel.cd_interp = rebuild_polar(panel.cd_interp, panel.alpha_knots, panel.cd_coeffs)
+    panel.cm_interp = rebuild_polar(panel.cm_interp, panel.alpha_knots, panel.cm_coeffs)
     return nothing
 end
+
+"""
+    rebuild_polar(old, knots, values) -> Extrapolation
+
+A 1D linear interpolation over `knots`/`values` carrying `old`'s extrapolation, so the
+rebuilt object has the type the panel's field was parameterised with.
+"""
+rebuild_polar(old, knots, values) =
+    linear_interpolation(knots, values; extrapolation_bc=old.et)
 
 """
     reinit!(panel, section_1, section_2, aero_center, control_point, bound_point_1,
@@ -404,14 +411,13 @@ calculate_cl(panel::Panel, alpha) = calculate_cl(panel, alpha, panel.delta)
 function calculate_cl(panel::Panel{Tp}, alpha::Ta, delta::Td) where {Tp, Ta, Td}
     R = promote_type(Tp, Ta, Td)
     isnan(alpha) && return R(NaN)
+    alpha = window_alpha(panel, alpha)
     if panel.aero_model == POLY
         cl = evalpoly(rad2deg(alpha), panel.cl_coeffs)
         if abs(alpha) > (π/9)
             cl = 2 * cos(alpha) * sin(alpha)^2
         end
         return R(cl)
-    elseif panel.aero_model == SAMPLED
-        return R(sampled_value(panel.alpha_knots, panel.cl_coeffs, alpha))
     elseif panel.aero_model == INVISCID
         return R(2π * alpha)
     end
@@ -435,14 +441,12 @@ calculate_cd(panel::Panel, alpha) = calculate_cd(panel, alpha, panel.delta)
 function calculate_cd(panel::Panel{Tp}, alpha::Ta, delta::Td) where {Tp, Ta, Td}
     R = promote_type(Tp, Ta, Td)
     isnan(alpha) && return R(NaN)
+    alpha = window_alpha(panel, alpha)
     if panel.aero_model == POLY
         if abs(alpha) > (π/9)  # Outside ±20 degrees
             return R(2 * sin(alpha)^3)
         end
         return R(evalpoly(rad2deg(alpha), panel.cd_coeffs))
-    elseif panel.aero_model == SAMPLED
-        return R(max(zero(R),
-                     sampled_value(panel.alpha_knots, panel.cd_coeffs, alpha)))
     elseif panel.aero_model in (POLAR_VECTORS, POLAR_MATRICES)
         cd_interp = panel.cd_interp
         cd_interp === nothing &&
@@ -467,10 +471,9 @@ calculate_cm(panel::Panel, alpha) = calculate_cm(panel, alpha, panel.delta)
 function calculate_cm(panel::Panel{Tp}, alpha::Ta, delta::Td) where {Tp, Ta, Td}
     R = promote_type(Tp, Ta, Td)
     isnan(alpha) && return R(NaN)
+    alpha = window_alpha(panel, alpha)
     if panel.aero_model == POLY
         return R(evalpoly(rad2deg(alpha), panel.cm_coeffs))
-    elseif panel.aero_model == SAMPLED
-        return R(sampled_value(panel.alpha_knots, panel.cm_coeffs, alpha))
     elseif panel.aero_model in (POLAR_VECTORS, POLAR_MATRICES)
         cm_interp = panel.cm_interp
         cm_interp === nothing &&

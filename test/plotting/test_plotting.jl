@@ -481,9 +481,12 @@ function create_body_aero_with_skin(; n_panels=4)
     cf = fill(0.003, n_node, length(alpha_range), 1)
     section_aero = SectionAero(alpha_range, [0.0], x, y, cp, cf)
 
+    # POLAR_VECTORS, so the panels carry the interpolations a live polar rewrites.
+    polar = (alpha_range, [0.0, 0.5, 1.0], fill(0.02, 3), fill(-0.05, 3))
     wing = Wing(n_panels, spanwise_distribution=LINEAR)
-    add_section!(wing, [0.0, 2.0, 0.0], [1.0, 2.0, 0.0], INVISCID, nothing, section_aero)
-    add_section!(wing, [0.0, -2.0, 0.0], [1.0, -2.0, 0.0], INVISCID, nothing, section_aero)
+    add_section!(wing, [0.0, 2.0, 0.0], [1.0, 2.0, 0.0], POLAR_VECTORS, polar, section_aero)
+    add_section!(wing, [0.0, -2.0, 0.0], [1.0, -2.0, 0.0], POLAR_VECTORS, polar,
+                 section_aero)
     refine!(wing)
     body_aero = BodyAerodynamics([wing])
     set_va!(body_aero, [20.0, 0.0, 1.0])
@@ -528,7 +531,7 @@ end
     cambered = VortexStepMethod.AirfoilAero.deform_kulfan(basis, base,
         @. 0.08 * basis.x * (1 - basis.x))
     for panel in body_aero.panels
-        VortexStepMethod.set_sampled_polar!(panel, deg2rad.([-4.0, 0.0, 4.0]),
+        VortexStepMethod.set_polar!(panel, deg2rad.([-4.0, 0.0, 4.0]),
             [0.3, 0.5, 0.7], [0.02, 0.02, 0.03], [-0.05, -0.05, -0.05];
             shape=cambered)
     end
