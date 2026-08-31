@@ -106,7 +106,7 @@ Solver configuration, used within [`VSMSettings`](@ref).
     k4::Float64 = 0.0                       # artificial damping parameter
     is_with_artificial_viscosity::Bool = false  # Li/Gaunaa post-stall artificial viscosity
     artificial_viscosity_factor::Float64 = 0.035 # viscosity scaling coefficient k
-    type_initial_gamma_distribution::InitialGammaDistribution = ZEROS # see: [InitialGammaDistribution](@ref)
+    type_initial_gamma_distribution::InitialGammaDistribution = ZEROS # see: [`InitialGammaDistribution`](@ref)
     use_gamma_prev::Bool = true             # if false, always reinitialize gamma from type_initial_gamma_distribution
     core_radius_fraction::Float64 = 0.05
     mu::Float64 = 1.81e-5                   # dynamic viscosity [N·s/m²]
