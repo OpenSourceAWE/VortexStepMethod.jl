@@ -133,6 +133,42 @@ function init_pos!(
 end
 
 """
+    ScanKnots(data)
+
+Polar angles that a lookup scans rather than bisects. `Interpolations` finds a gridded
+knot with `searchsortedfirst`, which dispatches on the knot vector, so a short table can
+choose the search that suits it: below `SCAN_KNOT_MAX` a linear scan over contiguous
+memory beats a binary search's mispredicted branches, and above it loses badly. Wraps
+its vector rather than copying it, so the angles stay writable in place.
+"""
+struct ScanKnots <: AbstractVector{Float64}
+    data::Vector{Float64}
+end
+
+"Longest table a linear knot scan still beats a binary search on."
+const SCAN_KNOT_MAX = 24
+
+Base.size(knots::ScanKnots) = size(knots.data)
+Base.@propagate_inbounds Base.getindex(knots::ScanKnots, i::Int) = knots.data[i]
+Base.IndexStyle(::Type{ScanKnots}) = IndexLinear()
+
+@inline function Base.searchsortedfirst(knots::ScanKnots, x, ::Base.Order.ForwardOrdering)
+    @inbounds for i in eachindex(knots.data)
+        knots.data[i] >= x && return i
+    end
+    return length(knots.data) + 1
+end
+
+"""
+    polar_knots(alphas) -> AbstractVector
+
+The angles of a 1D polar in the container whose knot search fits its length, see
+[`ScanKnots`](@ref).
+"""
+polar_knots(alphas::Vector{Float64}) =
+    length(alphas) <= SCAN_KNOT_MAX ? ScanKnots(alphas) : alphas
+
+"""
     build_interps(section_1, section_2, remove_nan) -> (cl, cd, cm, section_aero)
 
 Build the averaged aerodynamic interpolations for the panel between two sections.
@@ -162,9 +198,10 @@ function build_interps(section_1::Section, section_2::Section, remove_nan)
             cl = Vector{Float64}((aero_1[2] .+ aero_2[2]) ./ 2)
             cd = Vector{Float64}((aero_1[3] .+ aero_2[3]) ./ 2)
             cm = Vector{Float64}((aero_1[4] .+ aero_2[4]) ./ 2)
-            cl_i = linear_interpolation(alphas, cl; extrapolation_bc=extrap_flat)
-            cd_i = linear_interpolation(alphas, cd; extrapolation_bc=extrap_line)
-            cm_i = linear_interpolation(alphas, cm; extrapolation_bc=extrap_flat)
+            knots = polar_knots(alphas)
+            cl_i = linear_interpolation(knots, cl; extrapolation_bc=extrap_flat)
+            cd_i = linear_interpolation(knots, cd; extrapolation_bc=extrap_line)
+            cm_i = linear_interpolation(knots, cm; extrapolation_bc=extrap_flat)
         else
             (aero_1 isa Tuple{Vector{Float64}, Vector{Float64}, Matrix{Float64}, Matrix{Float64}, Matrix{Float64}} &&
              aero_2 isa Tuple{Vector{Float64}, Vector{Float64}, Matrix{Float64}, Matrix{Float64}, Matrix{Float64}}) ||
@@ -302,11 +339,18 @@ end
 """
     rebuild_polar(old, knots, values) -> Extrapolation
 
-A 1D linear interpolation over `knots`/`values` carrying `old`'s extrapolation, so the
-rebuilt object has the type the panel's field was parameterised with.
+A 1D linear interpolation over `knots`/`values` carrying `old`'s extrapolation and knot
+container, so the rebuilt object has the type the panel's field was parameterised with.
+Only the values need rebuilding — `Interpolations` holds the knots by reference — but
+they are what it copies, so the object is rebuilt until it can take them in place.
 """
 rebuild_polar(old, knots, values) =
-    linear_interpolation(knots, values; extrapolation_bc=old.et)
+    linear_interpolation(same_knots(old.itp.knots[1], knots), values;
+                         extrapolation_bc=old.et)
+
+"The angles in the container the panel's interpolations were parameterised with."
+same_knots(::ScanKnots, knots) = ScanKnots(knots)
+same_knots(::AbstractVector, knots) = knots
 
 """
     reinit!(panel, section_1, section_2, aero_center, control_point, bound_point_1,

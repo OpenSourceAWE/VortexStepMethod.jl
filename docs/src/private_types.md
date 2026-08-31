@@ -7,6 +7,7 @@ CurrentModule = VortexStepMethod
 ### Wing Geometry, Panel and Aerodynamics
 ```@docs
 Panel
+ScanKnots
 KulfanParameters
 PanelProperties
 Filament
@@ -17,6 +18,7 @@ SemiInfiniteFilament
 ### Aerodynamic model constants
 ```@docs
 LEI_AIRFOIL_BREUKELS
+SCAN_KNOT_MAX
 ```
 
 ### Airfoil aerodynamics (AirfoilAero)
