@@ -83,27 +83,30 @@ end
 
 """
     chord_residual(basis, deflection) -> Vector{Float64}
-    chord_line(basis, deflection) -> (offset, slope)
 
-The part of a deflection the CST basis can represent, and the part it cannot. `C(x)`
-vanishes at both chord ends, so the basis can put neither the leading nor the trailing
-edge off the chord line: a deflection that does not end at zero is asking for a chord
-**rotation and translation**, not a camber change. Projecting it anyway is not merely
-inexact, it is unstable — `pinv` answers an unrepresentable end displacement with
-weights an order of magnitude past the ones it is correcting, and the airfoil that
-comes back is not one.
+The part of a deflection the CST basis can represent. `C(x)` vanishes at both chord
+ends, so the basis can put neither the leading nor the trailing edge off the chord
+line: a deflection that does not end at zero is asking for a chord **rotation and
+translation**, not a camber change. Projecting it anyway is not merely inexact, it is
+unstable — `pinv` answers an unrepresentable end displacement with weights an order of
+magnitude past the ones it is correcting, and the airfoil that comes back is not one.
 
-[`chord_residual`](@ref) removes the straight line through the deflection's own
-endpoints and returns what is left. [`chord_line`](@ref) returns that line as
-`(offset, slope)`, both over chord: `offset` moves the leading edge and `slope` is the
-chord rotation `atan(slope)` [rad] the caller owes its angle of attack, when the frame
-it measured the deflection in has not already absorbed it.
+Removes the straight line through the deflection's own endpoints, which
+[`chord_line`](@ref) returns, and gives back what is left.
 """
 function chord_residual(basis::KulfanBasis, deflection::AbstractVector)
     offset, slope = chord_line(basis, deflection)
     return deflection .- (offset .+ slope .* basis.x)
 end
 
+"""
+    chord_line(basis, deflection) -> (offset, slope)
+
+The straight line through a deflection's own endpoints, both over chord: `offset` moves
+the leading edge and `slope` is the chord rotation `atan(slope)` [rad] the caller owes
+its angle of attack, when the frame it measured the deflection in has not already
+absorbed it. It is the part [`chord_residual`](@ref) removes.
+"""
 function chord_line(basis::KulfanBasis, deflection::AbstractVector)
     length(deflection) == length(basis.x) || throw(ArgumentError(
         "Deflection must be sampled on the basis' $(length(basis.x)) stations."))
