@@ -100,6 +100,7 @@ update_non_deformed_sections!
 calculate_new_aero_data
 set_polar!
 rebuild_polar
+polar_model
 same_knots
 polar_knots
 window_alpha
