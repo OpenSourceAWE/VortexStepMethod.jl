@@ -131,6 +131,33 @@ end
                                           zeros(5))
 end
 
+@testset "a rewritten polar lands on a matrix panel too" begin
+    # A wing whose offline polars carry a delta axis still has to take a live polar:
+    # the deflection is in the shape it was generated from, so the table says the same
+    # at every delta rather than having no answer for one.
+    alpha = collect(deg2rad.(-15.0:1.0:15.0))
+    delta = collect(deg2rad.(-40.0:10.0:40.0))
+    na, nd = length(alpha), length(delta)
+    grid = [0.1 * i for i in 1:na, _ in 1:nd]
+    data = (alpha, delta, grid, fill(0.02, na, nd), fill(-0.05, na, nd))
+    section = Section([0.0, 0.0, 0.0], [1.0, 0.0, 0.0], POLAR_MATRICES, data)
+    CL, CD, CM, CP = panel_interp_types(section, true)
+    panel = Panel{Float64, CL, CD, CM, CP}()
+    init_aero!(panel, section, section)
+
+    knots = collect(deg2rad.(-12.0:3.0:12.0))
+    cl = collect(range(0.0, 1.2, length(knots)))
+    set_polar!(panel, knots, cl, fill(0.03, 9), fill(-0.1, 9))
+
+    @test panel.aero_model == POLAR_MATRICES
+    @test calculate_cl(panel, knots[3]) ≈ cl[3]
+    # The flap axis is gone from the answer: every delta reads the same polar.
+    @test calculate_cl(panel, knots[3], deg2rad(-40.0)) ≈
+          calculate_cl(panel, knots[3], deg2rad(40.0)) ≈ cl[3]
+    # And it is held past the window it was sampled over, as on a vector panel.
+    @test calculate_cl(panel, deg2rad(40.0)) ≈ cl[end]
+end
+
 @testset "live polars" begin
     base = KulfanParameters(fill(0.15, 8), fill(-0.05, 8), 0.0, 0.0)
     n_panels = 3

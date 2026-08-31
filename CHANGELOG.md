@@ -22,13 +22,16 @@
 
 ### Added
 
-- A `POLAR_VECTORS` panel's table can be rewritten at run time by `set_polar!`,
-  which is what a live polar source does every solve. The knots and values reuse
-  the panel's own storage, and the panel records the range the table covers, so
-  a table generated over a window around one angle of attack is held at its end
+- A panel's polar table can be rewritten at run time by `set_polar!`, which is
+  what a live polar source does every solve. The knots and values reuse the
+  panel's own storage, and the panel records the range the table covers, so a
+  table generated over a window around one angle of attack is held at its end
   values rather than extrapolated past them, and the stall-angle scan skips a
-  table that stops short of it. A rewritten table is an ordinary polar in every
-  other way: same evaluation, same `delta` handling, no separate aero model.
+  table that stops short of it. The table keeps the shape the panel was built
+  with, so a `POLAR_MATRICES` wing takes one too, at every `delta` it spans: a
+  regenerated polar carries its deflection as shape and says the same at each. A
+  rewritten table is an ordinary polar in every other way, with no separate aero
+  model.
 - Live in-memory polars in `AirfoilAero`: `KulfanBasis` and `deform_kulfan`
   deform a fixed Kulfan fit analytically (a matvec against a constant CST basis,
   never a refit, which is non-unique); `control_point_deflection` resamples a
@@ -80,6 +83,14 @@
   handed, not a re-derivation, so a deformation bug is visible in the picture.
   `KulfanParameters` moved from `AirfoilAero` into the core module for it; it is
   still exported from both.
+
+### Changed
+
+- A `POLAR_VECTORS` table of at most 24 angles now scans for its knot rather
+  than bisecting, which is faster at that length and is what a live polar's grid
+  is; longer tables keep the binary search. The knot container is part of a
+  panel's interpolation types, so which one a wing uses is fixed when it is
+  built.
 
 ## VortexStepMethod v4.2.0 2026-08-25
 
