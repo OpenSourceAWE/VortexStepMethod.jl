@@ -9,13 +9,18 @@ plot or a traction pattern reads without knowing how the shape was produced. Fit
 with `AirfoilAero.fit_kulfan_parameters`, deform one with `AirfoilAero.deform_kulfan`
 and turn one into coordinates with `AirfoilAero.kulfan_to_coordinates`.
 
+Mutable, so a live polar source can rewrite one shape every solve instead of building a
+new one, and the panel pointing at it follows without being told
+(`AirfoilAero.deform_kulfan!`). That also makes a panel's `live_shape` the very object it
+was sampled from rather than a copy that compares equal to it.
+
 # Fields
 - `upper_weights::Vector{Float64}`: weights for upper surface
 - `lower_weights::Vector{Float64}`: weights for lower surface
 - `leading_edge_weight::Float64`: Leading edge modification weight
 - `TE_thickness::Float64`: Trailing edge thickness
 """
-struct KulfanParameters
+mutable struct KulfanParameters
     upper_weights::Vector{Float64}
     lower_weights::Vector{Float64}
     leading_edge_weight::Float64

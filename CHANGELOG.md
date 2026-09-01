@@ -31,10 +31,15 @@
   out of it into storage it holds, and reconstructs each panel's `Cp` through
   one set of reused buffers (`contour_arc!`, `contour_pressure!`). What is left
   is the monotone interpolation object itself, one per panel.
-- `set_polar!` no longer allocates when handed views rather than vectors, and
-  stores the `live_shape` only when the panel is not already carrying it — an
-  immutable that size is boxed on its way into a `Union` field, which cost a
-  refresh 48 bytes a panel even when the shape had not changed.
+- `set_polar!` no longer allocates when handed views rather than vectors.
+- `KulfanParameters` is now mutable, so a live polar source rewrites one shape
+  per panel every solve instead of building a new one, and the panel pointing at
+  it follows without being told. As an immutable it was boxed on its way into
+  the panel's `live_shape` field, which cost a refresh 48 bytes a panel even
+  when the shape had not changed; a panel's `live_shape` is now the very object
+  it was sampled from rather than a copy that compares equal to it. Two
+  separately built `KulfanParameters` therefore no longer compare `===` or `==`
+  on identical contents.
 
 ## VortexStepMethod v4.3.0 2026-08-31
 

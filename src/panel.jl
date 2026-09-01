@@ -310,9 +310,8 @@ views into a caller's own buffers; nothing here holds on to them.
 
 `shape` is the [`KulfanParameters`](@ref) the values were generated from, stored on the
 panel as `live_shape` so a panel's polar and the shape behind it are set together and
-cannot drift apart. It is only stored when it is not already there: an immutable this
-size is boxed on its way into a `Union` field, so the guard is what keeps a refresh of a
-shape whose weights were rewritten in place free of that box.
+cannot drift apart. The panel holds the shape itself, not a copy, so a source that
+rewrites one in place has already updated every panel flying it.
 """
 function set_polar!(panel::Panel, alphas, cl, cd, cm; shape=nothing)
     length(alphas) == length(cl) == length(cd) == length(cm) ||
@@ -326,7 +325,7 @@ function set_polar!(panel::Panel, alphas, cl, cd, cm; shape=nothing)
     panel.aero_model = polar_model(panel.cl_interp)
     panel.alpha_ref = (alphas[1] + alphas[end]) / 2
     panel.alpha_window = (alphas[end] - alphas[1]) / 2
-    panel.live_shape === shape || (panel.live_shape = shape)
+    panel.live_shape = shape
     panel.alpha_knots = polar_column!(panel.alpha_knots, alphas)
     panel.cl_coeffs = polar_column!(panel.cl_coeffs, cl)
     panel.cd_coeffs = polar_column!(panel.cd_coeffs, cd)
