@@ -19,6 +19,22 @@ function polar_panels(n_panels; n_samples=5)
     end
 end
 
+"""One `refresh_live_polars!` at the reference condition, its confidence dropped."""
+function refresh_once!(live, panels, deflection)
+    refresh_live_polars!(live, panels, deg2rad(6.0), 3e6; deflection)
+    return nothing
+end
+
+"""
+Allocations of one `refresh_once!`, warmed up first. The confidence the refresh returns
+has to be dropped rather than measured: on Julia 1.11 `@allocated` boxes a `Float64`
+result, which reads as 16 bytes the refresh itself never allocated.
+"""
+function refresh_allocs(live, panels; deflection=nothing)
+    refresh_once!(live, panels, deflection)
+    return @allocated refresh_once!(live, panels, deflection)
+end
+
 @testset "Kulfan deformation" begin
     basis = KulfanBasis()
     base = KulfanParameters(fill(0.15, 8), fill(-0.05, 8), 0.0, 0.0)
@@ -230,14 +246,8 @@ end
     # inputs, both symmetries of the pass and the decoded coefficients all land in
     # storage `LivePolars` already holds, so a solve loop refreshing every step adds
     # nothing to the heap — the property the whole struct is shaped around.
-    deflections = fill(camber, n_panels)
-    refresh_deformed(l, p, d) = refresh_live_polars!(l, p, deg2rad(6.0), 3e6;
-                                                    deflection=d)
-    refresh_base(l, p) = refresh_live_polars!(l, p, deg2rad(6.0), 3e6)
-    refresh_deformed(live, panels, deflections)
-    @test (@allocated refresh_deformed(live, panels, deflections)) == 0
-    refresh_base(live, panels)
-    @test (@allocated refresh_base(live, panels)) == 0
+    @test refresh_allocs(live, panels; deflection=fill(camber, n_panels)) == 0
+    @test refresh_allocs(live, panels) == 0
 
     @test_throws ArgumentError refresh_live_polars!(live, panels[1:2], 0.0, 3e6)
     @test_throws ArgumentError LivePolars(fill(base, 2);
