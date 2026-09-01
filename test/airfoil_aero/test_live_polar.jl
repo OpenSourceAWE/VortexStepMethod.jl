@@ -121,6 +121,18 @@ end
                        [0.03, 0.02, 0.02, 0.03, 0.06], zeros(5))
     @test panel.alpha_knots === knots && panel.cl_coeffs === coeffs
 
+    # A refresh of the same shape is a write, not a rebuild: the interpolations read
+    # the panel's own storage, so the objects survive and nothing is allocated.
+    set_polar!(panel, alphas, [0.1, 0.4, 0.7, 1.0, 0.9], fill(0.02, 5), fill(-0.1, 5))
+    cl_interp = panel.cl_interp
+    set_polar!(panel, alphas, [0.2, 0.5, 0.8, 1.1, 1.0], fill(0.03, 5), fill(-0.2, 5))
+    @test panel.cl_interp === cl_interp
+    @test calculate_cl(panel, alphas[2]) ≈ 0.5
+    cl_next, cd_next, cm_next = [0.2, 0.5, 0.8, 1.1, 1.0], fill(0.03, 5), fill(-0.2, 5)
+    refresh(p, a, l, d, m) = set_polar!(p, a, l, d, m)
+    refresh(panel, alphas, cl_next, cd_next, cm_next)
+    @test (@allocated refresh(panel, alphas, cl_next, cd_next, cm_next)) == 0
+
     @test_throws ArgumentError set_polar!(panel, alphas, [0.0], [0.0], [0.0])
     @test_throws ArgumentError set_polar!(panel, reverse(alphas), zeros(5),
                                           zeros(5), zeros(5))

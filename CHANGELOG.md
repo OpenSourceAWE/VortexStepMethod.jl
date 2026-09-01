@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- A live polar refresh writes into the panel's own storage instead of rebuilding
+  its interpolations. `Interpolations` hands back a gridded interpolation that
+  reads the very arrays it was given when it is built with `interpolate!`, so
+  once a panel's table reads its own knots and values, writing them is the whole
+  update: `set_polar!` on an unchanged table shape allocates nothing and leaves
+  the interpolation objects in place. A table that changes shape is rebuilt
+  once.
+
 ## VortexStepMethod v4.3.0 2026-08-31
 
 ### Fixed

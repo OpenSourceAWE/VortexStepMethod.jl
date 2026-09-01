@@ -333,30 +333,50 @@ function set_polar!(panel::Panel, alphas, cl, cd, cm; shape=nothing)
             setfield!(panel, dst_sym, collect(Float64, src))
         end
     end
-    panel.cl_interp = rebuild_polar(panel.cl_interp, panel.alpha_knots, panel.cl_coeffs)
-    panel.cd_interp = rebuild_polar(panel.cd_interp, panel.alpha_knots, panel.cd_coeffs)
-    panel.cm_interp = rebuild_polar(panel.cm_interp, panel.alpha_knots, panel.cm_coeffs)
+    cl_interp = refresh_polar!(panel.cl_interp, panel.alpha_knots, panel.cl_coeffs)
+    cd_interp = refresh_polar!(panel.cd_interp, panel.alpha_knots, panel.cd_coeffs)
+    cm_interp = refresh_polar!(panel.cm_interp, panel.alpha_knots, panel.cm_coeffs)
+    cl_interp === panel.cl_interp || (panel.cl_interp = cl_interp)
+    cd_interp === panel.cd_interp || (panel.cd_interp = cd_interp)
+    cm_interp === panel.cm_interp || (panel.cm_interp = cm_interp)
     return nothing
 end
 
 """
-    rebuild_polar(old, knots, values) -> Extrapolation
+    refresh_polar!(old, knots, values) -> Extrapolation
 
-A 1D linear interpolation over `knots`/`values` carrying `old`'s extrapolation and knot
-container, so the rebuilt object has the type the panel's field was parameterised with.
-Only the values need rebuilding — `Interpolations` holds the knots by reference — but
-they are what it copies, so the object is rebuilt until it can take them in place.
+An interpolation reading `knots` and `values` themselves, carrying `old`'s extrapolation
+and knot container so it keeps the type the panel's field was parameterised with.
+`interpolate!` takes both arrays by reference, so once an interpolation reads a panel's
+own storage, writing that storage is the whole update and there is nothing to rebuild.
+A table that changes shape is rebuilt once, and reads in place from then on. The two
+dimensional form spreads the angles over every `delta` the panel spans.
 """
-rebuild_polar(old::Interpolations.Extrapolation{<:Any, 1}, knots, values) =
-    linear_interpolation(same_knots(old.itp.knots[1], knots), values;
-                         extrapolation_bc=old.et)
-
-function rebuild_polar(old::Interpolations.Extrapolation{<:Any, 2}, knots, values)
-    deltas = old.itp.knots[2]
-    return linear_interpolation((same_knots(old.itp.knots[1], knots), deltas),
-                                repeat(values, 1, length(deltas));
-                                extrapolation_bc=old.et)
+function refresh_polar!(old::E, knots, values
+                       ) where {E <: Interpolations.Extrapolation{<:Any, 1}}
+    reads_from(old.itp.knots[1], knots) && old.itp.coefs === values && return old
+    return extrapolate(interpolate!((same_knots(old.itp.knots[1], knots),), values,
+                                    Gridded(Linear())), old.et)::E
 end
+
+function refresh_polar!(old::E, knots, values
+                       ) where {E <: Interpolations.Extrapolation{<:Any, 2}}
+    deltas = old.itp.knots[2]
+    coefs = old.itp.coefs
+    if reads_from(old.itp.knots[1], knots) && size(coefs) == (length(knots), length(deltas))
+        for column in axes(coefs, 2)
+            @views coefs[:, column] .= values
+        end
+        return old
+    end
+    return extrapolate(interpolate!((same_knots(old.itp.knots[1], knots), deltas),
+                                    repeat(values, 1, length(deltas)),
+                                    Gridded(Linear())), old.et)::E
+end
+
+"Whether an interpolation's knot container is a view of `knots` rather than a copy."
+reads_from(container::ScanKnots, knots) = container.data === knots
+reads_from(container::AbstractVector, knots) = container === knots
 
 "The angles in the container the panel's interpolations were parameterised with."
 same_knots(::ScanKnots, knots) = ScanKnots(knots)
