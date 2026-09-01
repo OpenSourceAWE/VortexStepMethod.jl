@@ -174,6 +174,8 @@ function deform_live_shapes!(live::LivePolars, deflection)
         if isnothing(deflection)
             shape.upper_weights .= base.upper_weights
             shape.lower_weights .= base.lower_weights
+            shape.leading_edge_weight = base.leading_edge_weight
+            shape.TE_thickness = base.TE_thickness
         else
             deform_kulfan!(shape, live.basis, base, deflection[i], live.residual)
         end
@@ -195,7 +197,7 @@ function apply_live_shapes!(live::LivePolars, panels; deflection=nothing)
         "base airfoils."))
     deform_live_shapes!(live, deflection)
     for (panel, shape) in zip(panels, live.deformed)
-        panel.live_shape === shape || (panel.live_shape = shape)
+        panel.live_shape = shape
     end
     return nothing
 end
