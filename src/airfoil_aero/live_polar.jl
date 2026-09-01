@@ -32,9 +32,10 @@ end
     LivePolars(base; settings=LivePolarSettings(), n_stations=60)
 
 Live polar source for a wing whose panels each carry one undeformed airfoil in `base`.
-Holds the fixed CST basis, the per-panel reference angles and the network input scratch.
-A refresh is dominated by the forward pass itself; the deformation is a matvec against
-the constant basis, about half a microsecond a panel. Drive it with
+Holds the fixed CST basis, the per-panel reference angles, the network and every buffer a
+refresh needs, so a refresh writes through storage that is already there and allocates
+nothing at all. A refresh is dominated by the forward pass itself; the deformation is a
+matvec against the constant basis, about half a microsecond a panel. Drive it with
 [`refresh_live_polars!`](@ref).
 """
 mutable struct LivePolars
@@ -44,7 +45,7 @@ mutable struct LivePolars
     basis::KulfanBasis
     "Undeformed Kulfan parameters per panel."
     base::Vector{KulfanParameters}
-    "Deformed Kulfan parameters per panel, rewritten every refresh."
+    "Deformed Kulfan parameters per panel, rewritten in place every refresh."
     deformed::Vector{KulfanParameters}
     "Reference angle [rad] the last refresh sampled about, per panel."
     alpha_ref::Vector{Float64}
@@ -56,6 +57,34 @@ mutable struct LivePolars
     pressure_inputs::Matrix{Float32}
     "Lowest confidence NeuralFoil reported over each panel's samples, last refresh."
     confidence::Vector{Float64}
+    "The network the settings name, held so a refresh never goes to the model cache."
+    model::NeuralFoilModel
+    "Forward-pass scratch, sized for the sampled batch and so wide enough for either pass."
+    work::NeuralFoilWorkspace
+    "Per-panel Reynolds number of the current pass."
+    reynolds::Vector{Float64}
+    "Per-panel angle [rad] the surface-pressure pass was evaluated at."
+    alpha_at::Vector{Float64}
+    "Lift coefficient of every sample of the last refresh."
+    sample_cl::Vector{Float64}
+    "Drag coefficient of every sample of the last refresh."
+    sample_cd::Vector{Float64}
+    "Moment coefficient of every sample of the last refresh."
+    sample_cm::Vector{Float64}
+    "Analysis confidence of every sample of the last refresh."
+    sample_confidence::Vector{Float64}
+    "Upper-surface edge velocity per station and panel, last surface-pressure pass."
+    ue_upper::Matrix{Float64}
+    "Lower-surface edge velocity per station and panel, last surface-pressure pass."
+    ue_lower::Matrix{Float64}
+    "Signed arc length of the contour one panel's pressure is being spread over."
+    arc::Vector{Float64}
+    "Buffers the pressure reconstruction walks from panel to panel through."
+    pressure_scratch::ContourPressureScratch
+    "The representable part of one panel's deflection."
+    residual::Vector{Float64}
+    "One panel's weight change off its base shape."
+    weight_delta::Vector{Float64}
 end
 
 function LivePolars(base::AbstractVector{KulfanParameters};
@@ -69,13 +98,23 @@ function LivePolars(base::AbstractVector{KulfanParameters};
     first(offsets) <= 0 <= last(offsets) || throw(ArgumentError(
         "LivePolars sample offsets must straddle zero, so the reference angle lies " *
         "inside the sampled range; got $(rad2deg.(extrema(offsets))) deg."))
-    n_panels = length(base)
-    return LivePolars(settings, KulfanBasis(; n_stations,
-                                            n_weights=length(base[1].upper_weights)),
-                      collect(base), collect(base), zeros(n_panels),
-                      zeros(length(offsets)),
-                      zeros(Float32, 25, n_panels * length(offsets)),
-                      zeros(Float32, 25, n_panels), zeros(n_panels))
+    n_panels, n_samples = length(base), length(offsets)
+    n_weights = length(base[1].upper_weights)
+    n_cases = n_panels * n_samples
+    model = load_neuralfoil_model(settings.model_size; weights_dir=settings.weights_dir)
+    work = NeuralFoilWorkspace(model, n_cases)
+    n_network_stations = length(work.stations)
+    deformed = [KulfanParameters(copy(p.upper_weights), copy(p.lower_weights),
+                                 p.leading_edge_weight, p.TE_thickness) for p in base]
+    return LivePolars(settings, KulfanBasis(; n_stations, n_weights),
+                      collect(base), deformed, zeros(n_panels), zeros(n_samples),
+                      zeros(Float32, 25, n_cases), zeros(Float32, 25, n_panels),
+                      zeros(n_panels), model, work, zeros(n_panels), zeros(n_panels),
+                      zeros(n_cases), zeros(n_cases), zeros(n_cases), zeros(n_cases),
+                      zeros(n_network_stations, n_panels),
+                      zeros(n_network_stations, n_panels),
+                      Float64[], ContourPressureScratch(), zeros(n_stations),
+                      zeros(n_weights))
 end
 
 """
@@ -114,21 +153,30 @@ function polar_drift(live::LivePolars, alpha::AbstractVector)
         "polar_drift: $(length(alpha)) angles for $(length(live.alpha_ref)) panels."))
     offsets = live.settings.offsets
     reach = min(-first(offsets), last(offsets))
-    return maximum(abs.(alpha .- live.alpha_ref)) / reach
+    return maximum(i -> abs(alpha[i] - live.alpha_ref[i]),
+                   eachindex(alpha, live.alpha_ref)) / reach
 end
 
 """
     deform_live_shapes!(live::LivePolars, deflection) -> Vector{KulfanParameters}
 
 Deform every base airfoil by its camber increment and store the result in
-`live.deformed`, which is returned. `nothing` leaves the base shapes in place.
-The deformation is an analytic perturbation of one fixed weight vector, so it
-never refits and never inherits the non-uniqueness of a fit.
+`live.deformed`, which is returned. `nothing` writes the base shapes back. The
+deformation is an analytic perturbation of one fixed weight vector, so it never refits
+and never inherits the non-uniqueness of a fit.
+
+Each entry keeps the object it already was, its weights overwritten, so a panel holding
+one from an earlier refresh follows the current shape and no frame allocates a new one.
 """
 function deform_live_shapes!(live::LivePolars, deflection)
     for i in eachindex(live.base)
-        live.deformed[i] = isnothing(deflection) ? live.base[i] :
-            deform_kulfan(live.basis, live.base[i], deflection[i])
+        shape, base = live.deformed[i], live.base[i]
+        if isnothing(deflection)
+            shape.upper_weights .= base.upper_weights
+            shape.lower_weights .= base.lower_weights
+        else
+            deform_kulfan!(shape, live.basis, base, deflection[i], live.residual)
+        end
     end
     return live.deformed
 end
@@ -147,7 +195,7 @@ function apply_live_shapes!(live::LivePolars, panels; deflection=nothing)
         "base airfoils."))
     deform_live_shapes!(live, deflection)
     for (panel, shape) in zip(panels, live.deformed)
-        panel.live_shape = shape
+        panel.live_shape === shape || (panel.live_shape = shape)
     end
     return nothing
 end
@@ -162,9 +210,10 @@ deform the base airfoil by `deflection` (a chord-normalized deflection on `live.
 or `nothing` to keep the base shape), evaluate NeuralFoil at `alpha_ref .+ offsets`, and
 hand those values straight to the panel.
 
-The write is in place — same knot count, same vectors — so a refresh every solve costs
-the forward pass and the three interpolation rebuilds `Interpolations` needs to take the
-new values, which it copies rather than references.
+The write is in place — same knot count, same vectors — and so is everything around it:
+the shapes, the network inputs, both symmetries of the forward pass and the decoded
+coefficients all land in storage `live` already holds, so a refresh every solve costs the
+forward pass and nothing else.
 
 Each panel keeps the deformed shape it was evaluated at as its `live_shape`, so a plot
 draws the airfoil the network actually saw.
@@ -182,9 +231,8 @@ function refresh_live_polars!(live::LivePolars, panels, alpha_ref, reynolds;
     n_panels = length(live.base)
     length(panels) == n_panels || throw(ArgumentError(
         "refresh_live_polars!: $(length(panels)) panels for $n_panels base airfoils."))
-    per_panel(v) = v isa Number ? fill(float(v), n_panels) : collect(float.(v))
-    alpha_vec, re_vec = per_panel(alpha_ref), per_panel(reynolds)
-    live.alpha_ref .= alpha_vec
+    live.alpha_ref .= alpha_ref
+    live.reynolds .= reynolds
 
     offsets = live.settings.offsets
     n_samples = length(offsets)
@@ -192,23 +240,24 @@ function refresh_live_polars!(live::LivePolars, panels, alpha_ref, reynolds;
     for i in 1:n_panels
         for k in 1:n_samples
             fill_case_input!(live.inputs, (i - 1) * n_samples + k, live.deformed[i],
-                             rad2deg(alpha_vec[i] + offsets[k]), re_vec[i],
+                             rad2deg(live.alpha_ref[i] + offsets[k]), live.reynolds[i],
                              live.settings.n_crit, 1.0, 1.0)
         end
     end
 
-    model = load_neuralfoil_model(live.settings.model_size;
-                                  weights_dir=live.settings.weights_dir)
-    cl, cd, cm, confidence = decode_coefficients(fused_output(live.inputs, model))
+    decode_coefficients!(live.sample_cl, live.sample_cd, live.sample_cm,
+                         live.sample_confidence,
+                         fused_output!(live.work, live.inputs, live.model))
 
     for i in 1:n_panels
         samples = ((i - 1) * n_samples + 1):(i * n_samples)
-        live.knots .= alpha_vec[i] .+ offsets
-        live.confidence[i] = minimum(view(confidence, samples))
-        set_polar!(panels[i], live.knots, view(cl, samples), view(cd, samples),
-                   view(cm, samples); shape=live.deformed[i])
+        live.knots .= live.alpha_ref[i] .+ offsets
+        live.confidence[i] = minimum(view(live.sample_confidence, samples))
+        set_polar!(panels[i], live.knots, view(live.sample_cl, samples),
+                   view(live.sample_cd, samples), view(live.sample_cm, samples);
+                   shape=live.deformed[i])
     end
-    return minimum(confidence)
+    return minimum(live.sample_confidence)
 end
 
 """
@@ -293,7 +342,8 @@ panel forces follow the deformed shape; without this the pattern that spreads th
 forces over the structure would still come from the undeformed section, so a
 deformation would change how hard a panel pulls but not where it pulls.
 
-One batched forward pass over all panels, at the converged angle of attack rather
+One batched forward pass over all panels — through the same workspace the polar refresh
+uses, whose inputs it has already consumed — at the converged angle of attack rather
 than at the sampled ones — a panel's `Cp` is wanted at exactly one angle, and
 evaluating there is both cheaper than storing the samples and exact. Call it after
 the solve has converged, with the contours the traction pattern is indexed on —
@@ -308,22 +358,20 @@ function refresh_live_pressure!(cp, live::LivePolars, contour_x, contour_y,
         length(leading_edge) == n_panels ||
         throw(ArgumentError("refresh_live_pressure!: $(length(cp)) pressure and " *
             "$(length(contour_x)) contour entries for $n_panels panels."))
-    per_panel(v) = v isa Number ? fill(float(v), n_panels) : collect(float.(v))
-    alpha_vec, re_vec = per_panel(alpha), per_panel(reynolds)
+    live.alpha_at .= alpha
+    live.reynolds .= reynolds
     for i in 1:n_panels
         fill_case_input!(live.pressure_inputs, i, live.deformed[i],
-                         rad2deg(alpha_vec[i]), re_vec[i], live.settings.n_crit,
-                         1.0, 1.0)
+                         rad2deg(live.alpha_at[i]), live.reynolds[i],
+                         live.settings.n_crit, 1.0, 1.0)
     end
-    model = load_neuralfoil_model(live.settings.model_size;
-                                  weights_dir=live.settings.weights_dir)
-    station_x, ue_upper, ue_lower = decode_surface_velocity(
-        fused_output(live.pressure_inputs, model))
+    decode_surface_velocity!(live.ue_upper, live.ue_lower,
+                             fused_output!(live.work, live.pressure_inputs, live.model))
     for i in 1:n_panels
-        arc = contour_arc(contour_x[i], contour_y[i], leading_edge[i])
-        cp[i] .= contour_pressure(station_x, view(ue_upper, :, i),
-                                  view(ue_lower, :, i), contour_x[i], arc,
-                                  leading_edge[i])
+        arc = contour_arc!(live.arc, contour_x[i], contour_y[i], leading_edge[i])
+        contour_pressure!(cp[i], live.pressure_scratch, live.work.stations,
+                          view(live.ue_upper, :, i), view(live.ue_lower, :, i),
+                          contour_x[i], arc, leading_edge[i])
     end
     return cp
 end
@@ -342,11 +390,12 @@ function live_surface_friction!(cf, contour_x, reynolds)
     length(cf) == length(contour_x) || throw(ArgumentError(
         "live_surface_friction!: $(length(cf)) friction and " *
         "$(length(contour_x)) contour entries."))
-    re_vec = reynolds isa Number ? fill(float(reynolds), length(cf)) :
-        collect(float.(reynolds))
     for i in eachindex(cf)
-        cf[i] .= (flat_plate_cf(clamp(x, 0.0, 1.0), re_vec[i])
-                  for x in contour_x[i])
+        re = reynolds isa Number ? float(reynolds) : float(reynolds[i])
+        nodes = contour_x[i]
+        @inbounds for k in eachindex(cf[i], nodes)
+            cf[i][k] = flat_plate_cf(clamp(nodes[k], 0.0, 1.0), re)
+        end
     end
     return cf
 end
@@ -380,8 +429,8 @@ function live_shape_offset!(offset, live::LivePolars, shape)
         "live_shape_offset!: $(length(offset)) offset and $(length(shape)) shape " *
         "entries for $(length(live.base)) panels."))
     for i in eachindex(live.base)
-        mul!(offset[i], shape[i],
-             live.deformed[i].upper_weights .- live.base[i].upper_weights)
+        live.weight_delta .= live.deformed[i].upper_weights .- live.base[i].upper_weights
+        mul!(offset[i], shape[i], live.weight_delta)
     end
     return offset
 end

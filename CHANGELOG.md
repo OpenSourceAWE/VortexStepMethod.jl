@@ -11,6 +11,30 @@
   update: `set_polar!` on an unchanged table shape allocates nothing and leaves
   the interpolation objects in place. A table that changes shape is rebuilt
   once.
+- `refresh_live_polars!` now allocates nothing at all, where a refresh over 60
+  panels cost 15.3 MB before; the forward pass itself is what a refresh costs
+  now, and its run time is unchanged. NeuralFoil's pass was the bulk of the
+  garbage: every layer built a fresh matrix for its product, another for its
+  activation, and the symmetry embedding did the whole thing twice more for the
+  flipped case. `NeuralFoilWorkspace` holds one set of layer activations per
+  symmetry and `fused_output!` runs the pass through them, with the bias and
+  activation folded into one in-place sweep, the Mahalanobis penalty subtracted
+  from the confidence logit case by case rather than through a vector of
+  distances, and the flip undone while averaging instead of into a third matrix.
+  `LivePolars` keeps that workspace, the network itself, and a buffer for every
+  per-panel quantity a refresh touches, so the shapes deform in place
+  (`deform_kulfan!`), the coefficients decode in place (`decode_coefficients!`)
+  and the panel takes them as views. `polar_drift`, `live_surface_friction!` and
+  `live_shape_offset!` allocate nothing either.
+- `refresh_live_pressure!` allocates 96% less (3.7 MB to 146 kB a refresh over
+  60 panels): it shares the polar refresh's workspace, reads the edge velocities
+  out of it into storage it holds, and reconstructs each panel's `Cp` through
+  one set of reused buffers (`contour_arc!`, `contour_pressure!`). What is left
+  is the monotone interpolation object itself, one per panel.
+- `set_polar!` no longer allocates when handed views rather than vectors, and
+  stores the `live_shape` only when the panel is not already carrying it — an
+  immutable that size is boxed on its way into a `Union` field, which cost a
+  refresh 48 bytes a panel even when the shape had not changed.
 
 ## VortexStepMethod v4.3.0 2026-08-31
 

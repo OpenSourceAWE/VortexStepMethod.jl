@@ -297,19 +297,22 @@ Rewrite a panel's polar table with values at `alphas` [rad], ascending, and rebu
 interpolations. The table keeps the shape the panel was built with: a `POLAR_VECTORS`
 panel takes the angles as they are, and a `POLAR_MATRICES` panel takes them at every
 `delta` it already spans, since a regenerated polar carries its deflection as shape
-rather than as a flap angle and so says the same thing at each. The panel's `alpha_ref` and `alpha_window` are taken from the
-angles, so a table covering only a window around one angle is held at its ends rather than
-extrapolated past them (see [`window_alpha`](@ref)).
+rather than as a flap angle and so says the same thing at each. The panel's `alpha_ref`
+and `alpha_window` are taken from the angles, so a table covering only a window around one
+angle is held at its ends rather than extrapolated past them (see [`window_alpha`](@ref)).
 
 Written in place: the knots and the three value vectors reuse the panel's own
 `alpha_knots` and `cl_coeffs`/`cd_coeffs`/`cm_coeffs` storage whenever the sample count is
-unchanged, which is what lets a live polar source refresh every solve without growing the
-panel. The interpolations themselves are rebuilt, since `Interpolations` copies the values
-it is handed; they keep the extrapolation the panel was built with.
+unchanged ([`polar_column!`](@ref)), and the interpolations read that storage rather than
+a copy of it, so writing it is the whole update and the interpolation objects stay put
+([`refresh_polar!`](@ref)). Only a table that changes shape is rebuilt. Values may be
+views into a caller's own buffers; nothing here holds on to them.
 
 `shape` is the [`KulfanParameters`](@ref) the values were generated from, stored on the
 panel as `live_shape` so a panel's polar and the shape behind it are set together and
-cannot drift apart.
+cannot drift apart. It is only stored when it is not already there: an immutable this
+size is boxed on its way into a `Union` field, so the guard is what keeps a refresh of a
+shape whose weights were rewritten in place free of that box.
 """
 function set_polar!(panel::Panel, alphas, cl, cd, cm; shape=nothing)
     length(alphas) == length(cl) == length(cd) == length(cm) ||
@@ -323,16 +326,11 @@ function set_polar!(panel::Panel, alphas, cl, cd, cm; shape=nothing)
     panel.aero_model = polar_model(panel.cl_interp)
     panel.alpha_ref = (alphas[1] + alphas[end]) / 2
     panel.alpha_window = (alphas[end] - alphas[1]) / 2
-    panel.live_shape = shape
-    for (dst_sym, src) in ((:alpha_knots, alphas), (:cl_coeffs, cl),
-                           (:cd_coeffs, cd), (:cm_coeffs, cm))
-        dst = getfield(panel, dst_sym)
-        if length(dst) == length(src)
-            dst .= src
-        else
-            setfield!(panel, dst_sym, collect(Float64, src))
-        end
-    end
+    panel.live_shape === shape || (panel.live_shape = shape)
+    panel.alpha_knots = polar_column!(panel.alpha_knots, alphas)
+    panel.cl_coeffs = polar_column!(panel.cl_coeffs, cl)
+    panel.cd_coeffs = polar_column!(panel.cd_coeffs, cd)
+    panel.cm_coeffs = polar_column!(panel.cm_coeffs, cm)
     cl_interp = refresh_polar!(panel.cl_interp, panel.alpha_knots, panel.cl_coeffs)
     cd_interp = refresh_polar!(panel.cd_interp, panel.alpha_knots, panel.cd_coeffs)
     cm_interp = refresh_polar!(panel.cm_interp, panel.alpha_knots, panel.cm_coeffs)
@@ -340,6 +338,19 @@ function set_polar!(panel::Panel, alphas, cl, cd, cm; shape=nothing)
     cd_interp === panel.cd_interp || (panel.cd_interp = cd_interp)
     cm_interp === panel.cm_interp || (panel.cm_interp = cm_interp)
     return nothing
+end
+
+"""
+    polar_column!(stored, values) -> Vector{Float64}
+
+One column of a rewritten polar table in the panel's own `stored` vector, which is
+returned, or in a fresh vector when the sample count has changed — the one case a
+rewritten table has to grow, and the one that costs the panel's interpolations a rebuild.
+"""
+function polar_column!(stored::Vector{Float64}, values)
+    length(stored) == length(values) || return collect(Float64, values)
+    stored .= values
+    return stored
 end
 
 """

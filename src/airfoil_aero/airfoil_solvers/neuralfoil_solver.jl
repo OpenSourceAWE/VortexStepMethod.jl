@@ -49,8 +49,17 @@ along the upper surface toward the trailing edge, negative along the lower. The
 natural coordinate across a blunt nose, where a small chordwise step is a long one
 along the skin.
 """
-function contour_arc(x, y, le)
-    arc = zeros(Float64, length(x))
+contour_arc(x, y, le) = contour_arc!(zeros(Float64, length(x)), x, y, le)
+
+"""
+    contour_arc!(arc, x, y, le) -> arc
+
+[`contour_arc`](@ref) written into `arc`, which is resized to the contour. A live
+pressure refresh walks panel after panel through one buffer this way.
+"""
+function contour_arc!(arc::Vector{Float64}, x, y, le)
+    resize!(arc, length(x))
+    arc[le] = 0.0
     for k in (le - 1):-1:1
         arc[k] = arc[k + 1] + hypot(x[k] - x[k + 1], y[k] - y[k + 1])
     end
@@ -61,20 +70,97 @@ function contour_arc(x, y, le)
 end
 
 """
+    ContourPressureScratch()
+
+The buffers a surface-pressure reconstruction reuses, so [`contour_pressure!`](@ref)
+allocates nothing per panel or per frame. Each grows to whatever contour and station
+count it is first handed and stays that size.
+"""
+struct ContourPressureScratch
+    "One surface's node chord fractions, ascending."
+    surface_x::Vector{Float64}
+    "The same nodes' signed arc length."
+    surface_arc::Vector{Float64}
+    "Arc length of the network's stations on the upper surface."
+    upper_arc::Vector{Float64}
+    "Arc length of the network's stations on the lower surface."
+    lower_arc::Vector{Float64}
+    "Arc length of every knot of the joined edge-velocity curve."
+    knots::Vector{Float64}
+    "Signed edge velocity at those knots."
+    values::Vector{Float64}
+end
+
+ContourPressureScratch() = ContourPressureScratch(Float64[], Float64[], Float64[],
+                                                  Float64[], Float64[], Float64[])
+
+"""
     arc_at_chord(x, arc, indices, fractions) -> Vector
 
 Signed arc length at each chord fraction, read off the contour nodes `indices` — the
 one surface the fractions belong to.
 """
 function arc_at_chord(x, arc, indices, fractions)
-    nodes = collect(indices)
-    order = sortperm(x[nodes])
-    xs, as = x[nodes][order], arc[nodes][order]
-    return [begin
+    scratch = ContourPressureScratch()
+    return arc_at_chord!(zeros(length(fractions)), scratch, x, arc, indices, fractions)
+end
+
+"""
+    arc_at_chord!(out, scratch, x, arc, indices, fractions) -> out
+
+[`arc_at_chord`](@ref) written into `out`, taking the sorted copy of the surface from
+`scratch` rather than allocating one per call.
+"""
+function arc_at_chord!(out::Vector{Float64}, scratch::ContourPressureScratch, x, arc,
+                       indices, fractions)
+    xs, as = sorted_surface!(scratch, x, arc, indices)
+    resize!(out, length(fractions))
+    @inbounds for (i, f) in enumerate(fractions)
         j = clamp(searchsortedfirst(xs, f), 2, length(xs))
         gap = max(xs[j] - xs[j - 1], eps())
-        as[j - 1] + (f - xs[j - 1]) / gap * (as[j] - as[j - 1])
-    end for f in fractions]
+        out[i] = as[j - 1] + (f - xs[j - 1]) / gap * (as[j] - as[j - 1])
+    end
+    return out
+end
+
+"""
+    sorted_surface!(scratch, x, arc, indices) -> (surface_x, surface_arc)
+
+One surface's nodes as chord fraction and signed arc length, ascending in chord, in the
+scratch's own storage. Sorted by insertion, which a surface listed from one end to the
+other is either already in or exactly reversed from, and which needs no scratch of its
+own.
+"""
+function sorted_surface!(scratch::ContourPressureScratch, x, arc, indices)
+    surface_x, surface_arc = scratch.surface_x, scratch.surface_arc
+    n = length(indices)
+    resize!(surface_x, n)
+    resize!(surface_arc, n)
+    @inbounds for (k, node) in enumerate(indices)
+        surface_x[k] = x[node]
+        surface_arc[k] = arc[node]
+    end
+    sort_pairs!(surface_x, surface_arc)
+    return (surface_x, surface_arc)
+end
+
+"""
+    sort_pairs!(sorted, carried)
+
+Insertion-sort `sorted` ascending, carrying `carried` along with it. Stable, in place,
+and linear on input that is already ordered, which both of its callers hand it.
+"""
+function sort_pairs!(sorted::Vector{Float64}, carried::Vector{Float64})
+    @inbounds for k in 2:length(sorted)
+        key, along = sorted[k], carried[k]
+        j = k - 1
+        while j >= 1 && sorted[j] > key
+            sorted[j + 1], carried[j + 1] = sorted[j], carried[j]
+            j -= 1
+        end
+        sorted[j + 1], carried[j + 1] = key, along
+    end
+    return nothing
 end
 
 """
@@ -111,20 +197,51 @@ than extrapolated off the end of one. The stagnation point enters as its own kno
 where `ue` interpolated linearly between those two stations reaches zero — the
 stagnation-point-flow result, `ue` being linear in arc length there.
 """
-function velocity_knots(station_x, ue_upper, ue_lower, x, arc, le)
-    upper_arc = arc_at_chord(x, arc, 1:le, station_x)
-    lower_arc = arc_at_chord(x, arc, le:length(x), station_x)
+velocity_knots(station_x, ue_upper, ue_lower, x, arc, le) =
+    velocity_knots!(ContourPressureScratch(), station_x, ue_upper, ue_lower, x, arc, le)
+
+"""
+    velocity_knots!(scratch, station_x, ue_upper, ue_lower, x, arc, le)
+        -> (knots, values)
+
+[`velocity_knots`](@ref) assembled in `scratch`. The two vectors returned are the
+scratch's own and are overwritten by the next call.
+"""
+function velocity_knots!(scratch::ContourPressureScratch, station_x, ue_upper, ue_lower,
+                         x, arc, le)
+    n_stations = length(station_x)
+    upper_arc = arc_at_chord!(scratch.upper_arc, scratch, x, arc, 1:le, station_x)
+    lower_arc = arc_at_chord!(scratch.lower_arc, scratch, x, arc, le:length(x),
+                              station_x)
     speed = trailing_edge_speed(ue_upper, ue_lower, upper_arc, lower_arc,
                                 arc[1], arc[end])
     lower_first, upper_first = abs(ue_lower[1]), abs(ue_upper[1])
     stagnation = lower_arc[1] + lower_first / max(lower_first + upper_first, eps()) *
                  (upper_arc[1] - lower_arc[1])
-    knots = [arc[end]; reverse(lower_arc); stagnation; upper_arc; arc[1]]
-    values = [-speed; reverse(-abs.(ue_lower)); 0.0; abs.(ue_upper); speed]
-    order = sortperm(knots)
-    knots, values = knots[order], values[order]
-    keep = [1; [k for k in 2:length(knots) if knots[k] > knots[k - 1] + 1e-9]]
-    return knots[keep], values[keep]
+    knots = resize!(scratch.knots, 2 * n_stations + 3)
+    values = resize!(scratch.values, 2 * n_stations + 3)
+    knots[1], values[1] = arc[end], -speed
+    for k in 1:n_stations
+        knots[1 + k], values[1 + k] = lower_arc[n_stations + 1 - k],
+                                      -abs(ue_lower[n_stations + 1 - k])
+    end
+    knots[n_stations + 2], values[n_stations + 2] = stagnation, 0.0
+    for k in 1:n_stations
+        knots[n_stations + 2 + k], values[n_stations + 2 + k] = upper_arc[k],
+                                                                abs(ue_upper[k])
+    end
+    knots[end], values[end] = arc[1], speed
+    sort_pairs!(knots, values)
+    kept, previous = 1, knots[1]
+    for k in 2:length(knots)
+        current = knots[k]
+        if current > previous + 1e-9
+            kept += 1
+            knots[kept], values[kept] = current, values[k]
+        end
+        previous = current
+    end
+    return (resize!(knots, kept), resize!(values, kept))
 end
 
 """
@@ -135,10 +252,24 @@ end
 one-curve edge velocity ([`velocity_knots`](@ref)), interpolates it with a
 shape-preserving monotone cubic in arc length, and squares it into `Cp = 1 - ue²`.
 """
-function contour_pressure(station_x, ue_upper, ue_lower, x, arc, le)
-    knots, values = velocity_knots(station_x, ue_upper, ue_lower, x, arc, le)
+contour_pressure(station_x, ue_upper, ue_lower, x, arc, le) =
+    contour_pressure!(zeros(length(x)), ContourPressureScratch(), station_x, ue_upper,
+                      ue_lower, x, arc, le)
+
+"""
+    contour_pressure!(cp, scratch, station_x, ue_upper, ue_lower, x, arc, le) -> cp
+
+[`contour_pressure`](@ref) written into `cp`, with `scratch` carrying the edge-velocity
+curve. Only the monotone interpolation itself still allocates, once per contour.
+"""
+function contour_pressure!(cp, scratch::ContourPressureScratch, station_x, ue_upper,
+                           ue_lower, x, arc, le)
+    knots, values = velocity_knots!(scratch, station_x, ue_upper, ue_lower, x, arc, le)
     speed = interpolate(knots, values, FritschButlandMonotonicInterpolation())
-    return [1 - speed(clamp(a, first(knots), last(knots)))^2 for a in arc]
+    @inbounds for k in eachindex(cp, arc)
+        cp[k] = 1 - speed(clamp(arc[k], first(knots), last(knots)))^2
+    end
+    return cp
 end
 
 """
