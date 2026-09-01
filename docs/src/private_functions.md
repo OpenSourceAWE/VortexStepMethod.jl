@@ -99,8 +99,9 @@ update_non_deformed_sections!
 ```@docs
 calculate_new_aero_data
 set_polar!
-rebuild_polar
+refresh_polar!
 polar_model
+reads_from
 same_knots
 polar_knots
 window_alpha
