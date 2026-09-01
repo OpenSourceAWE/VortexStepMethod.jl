@@ -100,6 +100,7 @@ update_non_deformed_sections!
 calculate_new_aero_data
 set_polar!
 refresh_polar!
+polar_column!
 polar_model
 reads_from
 same_knots
@@ -134,6 +135,8 @@ CurrentModule = VortexStepMethod.AirfoilAero
 
 ### Kulfan CST parametrization
 ```@docs
+deform_kulfan!
+chord_residual!
 bernstein_basis
 class_function
 leading_edge_basis
@@ -161,14 +164,27 @@ load_neuralfoil_model
 neuralfoil_section
 neuralfoil_fused_output
 fused_output
+fused_output!
 decode_surface_velocity
+decode_surface_velocity!
+surface_velocity_rows
 decode_coefficients
+decode_coefficients!
 nn_forward
+nn_forward!
+add_bias!
+layer_buffers
+case_capacity
 prepare_inputs
 fill_case_input!
 flip_inputs
+flip_inputs!
 flip_outputs
+flipped_row
+fuse_flipped!
 squared_mahalanobis_distance
+mahalanobis_case
+penalize_confidence!
 swish
 sigmoid
 ```
@@ -187,10 +203,16 @@ write_node_table
 flat_plate_cf
 neuralfoil_contour_solution
 contour_arc
+contour_arc!
 arc_at_chord
+arc_at_chord!
+sorted_surface!
+sort_pairs!
 trailing_edge_speed
 velocity_knots
+velocity_knots!
 contour_pressure
+contour_pressure!
 fill_node_nans!
 live_xfoil_solver
 xfoil_ramp

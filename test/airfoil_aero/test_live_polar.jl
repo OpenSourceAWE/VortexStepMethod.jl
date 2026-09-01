@@ -226,6 +226,19 @@ end
     @test panels[1].live_shape === live.deformed[1]
     @test panels[1].live_shape.upper_weights ≈ live.base[1].upper_weights
 
+    # Which makes a refresh the forward pass and nothing else. The shapes, the network
+    # inputs, both symmetries of the pass and the decoded coefficients all land in
+    # storage `LivePolars` already holds, so a solve loop refreshing every step adds
+    # nothing to the heap — the property the whole struct is shaped around.
+    deflections = fill(camber, n_panels)
+    refresh_deformed(l, p, d) = refresh_live_polars!(l, p, deg2rad(6.0), 3e6;
+                                                    deflection=d)
+    refresh_base(l, p) = refresh_live_polars!(l, p, deg2rad(6.0), 3e6)
+    refresh_deformed(live, panels, deflections)
+    @test (@allocated refresh_deformed(live, panels, deflections)) == 0
+    refresh_base(live, panels)
+    @test (@allocated refresh_base(live, panels)) == 0
+
     @test_throws ArgumentError refresh_live_polars!(live, panels[1:2], 0.0, 3e6)
     @test_throws ArgumentError LivePolars(fill(base, 2);
         settings=LivePolarSettings(; offsets=deg2rad.([1.0, 2.0, 3.0])))
@@ -323,7 +336,11 @@ end
     contour_x = [1.0, 0.5, 0.0, 0.5, 1.0]
     cf = [zeros(5), zeros(5)]
     same = cf[1]
-    live_surface_friction!(cf, [contour_x, contour_x], [3e6, 1e6])
+    contours, reynolds = [contour_x, contour_x], [3e6, 1e6]
+    live_surface_friction!(cf, contours, reynolds)
+    friction(c, x, re) = live_surface_friction!(c, x, re)
+    friction(cf, contours, reynolds)
+    @test (@allocated friction(cf, contours, reynolds)) == 0
     @test cf[1] === same
     @test cf[1] ≈ [AirfoilAero.flat_plate_cf(x, 3e6) for x in contour_x]
     # Lower Reynolds is more friction, and it is highest at the nose.

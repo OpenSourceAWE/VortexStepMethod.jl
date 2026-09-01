@@ -69,16 +69,46 @@ they are the two shape freedoms a chord-referenced deflection cannot resolve.
 function deform_kulfan(basis::KulfanBasis, base::KulfanParameters,
                        upper_deflection::AbstractVector,
                        lower_deflection::AbstractVector)
+    out = KulfanParameters(copy(base.upper_weights), copy(base.lower_weights),
+                           base.leading_edge_weight, base.TE_thickness)
+    return deform_kulfan!(out, basis, base, upper_deflection, lower_deflection,
+                          similar(basis.x))
+end
+
+"""
+    deform_kulfan!(out, basis, base, upper_deflection, lower_deflection, residual)
+        -> out
+
+[`deform_kulfan`](@ref) written into the weight vectors `out` already holds, with
+`residual` as the scratch [`chord_residual!`](@ref) fills — the form a live polar
+refreshes a panel's shape with, since it neither allocates nor changes the object the
+panel points at.
+
+Only the weights are written. The leading-edge weight and trailing-edge thickness are
+carried by a deformation unchanged, so `out` must already agree with `base` on both;
+it does when `out` was built from `base`, which is checked.
+"""
+function deform_kulfan!(out::KulfanParameters, basis::KulfanBasis,
+                        base::KulfanParameters, upper_deflection::AbstractVector,
+                        lower_deflection::AbstractVector, residual::AbstractVector)
     length(base.upper_weights) == basis.n_weights || throw(ArgumentError(
         "KulfanBasis has $(basis.n_weights) weights, airfoil has " *
         "$(length(base.upper_weights))."))
     (length(upper_deflection) == length(basis.x) &&
      length(lower_deflection) == length(basis.x)) || throw(ArgumentError(
         "Deflections must be sampled on the basis' $(length(basis.x)) stations."))
-    return KulfanParameters(
-        base.upper_weights .+ basis.projection * chord_residual(basis, upper_deflection),
-        base.lower_weights .+ basis.projection * chord_residual(basis, lower_deflection),
-        base.leading_edge_weight, base.TE_thickness)
+    (out.leading_edge_weight == base.leading_edge_weight &&
+     out.TE_thickness == base.TE_thickness) || throw(ArgumentError(
+        "deform_kulfan! writes weights only, so its target must carry the base " *
+        "airfoil's leading-edge weight and trailing-edge thickness."))
+    for (weights, base_weights, deflection) in
+            ((out.upper_weights, base.upper_weights, upper_deflection),
+             (out.lower_weights, base.lower_weights, lower_deflection))
+        chord_residual!(residual, basis, deflection)
+        mul!(weights, basis.projection, residual)
+        weights .+= base_weights
+    end
+    return out
 end
 
 """
@@ -94,9 +124,19 @@ magnitude past the ones it is correcting, and the airfoil that comes back is not
 Removes the straight line through the deflection's own endpoints, which
 [`chord_line`](@ref) returns, and gives back what is left.
 """
-function chord_residual(basis::KulfanBasis, deflection::AbstractVector)
+chord_residual(basis::KulfanBasis, deflection::AbstractVector) =
+    chord_residual!(similar(basis.x), basis, deflection)
+
+"""
+    chord_residual!(residual, basis, deflection) -> residual
+
+[`chord_residual`](@ref) written into storage the caller owns.
+"""
+function chord_residual!(residual::AbstractVector, basis::KulfanBasis,
+                         deflection::AbstractVector)
     offset, slope = chord_line(basis, deflection)
-    return deflection .- (offset .+ slope .* basis.x)
+    residual .= deflection .- (offset .+ slope .* basis.x)
+    return residual
 end
 
 """
@@ -118,6 +158,10 @@ end
 
 deform_kulfan(basis::KulfanBasis, base::KulfanParameters,
               camber::AbstractVector) = deform_kulfan(basis, base, camber, camber)
+
+deform_kulfan!(out::KulfanParameters, basis::KulfanBasis, base::KulfanParameters,
+               camber::AbstractVector, residual::AbstractVector) =
+    deform_kulfan!(out, basis, base, camber, camber, residual)
 
 """
     control_point_deflection(basis, fractions, deflections) -> Vector{Float64}

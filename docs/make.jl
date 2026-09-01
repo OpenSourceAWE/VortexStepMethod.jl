@@ -14,7 +14,7 @@ makedocs(;
              VortexStepMethod.ObjAdapter],
     authors="Uwe Fechner <uwe.fechner.msc@gmail.com>, Bart van de Lint <bart@vandelint.net> and contributors",
     sitename="VortexStepMethod.jl",
-    format = Documenter.HTML(prettyurls = haskey(ENV, "CI")),
+    format = Documenter.HTML(prettyurls = haskey(ENV, "CI"), size_threshold = 400_000),
     pages=[
         "Home" => "index.md",
         "How it works" => "explanation.md",

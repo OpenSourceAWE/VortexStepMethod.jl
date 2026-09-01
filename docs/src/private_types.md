@@ -31,6 +31,8 @@ LivePolarSettings
 LivePolars
 NeuralFoilModel
 NeuralFoilResult
+NeuralFoilWorkspace
+ContourPressureScratch
 ```
 ```@meta
 CurrentModule = VortexStepMethod
