@@ -41,6 +41,7 @@ end
           delta_range: [-40, 10, 40]
           v_app: 25.0
           chord_ref: 6.0
+          table_format: csv
     solver_settings:
       aerodynamic_model_type: VSM
       type_initial_gamma_distribution: ELLIPTIC
@@ -66,6 +67,8 @@ end
     @test keys(slice_args(wing)) ==
         (:rotation, :wrap_method, :wingtip_distance)
     @test preview_args(wing).n_slices == 45
+    # the generator takes a Symbol, so the settings carry one
+    @test wing.airfoil.table_format === :csv
 
     @test_throws ArgumentError VortexStepMethod.airfoil_settings(
         Dict("solver" => "rans"))

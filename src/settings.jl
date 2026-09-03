@@ -67,8 +67,9 @@ generated at different transition settings or off different networks.
     (default `25.0`).
 - `chord_ref`: Reference (maximum panel) chord [m], which Reynolds is defined
     against (default `1.0`).
-- `table_format`: Per-node table format, `"csv"` (readable) or `"arrow"` (about ten
-    times faster to load; default `"arrow"`).
+- `table_format`: Per-node table format, `:csv` (readable) or `:arrow` (about ten
+    times faster to load; default `:arrow`). Written in YAML as a plain string,
+    and carried as the `Symbol` the generator takes.
 """
 @with_kw mutable struct AirfoilSettings
     solver::String = "neuralfoil"
@@ -81,7 +82,7 @@ generated at different transition settings or off different networks.
     live_offsets::Vector{Float64} = collect(-12.0:3.0:12.0)
     v_app::Float64 = 25.0
     chord_ref::Float64 = 1.0
-    table_format::String = "arrow"
+    table_format::Symbol = :arrow
 end
 
 """
@@ -331,10 +332,12 @@ default; `delta_range: null` (or an absent key) means no flap sweep.
 """
 function airfoil_settings(data)
     airfoil = AirfoilSettings()
-    for key in (:solver, :model_size, :table_format)
+    for key in (:solver, :model_size)
         haskey(data, String(key)) &&
             setfield!(airfoil, key, String(data[String(key)]))
     end
+    haskey(data, "table_format") &&
+        (airfoil.table_format = Symbol(data["table_format"]))
     for key in (:n_crit, :xtr_upper, :xtr_lower, :v_app, :chord_ref)
         haskey(data, String(key)) &&
             setfield!(airfoil, key, Float64(data[String(key)]))
@@ -349,7 +352,7 @@ function airfoil_settings(data)
     airfoil.solver in ("neuralfoil", "xfoil") || throw(ArgumentError(
         "Invalid airfoil solver \"$(airfoil.solver)\". " *
         "Valid values: neuralfoil, xfoil"))
-    airfoil.table_format in ("csv", "arrow") || throw(ArgumentError(
+    airfoil.table_format in (:csv, :arrow) || throw(ArgumentError(
         "Invalid table_format \"$(airfoil.table_format)\". " *
         "Valid values: csv, arrow"))
     return airfoil
