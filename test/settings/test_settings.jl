@@ -12,5 +12,64 @@ using Test
     @test length(vss.wings) == 2
     io = IOBuffer(repr(vss))
     @test countlines(io) > 0
+
+    # A file that names neither block still loads, on the defaults.
+    bare = vss.wings[1]
+    @test bare.mesh isa MeshSettings
+    @test bare.airfoil isa AirfoilSettings
+    @test isnothing(delta_range(bare.airfoil))
+    @test airfoil_solver(bare.airfoil) isa
+        VortexStepMethod.AirfoilAero.NeuralFoilSolver
+end
+
+@testset "mesh and airfoil blocks" begin
+    yaml = """
+    wings:
+      - name: wing
+        n_panels: 4
+        spanwise_panel_distribution: LINEAR
+        spanwise_direction: [0.0, 1.0, 0.0]
+        remove_nan: true
+        mesh:
+          n_sections: 45
+          rotation: [[0, 0, -1], [-1, 0, 0], [0, 1, 0]]
+          clearance: 0.0
+        airfoil:
+          solver: xfoil
+          n_crit: 4.0
+          alpha_range: [-15, 3, 90]
+          delta_range: [-40, 10, 40]
+          v_app: 25.0
+          chord_ref: 6.0
+    solver_settings:
+      aerodynamic_model_type: VSM
+      type_initial_gamma_distribution: ELLIPTIC
+      density: 1.225
+      mu: 1.81e-5
+    """
+    path = tempname() * ".yaml"
+    write(path, yaml)
+    set = VSMSettings(path; data_prefix = false)
+    wing = set.wings[1]
+
+    @test wing.mesh.n_sections == 45
+    @test rotation_matrix(wing.mesh) == [0 0 -1; -1 0 0; 0 1 0]
+    @test alpha_range(wing.airfoil) == -15.0:3.0:90.0
+    @test delta_range(wing.airfoil) == -40.0:10.0:40.0
+    # the air is stated once, in solver_settings, and Reynolds reads it there
+    @test reynolds(set, wing) ≈ 1.225 * 25.0 * 6.0 / 1.81e-5
+    @test airfoil_solver(wing.airfoil) isa VortexStepMethod.AirfoilAero.XFoilSolver
+    # tables and live polars come off the same block, so they cannot disagree
+    live = VortexStepMethod.AirfoilAero.LivePolarSettings(wing.airfoil)
+    @test live.n_crit == wing.airfoil.n_crit
+    @test live.model_size == wing.airfoil.model_size
+    @test keys(slice_args(wing)) ==
+        (:rotation, :wrap_method, :wingtip_distance)
+    @test preview_args(wing).n_slices == 45
+
+    @test_throws ArgumentError VortexStepMethod.airfoil_settings(
+        Dict("solver" => "rans"))
+    @test_throws ArgumentError VortexStepMethod.airfoil_settings(
+        Dict("table_format" => "parquet"))
 end
 nothing

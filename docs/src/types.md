@@ -28,6 +28,8 @@ AeroData
 ```@docs
 VSMSettings
 WingSettings
+MeshSettings
+AirfoilSettings
 SolverSettings
 ```
 

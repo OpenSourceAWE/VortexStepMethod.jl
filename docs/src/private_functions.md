@@ -4,6 +4,13 @@ CurrentModule = VortexStepMethod
 
 ## Private Functions
 
+### Settings
+```@docs
+mesh_settings
+airfoil_settings
+settings_range
+```
+
 ### Solver, forces and circulation
 ```@docs
 calculate_AIC_matrices!

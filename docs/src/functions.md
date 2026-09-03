@@ -116,6 +116,19 @@ plot_combined_analysis
 plot_section_polars
 ```
 
+## Settings to arguments
+The blocks a `vsm_settings.yaml` carries, turned into the arguments the slicer, the
+polar generator and the live polars take.
+```@docs
+airfoil_solver
+alpha_range
+delta_range
+reynolds
+rotation_matrix
+slice_args
+preview_args
+```
+
 ## Helper Functions
 ```@docs
 save_plot
