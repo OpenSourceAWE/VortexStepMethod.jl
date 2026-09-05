@@ -152,6 +152,7 @@ point_buckets
 turn_measure
 pivot_step
 push_arc!
+edge_normal
 pivot_contour
 largest_linking_gap
 enforce_min_spacing!

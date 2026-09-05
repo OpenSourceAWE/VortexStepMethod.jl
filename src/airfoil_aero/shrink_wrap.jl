@@ -4,29 +4,26 @@
 
 Rolling-ball shrink wrap: the offset of a raw slice point cloud, traced exactly as
 one closed airfoil contour. A disk of radius `min_concave_radius` is pivoted around
-the outside of the cloud ([`pivot_contour`](@ref)); the wrap is what its contact
-side sweeps, so it consists of arcs of radius `clearance` about the points the disk
-touches, joined by arcs of the disk radius across the gaps it cannot enter. Being
-built from arcs rather than sampled on a grid, the wrap has no resolution floor:
-the leading edge comes out genuinely round — the offset of the cloud nose — the
-blunt trailing edge is capped by an arc of radius `clearance`, and a
-single-membrane cloud becomes a capsule of exactly that half-thickness.
+the outside of the cloud and the polygon through the points it touches is offset by
+`clearance` ([`pivot_contour`](@ref)). Being traced rather than sampled on a grid,
+the wrap has no resolution floor: the leading edge comes out genuinely round — the
+offset of the cloud nose — the blunt trailing edge is capped by an arc of radius
+`clearance`, and a single-membrane cloud becomes a capsule of exactly that
+half-thickness.
 
 # Fields
 - `clearance`: offset the contour keeps outside every cloud point, and the radius
   every convex corner is rounded at; floored at `min_clearance` only when the cloud
   is an open single membrane rather than a closed loop.
 - `min_concave_radius`: rolling-ball radius — concave features narrower than about
-  twice this are bridged by a fillet of roughly this radius; convex geometry is
-  unaffected. Auto-raised so the ball can neither fall through the cloud's largest
-  point gap nor dip below `clearance` between neighbouring points, so sparse clouds
-  get a correspondingly looser, smoother wrap.
+  twice this are bridged straight; convex geometry is unaffected. Raised where the
+  cloud is sparse enough that the ball would otherwise fall through its largest point
+  gap.
 - `min_clearance`: floor on `clearance` for an open single-membrane cloud, so
   `clearance=0` still leaves it a capsule with two distinguishable sides instead of
   a bare curve; a closed loop uses its true `clearance`, so `clearance=0` hugs the
   cloud and keeps its sharp trailing edge sharp. Also accepted under its former name
-  `cell_size`, which set the resolution of the distance field this used to be traced
-  on.
+  `cell_size`.
 - `n_points`: output stations per surface; the contour has `2*n_points - 1` points,
   cosine-clustered in arclength at the leading and trailing edges.
 - `curvature_weight`: extra sampling measure per radian of contour turning (chord
@@ -117,14 +114,14 @@ end
     push_arc!(px, py, cx, cy, radius, from, sweep)
 
 Append the arc about `(cx, cy)` that starts at angle `from` and turns by the signed
-angle `sweep`, stepped fine enough to stay within `1e-6` of the true arc. The closing
-point is left off so consecutive arcs concatenate without duplicates.
+angle `sweep`, endpoints included, stepped fine enough to stay within `1e-6` of the
+true arc. A zero radius appends the centre once.
 """
 function push_arc!(px, py, cx, cy, radius, from, sweep)
-    steps = radius < 1e-12 ? 1 :
+    steps = radius < 1e-12 ? 0 :
             clamp(ceil(Int, abs(sweep) / sqrt(8e-6 / radius)), 1, 400)
-    for k in 0:steps-1
-        angle = from + sweep * k / steps
+    for k in 0:steps
+        angle = from + sweep * k / max(steps, 1)
         push!(px, cx + radius * cos(angle))
         push!(py, cy + radius * sin(angle))
     end
@@ -132,14 +129,23 @@ function push_arc!(px, py, cx, cy, radius, from, sweep)
 end
 
 """
+    edge_normal(ax, ay, bx, by) -> Float64
+
+Angle of the outward normal of the wrap edge running from `(ax, ay)` to `(bx, by)`,
+which [`pivot_contour`](@ref) traces with the cloud on its left.
+"""
+edge_normal(ax, ay, bx, by) = atan(ax - bx, by - ay)
+
+"""
     pivot_contour(x, y, r, clearance) -> (px, py)
 
-Trace the rolling-ball closing of the cloud `(x, y)` offset outward by `clearance`,
-as a dense closed polyline. A disk of radius `r` is pivoted around the outside of the
-cloud from its leftmost point; each point the disk touches contributes an arc of
-radius `clearance` about itself, and each pivot an arc of radius `r - clearance`
-about the empty disk's centre, spanning the gap the disk could not enter. Those arcs
-are the exact wrap boundary, so nothing here has a resolution to choose.
+Trace the alpha shape of the cloud `(x, y)` for alpha `r`, offset outward by
+`clearance`, as a closed polyline. A disk of radius `r` is pivoted around the outside
+of the cloud from its leftmost point; the points it touches are the polygon's
+vertices in order, the ones inside a concavity narrower than the disk having been
+skipped and bridged straight. The offset rounds each convex vertex with an arc of
+radius `clearance` and chamfers each reflex one across the bisector, so it holds that
+distance from every contact.
 """
 function pivot_contour(x, y, r, clearance)
     start = argmin(x)
@@ -160,18 +166,21 @@ function pivot_contour(x, y, r, clearance)
         p = next
     end
     px, py = Float64[], Float64[]
-    isempty(contacts) && return px, py
-    for (k, i) in enumerate(contacts)
-        incoming = centres[mod1(k - 1, length(centres))]
-        outgoing = centres[k]
-        from = atan(incoming[2] - y[i], incoming[1] - x[i])
-        to = atan(outgoing[2] - y[i], outgoing[1] - x[i])
-        push_arc!(px, py, x[i], y[i], clearance, from, mod(to - from, 2pi))
-        j = contacts[mod1(k + 1, length(contacts))]
-        from = atan(y[i] - outgoing[2], x[i] - outgoing[1])
-        to = atan(y[j] - outgoing[2], x[j] - outgoing[1])
-        push_arc!(px, py, outgoing[1], outgoing[2], r - clearance, from,
-                  rem(to - from, 2pi, RoundNearest))
+    n = length(contacts)
+    n < 3 && return px, py
+    tail = contacts[n]
+    from = edge_normal(x[tail], y[tail], x[contacts[1]], y[contacts[1]])
+    for k in 1:n
+        i, j = contacts[k], contacts[mod1(k + 1, n)]
+        to = edge_normal(x[i], y[i], x[j], y[j])
+        turn = rem(to - from, 2pi, RoundNearest)
+        if turn >= 0
+            push_arc!(px, py, x[i], y[i], clearance, from, turn)
+        else
+            push!(px, x[i] + clearance * cos(from + turn / 2))
+            push!(py, y[i] + clearance * sin(from + turn / 2))
+        end
+        from = to
     end
     return px, py
 end
@@ -213,14 +222,9 @@ end
     smoothed_curvature(node_arclength, turn, band) -> Vector{Float64}
 
 Turning per unit arclength at each node, averaged over a window of length `band`
-centred on it. Averaging over a length rather than over a node count is what makes it
-independent of how the traced arcs happen to be stepped: [`push_arc!`](@ref) steps each
-arc to a chord tolerance, so its segments scale as `sqrt(radius)` and the trace's node
-spacing alternates by a factor of several between the `clearance` arcs and the wider
-pivot arcs. Diffusing per node would carry that alternation into the measure and leave
-the resampled panel lengths oscillating, which XFoil's viscous solver cannot follow.
-A sharp corner still refines a band of panels gradually, the way XFoil's `PANGEN`
-bunches panels on a *smoothed* curvature.
+centred on it. Averaging over a length leaves the measure independent of how densely
+the trace happens to be stepped, which varies by a factor of several between the
+`clearance` arcs and the straight edges between them.
 """
 function smoothed_curvature(node_arclength, turn, band)
     m = length(turn)
@@ -246,15 +250,14 @@ end
 
 Push the sampling `stations` apart until no gap is shorter than `floor_length`, taking
 the room out of the gaps that have it to spare so the first and last station stay put.
-Cosine clustering thins as the square of the station count, so at the counts a wrap
-emits it puts panels a small fraction of a percent of chord at the leading edge, which
-XFoil's viscous solver cannot march through however smoothly they are graded.
+`floor_length` is capped at the mean gap, which a uniform spacing already meets.
 """
 function enforce_min_spacing!(stations, floor_length)
     n = length(stations)
     n < 3 && return stations
     gap = diff(stations)
     total = sum(gap)
+    finish = stations[n]
     floor_length = min(floor_length, total / (n - 1))
     for _ in 1:20
         deficit = sum(max(0.0, floor_length - g) for g in gap)
@@ -271,6 +274,7 @@ function enforce_min_spacing!(stations, floor_length)
     for k in 2:n
         stations[k] = stations[k-1] + gap[k-1]
     end
+    stations[n] = finish
     return stations
 end
 
@@ -341,9 +345,7 @@ function shrink_wrap(x, y, method::ShrinkWrap)
     closed = hypot(xn[end] - xn[1], yn[end] - yn[1]) < 0.02
     gap = closed ? method.clearance : max(method.clearance, method.min_clearance)
     linking = largest_linking_gap(xn, yn)
-    ball = gap > 0 ? max(method.min_concave_radius, gap, 1.01 * linking / 2,
-                         1.5 * (linking^2 / 4 + gap^2) / (2gap)) :
-                     max(method.min_concave_radius, 1.01 * linking / 2)
+    ball = max(method.min_concave_radius, 1.01 * linking / 2)
     px, py = pivot_contour(xn, yn, ball, gap)
     length(px) < 3 && error("ShrinkWrap traced no contour; the cloud may be too" *
                             " sparse or thin to pivot a ball of $(ball) around.")
