@@ -83,8 +83,7 @@ delta_range(airfoil::AirfoilSettings) =
     reynolds(set::VSMSettings, wing::WingSettings) -> Float64
 
 `density * v_app * chord_ref / mu`, the definition the solver uses. The air comes
-from `solver_settings`, which is the only place it is stated, so polars generated
-at this number cannot drift from the solve that reads them.
+from `solver_settings`, and the reference speed and chord from `wing.airfoil`.
 """
 reynolds(set::VSMSettings, wing::WingSettings) =
     set.solver_settings.density * wing.airfoil.v_app * wing.airfoil.chord_ref /

@@ -2,6 +2,7 @@
 # Organized by source module being tested
 
 using YAML
+using LinearAlgebra: BLAS
 using Random: randstring
 using Logging
 using VortexStepMethod.ObjAdapter: obj_to_yaml
@@ -45,9 +46,19 @@ function ram_air_matrix_dir(; n_sections=4,
     key = (n_sections, collect(alpha_range), collect(delta_range))
     gen_dir = joinpath(@__DIR__, "generated", "ram_matrix_$(string(hash(key); base=16))")
     yaml = joinpath(gen_dir, "geometry.yaml")
-    isfile(yaml) || obj_to_yaml(obj, gen_dir; n_sections, Re=1e6,
-        alpha_range=rad2deg.(alpha_range), delta_range=rad2deg.(delta_range),
-        aero_solver=NeuralFoilSolver(), wingtip_distance=0.05, verbose=false)
+    if !isfile(yaml)
+        # NeuralFoil's Float32 matrix multiplies are only bit-reproducible
+        # single-threaded; pin BLAS so the generated tables are identical every run.
+        n_threads = BLAS.get_num_threads()
+        BLAS.set_num_threads(1)
+        try
+            obj_to_yaml(obj, gen_dir; n_sections, Re=1e6,
+                alpha_range=rad2deg.(alpha_range), delta_range=rad2deg.(delta_range),
+                aero_solver=NeuralFoilSolver(), wingtip_distance=0.05, verbose=false)
+        finally
+            BLAS.set_num_threads(n_threads)
+        end
+    end
     return gen_dir, yaml
 end
 
