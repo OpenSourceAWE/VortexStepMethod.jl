@@ -45,7 +45,8 @@ Convert a 3D wing `.obj` mesh to the native YAML geometry route.
 Stations are placed at equal leading-edge arc-length intervals and sliced
 perpendicular to the local span (see [`perpendicular_sections`](@ref)), which
 keeps the airfoil undistorted near curved tips; each shape is then shrink-wrapped
-into a clean airfoil and evaluated with `aero_solver`. A tip that tapers to a
+into a clean airfoil and evaluated with `aero_solver`. The leading edge is marched
+into `n_bins` stations. A tip that tapers to a
 point carries no airfoil, so the outermost stations stop at the last slice that
 still has a chord ([`station_indices`](@ref)); `wingtip_distance` moves them a
 further arc length inboard.
@@ -191,8 +192,8 @@ function obj_to_yaml(obj_path::String, output_dir::String;
                      wrap_method::ShrinkWrap=ShrinkWrap(),
                      reuse_valid_airfoils::Bool=true, max_thickness_ratio::Real=2.0,
                      spanwise_direction=[0.0, 1.0, 0.0], rotation=I,
-                     wingtip_distance=0.0, crease_frac=0.75, force::Bool=false,
-                     verbose::Bool=true, table_format::Symbol=:csv,
+                     wingtip_distance=0.0, crease_frac=0.75, n_bins::Int=60,
+                     force::Bool=false, verbose::Bool=true, table_format::Symbol=:csv,
                      geometry_path::String=joinpath(output_dir, "geometry.yaml"))
     (!endswith(obj_path, ".obj")) && (obj_path *= ".obj")
     isfile(obj_path) || error("OBJ file not found: $obj_path")
@@ -210,7 +211,7 @@ function obj_to_yaml(obj_path::String, output_dir::String;
 
     vertices, faces = read_faces(obj_path)
 
-    raw_sections = perpendicular_sections(vertices, faces, n_sections;
+    raw_sections = perpendicular_sections(vertices, faces, n_sections; n_bins,
                                           rotation, wingtip_distance)
     isempty(raw_sections) && error("No valid sections sliced from $obj_path")
 

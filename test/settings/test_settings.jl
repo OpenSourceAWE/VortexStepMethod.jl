@@ -65,8 +65,9 @@ end
     @test live.n_crit == wing.airfoil.n_crit
     @test live.model_size == wing.airfoil.model_size
     @test keys(slice_args(wing)) ==
-        (:rotation, :wrap_method, :wingtip_distance)
+        (:rotation, :n_bins, :wrap_method, :wingtip_distance)
     @test preview_args(wing).n_slices == 45
+    @test preview_args(wing).n_bins == wing.mesh.n_bins
     # the generator takes a Symbol, so the settings carry one
     @test wing.airfoil.table_format === :csv
 
