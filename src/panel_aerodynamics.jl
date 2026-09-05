@@ -49,6 +49,11 @@ end
 Airfoil frame and size of the panel between two sections, as
 `(; x_airf, y_airf, z_airf, chord, width)`.
 
+`x_airf` is chordwise and `y_airf` runs along the quarter-chord line the bound
+vortex sits on, so `z_airf` is their cross product. The first two are not orthogonal
+on a swept panel; taking the normal from the quarter-chord step rather than the
+leading-edge step is what keeps it square to the vortex the loads are built from.
+
 `chord_weight` ([`panel_chord_weight`](@ref)) enters as an offset from the
 midpoint rather than as `w·p₁ + (1-w)·p₂`: the two are equal, but the offset form
 leaves a constant term to fold, which a symbolic consumer builds several times
@@ -63,7 +68,7 @@ on section ordering.
     width = smooth_norm(span_vec)
     x_airf = chord_vec ./ smooth_norm(chord_vec)
     y_airf = orient .* (span_vec ./ width)
-    z_cross = cross(x_airf, le_1 .- le_2)
+    z_cross = cross(x_airf, span_vec)
     z_airf = orient .* (z_cross ./ smooth_norm(z_cross))
     return (; x_airf, y_airf, z_airf,
             chord=panel_chord(le_1, te_1, le_2, te_2), width)

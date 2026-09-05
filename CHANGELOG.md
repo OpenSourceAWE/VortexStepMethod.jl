@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- `panel_axes` builds the panel normal from the quarter-chord step rather than
+  the leading-edge step. `z_airf` was `cross(x_airf, le_1 - le_2)` while the
+  bound vortex, `width` and `y_airf` all come from `panel_span_vector`, so on a
+  panel whose two sections have differently-directed chords the normal was not
+  square to the vortex the loads are built from. `alpha` is measured against
+  that normal, so every panel coefficient inherited the error. The frame now
+  closes as `z_airf = x_airf × y_airf`, which is what the `Panel` field
+  docstring already described.
+
+  Taper alone never triggered it: `(le_1 - le_2) - span_vec` is a quarter of
+  `chord_vec_2 - chord_vec_1`, which is purely chordwise when the two chords are
+  parallel, and `cross(x_airf, ·)` annihilates it. Twist, sweep and dihedral do
+  trigger it — 0.84° of twist on the `:rectangular` reference wing, and
+  5.6–13.8° on the raked outboard bay of a leading-edge-inflatable kite.
+
 ## VortexStepMethod v4.3.1 2026-09-01
 
 ### Changed
