@@ -4,9 +4,10 @@
 
 ### Added
 
-- A wing's settings carry two optional blocks: `mesh:` (`MeshSettings` — section
-  count, leading-edge marching resolution, the mesh-to-slicer rotation, tip
-  standoff and shrink wrap) and `airfoil:` (`AirfoilSettings` — the 2D backend,
+- A wing's settings carry two optional blocks: `mesh:` (`MeshSettings` — the
+  `obj_file` the sections are sliced from, section count, leading-edge marching
+  resolution, the mesh-to-slicer rotation, tip standoff and shrink wrap) and
+  `airfoil:` (`AirfoilSettings` — the 2D backend,
   its transition settings, the α and δ sweeps, the Reynolds reference and the
   table format). Both fall back to the defaults, so a settings file that names
   neither loads unchanged.

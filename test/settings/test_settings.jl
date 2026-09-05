@@ -31,6 +31,7 @@ end
         spanwise_direction: [0.0, 1.0, 0.0]
         remove_nan: true
         mesh:
+          obj_file: obj/wing.obj
           n_sections: 45
           rotation: [[0, 0, -1], [-1, 0, 0], [0, 1, 0]]
           clearance: 0.0
@@ -54,6 +55,10 @@ end
     wing = set.wings[1]
 
     @test wing.mesh.n_sections == 45
+    # the mesh the sections come from, not the wing's own obj_file, which is an
+    # alternative to geometry_file and cannot be given beside one
+    @test wing.mesh.obj_file == "obj/wing.obj"
+    @test isempty(wing.obj_file)
     @test rotation_matrix(wing.mesh) == [0 0 -1; -1 0 0; 0 1 0]
     @test alpha_range(wing.airfoil) == -15.0:3.0:90.0
     @test delta_range(wing.airfoil) == -40.0:10.0:40.0

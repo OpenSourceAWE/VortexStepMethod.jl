@@ -18,10 +18,17 @@ end
 """
     MeshSettings
 
-How a wing's `.obj` mesh becomes airfoil slices, used within [`WingSettings`](@ref).
-The mesh itself is the wing's `obj_file`; this says how to cut it.
+How a wing's `.obj` mesh becomes airfoil slices, used within [`WingSettings`](@ref):
+which mesh, and how to cut it.
+
+`obj_file` here is the mesh the sections are *generated from*, an input to the
+`geometry_file` a wing then flies. That is not the wing's own `obj_file`, which is
+an alternative to `geometry_file` — a wing built straight from an obj and a dat,
+with no polar generation in between — and which cannot be given alongside one.
 
 # Fields
+- `obj_file`: Mesh the sections are sliced from, relative to the data directory
+    (default `""`, no mesh).
 - `n_sections`: Sections sliced from the mesh (default `45`).
 - `n_bins`: Leading-edge stations marched across the span; more gives a smoother
     trace (default `200`).
@@ -35,6 +42,7 @@ The mesh itself is the wing's `obj_file`; this says how to cut it.
     point cloud (default `0.2`).
 """
 @with_kw mutable struct MeshSettings
+    obj_file::String = ""
     n_sections::Int64 = 45
     n_bins::Int64 = 200
     rotation::Vector{Vector{Float64}} = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0],
