@@ -433,6 +433,9 @@ built (`build_section`) at the marched station nearest each equal
 **leading-edge arc-length** target. Each section is
 `(; LE_point, TE_point, span_dir, contour3d, x_airfoil, y_airfoil)`.
 
+Stations closed to a point at the tips are skipped ([`station_indices`](@ref)), and
+`wingtip_distance` insets the outermost sections a further arc length.
+
 The slicer assumes `x` = chordwise, `y` = spanwise, `z` = up. Pass a `3×3` rotation
 matrix to reorient a mesh stored in another convention before slicing.
 """
@@ -442,7 +445,7 @@ function perpendicular_sections(vertices, faces, n_sections; n_bins=60, rotation
     ys = [v[2] for v in vertices]
     m = march_edges(vertices, faces; step=(maximum(ys) - minimum(ys)) / n_bins)
     out = NamedTuple[]
-    for i in station_indices(m.arclen, n_sections; wingtip_distance)
+    for i in station_indices(m, n_sections; wingtip_distance)
         sec = build_section(vertices, faces, m.le[i], m.te[i], m.point[i], m.tangent[i])
         sec === nothing || push!(out, sec)
     end
@@ -450,17 +453,21 @@ function perpendicular_sections(vertices, faces, n_sections; n_bins=60, rotation
 end
 
 """
-    station_indices(arclen, n; wingtip_distance=0.0) -> Vector{Int}
+    station_indices(march, n; wingtip_distance=0.0, min_chord_frac=0.01) -> Vector{Int}
 
-Indices of the marched stations nearest `n` targets spread over the leading-edge arc
-length. The first and last targets sit `wingtip_distance` (arc length) in from the
-tips; with the default `0.0` they land exactly on the tips. Inset the tips a little
-(e.g. `0.1` m) to avoid degenerate near-zero-chord tip sections that some solvers
-(XFoil) cannot analyse.
+Indices of the [`march_edges`](@ref) stations nearest `n` targets spread over the
+leading-edge arc length. Stations whose chord has closed to less than
+`min_chord_frac` of the longest one are left out of that range first, so a wing
+tapering to a point puts its outermost sections on the last stations that still
+have an airfoil to slice rather than on the point itself. The remaining first and
+last targets sit a further `wingtip_distance` (arc length) inboard.
 """
-function station_indices(arclen, n; wingtip_distance=0.0)
-    total = arclen[end]
-    d = clamp(wingtip_distance, 0.0, total / 2)
-    n == 1 && return [argmin(abs.(arclen .- total / 2))]
-    return [argmin(abs.(arclen .- t)) for t in range(d, total - d, n)]
+function station_indices(march, n; wingtip_distance=0.0, min_chord_frac=0.01)
+    chords = [norm(te .- le) for (le, te) in zip(march.le, march.te)]
+    usable = findall(≥(min_chord_frac * maximum(chords)), chords)
+    arclen = march.arclen
+    inner, outer = arclen[first(usable)], arclen[last(usable)]
+    d = clamp(wingtip_distance, 0.0, (outer - inner) / 2)
+    n == 1 && return [argmin(abs.(arclen .- (inner + outer) / 2))]
+    return [argmin(abs.(arclen .- t)) for t in range(inner + d, outer - d, n)]
 end

@@ -41,6 +41,20 @@ deform_section
 analyze_section
 analyze_sweep
 neuralfoil_aero
+deform_kulfan
+chord_residual
+chord_line
+control_point_deflection
+panel_kulfan_parameters
+refresh_live_polars!
+deform_live_shapes!
+apply_live_shapes!
+polar_drift
+compare_live_polar
+refresh_live_pressure!
+live_surface_friction!
+contour_shape_matrix
+live_shape_offset!
 generate_aero_matrices
 generate_polar_from_coordinates
 generate_polar_from_dat
@@ -82,6 +96,7 @@ CurrentModule = VortexStepMethod
 ## Setting the inflow conditions and solving
 ```@docs
 set_va!
+section_pitch_rate
 solve
 solve!
 solve_base!

@@ -8,15 +8,19 @@ using NPZ
 using Xfoil
 using Printf: @sprintf
 using ..VortexStepMethod: SectionAero, interpolate_matrix_nans!, delta_suffix,
-                          write_node_rows
+                          write_node_rows, section_surface, set_polar!,
+                          KulfanParameters, calculate_cl, calculate_cd,
+                          calculate_cm
 
 include("kulfan.jl")
+include("deform.jl")
 include("shrink_wrap.jl")
 include("neuralfoil.jl")
 include("poly.jl")
 include("airfoil_solvers/common.jl")
 include("airfoil_solvers/xfoil_solver.jl")
 include("airfoil_solvers/neuralfoil_solver.jl")
+include("live_polar.jl")
 include("airfoil_io.jl")
 include("polar_gen.jl")
 include("polar_export.jl")
@@ -29,6 +33,12 @@ export ShrinkWrap, shrink_wrap
 export fit_kulfan_parameters, kulfan_to_coordinates
 export NeuralFoilModel, NeuralFoilResult, load_neuralfoil_model
 export neuralfoil_aero, neuralfoil_section
+export KulfanBasis, deform_kulfan, control_point_deflection
+export chord_residual, chord_line
+export LivePolarSettings, LivePolars, panel_kulfan_parameters
+export refresh_live_polars!, refresh_live_pressure!, live_surface_friction!
+export contour_shape_matrix, live_shape_offset!
+export polar_drift, compare_live_polar
 export AbstractAirfoilSolver, XFoilSolver, NeuralFoilSolver
 export SectionSolution, DeformedSection, deform_section, analyze_section, analyze_sweep
 export create_2d_polars, generate_aero_matrices, generate_section_aero, lei_poly_coeffs

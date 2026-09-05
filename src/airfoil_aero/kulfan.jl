@@ -7,24 +7,6 @@ This module provides functions to:
 """
 
 """
-    KulfanParameters
-
-Kulfan CST parameters for an airfoil.
-
-# Fields
-- `upper_weights::Vector{Float64}`: 8 weights for upper surface
-- `lower_weights::Vector{Float64}`: 8 weights for lower surface
-- `leading_edge_weight::Float64`: Leading edge modification weight
-- `TE_thickness::Float64`: Trailing edge thickness
-"""
-struct KulfanParameters
-    upper_weights::Vector{Float64}
-    lower_weights::Vector{Float64}
-    leading_edge_weight::Float64
-    TE_thickness::Float64
-end
-
-"""
     KulfanFitMethod
 
 Abstract supertype for Kulfan-parameter fitting strategies. The concrete method

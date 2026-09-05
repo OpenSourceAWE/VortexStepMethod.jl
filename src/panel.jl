@@ -11,7 +11,7 @@ Represents a panel in a vortex step method simulation. All points and vectors ar
 - `chord`::Float64=0: Panel chord length
 - `va`::MVec3=zeros(MVec3): Panel velocity
 - `corner_points`::MMatrix{3, 4, Float64}=zeros(MMatrix{3, 4, Float64}: Panel corner points
-- `aero_model`::AeroModel=INVISCID: Aerodynamic model type [AeroModel](@ref)
+- `aero_model`::AeroModel=INVISCID: Aerodynamic model type [`AeroModel`](@ref)
 - `aero_center::Vector{Float64}`: Panel aerodynamic center
 - cl_coeffs::Vector{Float64}=zeros(Float64, 3)
 - cd_coeffs::Vector{Float64}=zeros(Float64, 3)
@@ -19,7 +19,7 @@ Represents a panel in a vortex step method simulation. All points and vectors ar
 - cl_interp::CL = nothing: lift interpolation (its type is a struct parameter)
 - cd_interp::CD = nothing: drag interpolation
 - cm_interp::CM = nothing: moment interpolation
-- section_aero::SA = nothing: optional surface aero table, see [SectionAero](@ref)
+- section_aero::SA = nothing: optional surface aero table, see [`SectionAero`](@ref)
 - `control_point`::Vector{MVec3}: Panel control point
 - `bound_point_1`::Vector{MVec3}: First bound point
 - `bound_point_2`::Vector{MVec3}: Second bound point
@@ -33,9 +33,13 @@ Represents a panel in a vortex step method simulation. All points and vectors ar
         BoundFilament(),
         SemiInfiniteFilament(),
         SemiInfiniteFilament()
-    ): Panel filaments, see: [BoundFilament](@ref)
+    ): Panel filaments, see: [`BoundFilament`](@ref)
 - `delta`::T=0: flap trailing-edge deflection [rad]
 - `crease_frac`::T=0: chordwise flap-hinge fraction (0–1); 0 disables the plate kink
+- `alpha_ref`::Float64=0: centre angle [rad] of the range the polar table covers
+- `alpha_window`::Float64=0: half width [rad] the table reaches; 0 = unbounded
+- `alpha_knots`::Vector{Float64}=Float64[]: ascending angles [rad] the panel's own table holds values at
+- `live_shape`::Union{Nothing, KulfanParameters}=nothing: the deformed airfoil the polar was generated from
 """
 @with_kw mutable struct Panel{T, CL, CD, CM, SA}
     TE_point_1::MVector{3, T} = zeros(MVector{3, T})
@@ -70,6 +74,10 @@ Represents a panel in a vortex step method simulation. All points and vectors ar
     )
     delta::T = zero(T)
     crease_frac::T = zero(T)
+    alpha_ref::Float64 = 0.0
+    alpha_window::Float64 = 0.0
+    alpha_knots::Vector{Float64} = Float64[]
+    live_shape::Union{Nothing, KulfanParameters} = nothing
 end
 
 """
@@ -100,16 +108,15 @@ function init_pos!(
     panel.LE_point_1 .= section_1.LE_point
     panel.TE_point_2 .= section_2.TE_point
     panel.LE_point_2 .= section_2.LE_point
-    panel.chord = (
-        norm(panel.TE_point_1 - panel.LE_point_1) +
-        norm(panel.TE_point_2 - panel.LE_point_2)
-    ) / 2
+    panel.chord = panel_chord(
+        SVector{3}(section_1.LE_point), SVector{3}(section_1.TE_point),
+        SVector{3}(section_2.LE_point), SVector{3}(section_2.TE_point))
     panel.corner_points[:, 1] = panel.LE_point_1
     panel.corner_points[:, 2] = panel.TE_point_1
     panel.corner_points[:, 3] = panel.TE_point_2
     panel.corner_points[:, 4] = panel.LE_point_2
     vec .= bound_point_2 .- bound_point_1
-    panel.width = norm(vec)
+    panel.width = smooth_norm(vec)
     reinit!(panel.filaments[1], bound_point_2, bound_point_1, vec)
     reinit!(panel.filaments[2], bound_point_1, panel.TE_point_1, vec)
     reinit!(panel.filaments[3], panel.TE_point_2, bound_point_2, vec)
@@ -124,6 +131,42 @@ function init_pos!(
     panel.delta = delta
     return nothing
 end
+
+"""
+    ScanKnots(data)
+
+Polar angles that a lookup scans rather than bisects. `Interpolations` finds a gridded
+knot with `searchsortedfirst`, which dispatches on the knot vector, so a short table can
+choose the search that suits it: below `SCAN_KNOT_MAX` a linear scan over contiguous
+memory beats a binary search's mispredicted branches, and above it loses badly. Wraps
+its vector rather than copying it, so the angles stay writable in place.
+"""
+struct ScanKnots <: AbstractVector{Float64}
+    data::Vector{Float64}
+end
+
+"Longest table a linear knot scan still beats a binary search on."
+const SCAN_KNOT_MAX = 24
+
+Base.size(knots::ScanKnots) = size(knots.data)
+Base.@propagate_inbounds Base.getindex(knots::ScanKnots, i::Int) = knots.data[i]
+Base.IndexStyle(::Type{ScanKnots}) = IndexLinear()
+
+@inline function Base.searchsortedfirst(knots::ScanKnots, x, ::Base.Order.ForwardOrdering)
+    @inbounds for i in eachindex(knots.data)
+        knots.data[i] >= x && return i
+    end
+    return length(knots.data) + 1
+end
+
+"""
+    polar_knots(alphas) -> AbstractVector
+
+The angles of a 1D polar in the container whose knot search fits its length, see
+[`ScanKnots`](@ref).
+"""
+polar_knots(alphas::Vector{Float64}) =
+    length(alphas) <= SCAN_KNOT_MAX ? ScanKnots(alphas) : alphas
 
 """
     build_interps(section_1, section_2, remove_nan) -> (cl, cd, cm, section_aero)
@@ -155,9 +198,10 @@ function build_interps(section_1::Section, section_2::Section, remove_nan)
             cl = Vector{Float64}((aero_1[2] .+ aero_2[2]) ./ 2)
             cd = Vector{Float64}((aero_1[3] .+ aero_2[3]) ./ 2)
             cm = Vector{Float64}((aero_1[4] .+ aero_2[4]) ./ 2)
-            cl_i = linear_interpolation(alphas, cl; extrapolation_bc=extrap_flat)
-            cd_i = linear_interpolation(alphas, cd; extrapolation_bc=extrap_line)
-            cm_i = linear_interpolation(alphas, cm; extrapolation_bc=extrap_flat)
+            knots = polar_knots(alphas)
+            cl_i = linear_interpolation(knots, cl; extrapolation_bc=extrap_flat)
+            cd_i = linear_interpolation(knots, cd; extrapolation_bc=extrap_line)
+            cm_i = linear_interpolation(knots, cm; extrapolation_bc=extrap_flat)
         else
             (aero_1 isa Tuple{Vector{Float64}, Vector{Float64}, Matrix{Float64}, Matrix{Float64}, Matrix{Float64}} &&
              aero_2 isa Tuple{Vector{Float64}, Vector{Float64}, Matrix{Float64}, Matrix{Float64}, Matrix{Float64}}) ||
@@ -207,6 +251,8 @@ end
 function init_aero!(panel::Panel, section_1::Section, section_2::Section;
                     remove_nan = true)
     panel.aero_model = section_1.aero_model
+    panel.alpha_ref, panel.alpha_window = 0.0, 0.0
+    panel.live_shape = nothing
     section_1.aero_model == section_2.aero_model ||
         throw(ArgumentError("Both sections must have the same aero model, not " *
             "$(section_1.aero_model) and $(section_2.aero_model)"))
@@ -226,15 +272,145 @@ function init_aero!(panel::Panel, section_1::Section, section_2::Section;
 end
 
 """
+    window_alpha(panel, alpha)
+
+`alpha` [rad] clamped into the range the panel's polar was built over. A table generated
+over a window around one angle of attack says nothing past its ends, so it is held at its
+end values rather than extrapolated out of them; `alpha_window` of `0` means unbounded and
+leaves `alpha` alone, which is what a full-range polar wants.
+"""
+@inline function window_alpha(panel::Panel, alpha)
+    panel.alpha_window > 0 || return alpha
+    return clamp(alpha, panel.alpha_ref - panel.alpha_window,
+                 panel.alpha_ref + panel.alpha_window)
+end
+
+set_polar!(panel::Panel{<:Any, Nothing}, alphas, cl, cd, cm; shape=nothing) =
+    throw(ArgumentError("set_polar! needs a panel that carries interpolations. This one " *
+        "was built without them (INVISCID or POLY sections); build the wing from " *
+        "POLAR_VECTORS sections so its panels have the interpolation types."))
+
+"""
+    set_polar!(panel, alphas, cl, cd, cm; shape=nothing)
+
+Rewrite a panel's polar table with values at `alphas` [rad], ascending, and rebuild its
+interpolations. The table keeps the shape the panel was built with: a `POLAR_VECTORS`
+panel takes the angles as they are, and a `POLAR_MATRICES` panel takes them at every
+`delta` it already spans, since a regenerated polar carries its deflection as shape
+rather than as a flap angle and so says the same thing at each. The panel's `alpha_ref`
+and `alpha_window` are taken from the angles, so a table covering only a window around one
+angle is held at its ends rather than extrapolated past them (see [`window_alpha`](@ref)).
+
+Written in place: the knots and the three value vectors reuse the panel's own
+`alpha_knots` and `cl_coeffs`/`cd_coeffs`/`cm_coeffs` storage whenever the sample count is
+unchanged ([`polar_column!`](@ref)), and the interpolations read that storage rather than
+a copy of it, so writing it is the whole update and the interpolation objects stay put
+([`refresh_polar!`](@ref)). Only a table that changes shape is rebuilt. Values may be
+views into a caller's own buffers; nothing here holds on to them.
+
+`shape` is the [`KulfanParameters`](@ref) the values were generated from, stored on the
+panel as `live_shape` so a panel's polar and the shape behind it are set together and
+cannot drift apart. The panel holds the shape itself, not a copy, so a source that
+rewrites one in place has already updated every panel flying it.
+"""
+function set_polar!(panel::Panel, alphas, cl, cd, cm; shape=nothing)
+    length(alphas) == length(cl) == length(cd) == length(cm) ||
+        throw(ArgumentError("A polar table needs one value per angle; got " *
+            "$(length(alphas)) angles and $(length(cl))/$(length(cd))/" *
+            "$(length(cm)) values."))
+    length(alphas) >= 2 ||
+        throw(ArgumentError("A polar table needs at least two angles."))
+    issorted(alphas) ||
+        throw(ArgumentError("A polar table needs ascending angles."))
+    panel.aero_model = polar_model(panel.cl_interp)
+    panel.alpha_ref = (alphas[1] + alphas[end]) / 2
+    panel.alpha_window = (alphas[end] - alphas[1]) / 2
+    panel.live_shape = shape
+    panel.alpha_knots = polar_column!(panel.alpha_knots, alphas)
+    panel.cl_coeffs = polar_column!(panel.cl_coeffs, cl)
+    panel.cd_coeffs = polar_column!(panel.cd_coeffs, cd)
+    panel.cm_coeffs = polar_column!(panel.cm_coeffs, cm)
+    cl_interp = refresh_polar!(panel.cl_interp, panel.alpha_knots, panel.cl_coeffs)
+    cd_interp = refresh_polar!(panel.cd_interp, panel.alpha_knots, panel.cd_coeffs)
+    cm_interp = refresh_polar!(panel.cm_interp, panel.alpha_knots, panel.cm_coeffs)
+    cl_interp === panel.cl_interp || (panel.cl_interp = cl_interp)
+    cd_interp === panel.cd_interp || (panel.cd_interp = cd_interp)
+    cm_interp === panel.cm_interp || (panel.cm_interp = cm_interp)
+    return nothing
+end
+
+"""
+    polar_column!(stored, values) -> Vector{Float64}
+
+One column of a rewritten polar table in the panel's own `stored` vector, which is
+returned, or in a fresh vector when the sample count has changed — the one case a
+rewritten table has to grow, and the one that costs the panel's interpolations a rebuild.
+"""
+function polar_column!(stored::Vector{Float64}, values)
+    length(stored) == length(values) || return collect(Float64, values)
+    stored .= values
+    return stored
+end
+
+"""
+    refresh_polar!(old, knots, values) -> Extrapolation
+
+An interpolation reading `knots` and `values` themselves, carrying `old`'s extrapolation
+and knot container so it keeps the type the panel's field was parameterised with.
+`interpolate!` takes both arrays by reference, so once an interpolation reads a panel's
+own storage, writing that storage is the whole update and there is nothing to rebuild.
+A table that changes shape is rebuilt once, and reads in place from then on. The two
+dimensional form spreads the angles over every `delta` the panel spans.
+"""
+function refresh_polar!(old::E, knots, values
+                       ) where {E <: Interpolations.Extrapolation{<:Any, 1}}
+    reads_from(old.itp.knots[1], knots) && old.itp.coefs === values && return old
+    return extrapolate(interpolate!((same_knots(old.itp.knots[1], knots),), values,
+                                    Gridded(Linear())), old.et)::E
+end
+
+function refresh_polar!(old::E, knots, values
+                       ) where {E <: Interpolations.Extrapolation{<:Any, 2}}
+    deltas = old.itp.knots[2]
+    coefs = old.itp.coefs
+    if reads_from(old.itp.knots[1], knots) && size(coefs) == (length(knots), length(deltas))
+        for column in axes(coefs, 2)
+            @views coefs[:, column] .= values
+        end
+        return old
+    end
+    return extrapolate(interpolate!((same_knots(old.itp.knots[1], knots), deltas),
+                                    repeat(values, 1, length(deltas)),
+                                    Gridded(Linear())), old.et)::E
+end
+
+"Whether an interpolation's knot container is a view of `knots` rather than a copy."
+reads_from(container::ScanKnots, knots) = container.data === knots
+reads_from(container::AbstractVector, knots) = container === knots
+
+"The angles in the container the panel's interpolations were parameterised with."
+same_knots(::ScanKnots, knots) = ScanKnots(knots)
+same_knots(::AbstractVector, knots) = knots
+
+"""
+    polar_model(interp) -> AeroModel
+
+The model a rewritten table leaves the panel on: the one its interpolations were built
+with, since their shape is fixed by the panel's type.
+"""
+polar_model(::Interpolations.Extrapolation{<:Any, 1}) = POLAR_VECTORS
+polar_model(::Interpolations.Extrapolation{<:Any, 2}) = POLAR_MATRICES
+
+"""
     reinit!(panel, section_1, section_2, aero_center, control_point, bound_point_1,
-            bound_point_2, x_airf, y_airf, z_airf, delta, vec, spanwise_direction; kwargs...)
+            bound_point_2, x_airf, y_airf, z_airf, delta, vec; kwargs...)
 
 Reinitialize a panel's geometry, horseshoe filaments and aerodynamic interpolations.
 
-The panel is oriented so its `y_airf` (and the bound vortex `bound_2 -> bound_1`) points
-along `+spanwise_direction`, with `z_airf` pointing to the airfoil upper surface. This
-makes the aero independent of section ordering: a reversed order would otherwise flip the
-normal and make the panel look up its polar at a negated angle of attack.
+`flip` reverses the section order so `y_airf` points along `+spanwise_direction` and
+`z_airf` to the airfoil upper surface, making the aero independent of section ordering.
+The caller owns it and must not derive it from the live geometry, which would invert
+normals mid-run; [`reinit!(::BodyAerodynamics)`](@ref) decides it once per wing.
 """
 function reinit!(
     panel::Panel,
@@ -248,12 +424,11 @@ function reinit!(
     y_airf,
     z_airf,
     delta,
-    vec,
-    spanwise_direction;
+    vec;
     init_aero = true,
-    remove_nan = true
+    remove_nan = true,
+    flip::Bool = false
 )
-    flip = dot(y_airf, spanwise_direction) < 0
     if flip
         section_1, section_2 = section_2, section_1
         bound_point_1, bound_point_2 = bound_point_2, bound_point_1
@@ -268,6 +443,18 @@ function reinit!(
     return nothing
 end
 
+
+"""
+    panel_axes(panel::Panel)
+
+The panel's stored airfoil frame and size in the shape [`panel_axes`](@ref)
+returns, so a panel built by the geometry pass feeds the same functions as one built
+straight from section points.
+"""
+@inline panel_axes(panel::Panel) =
+    (x_airf = SVector{3}(panel.x_airf), y_airf = SVector{3}(panel.y_airf),
+     z_airf = SVector{3}(panel.z_airf), chord = panel.chord,
+     width = panel.width)
 
 """
     calculate_relative_alpha_and_relative_velocity(panel::Panel, induced_velocity::Vector{Float64})
@@ -287,14 +474,8 @@ function calculate_relative_alpha_and_relative_velocity(
     panel::Panel{T},
     induced_velocity::AbstractVector{T}
 ) where T
-    # Calculate relative velocity and angle of attack
-    # Constants throughout iterations: panel.va, panel.x_airf, panel.y_airf
-    relative_velocity = panel.va .+ induced_velocity
-    v_normal = dot(panel.z_airf, relative_velocity)
-    v_tangential = dot(panel.x_airf, relative_velocity)
-    alpha = atan(v_normal, v_tangential)
-    
-    return alpha, relative_velocity
+    flow = panel_inflow(panel_axes(panel), panel.va, panel.va, induced_velocity)
+    return flow.alpha, flow.v_eff
 end
 
 """
@@ -303,11 +484,8 @@ end
 Calculate relative angle of attack and relative velocity of the panel.
 """
 function calculate_relative_alpha_and_velocity(panel::Panel, induced_velocity)
-    relative_velocity = panel.va + induced_velocity
-    v_normal = dot(panel.z_airf, relative_velocity)
-    v_tangential = dot(panel.x_airf, relative_velocity)
-    alpha = atan(v_normal, v_tangential)
-    return alpha, relative_velocity
+    flow = panel_inflow(panel_axes(panel), panel.va, panel.va, induced_velocity)
+    return flow.alpha, flow.v_eff
 end
 
 """
@@ -326,6 +504,7 @@ calculate_cl(panel::Panel, alpha) = calculate_cl(panel, alpha, panel.delta)
 function calculate_cl(panel::Panel{Tp}, alpha::Ta, delta::Td) where {Tp, Ta, Td}
     R = promote_type(Tp, Ta, Td)
     isnan(alpha) && return R(NaN)
+    alpha = window_alpha(panel, alpha)
     if panel.aero_model == POLY
         cl = evalpoly(rad2deg(alpha), panel.cl_coeffs)
         if abs(alpha) > (π/9)
@@ -355,6 +534,7 @@ calculate_cd(panel::Panel, alpha) = calculate_cd(panel, alpha, panel.delta)
 function calculate_cd(panel::Panel{Tp}, alpha::Ta, delta::Td) where {Tp, Ta, Td}
     R = promote_type(Tp, Ta, Td)
     isnan(alpha) && return R(NaN)
+    alpha = window_alpha(panel, alpha)
     if panel.aero_model == POLY
         if abs(alpha) > (π/9)  # Outside ±20 degrees
             return R(2 * sin(alpha)^3)
@@ -384,6 +564,7 @@ calculate_cm(panel::Panel, alpha) = calculate_cm(panel, alpha, panel.delta)
 function calculate_cm(panel::Panel{Tp}, alpha::Ta, delta::Td) where {Tp, Ta, Td}
     R = promote_type(Tp, Ta, Td)
     isnan(alpha) && return R(NaN)
+    alpha = window_alpha(panel, alpha)
     if panel.aero_model == POLY
         return R(evalpoly(rad2deg(alpha), panel.cm_coeffs))
     elseif panel.aero_model in (POLAR_VECTORS, POLAR_MATRICES)

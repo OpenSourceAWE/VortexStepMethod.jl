@@ -83,7 +83,7 @@ function surfplan_to_aero_yaml(adapter_dir::AbstractString, output_dir::Abstract
         push!(section_rows, Any[fid, s.LE_point[1], s.LE_point[2], s.LE_point[3],
                                 s.TE_point[1], s.TE_point[2], s.TE_point[3]])
     end
-    sort!(section_rows; by = row -> row[3])
+    sort!(section_rows; by = row -> row[3], rev = true)   # +y to -y, by LE_y
     sort!(airfoil_rows; by = row -> row[1])
     write_geometry_yaml(yaml_path, section_rows, airfoil_rows)
     verbose && @info "Wrote pressure geometry to $yaml_path " *

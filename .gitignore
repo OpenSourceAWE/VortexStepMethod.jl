@@ -46,6 +46,7 @@ LocalPreferences.toml
 # Pipeline-generated polars/dat/cp (regenerate via AirfoilAero/ObjAdapter)
 data/**/polars_neuralfoil/
 data/**/polars_xfoil/
+data/**/generated_neuralfoil/
 data/TUDELFT_V3_KITE/aero_geometry_neuralfoil.yaml
 
 # Local planning docs (not tracked)
@@ -58,3 +59,6 @@ lib/**/Manifest.toml
 
 # Generated test geometries (regenerated on demand by ram_air_matrix_wing)
 test/generated/
+
+# Generated aero tables and run logs
+*.arrow

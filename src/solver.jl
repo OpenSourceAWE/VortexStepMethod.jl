@@ -2,7 +2,7 @@
 """
     VSMSolution
 
-Struct for storing the solution of the [solve!](@ref) function. Must contain all info needed by `KiteModels.jl`.
+Struct for storing the solution of the [`solve!`](@ref) function. Must contain all info needed by `KiteModels.jl`.
 
 # Naming Convention
 - Variables ending in `_dist`: Per-panel distributions (length P, one value per panel)
@@ -32,7 +32,7 @@ Struct for storing the solution of the [solve!](@ref) function. Must contain all
 - `cm_unrefined_dist`::MVector{U, Float64}: Averaged airfoil moment coefficients for unrefined sections [-]
 - `moment_coeff_unrefined_dist`::MVector{U, Float64}: Summed `moment_frac`-referenced pitching-moment coefficient per unrefined section [-]
 - `alpha_unrefined_dist`::MVector{U, Float64}: Averaged angles of attack for unrefined sections [rad]
-- `solver_status`::SolverStatus: enum, see [SolverStatus](@ref)
+- `solver_status`::SolverStatus: enum, see [`SolverStatus`](@ref)
 """
 @with_kw mutable struct VSMSolution{P, U, T}
     ### private vectors of solve_base!
@@ -107,12 +107,12 @@ end
 """
     Solver
 
-Main solver structure for the Vortex Step Method.See also: [solve](@ref)
+Main solver structure for the Vortex Step Method.See also: [`solve`](@ref)
 
 # Attributes
 
 ## General settings
-- `aerodynamic_model_type`::Model = VSM: The model type, see: [Model](@ref)
+- `aerodynamic_model_type`::Model = VSM: The model type, see: [`Model`](@ref)
 - density::Float64 = 1.225: Air density [kg/m³] 
 - `max_iterations`::Int64 = 1500
 - `rtol`::Float64 = 1e-5: relative error
@@ -130,16 +130,18 @@ Main solver structure for the Vortex Step Method.See also: [solve](@ref)
     (the conservative envelope from the paper)
 
 ## Additional settings
-- `type_initial_gamma_distribution`::InitialGammaDistribution = ZEROS: see: [InitialGammaDistribution](@ref)
+- `type_initial_gamma_distribution`::InitialGammaDistribution = ZEROS: see: [`InitialGammaDistribution`](@ref)
 - `use_gamma_prev`::Bool = true: reuse provided previous gamma as initial guess when available
 - `core_radius_fraction`::Float64 = 0.05: Bound vortex core cut-off, as a fraction of the
     filament length, following Damiani et al. (2019)
 - mu::Float64 = 1.81e-5: Dynamic viscosity [N·s/m²]
 - `is_only_f_and_gamma_output`::Bool = false: Whether to only output f and gamma
+- `flow_curvature`::Bool = false: Add the thin-airfoil pitch-rate moment
+    increment `-(π/4) q̂` to each section, see: [`flow_curvature_cm`](@ref)
 - `reference_point`::MVec3 = [0.0, 0.0, 0.0]: Moment reference point in body frame
 
 ## Solution
-sol::VSMSolution = VSMSolution(): The result of calling [solve!](@ref) 
+sol::VSMSolution = VSMSolution(): The result of calling [`solve!`](@ref) 
 """
 @with_kw mutable struct Solver{P, U, T}
     # General settings
@@ -174,6 +176,7 @@ sol::VSMSolution = VSMSolution(): The result of calling [solve!](@ref)
     mu::T = T(1.81e-5)
     is_only_f_and_gamma_output::Bool = false
     correct_aoa::Bool = false
+    flow_curvature::Bool = false
     reference_point::MVector{3, T} = zeros(MVector{3, T})
 
     # Intermediate results
@@ -215,6 +218,7 @@ function Solver(body_aero, settings::VSMSettings)
         mu=ss.mu,
         is_only_f_and_gamma_output=ss.calc_only_f_and_gamma,
         correct_aoa=ss.correct_aoa,
+        flow_curvature=ss.flow_curvature,
         reference_point=reference_point,
     )
 end
@@ -228,8 +232,8 @@ This version is modifying the `solver.sol` struct and is faster than the `solve`
 a dictionary.
 
 # Arguments:
-- solver::Solver: The solver to use, could be a VSM or LLT solver. See: [Solver](@ref)
-- body_aero::BodyAerodynamics: The aerodynamic body. See: [BodyAerodynamics](@ref)
+- solver::Solver: The solver to use, could be a VSM or LLT solver. See: [`Solver`](@ref)
+- body_aero::BodyAerodynamics: The aerodynamic body. See: [`BodyAerodynamics`](@ref)
 - gamma_distribution: Initial circulation vector or nothing; Length: Number of segments. [m²/s]
 
 # Keyword Arguments:
@@ -238,7 +242,7 @@ a dictionary.
 - moment_frac=0.1: X-coordinate of normalized panel around which the moment distribution should be calculated.
 
 # Returns
-The solution of type [VSMSolution](@ref)
+The solution of type [`VSMSolution`](@ref)
 """
 function solve!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics, gamma_distribution=solver.sol.gamma_distribution;
         log=false, reference_point=solver.reference_point, moment_frac=0.1) where {P, U, T}
@@ -289,6 +293,11 @@ function calc_forces!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics;
     for (i, panel) in enumerate(panels)                                               # zero bytes
         cl_dist[i] = calculate_cl(panel, alpha_dist[i])
         cd_dist[i], cm_dist[i] = calculate_cd_cm(panel, alpha_dist[i])
+        if solver.flow_curvature
+            cm_dist[i] += flow_curvature_cm(
+                body_aero.pitch_rate_dist[i], solver.sol._chord_dist[i],
+                v_a_dist[i])
+        end
         width_dist[i] = panel.width
 
         # Geometric AoA using panel-local axes and prescribed
@@ -322,15 +331,9 @@ function calc_forces!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics;
 
     end
 
-    # create an alias for the three vertical output vectors
     lift = solver.sol.lift_dist
     drag = solver.sol.drag_dist
     panel_moment_dist = solver.sol.panel_moment_dist
-
-    # Compute using fused broadcasting (no intermediate allocations)
-    @. lift = cl_dist * 0.5 * density * v_a_dist^2 * solver.sol._chord_dist
-    @. drag = cd_dist * 0.5 * density * v_a_dist^2 * solver.sol._chord_dist
-    @. panel_moment_dist = cm_dist * 0.5 * density * v_a_dist^2 * solver.sol._chord_dist^2
 
     # Calculate alpha corrections based on model type
     if solver.correct_aoa && aerodynamic_model_type == VSM      # 64 bytes
@@ -360,76 +363,32 @@ function calc_forces!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics;
     projected_area = body_aero.projected_area
     c_ref = body_aero.c_ref
     
-    wv = body_aero.work_vectors
-    dir_iva = wv[1]
-    dir_lift = wv[2]
-    dir_drag = wv[3]
-    lift_va = wv[4]
-    drag_va = wv[5]
-    r_vec = wv[6]
-    f_tmp = wv[7]
-    cross_tmp = wv[8]
+    spanwise_unit = SVector{3, T}(spanwise_direction)
 
     for (i, panel) in enumerate(panels)
-
-        ### Lift and Drag ###
         panel_area = panel.chord * panel.width
         area_all_panels += panel_area
         panel_areas[i] = panel_area
 
-        # Calculate induced velocity direction
-        alpha_corrected_i = alpha_corrected[i]
-        c_alpha = cos(alpha_corrected_i)
-        s_alpha = sin(alpha_corrected_i)
-        @inbounds for k in 1:3
-            dir_iva[k] = c_alpha * panel.x_airf[k] +
-                         s_alpha * panel.z_airf[k]
-        end
-        normalize3!(dir_iva)
+        axes = panel_axes(panel)
+        dirs = panel_force_directions(axes, alpha_corrected[i], spanwise_unit)
+        loads = panel_loads(axes, dirs,
+            dynamic_pressure(density, density, v_a_dist[i]),
+            cl_dist[i], cd_dist[i], cm_dist[i])
+        lift[i] = loads.lift
+        drag[i] = loads.drag
+        panel_moment_dist[i] = loads.moment
 
-        # Calculate lift and drag directions
-        cross3!(dir_lift, dir_iva, panel.y_airf)
-        normalize3!(dir_lift)
-        cross3!(dir_drag, spanwise_direction, dir_lift)
-        normalize3!(dir_drag)
-
-        # Calculate force vectors
-        li = lift[i]
-        di = drag[i]
+        force = loads.force
+        arm_vec = SVector{3, T}(panel.aero_center) - SVector{3, T}(reference_point)
+        moment = loads.pitching_moment .* axes.y_airf .+ cross(arm_vec, force)
         @inbounds for k in 1:3
-            lift_va[k] = li * dir_lift[k]
-            drag_va[k] = di * dir_drag[k]
+            solver.sol.f_body_3D[k, i] = force[k]
+            solver.sol.m_body_3D[k, i] = moment[k]
         end
 
-        # Body frame forces
-        width = panel.width
-        @inbounds for k in 1:3
-            solver.sol.f_body_3D[k, i] = (lift_va[k] +
-                                          drag_va[k]) * width
-        end
-
-        # Calculate the moments
-        m_scale = panel_moment_dist[i] * width
-        @inbounds for k in 1:3
-            r_vec[k] = panel.aero_center[k] -
-                       reference_point[k]
-            f_tmp[k] = solver.sol.f_body_3D[k, i]
-        end
-        cross3!(cross_tmp, r_vec, f_tmp)
-        @inbounds for k in 1:3
-            solver.sol.m_body_3D[k, i] = m_scale *
-                panel.y_airf[k] + cross_tmp[k]
-        end
-
-        # Moment distribution (moment on each panel)
         arm = (moment_frac - 0.25) * panel.chord
-        ftotal_dot_z = 0.0
-        @inbounds for k in 1:3
-            ftotal_dot_z += (lift_va[k] + drag_va[k]) *
-                            panel.z_airf[k]
-        end
-        moment_dist[i] = (ftotal_dot_z * arm +
-                          panel_moment_dist[i]) * width
+        moment_dist[i] = dot(force, axes.z_airf) * arm + loads.pitching_moment
     end
 
     # Python parity: normalize with area-weighted reference velocity for distributed inflow.
@@ -562,11 +521,11 @@ end
           log=false, reference_point=solver.reference_point)
 
 Main solving routine for the aerodynamic model. Reference point is in the kite body (KB) frame.
-See also: [solve!](@ref)
+See also: [`solve!`](@ref)
 
 # Arguments:
-- solver::Solver: The solver to use, could be a VSM or LLT solver. See: [Solver](@ref)
-- body_aero::BodyAerodynamics: The aerodynamic body. See: [BodyAerodynamics](@ref)
+- solver::Solver: The solver to use, could be a VSM or LLT solver. See: [`Solver`](@ref)
+- body_aero::BodyAerodynamics: The aerodynamic body. See: [`BodyAerodynamics`](@ref)
 - gamma_distribution: Initial circulation vector or nothing; Length: Number of segments. [m²/s]
 
 # Keyword Arguments:
@@ -600,7 +559,8 @@ function solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=n
         solver.br.va_unit_dist,
         body_aero.panels,
         solver.is_only_f_and_gamma_output;
-        correct_aoa=solver.correct_aoa
+        correct_aoa=solver.correct_aoa,
+        flow_curvature=solver.flow_curvature
     )
     # Attach geometric AoA (already computed in calculate_results) to solver.sol
     if haskey(results, "alpha_geometric")
@@ -1230,6 +1190,7 @@ function make_dual_shadow(solver::Solver{P, U, Float64},
         mu = TD(solver.mu),
         is_only_f_and_gamma_output = solver.is_only_f_and_gamma_output,
         correct_aoa = solver.correct_aoa,
+        flow_curvature = solver.flow_curvature,
         reference_point = MVector{3, TD}(solver.reference_point),
     )
     return body_aero_d, solver_d

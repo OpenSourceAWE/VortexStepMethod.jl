@@ -21,7 +21,7 @@ The conversion runs four stages per spanwise station:
     └── XFoil:       coordinates  →  panel code  (± repanel)
     │  4. write
     ▼
- airfoils/*.dat  +  polars/*.csv  +  geometry.yaml   →   Wing(geometry.yaml)
+ airfoils/*.dat + polars/*.csv + pressure/* + geometry.yaml → Wing(geometry.yaml)
 ```
 
 ## 1. Slice
@@ -99,12 +99,26 @@ For each unique airfoil id `j`, `obj_to_yaml` writes into `output_dir`:
   `{tag}` encodes the deflection in degrees (`m` for a minus sign, `p` for the decimal
   point), e.g. `_d5.dat` for 5°, `_dm3.dat` for −3°, `_d2p5.dat` for 2.5°
 - `polars/{j}.csv` — the generated polar (`POLAR_VECTORS` or `POLAR_MATRICES`)
+- `pressure/{j}_cp.csv`, `pressure/{j}_cf.csv` — surface pressure and skin friction per
+  contour node over the `alpha × delta` grid, what pressure integration reads.
+  `table_format=:arrow` writes these two as `.arrow` instead: binary, roughly an order of
+  magnitude faster to load and a third of the size. `read_section_aero` detects the format
+  from the suffix, so both are loadable and a directory can be migrated between them with
+  [`convert_node_table`](@ref VortexStepMethod.convert_node_table) — which `obj_to_yaml`
+  does itself when `table_format` differs from what the directory holds, without re-running
+  the solver
 - `geometry.yaml` — `wing_sections` (leading/trailing-edge points) plus `wing_airfoils`
-  (each section's `type` and the `.dat`/`.csv` paths above)
+  (each section's `type` and the table paths above). `geometry_path` writes the YAML
+  somewhere else, in which case the emitted table references carry the path from the YAML's
+  directory to `output_dir` — the geometry loader resolves them against the YAML's own
+  directory
 
-A near-vanishing wingtip slice can shrink-wrap to an implausibly thick blob; such a
-degenerate section reuses its nearest valid neighbour's airfoil and polar while keeping its
-own edge positions, and a warning lists the reuse. All floats are rounded to millimetre
+A tip that tapers to a point has no airfoil to slice, so the outermost stations stop at
+the last slice that still has a chord; `wingtip_distance` moves them a further arc length
+inboard when the slices just short of the tip are still too thin to analyse. A
+near-vanishing slice that does get through can shrink-wrap to an implausibly thick blob;
+such a degenerate section reuses its nearest valid neighbour's airfoil and polar while
+keeping its own edge positions, and a warning lists the reuse. All floats are rounded to millimetre
 precision by the single [`write_yaml`](@ref VortexStepMethod.ObjAdapter.write_yaml) writer,
 so generated geometry files stay diff-friendly and consistent.
 
@@ -117,5 +131,6 @@ so generated geometry files stay diff-friendly and consistent.
 - **One geometry, either backend.** Fast NeuralFoil for full-envelope polars, or XFoil as a
   viscous cross-check, both from the identical wrapped contour.
 - **Generate once, reuse cheaply.** The `.dat`/`.csv`/`geometry.yaml` bundle is a plain-text
-  artifact you check in and load with `Wing(geometry.yaml)`; the expensive slicing,
+  artifact you check in and load with `Wing(geometry.yaml)` (the bulky surface tables
+  optionally binary); the expensive slicing,
   wrapping and polar generation happen only when the geometry changes.

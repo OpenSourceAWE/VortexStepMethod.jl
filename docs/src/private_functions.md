@@ -17,15 +17,38 @@ calculate_cl
 calculate_cd
 calculate_cm
 calculate_cd_cm
+set_pitch_rate_dist!
 calculate_relative_alpha_and_velocity
 calculate_relative_alpha_and_relative_velocity
 update_effective_angle_of_attack!
 calculate_stall_angle_list
+wing_span_flip
 calculate_circulation_distribution_elliptical_wing
 _compute_reference_velocity_from_distribution
 smooth_circulation!
 smooth_distribution!
 make_dual_shadow
+```
+
+### Panel aerodynamics
+The per-panel aerodynamics, written once as pure, branch-free functions of the
+section geometry and the flow. `SymbolicAWEModels` traces the same functions with
+symbolic arguments to build its equations, so both packages evaluate one
+definition of the physics.
+```@docs
+SMOOTH_FLOOR
+smooth_norm
+panel_span_vector
+panel_chord_weight
+panel_axes
+effective_alpha
+panel_inflow
+dynamic_pressure
+flow_curvature_cm
+panel_force_directions
+panel_moment
+panel_couple_force
+panel_loads
 ```
 
 ### Induced velocities
@@ -44,7 +67,7 @@ update_panel_properties!
 build_interps
 panel_interp_types
 reinit!(wing::AbstractWing)
-reinit!(panel::Panel, section_1::Section, section_2::Section, aero_center, control_point, bound_point_1, bound_point_2, x_airf, y_airf, z_airf, delta, vec, spanwise_direction)
+reinit!(panel::Panel, section_1::Section, section_2::Section, aero_center, control_point, bound_point_1, bound_point_2, x_airf, y_airf, z_airf, delta, vec)
 rotated_te
 calculate_filaments_for_plotting
 ```
@@ -60,7 +83,9 @@ copy_sections_to_refined!
 _apply_refined_section_thetas!
 _panel_thetas_to_section_thetas!
 _interpolate_unrefined_to_refined
-_section_sort_key
+span_order_key
+normalize_span_order!
+can_reuse_prior_refined_surface_tables
 refine_mesh_for_linear_cosine_distribution!
 refine_mesh_by_splitting_provided_sections!
 refine_mesh_with_billowing!
@@ -73,6 +98,14 @@ update_non_deformed_sections!
 ### Aerodynamic data and Cp
 ```@docs
 calculate_new_aero_data
+set_polar!
+refresh_polar!
+polar_column!
+polar_model
+reads_from
+same_knots
+polar_knots
+window_alpha
 assemble_polar_matrix
 load_matrix_polar_data
 read_aero_matrix
@@ -102,6 +135,8 @@ CurrentModule = VortexStepMethod.AirfoilAero
 
 ### Kulfan CST parametrization
 ```@docs
+deform_kulfan!
+chord_residual!
 bernstein_basis
 class_function
 leading_edge_basis
@@ -129,11 +164,28 @@ smoothed_curvature
 load_neuralfoil_model
 neuralfoil_section
 neuralfoil_fused_output
+fused_output
+fused_output!
+decode_surface_velocity
+decode_surface_velocity!
+surface_velocity_rows
+decode_coefficients
+decode_coefficients!
 nn_forward
+nn_forward!
+add_bias!
+layer_buffers
+case_capacity
 prepare_inputs
+fill_case_input!
 flip_inputs
+flip_inputs!
 flip_outputs
+flipped_row
+fuse_flipped!
 squared_mahalanobis_distance
+mahalanobis_case
+penalize_confidence!
 swish
 sigmoid
 ```
@@ -151,7 +203,20 @@ write_aero_matrix
 write_node_table
 flat_plate_cf
 neuralfoil_contour_solution
+contour_arc
+contour_arc!
+arc_at_chord
+arc_at_chord!
+sorted_surface!
+sort_pairs!
+trailing_edge_speed
+velocity_knots
+velocity_knots!
+contour_pressure
+contour_pressure!
 fill_node_nans!
+live_xfoil_solver
+xfoil_ramp
 ```
 
 ## OBJ mesh conversion (ObjAdapter)
@@ -177,6 +242,8 @@ center_to_com!
 airfoils_from_yaml
 write_geometry_yaml
 resolve_aero_geometry
+table_path_prefix
+prefix_table_paths!
 plot_airfoil_fit
 migrate_node_tables
 ```
@@ -186,6 +253,8 @@ migrate_node_tables
 CurrentModule = Base.get_extension(VortexStepMethod, :VortexStepMethodMakieExt)
 ```
 ```@docs
+display_named
+span_axis
 create_geometry_plot_makie
 plot_line_segment_makie!
 set_axes_equal_makie!
@@ -193,6 +262,7 @@ map_airfoil_3d
 fitted_airfoil_3d
 generated_slices
 airfoil_skin_geometry
+panel_contour
 panel_normal
 plate_hinge_local
 panel_plate_geometry

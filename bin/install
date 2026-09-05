@@ -4,6 +4,7 @@ _yes_to_all=false
 _update=false
 _skip_subprojects=false
 _no_precompile=false
+_desired_julia=""
 
 print_usage() {
     echo "Usage:"
@@ -13,6 +14,8 @@ print_usage() {
     echo "./bin/install --update"
     echo "./bin/install --skip-subprojects"
     echo "./bin/install --no-precompile"
+    echo "./bin/install +1.11 | +1.12"
+    echo "./bin/install --version 1.11 | --version 1.12"
     echo "./bin/install -h"
     echo "./bin/install --help"
     echo "Options:"
@@ -22,6 +25,8 @@ print_usage() {
     echo "  --skip-subprojects    Skip setup of the examples/test/docs/... sub-projects."
     echo "  --no-precompile       Skip the precompile, extension-verification and smoke-test"
     echo "                        steps; just resolve/update manifests."
+    echo "  +X.Y, --version X.Y   Use Julia channel X.Y for this run (juliaup default unchanged)."
+    echo "                        Without this, a menu asks which version to use."
 }
 
 while [[ $# -gt 0 ]]; do
@@ -44,6 +49,18 @@ while [[ $# -gt 0 ]]; do
             ;;
         --no-precompile)
             _no_precompile=true
+            shift
+            ;;
+        --version)
+            if [[ $# -lt 2 ]]; then
+                echo "Error: --version requires a value (e.g. --version 1.12)"
+                exit 1
+            fi
+            _desired_julia="$2"
+            shift 2
+            ;;
+        +*)
+            _desired_julia="${1#+}"
             shift
             ;;
         *)
@@ -71,43 +88,44 @@ if ! command -v julia &> /dev/null; then
     juliaup default 1.11
 fi
 
-if juliaup status 2>/dev/null | grep '^\s*\*' | grep -q '1\.12'; then
-    _default_choice=2
-    _default_julia="1.12"
-else
-    _default_choice=1
-    _default_julia="1.11"
+if [[ -z ${_desired_julia} ]]; then
+    if juliaup status 2>/dev/null | grep '^\s*\*' | grep -q '1\.12'; then
+        _default_choice=2
+        _default_julia="1.12"
+    else
+        _default_choice=1
+        _default_julia="1.11"
+    fi
+
+    if [[ $_yes_to_all == true ]]; then
+        _julia_choice=""
+        echo "Using Julia version: ${_default_julia}"
+    else
+        echo "Which Julia version do you want to use?"
+        echo "  1) Julia 1.11"
+        echo "  2) Julia 1.12"
+        read -rp "Enter 1 or 2 [default: ${_default_choice}]: " _julia_choice
+    fi
+
+    case "${_julia_choice}" in
+        1)
+            _desired_julia="1.11"
+            ;;
+        2)
+            _desired_julia="1.12"
+            ;;
+        "")
+            _desired_julia="${_default_julia}"
+            ;;
+        *)
+            echo "Invalid choice: '${_julia_choice}'. Please enter 1 or 2."
+            exit 1
+            ;;
+    esac
 fi
 
-if [[ $_yes_to_all == true ]]; then
-    _julia_choice=""
-    echo "Using Julia version: ${_default_julia}"
-else
-    echo "Which Julia version do you want to use?"
-    echo "  1) Julia 1.11"
-    echo "  2) Julia 1.12"
-    read -rp "Enter 1 or 2 [default: ${_default_choice}]: " _julia_choice
-fi
-
-case "${_julia_choice}" in
-    1)
-        _desired_julia="1.11"
-        ;;
-    2)
-        _desired_julia="1.12"
-        ;;
-    "")
-        _desired_julia="${_default_julia}"
-        ;;
-    *)
-        echo "Invalid choice: '${_julia_choice}'. Please enter 1 or 2."
-        exit 1
-        ;;
-esac
-
-echo "Installing and activating Julia ${_desired_julia}..."
-juliaup add "${_desired_julia}"
-juliaup default "${_desired_julia}"
+echo "Ensuring the Julia ${_desired_julia} channel is installed..."
+juliaup add "${_desired_julia}" 2>/dev/null || true
 
 _julia_cmd="julia +${_desired_julia}"
 _julia_version=$($_julia_cmd --version | awk '{print $3}')

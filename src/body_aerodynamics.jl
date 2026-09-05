@@ -4,9 +4,9 @@
 Main structure for calculating aerodynamic properties of bodies. Use the constructor to initialize.
 
 # Fields
-- panels::Vector{<:Panel}: Vector of refined [Panel](@ref) structs
+- panels::Vector{<:Panel}: Vector of refined [`Panel`](@ref) structs
 - wings::Vector{W}: A vector of wings of type `W <: AbstractWing`; a body can have multiple wings
-- `va::MVec3` = zeros(MVec3):   A vector of the apparent wind speed, see: [MVec3](@ref)
+- `va::MVec3` = zeros(MVec3):   A vector of the apparent wind speed, see: [`MVec3`](@ref)
 - `omega`::MVec3 = zeros(MVec3): A vector of the turn rates around the kite body axes
 - `gamma_distribution`=zeros(Float64, P): A vector of the circulation
                         of the velocity field; Length: Number of segments. [m²/s]
@@ -15,9 +15,15 @@ Main structure for calculating aerodynamic properties of bodies. Use the constru
 - `stall_angle_list`=zeros(Float64, P):  stall angle per panel
 - `alpha_dist::MVector{P, Float64}` = zeros(Float64, P)
 - `v_a_dist::MVector{P, Float64}` = zeros(Float64, P)
+- `pitch_rate_dist::MVector{P, Float64}` = zeros(Float64, P): rotation rate of each
+    panel about its own spanwise axis, positive nose-up [rad/s]; set by
+    [`set_va!`](@ref) and read when the solver has `flow_curvature` enabled
 - `work_vectors`::NTuple{10, MVec3} = ntuple(_ -> zeros(MVec3), 10)
-- `AIC::Array{Float64, 3}` = zeros(P, P, 3): influence coefficients, component last so
-                        that each `AIC[:, :, k]` slice is a contiguous BLAS matrix
+- `AIC::Array{Float64, 3}` = zeros(P, P, 3): control-point influence coefficients, the
+                        matrix the circulation is solved against; component last so that
+                        each `AIC[:, :, k]` slice is a contiguous BLAS matrix
+- `AIC_aero_center::Array{Float64, 3}` = zeros(P, P, 3): aerodynamic-centre (LLT)
+                        influence coefficients, used only for the corrected angle of attack
 - `projected_area::Float64` = 1.0: The area projected onto the xy-plane of the kite body reference frame [m²]
 - `c_ref::Float64` = 1.0: Reference chord length (max panel chord) [m]
 - `y::MVector{P, Float64}` = MVector{P,Float64}(zeros(P))
@@ -35,8 +41,10 @@ Main structure for calculating aerodynamic properties of bodies. Use the constru
     stall_angle_list::MVector{P, T} = zeros(MVector{P, T})
     alpha_dist::MVector{P, T} = zeros(MVector{P, T})
     v_a_dist::MVector{P, T} = zeros(MVector{P, T})
+    pitch_rate_dist::MVector{P, T} = zeros(MVector{P, T})
     work_vectors::NTuple{10, MVector{3, T}} = ntuple(_ -> zeros(MVector{3, T}), 10)
     AIC::Array{T, 3} = zeros(T, P, P, 3)
+    AIC_aero_center::Array{T, 3} = zeros(T, P, P, 3)
     projected_area::T = one(T)
     c_ref::T = one(T)
     y::MVector{P, T} = zeros(MVector{P, T})
@@ -47,7 +55,7 @@ end
     BodyAerodynamics(wings::Vector{T}; 
                      kite_body_origin=zeros(MVec3)) where T <: AbstractWing
 
-Construct a [BodyAerodynamics](@ref) object for aerodynamic calculations.
+Construct a [`BodyAerodynamics`](@ref) object for aerodynamic calculations.
 
 This constructor handles initialization of panels, coordinate transformations, and
 aerodynamic properties, returning a fully initialized structure ready for simulation.
@@ -61,7 +69,7 @@ aerodynamic properties, returning a fully initialized structure ready for simula
 - `omega=zeros(3)`: Turn rate in kite body frame x y and z
 
 # Returns
-- [BodyAerodynamics](@ref) object initialized with panels and wings
+- [`BodyAerodynamics`](@ref) object initialized with panels and wings
 
 # Example
 ```julia
@@ -117,6 +125,17 @@ function BodyAerodynamics(
     reinit!(body_aero; va, omega)
     return body_aero
 end
+
+"""
+    wing_span_flip(wing) -> Int8
+
+`-1` when `wing`'s sections run against its `spanwise_direction`, `+1` otherwise: the
+`flip` every panel of the wing is reinitialized with ([`reinit!`](@ref)). One answer per
+wing, so neighbouring panels cannot disagree and invert a single normal by 180°.
+"""
+wing_span_flip(wing) =
+    dot(first(wing.refined_sections).LE_point - last(wing.refined_sections).LE_point,
+        wing.spanwise_direction) < 0 ? Int8(-1) : Int8(1)
 
 function Base.getproperty(obj::BodyAerodynamics, sym::Symbol)
     if sym === :va
@@ -205,6 +224,14 @@ function calculate_stall_angle_list!(stall_angles::AbstractVector,
         # Default stall angle if none found
         panel_stall = stall_angle_if_none_detected
 
+        # A table that stops short of the scan says nothing about a stall in it:
+        # past its end it is held flat, which is not a peak.
+        if panel.alpha_window > 0 &&
+           panel.alpha_ref + panel.alpha_window < deg2rad(begin_aoa)
+            stall_angles[idx] = panel_stall
+            continue
+        end
+
         # Start with minimum cl
         cl_old = cl_initial
 
@@ -248,12 +275,13 @@ function reinit!(body_aero::BodyAerodynamics{P, W, T};
 ) where {P, W, T}
     idx = 1
     vec = zeros(MVector{3, T})
-    for wing in body_aero.wings
+    for (wing_idx, wing) in enumerate(body_aero.wings)
         reinit!(wing)
         validate_section_aero(wing.refined_sections)
         panel_props = wing.panel_props
         wing_init_aero = init_aero && !_can_skip_panel_aero_reinit(wing, body_aero.panels, idx)
-        
+        wing_flip = wing_span_flip(wing) == -1
+
         # Create panels
         for i in 1:wing.n_panels
             if length(wing.delta_dist) > 0
@@ -263,7 +291,7 @@ function reinit!(body_aero::BodyAerodynamics{P, W, T};
                 delta = zero(T)
             end
             @views reinit!(
-                body_aero.panels[idx], 
+                body_aero.panels[idx],
                 wing.refined_sections[i],
                 wing.refined_sections[i+1],
                 panel_props.aero_centers[i, :],
@@ -274,10 +302,10 @@ function reinit!(body_aero::BodyAerodynamics{P, W, T};
                 panel_props.y_airf[i, :],
                 panel_props.z_airf[i, :],
                 delta,
-                vec,
-                wing.spanwise_direction;
+                vec;
                 remove_nan=wing.remove_nan,
-                init_aero=wing_init_aero
+                init_aero=wing_init_aero,
+                flip=wing_flip
             )
             body_aero.panels[idx].crease_frac = wing.crease_frac
             idx += 1
@@ -363,14 +391,15 @@ end
 
 Calculate Aerodynamic Influence Coefficient matrices.
 
-See also: [BodyAerodynamics](@ref), [Model](@ref)
+See also: [`BodyAerodynamics`](@ref), [`Model`](@ref)
 
 Returns: nothing
 """
 @inline function calculate_AIC_matrices!(body_aero::BodyAerodynamics{P, W, T}, model::Model,
                               core_radius_fraction,
                               va_norm_array::AbstractVector{T},
-                              va_unit_array::AbstractMatrix{T}) where {P, W, T}
+                              va_unit_array::AbstractMatrix{T},
+                              target::AbstractArray{T, 3}=body_aero.AIC) where {P, W, T}
     # Determine evaluation point based on model
     evaluation_point = model == VSM ? :control_point : :aero_center
     evaluation_point_on_bound = model == LLT
@@ -424,7 +453,7 @@ Returns: nothing
                 velocity_induced .-= U_2D
             end
             @inbounds for k in 1:3
-                body_aero.AIC[icp, jring, k] = velocity_induced[k]
+                target[icp, jring, k] = velocity_induced[k]
             end
         end
     end
@@ -482,11 +511,14 @@ function update_effective_angle_of_attack!(alpha_corrected,
     va_norm_array,
     va_unit_array)
 
-    calculate_AIC_matrices!(body_aero, LLT, core_radius_fraction, va_norm_array, va_unit_array)
+    # Its own buffer: `AIC` holds the control-point matrix the circulation was solved
+    # against, so overwriting it here would leave post-solve readers on the LLT one.
+    calculate_AIC_matrices!(body_aero, LLT, core_radius_fraction, va_norm_array,
+                            va_unit_array, body_aero.AIC_aero_center)
 
     induced_velocity = body_aero.cache[1][va_array]
     for k in 1:3
-        mul!(view(induced_velocity, :, k), view(body_aero.AIC, :, :, k), gamma)
+        mul!(view(induced_velocity, :, k), view(body_aero.AIC_aero_center, :, :, k), gamma)
     end
 
     # In-place relative velocity calculation
@@ -704,7 +736,21 @@ function compute_panel_center_of_pressures(
 end
 
 """
-    calculate_results(body_aero::BodyAerodynamics, gamma_new, 
+    set_pitch_rate_dist!(body_aero, omega)
+
+Fill `body_aero.pitch_rate_dist` from a rigid-body turn rate by projecting it
+onto each panel's own spanwise axis. Panels with different dihedral see
+different rates from the same `omega`.
+"""
+function set_pitch_rate_dist!(body_aero::BodyAerodynamics, omega)
+    for (i, panel) in enumerate(body_aero.panels)
+        body_aero.pitch_rate_dist[i] = dot3(omega, panel.y_airf)
+    end
+    return nothing
+end
+
+"""
+    calculate_results(body_aero::BodyAerodynamics, gamma_new,
                      density,
                      core_radius_fraction, mu,
                      alpha_dist, v_a_dist,
@@ -715,6 +761,9 @@ end
                      is_only_f_and_gamma_output::Bool)
 
 Calculate final aerodynamic results. Reference point is in the kite body (KB) frame.
+
+`flow_curvature` adds [`flow_curvature_cm`](@ref) to every section moment, read
+from `body_aero.omega`.
 
 Returns:
     Dict: Results including forces, coefficients and distributions
@@ -737,6 +786,7 @@ function calculate_results(
     panels::Vector{<:Panel},
     is_only_f_and_gamma_output::Bool;
     correct_aoa::Bool=false,
+    flow_curvature::Bool=false,
 )
 
     n_panels = length(panels)
@@ -764,6 +814,10 @@ function calculate_results(
         cl_array[i] = calculate_cl(panel, alpha_dist[i])
         cd_array[i], cm_array[i] = calculate_cd_cm(
             panel, alpha_dist[i])
+        if flow_curvature
+            cm_array[i] += flow_curvature_cm(
+                body_aero.pitch_rate_dist[i], chord_array[i], v_a_dist[i])
+        end
         panel_width_array[i] = panel.width
         va_norm = va_norm_array[i]
         x_norm = norm3(panel.x_airf)
@@ -849,43 +903,26 @@ function calculate_results(
     cross3!(dir_side_ref, dir_lift_ref, va_ref_unit)
     q_ref = 0.5 * density * va_ref_mag^2
 
-    induced_va_airfoil = body_aero.work_vectors[4]
-    dir_lift_induced_va = body_aero.work_vectors[5]
-    dir_drag_induced_va = body_aero.work_vectors[6]
     lift_induced_va = body_aero.work_vectors[7]
     drag_induced_va = body_aero.work_vectors[8]
     dir_lift_prescribed_va = body_aero.work_vectors[9]
     temp_vec = body_aero.work_vectors[10]
+    spanwise_unit = SVector{3}(spanwise_direction)
 
     # Main calculation loop
     for (i, panel) in enumerate(panels)
         panel_area = panel.chord * panel.width
         area_all_panels += panel_area
 
-        alpha_corrected_i = alpha_corrected[i]
-        c_alpha = cos(alpha_corrected_i)
-        s_alpha = sin(alpha_corrected_i)
+        axes = panel_axes(panel)
+        dirs = panel_force_directions(axes, alpha_corrected[i], spanwise_unit)
+        loads = panel_loads(axes, dirs,
+            dynamic_pressure(density, density, v_a_dist[i]),
+            cl_array[i], cd_array[i], cm_array[i])
+        moment_i = loads.moment
         @inbounds for k in 1:3
-            induced_va_airfoil[k] = c_alpha * panel.x_airf[k] +
-                                    s_alpha * panel.z_airf[k]
-        end
-        normalize3!(induced_va_airfoil)
-
-        cross3!(dir_lift_induced_va,
-                induced_va_airfoil, panel.y_airf)
-        normalize3!(dir_lift_induced_va)
-        cross3!(dir_drag_induced_va,
-                spanwise_direction, dir_lift_induced_va)
-        normalize3!(dir_drag_induced_va)
-
-        q_lift = 0.5 * density * v_a_dist[i]^2
-        lift_i = cl_array[i] * q_lift * chord_array[i]
-        drag_i = cd_array[i] * q_lift * chord_array[i]
-        moment_i = cm_array[i] * q_lift * chord_array[i]^2
-
-        @inbounds for k in 1:3
-            lift_induced_va[k] = lift_i * dir_lift_induced_va[k]
-            drag_induced_va[k] = drag_i * dir_drag_induced_va[k]
+            lift_induced_va[k] = loads.lift * dirs.dir_lift[k]
+            drag_induced_va[k] = loads.drag * dirs.dir_drag[k]
         end
 
         va_panel_mag = va_norm_array[i]
@@ -1044,14 +1081,18 @@ end
 Set velocity array and update wake filaments.
 
 # Arguments
-- body_aero::BodyAerodynamics: The [BodyAerodynamics](@ref) struct to modify
+- body_aero::BodyAerodynamics: The [`BodyAerodynamics`](@ref) struct to modify
 - `va::VelVector`: Velocity vector of the apparent wind speed           [m/s]
 - `omega::VelVector`: Turn rate vector around x y and z axis            [rad/s]
+
+`omega` is also projected onto each panel's spanwise axis into
+`pitch_rate_dist`, which the solver reads when `flow_curvature` is enabled.
 """
 function set_va!(body_aero::BodyAerodynamics{P, W, T}, va::AbstractVector, omega=zeros(MVector{3, T})) where {P, W, T}
     n_panels = length(body_aero.panels)
     va_distribution = zeros(T, n_panels, 3)
     body_aero.omega .= omega
+    set_pitch_rate_dist!(body_aero, omega)
 
     if all(iszero, omega)
         va_distribution .= reshape(va, 1, 3)
@@ -1081,9 +1122,28 @@ function set_va!(body_aero::BodyAerodynamics{P, W, T}, va::AbstractVector, omega
     return nothing
 end
 
-function set_va!(body_aero::BodyAerodynamics, va_distribution::AbstractMatrix)
+"""
+    set_va!(body_aero::BodyAerodynamics, va_distribution::AbstractMatrix;
+            pitch_rate_dist=nothing)
+
+Set a per-panel inflow distribution. `pitch_rate_dist` gives each panel's rotation
+rate about its own spanwise axis [rad/s], positive nose-up; build it with
+[`section_pitch_rate`](@ref) when the structure deforms, since twist and flapping
+rates differ per section and no single body rate describes them. It is reset to
+zero when omitted, because this method takes no `omega` and a stale one would
+silently feed the `flow_curvature` moment.
+"""
+function set_va!(body_aero::BodyAerodynamics, va_distribution::AbstractMatrix;
+                 pitch_rate_dist=nothing)
     size(va_distribution, 1) != length(body_aero.panels) &&
         throw(ArgumentError("Number of rows in va distribution should be equal to number of panels."))
+    if isnothing(pitch_rate_dist)
+        body_aero.pitch_rate_dist .= 0
+    else
+        length(pitch_rate_dist) != length(body_aero.panels) &&
+            throw(ArgumentError("Length of pitch rate distribution should be equal to number of panels."))
+        body_aero.pitch_rate_dist .= pitch_rate_dist
+    end
 
     for (i, panel) in enumerate(body_aero.panels)
         panel.va .= va_distribution[i, :]
