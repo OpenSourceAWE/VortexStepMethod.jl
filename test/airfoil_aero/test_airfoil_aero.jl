@@ -70,6 +70,9 @@ end
 
         xt, yt = shrink_wrap(xr, yr, ShrinkWrap(clearance=0.0))
         @test cloud_to_wrap(xt, yt) < 0.002
+        # A closed loop at zero clearance keeps its trailing edge sharp instead of
+        # stamping it into a round cap of `min_clearance` radius.
+        @test maximum(xt) ≈ 1.0 atol = 1e-6
     end
 
     @testset "NeuralFoil matches Python neuralfoil (xlarge)" begin

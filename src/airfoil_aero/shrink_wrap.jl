@@ -14,16 +14,19 @@ single-membrane cloud becomes a capsule of exactly that half-thickness.
 
 # Fields
 - `clearance`: offset the contour keeps outside every cloud point, and the radius
-  every convex corner is rounded at; floored at `min_clearance`.
+  every convex corner is rounded at; floored at `min_clearance` only when the cloud
+  is an open single membrane rather than a closed loop.
 - `min_concave_radius`: rolling-ball radius — concave features narrower than about
   twice this are bridged by a fillet of roughly this radius; convex geometry is
   unaffected. Auto-raised so the ball can neither fall through the cloud's largest
   point gap nor dip below `clearance` between neighbouring points, so sparse clouds
   get a correspondingly looser, smoother wrap.
-- `min_clearance`: floor on `clearance`, so `clearance=0` still leaves a single
-  membrane a capsule with two distinguishable sides instead of a bare curve. Also
-  accepted under its former name `cell_size`, which set the resolution of the
-  distance field this used to be traced on.
+- `min_clearance`: floor on `clearance` for an open single-membrane cloud, so
+  `clearance=0` still leaves it a capsule with two distinguishable sides instead of
+  a bare curve; a closed loop uses its true `clearance`, so `clearance=0` hugs the
+  cloud and keeps its sharp trailing edge sharp. Also accepted under its former name
+  `cell_size`, which set the resolution of the distance field this used to be traced
+  on.
 - `n_points`: output stations per surface; the contour has `2*n_points - 1` points,
   cosine-clustered in arclength at the leading and trailing edges.
 - `curvature_weight`: extra sampling measure per radian of contour turning (chord
@@ -325,17 +328,22 @@ LE → TE lower), following [`ShrinkWrap`](@ref): the rolling ball
 by `clearance` ([`pivot_contour`](@ref)), and the resulting arcs are resampled to
 cosine panels in a curvature-weighted arclength measure. The first and last point
 coincide at the
-trailing edge (the TE cap is part of the contour). The output stays in the
+trailing edge (the TE cap is part of the contour). A closed loop (first and last
+cloud points coincident) keeps its true `clearance`, so `clearance=0` hugs the input
+and leaves a sharp trailing edge sharp; an open single-membrane cloud is floored at
+`min_clearance`. The output stays in the
 normalized frame of the input cloud (chord slightly longer than 1, nose apex near
 `x = -clearance`) and is ready to write as a `.dat` or fit with
 [`LeastSquaresFit`](@ref).
 """
 function shrink_wrap(x, y, method::ShrinkWrap)
     xn, yn, _ = normalize_airfoil(collect(float.(x)), collect(float.(y)))
-    gap = max(method.clearance, method.min_clearance)
+    closed = hypot(xn[end] - xn[1], yn[end] - yn[1]) < 0.02
+    gap = closed ? method.clearance : max(method.clearance, method.min_clearance)
     linking = largest_linking_gap(xn, yn)
-    ball = max(method.min_concave_radius, gap, 1.01 * linking / 2,
-               1.5 * (linking^2 / 4 + gap^2) / (2gap))
+    ball = gap > 0 ? max(method.min_concave_radius, gap, 1.01 * linking / 2,
+                         1.5 * (linking^2 / 4 + gap^2) / (2gap)) :
+                     max(method.min_concave_radius, 1.01 * linking / 2)
     px, py = pivot_contour(xn, yn, ball, gap)
     length(px) < 3 && error("ShrinkWrap traced no contour; the cloud may be too" *
                             " sparse or thin to pivot a ball of $(ball) around.")
