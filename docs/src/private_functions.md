@@ -6,7 +6,6 @@ CurrentModule = VortexStepMethod
 
 ### Settings
 ```@docs
-mesh_settings
 airfoil_settings
 settings_range
 ```

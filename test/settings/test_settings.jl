@@ -75,5 +75,6 @@ end
         Dict("solver" => "rans"))
     @test_throws ArgumentError VortexStepMethod.airfoil_settings(
         Dict("table_format" => "parquet"))
+    @test_throws Exception VortexStepMethod.airfoil_settings(Dict("n_crt" => 4.0))
 end
 nothing

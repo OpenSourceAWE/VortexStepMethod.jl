@@ -268,7 +268,7 @@ function VSMSettings(filename; data_prefix=true)
                 wing.crease_frac = Float64(wing_data["crease_frac"])
             end
             haskey(wing_data, "mesh") &&
-                (wing.mesh = mesh_settings(wing_data["mesh"]))
+                (wing.mesh = convertdict(MeshSettings, wing_data["mesh"]))
             haskey(wing_data, "airfoil") &&
                 (wing.airfoil = airfoil_settings(wing_data["airfoil"]))
 
@@ -306,49 +306,14 @@ function VSMSettings(filename; data_prefix=true)
 end
 
 """
-    mesh_settings(data) -> MeshSettings
-
-Read a wing's `mesh:` block. Every key is optional and falls back to the default.
-"""
-function mesh_settings(data)
-    mesh = MeshSettings()
-    haskey(data, "n_sections") && (mesh.n_sections = Int64(data["n_sections"]))
-    haskey(data, "n_bins") && (mesh.n_bins = Int64(data["n_bins"]))
-    haskey(data, "rotation") &&
-        (mesh.rotation = [Float64.(row) for row in data["rotation"]])
-    haskey(data, "wingtip_distance") &&
-        (mesh.wingtip_distance = Float64(data["wingtip_distance"]))
-    haskey(data, "clearance") && (mesh.clearance = Float64(data["clearance"]))
-    haskey(data, "min_concave_radius") &&
-        (mesh.min_concave_radius = Float64(data["min_concave_radius"]))
-    return mesh
-end
-
-"""
     airfoil_settings(data) -> AirfoilSettings
 
-Read a wing's `airfoil:` block. Every key is optional and falls back to the
-default; `delta_range: null` (or an absent key) means no flap sweep.
+Read a wing's `airfoil:` block, checking that `solver` and `table_format` name
+backends that exist. Every key is optional and falls back to the default;
+`delta_range: null` (or an absent key) means no flap sweep.
 """
 function airfoil_settings(data)
-    airfoil = AirfoilSettings()
-    for key in (:solver, :model_size)
-        haskey(data, String(key)) &&
-            setfield!(airfoil, key, String(data[String(key)]))
-    end
-    haskey(data, "table_format") &&
-        (airfoil.table_format = Symbol(data["table_format"]))
-    for key in (:n_crit, :xtr_upper, :xtr_lower, :v_app, :chord_ref)
-        haskey(data, String(key)) &&
-            setfield!(airfoil, key, Float64(data[String(key)]))
-    end
-    haskey(data, "alpha_range") &&
-        (airfoil.alpha_range = Float64.(data["alpha_range"]))
-    haskey(data, "live_offsets") &&
-        (airfoil.live_offsets = Float64.(data["live_offsets"]))
-    if haskey(data, "delta_range") && !isnothing(data["delta_range"])
-        airfoil.delta_range = Float64.(data["delta_range"])
-    end
+    airfoil = convertdict(AirfoilSettings, data)
     airfoil.solver in ("neuralfoil", "xfoil") || throw(ArgumentError(
         "Invalid airfoil solver \"$(airfoil.solver)\". " *
         "Valid values: neuralfoil, xfoil"))
