@@ -1,5 +1,29 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- A wing's settings carry two optional blocks: `mesh:` (`MeshSettings` — the
+  `obj_file` the sections are sliced from, section count, leading-edge marching
+  resolution, the mesh-to-slicer rotation, tip standoff and shrink wrap) and
+  `airfoil:` (`AirfoilSettings` — the 2D backend, its transition settings, the α
+  and δ sweeps, the Reynolds reference and the table format). Both are optional,
+  so a settings file that names neither loads unchanged, and an unnamed `mesh:`
+  block slices and wraps exactly as an unconfigured `obj_to_yaml` call.
+- `airfoil_solver`, `alpha_range`, `delta_range`, `reynolds`, `rotation_matrix`,
+  `slice_args` and `preview_args` turn a block into the arguments `obj_to_yaml`,
+  the section solvers and the live polars already take, and `NeuralFoilSolver`,
+  `XFoilSolver`, `ShrinkWrap` and `LivePolarSettings` each take the block they are
+  configured by.
+- `solver: xfoil` selects the viscous panel code for a whole dataset from the
+  settings file, where the backend used to be a caller's hard-coded choice.
+- The live polars read the `model_size` and `n_crit` the tables were generated at
+  rather than their own defaults, so a wing is not re-solved in flight at
+  different transition settings than it was tabulated at.
+- Reynolds is stated once: `reynolds(set, wing)` takes the air from
+  `solver_settings` and the reference speed and chord from `airfoil:`.
+
 ## VortexStepMethod v4.3.1 2026-09-01
 
 ### Changed

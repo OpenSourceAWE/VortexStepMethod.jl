@@ -16,6 +16,91 @@ end
 end
 
 """
+    MeshSettings
+
+How a wing's `.obj` mesh becomes airfoil slices, used within [`WingSettings`](@ref):
+which mesh, and how to cut it.
+
+`obj_file` here is the mesh the sections are *generated from*, an input to the
+`geometry_file` a wing then flies. That is not the wing's own `obj_file`, which is
+an alternative to `geometry_file` — a wing built straight from an obj and a dat,
+with no polar generation in between — and which cannot be given alongside one.
+
+Apart from `n_sections`, which `obj_to_yaml` requires, every default here is the one
+that call and [`ShrinkWrap`](@ref) already apply, so a wing naming no `mesh:` block
+slices as an unconfigured call.
+
+# Fields
+- `obj_file`: Mesh the sections are sliced from, relative to the data directory
+    (default `""`, no mesh).
+- `n_sections`: Sections sliced from the mesh (default `45`).
+- `n_bins`: Leading-edge stations marched across the span; more gives a smoother
+    trace (default `60`).
+- `rotation`: Rows of the mesh-to-slicer rotation, which brings the mesh into the
+    slicer's convention of x = chord, y = span, z = up (default the identity).
+- `wingtip_distance`: Arc length [m] the outermost sections stop short of each tip
+    (default `0.0`).
+- `clearance`: Shrink-wrap offset [chord fraction] the contour holds outside every
+    cloud point, and the radius its convex corners are rounded at (default
+    `0.006`).
+- `min_concave_radius`: Shrink-wrap rolling-ball radius [chord fraction], bridging
+    gaps and crevices in the point cloud (default `0.02`).
+"""
+@with_kw mutable struct MeshSettings
+    obj_file::String = ""
+    n_sections::Int64 = 45
+    n_bins::Int64 = 60
+    rotation::Vector{Vector{Float64}} = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0],
+                                         [0.0, 0.0, 1.0]]
+    wingtip_distance::Float64 = 0.0
+    clearance::Float64 = 0.006
+    min_concave_radius::Float64 = 0.02
+end
+
+"""
+    AirfoilSettings
+
+The 2D section backend and the polars it tabulates, used within
+[`WingSettings`](@ref). One block answers for both the tables a mesh is sliced into
+and the live polars a deformed section is re-solved on, so the two cannot be
+generated at different transition settings or off different networks.
+
+# Fields
+- `solver`: Section backend, `"neuralfoil"` or `"xfoil"` (default `"neuralfoil"`).
+- `model_size`: NeuralFoil network size (default `"large"`).
+- `n_crit`: e^N transition criticality; lower is dirtier, so transition is earlier
+    (default `9.0`, the standard clean-tunnel value).
+- `xtr_upper` / `xtr_lower`: Forced transition as a chord fraction, applied to
+    whichever backend `solver` names (default `0.05`).
+- `alpha_range`: Angle-of-attack sweep [deg] as `[first, step, last]`
+    (default `[-180, 1, 180]`).
+- `delta_range`: Flap-deflection sweep [deg] as `[first, step, last]`; `nothing`
+    for a dataset generated without a flap sweep (default `nothing`).
+- `live_offsets`: Angles [deg] off the reference angle a live polar is sampled at
+    (default `-12:3:12`).
+- `v_app`: Apparent wind [m/s] the polars' Reynolds number is taken at
+    (default `25.0`).
+- `chord_ref`: Reference (maximum panel) chord [m], which Reynolds is defined
+    against (default `1.0`).
+- `table_format`: Per-node table format, `:csv` (readable) or `:arrow` (about ten
+    times faster to load; default `:arrow`). Written in YAML as a plain string,
+    and carried as the `Symbol` the generator takes.
+"""
+@with_kw mutable struct AirfoilSettings
+    solver::String = "neuralfoil"
+    model_size::String = "large"
+    n_crit::Float64 = 9.0
+    xtr_upper::Float64 = 0.05
+    xtr_lower::Float64 = 0.05
+    alpha_range::Vector{Float64} = [-180.0, 1.0, 180.0]
+    delta_range::Union{Nothing, Vector{Float64}} = nothing
+    live_offsets::Vector{Float64} = collect(-12.0:3.0:12.0)
+    v_app::Float64 = 25.0
+    chord_ref::Float64 = 1.0
+    table_format::Symbol = :arrow
+end
+
+"""
     WingSettings
 
 Settings for a single wing, used within [`VSMSettings`](@ref).
@@ -36,8 +121,10 @@ Settings for a single wing, used within [`VSMSettings`](@ref).
     reinit/refine updates (default `false`)
 - `billowing_percentage`: TE billow as percentage of arc length
     (default `0.0`; only used with `BILLOWING` distribution).
-- `crease_frac`: Chordwise flap-hinge fraction (0–1) for drawing the
-    δ-deflected plate/skin (default `0.75`).
+- `crease_frac`: Chordwise flap-hinge fraction (0–1) the polars are deflected
+    about and the δ-deflected plate/skin is drawn with (default `0.75`).
+- `mesh`: [`MeshSettings`](@ref) — how `obj_file` is sliced into sections.
+- `airfoil`: [`AirfoilSettings`](@ref) — the 2D backend and the polars it writes.
 """
 @with_kw mutable struct WingSettings
     name::String = "main_wing"
@@ -51,6 +138,8 @@ Settings for a single wing, used within [`VSMSettings`](@ref).
     use_prior_polar::Bool = false
     billowing_percentage::Float64 = 0.0 # TE billow as % of arc length
     crease_frac::Float64 = 0.75
+    mesh::MeshSettings = MeshSettings()
+    airfoil::AirfoilSettings = AirfoilSettings()
 end
 
 """
@@ -193,6 +282,10 @@ function VSMSettings(filename; data_prefix=true)
             if haskey(wing_data, "crease_frac")
                 wing.crease_frac = Float64(wing_data["crease_frac"])
             end
+            haskey(wing_data, "mesh") &&
+                (wing.mesh = convertdict(MeshSettings, wing_data["mesh"]))
+            haskey(wing_data, "airfoil") &&
+                (wing.airfoil = airfoil_settings(wing_data["airfoil"]))
 
             push!(vsm_settings.wings, wing)
             n_panels += wing.n_panels
@@ -225,6 +318,24 @@ function VSMSettings(filename; data_prefix=true)
     end
     
     return vsm_settings
+end
+
+"""
+    airfoil_settings(data) -> AirfoilSettings
+
+Read a wing's `airfoil:` block, checking that `solver` and `table_format` name
+backends that exist. Every key is optional and falls back to the default;
+`delta_range: null` (or an absent key) means no flap sweep.
+"""
+function airfoil_settings(data)
+    airfoil = convertdict(AirfoilSettings, data)
+    airfoil.solver in ("neuralfoil", "xfoil") || throw(ArgumentError(
+        "Invalid airfoil solver \"$(airfoil.solver)\". " *
+        "Valid values: neuralfoil, xfoil"))
+    airfoil.table_format in (:csv, :arrow) || throw(ArgumentError(
+        "Invalid table_format \"$(airfoil.table_format)\". " *
+        "Valid values: csv, arrow"))
+    return airfoil
 end
 
 function Base.show(io::IO, vsm_settings::VSMSettings)
