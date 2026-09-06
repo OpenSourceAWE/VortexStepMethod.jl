@@ -1,11 +1,11 @@
 using VortexStepMethod
+using VortexStepMethod: ObjAdapter
 using Test
 
+ram_air_dir = joinpath(dirname(dirname(@__DIR__)), "data", "ram_air_kite")
+
 @testset "Test settings.jl" begin
-    # Use the absolute path to test data to avoid path concatenation issues
-    project_root = dirname(dirname(@__DIR__))
-    settings_file = joinpath(project_root, "data", "ram_air_kite", "vsm_settings_dual.yaml")
-    vss = VSMSettings(settings_file)
+    vss = VSMSettings(joinpath(ram_air_dir, "vsm_settings_dual.yaml"))
     @test vss isa VSMSettings
     @test vss.solver_settings isa SolverSettings
     @test vss.wings isa Vector{WingSettings}
@@ -81,5 +81,16 @@ end
     @test_throws ArgumentError VortexStepMethod.airfoil_settings(
         Dict("table_format" => "parquet"))
     @test_throws Exception VortexStepMethod.airfoil_settings(Dict("n_crt" => 4.0))
+end
+
+@testset "an unnamed mesh block slices as an unconfigured call" begin
+    vertices, faces = ObjAdapter.read_faces(joinpath(ram_air_dir,
+                                                    "ram_air_kite_body.obj"))
+    args = slice_args(WingSettings())
+
+    @test ObjAdapter.perpendicular_sections(vertices, faces, 4; args.rotation,
+              args.n_bins, args.wingtip_distance) ==
+          ObjAdapter.perpendicular_sections(vertices, faces, 4)
+    @test args.wrap_method == VortexStepMethod.AirfoilAero.ShrinkWrap()
 end
 nothing

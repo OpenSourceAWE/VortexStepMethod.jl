@@ -47,8 +47,7 @@ function ram_air_matrix_dir(; n_sections=4,
     gen_dir = joinpath(@__DIR__, "generated", "ram_matrix_$(string(hash(key); base=16))")
     yaml = joinpath(gen_dir, "geometry.yaml")
     if !isfile(yaml)
-        # NeuralFoil's Float32 matrix multiplies are only bit-reproducible
-        # single-threaded; pin BLAS so the generated tables are identical every run.
+        # NeuralFoil's Float32 matmuls are bit-reproducible only single-threaded.
         n_threads = BLAS.get_num_threads()
         BLAS.set_num_threads(1)
         try

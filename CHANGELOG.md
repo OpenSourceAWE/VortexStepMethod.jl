@@ -7,10 +7,10 @@
 - A wing's settings carry two optional blocks: `mesh:` (`MeshSettings` — the
   `obj_file` the sections are sliced from, section count, leading-edge marching
   resolution, the mesh-to-slicer rotation, tip standoff and shrink wrap) and
-  `airfoil:` (`AirfoilSettings` — the 2D backend,
-  its transition settings, the α and δ sweeps, the Reynolds reference and the
-  table format). Both fall back to the defaults, so a settings file that names
-  neither loads unchanged.
+  `airfoil:` (`AirfoilSettings` — the 2D backend, its transition settings, the α
+  and δ sweeps, the Reynolds reference and the table format). Both are optional,
+  so a settings file that names neither loads unchanged, and an unnamed `mesh:`
+  block slices and wraps exactly as an unconfigured `obj_to_yaml` call.
 - `airfoil_solver`, `alpha_range`, `delta_range`, `reynolds`, `rotation_matrix`,
   `slice_args` and `preview_args` turn a block into the arguments `obj_to_yaml`,
   the section solvers and the live polars already take, and `NeuralFoilSolver`,

@@ -26,30 +26,35 @@ which mesh, and how to cut it.
 an alternative to `geometry_file` — a wing built straight from an obj and a dat,
 with no polar generation in between — and which cannot be given alongside one.
 
+Apart from `n_sections`, which `obj_to_yaml` requires, every default here is the one
+that call and [`ShrinkWrap`](@ref) already apply, so a wing naming no `mesh:` block
+slices as an unconfigured call.
+
 # Fields
 - `obj_file`: Mesh the sections are sliced from, relative to the data directory
     (default `""`, no mesh).
 - `n_sections`: Sections sliced from the mesh (default `45`).
 - `n_bins`: Leading-edge stations marched across the span; more gives a smoother
-    trace (default `200`).
+    trace (default `60`).
 - `rotation`: Rows of the mesh-to-slicer rotation, which brings the mesh into the
     slicer's convention of x = chord, y = span, z = up (default the identity).
 - `wingtip_distance`: Arc length [m] the outermost sections stop short of each tip
-    (default `0.05`).
-- `clearance`: Shrink-wrap trailing-edge cap radius [m]; `0` collapses it to a
-    sharp edge (default `0.0`).
-- `min_concave_radius`: Shrink-wrap rolling-ball radius [m], bridging gaps in the
-    point cloud (default `0.2`).
+    (default `0.0`).
+- `clearance`: Shrink-wrap offset [chord fraction] the contour holds outside every
+    cloud point, and the radius its convex corners are rounded at (default
+    `0.006`).
+- `min_concave_radius`: Shrink-wrap rolling-ball radius [chord fraction], bridging
+    gaps and crevices in the point cloud (default `0.02`).
 """
 @with_kw mutable struct MeshSettings
     obj_file::String = ""
     n_sections::Int64 = 45
-    n_bins::Int64 = 200
+    n_bins::Int64 = 60
     rotation::Vector{Vector{Float64}} = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0],
                                          [0.0, 0.0, 1.0]]
-    wingtip_distance::Float64 = 0.05
-    clearance::Float64 = 0.0
-    min_concave_radius::Float64 = 0.2
+    wingtip_distance::Float64 = 0.0
+    clearance::Float64 = 0.006
+    min_concave_radius::Float64 = 0.02
 end
 
 """
@@ -65,8 +70,10 @@ generated at different transition settings or off different networks.
 - `model_size`: NeuralFoil network size (default `"large"`).
 - `n_crit`: e^N transition criticality; lower is dirtier, so transition is earlier
     (default `9.0`, the standard clean-tunnel value).
-- `xtr_upper` / `xtr_lower`: Forced transition as a chord fraction (default `0.05`).
-- `alpha_range`: Angle-of-attack sweep [deg] as `[first, step, last]`.
+- `xtr_upper` / `xtr_lower`: Forced transition as a chord fraction, applied to
+    whichever backend `solver` names (default `0.05`).
+- `alpha_range`: Angle-of-attack sweep [deg] as `[first, step, last]`
+    (default `[-180, 1, 180]`).
 - `delta_range`: Flap-deflection sweep [deg] as `[first, step, last]`; `nothing`
     for a dataset generated without a flap sweep (default `nothing`).
 - `live_offsets`: Angles [deg] off the reference angle a live polar is sampled at
@@ -85,7 +92,7 @@ generated at different transition settings or off different networks.
     n_crit::Float64 = 9.0
     xtr_upper::Float64 = 0.05
     xtr_lower::Float64 = 0.05
-    alpha_range::Vector{Float64} = [-15.0, 3.0, 90.0]
+    alpha_range::Vector{Float64} = [-180.0, 1.0, 180.0]
     delta_range::Union{Nothing, Vector{Float64}} = nothing
     live_offsets::Vector{Float64} = collect(-12.0:3.0:12.0)
     v_app::Float64 = 25.0
