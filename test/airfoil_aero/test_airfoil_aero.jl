@@ -8,6 +8,12 @@ using VortexStepMethod.AirfoilAero: KulfanParameters, LeastSquaresFit, ShrinkWra
 using VortexStepMethod: SectionAero, section_surface, read_section_aero
 using VortexStepMethod.AirfoilAero: write_section_aero
 
+seg_dist(px, py, ax, ay, bx, by) = begin
+    vx, vy = bx - ax, by - ay
+    t = clamp(((px - ax) * vx + (py - ay) * vy) / max(vx^2 + vy^2, eps()), 0.0, 1.0)
+    hypot(px - (ax + t * vx), py - (ay + t * vy))
+end
+
 read_dat_coords(path) = begin
     x = Float64[]; y = Float64[]
     for ln in eachline(path)
@@ -49,12 +55,6 @@ end
     end
 
     @testset "Shrink-wrap encloses points with clearance" begin
-        seg_dist(px, py, ax, ay, bx, by) = begin
-            vx, vy = bx - ax, by - ay
-            t = clamp(((px - ax) * vx + (py - ay) * vy) / max(vx^2 + vy^2, eps()),
-                      0.0, 1.0)
-            hypot(px - (ax + t * vx), py - (ay + t * vy))
-        end
         xn, yn, _ = normalize_airfoil(collect(float.(xr)), collect(float.(yr)))
         cloud_to_wrap(xw, yw) = minimum(
             minimum(seg_dist(xn[p], yn[p], xw[k], yw[k], xw[k+1], yw[k+1])
@@ -70,6 +70,18 @@ end
 
         xt, yt = shrink_wrap(xr, yr, ShrinkWrap(clearance=0.0))
         @test cloud_to_wrap(xt, yt) < 0.002
+        # A closed loop at zero clearance keeps its trailing edge sharp instead of
+        # stamping it into a round cap of `min_clearance` radius.
+        @test maximum(xt) ≈ 1.0 atol = 1e-6
+    end
+
+    @testset "Shrink-wrap at zero clearance lands on a clean airfoil" begin
+        clean = KulfanParameters(fill(0.2, 8), fill(-0.2, 8), 0.0, 0.0)
+        xc, yc = kulfan_to_coordinates(clean; n_points=60)
+        xn, yn, _ = normalize_airfoil(collect(float.(xc)), collect(float.(yc)))
+        xw, yw = shrink_wrap(collect(xc), collect(yc), ShrinkWrap(clearance=0.0))
+        @test maximum(minimum(seg_dist(xw[k], yw[k], xn[p], yn[p], xn[p+1], yn[p+1])
+                              for p in 1:length(xn)-1) for k in eachindex(xw)) < 1e-9
     end
 
     @testset "NeuralFoil matches Python neuralfoil (xlarge)" begin

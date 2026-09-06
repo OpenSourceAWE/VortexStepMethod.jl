@@ -303,6 +303,19 @@
   `reduce(vcat, …)` over a generator, which was quadratic in the row count: ~21×
   faster on a 16 MB surface table (2.49 s → 0.12 s), benefiting every existing
   dataset.
+- `shrink_wrap` traces the rolling ball exactly — pivoting it around the cloud
+  and offsetting the polygon through the points it touches (`pivot_contour`) —
+  instead of thresholding and marching-squares-tracing a distance field, so
+  there is no grid resolution left to set. `ShrinkWrap`'s `cell_size` is
+  accordingly named `min_clearance`, still accepted under the old name, and
+  floors `clearance` only
+  for an open single-membrane cloud; a closed loop keeps its true `clearance`, so
+  `clearance=0` hugs the input and leaves its sharp trailing edge sharp. The wrap
+  sits at exactly `clearance` from the cloud instead of a cell over it, so a V3
+  canopy's aft strip comes out `2 * clearance` thick where the grid gave
+  `3.5 * cell_size`. `min_concave_radius` stops costing anything,
+  having padded the grid in both directions before: one V3 slice at radius 0.4
+  drops from 173 ms to 10 ms, and at the default radius from 15 ms to 3 ms.
 - `is_show=true` draws into a window named after the plot title instead of into
   whichever window the backend last used, so a script showing several plots gets
   one window each and re-running it redraws them in place. `show_plot` takes the

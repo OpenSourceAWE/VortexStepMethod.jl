@@ -38,14 +38,15 @@ interior rib, spar and seam the cutting plane happened to cross.
 ## 2. Shrink-wrap
 
 [`shrink_wrap`](@ref), configured by [`ShrinkWrap`](@ref), turns that noisy cloud into
-a single clean closed airfoil. It builds a distance field on a grid, thresholds it at a
-rolling-ball radius (bridging gaps between points and ignoring interior structure),
-flood-fills the outside, erodes the boundary back to a small `clearance`, and traces the
-resulting level set with marching squares. The contour is parameterised by arclength, so
-the leading edge comes out genuinely round and the blunt trailing edge is capped by an
-arc — and the output points are cosine-clustered toward both edges. The same wrapped
-airfoil is what *both* backends analyse, so the geometry the polar is generated for
-always matches the `.dat` written to disk.
+a single clean closed airfoil. It pivots a ball of the `min_concave_radius` around
+the outside of the cloud (ignoring interior structure and skipping the points inside
+a concavity too narrow for the ball) and offsets the polygon through the points it
+touches by `clearance`, rounding each convex corner at that radius. That polygon is
+the wrap boundary exactly, so there is no grid resolution to choose. The contour is
+parameterised by arclength, so the leading edge comes out genuinely round and the
+blunt trailing edge is capped by an arc — and the output points are cosine-clustered
+toward both edges. The same wrapped airfoil is what *both* backends analyse, so the
+geometry the polar is generated for always matches the `.dat` written to disk.
 
 This is the robustness win: an arbitrary, self-intersecting, structurally-detailed slice
 becomes one well-formed airfoil with no manual cleanup.

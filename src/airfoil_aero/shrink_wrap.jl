@@ -1,212 +1,188 @@
 """
-    ShrinkWrap(; clearance=0.006, min_concave_radius=0.02, cell_size=0.001,
+    ShrinkWrap(; clearance=0.006, min_concave_radius=0.02, min_clearance=0.001,
                n_points=120, curvature_weight=0.05)
 
-Distance-field shrink wrap: the rolling-ball offset of a raw slice point cloud,
-extracted as one closed airfoil contour. A grid distance field is thresholded at
-the rolling-ball radius (bridging cloud gaps and crevices narrower than about
-twice `min_concave_radius`), flood-filled, eroded back to `clearance`, and the
-resulting level set is traced with marching squares, faired (each pass clamped so
-the contour keeps `clearance`) and resampled. Because the contour is
-parameterized by arclength rather than `x`, the leading edge comes out genuinely
-round — the offset of the cloud nose — the blunt trailing edge is capped by an arc
-of radius `clearance`, and a single-membrane cloud becomes a thin capsule (at least
-one `cell_size` half-thickness).
+Rolling-ball shrink wrap: the offset of a raw slice point cloud, traced exactly as
+one closed airfoil contour. A disk of radius `min_concave_radius` is pivoted around
+the outside of the cloud and the polygon through the points it touches is offset by
+`clearance` ([`pivot_contour`](@ref)). Being traced rather than sampled on a grid,
+the wrap has no resolution floor: the leading edge comes out genuinely round — the
+offset of the cloud nose — the blunt trailing edge is capped by an arc of radius
+`clearance`, and a single-membrane cloud becomes a capsule of exactly that
+half-thickness.
 
 # Fields
-- `clearance`: offset the contour keeps outside every cloud point; floored at one
-  `cell_size` (the grid cannot represent a tighter wrap). Also the radius every
-  convex corner is rounded at.
+- `clearance`: offset the contour keeps outside every cloud point, and the radius
+  every convex corner is rounded at; floored at `min_clearance` only when the cloud
+  is an open single membrane rather than a closed loop.
 - `min_concave_radius`: rolling-ball radius — concave features narrower than about
-  twice this are bridged by a fillet of roughly this radius; convex geometry is
-  unaffected. Auto-raised so the ball can neither fall through the cloud's largest
-  point gap nor pinch off between points during erosion, so sparse clouds get a
-  correspondingly looser, smoother wrap.
-- `cell_size`: distance-field grid resolution as a chord fraction; sets the
-  geometric fidelity of the wrap.
+  twice this are bridged straight; convex geometry is unaffected. Raised where the
+  cloud is sparse enough that the ball would otherwise fall through its largest point
+  gap.
+- `min_clearance`: floor on `clearance` for an open single-membrane cloud, so
+  `clearance=0` still leaves it a capsule with two distinguishable sides instead of
+  a bare curve; a closed loop uses its true `clearance`, so `clearance=0` hugs the
+  cloud and keeps its sharp trailing edge sharp. Also accepted under its former name
+  `cell_size`.
 - `n_points`: output stations per surface; the contour has `2*n_points - 1` points,
   cosine-clustered in arclength at the leading and trailing edges.
 - `curvature_weight`: extra sampling measure per radian of contour turning (chord
   fraction), concentrating output points into corners so XFoil's spline can follow
   them; `0` gives plain cosine-in-arclength sampling.
 """
-@with_kw struct ShrinkWrap
-    clearance::Float64 = 0.006
-    min_concave_radius::Float64 = 0.02
-    cell_size::Float64 = 0.001
-    n_points::Int = 120
-    curvature_weight::Float64 = 0.05
+struct ShrinkWrap
+    clearance::Float64
+    min_concave_radius::Float64
+    min_clearance::Float64
+    n_points::Int
+    curvature_weight::Float64
+end
+
+function ShrinkWrap(; clearance=0.006, min_concave_radius=0.02, min_clearance=0.001,
+                    cell_size=nothing, n_points=120, curvature_weight=0.05)
+    return ShrinkWrap(clearance, min_concave_radius,
+                      isnothing(cell_size) ? min_clearance : cell_size,
+                      n_points, curvature_weight)
 end
 
 """
-    distance_parabolas!(d, f, n, v, z)
+    point_buckets(x, y, reach) -> Dict
 
-One pass of the Felzenszwalb–Huttenlocher distance transform: writes into `d` the
-lower envelope of the parabolas `(q - p)^2 + f[p]` over `p`, for `q in 1:n`.
-`v` and `z` are scratch (length `n` and `n + 1`).
+Sparse uniform grid of the point indices, one bucket per `reach`-sized cell, so every
+point within `reach` of a query lies in one of the nine buckets around it.
 """
-function distance_parabolas!(d, f, n, v, z)
-    k = 1
-    v[1] = 1
-    z[1] = -Inf
-    z[2] = Inf
-    for q in 2:n
-        s = ((f[q] + q * q) - (f[v[k]] + v[k] * v[k])) / (2 * (q - v[k]))
-        while s <= z[k]
-            k -= 1
-            s = ((f[q] + q * q) - (f[v[k]] + v[k] * v[k])) / (2 * (q - v[k]))
-        end
-        k += 1
-        v[k] = q
-        z[k] = s
-        z[k+1] = Inf
+function point_buckets(x, y, reach)
+    buckets = Dict{NTuple{2,Int},Vector{Int}}()
+    for k in eachindex(x)
+        key = (floor(Int, x[k] / reach), floor(Int, y[k] / reach))
+        push!(get!(buckets, key, Int[]), k)
     end
-    k = 1
-    for q in 1:n
-        while z[k+1] < q
-            k += 1
-        end
-        d[q] = (q - v[k])^2 + f[v[k]]
-    end
-    return d
+    return buckets
 end
 
 """
-    squared_distance_transform!(field) -> field
+    turn_measure(cross, dot) -> Float64
 
-In-place 2D squared Euclidean distance transform in grid-index units. On input
-`field` holds `0` (or a local squared offset) at seeds and a large finite value
-elsewhere; on output every node holds its squared distance to the nearest seed.
+Pseudo-angle in `[0, 4)` of the direction with the given `cross` and `dot` against a
+reference, rising monotonically with the counterclockwise angle it stands for. Ordering
+directions by it is ordering them by angle, without the `atan` that dominates the
+pivot's inner loop.
 """
-function squared_distance_transform!(field::Matrix{Float64})
-    nx, ny = size(field)
-    m = max(nx, ny)
-    d, f = Vector{Float64}(undef, m), Vector{Float64}(undef, m)
-    v, z = Vector{Int}(undef, m), Vector{Float64}(undef, m + 1)
-    for i in 1:nx
-        f[1:ny] .= @view field[i, :]
-        distance_parabolas!(d, f, ny, v, z)
-        field[i, :] .= @view d[1:ny]
+function turn_measure(cross, dot)
+    if cross >= 0
+        return dot >= 0 ? cross / (cross + dot) : 1 + (-dot) / (cross - dot)
     end
-    for j in 1:ny
-        f[1:nx] .= @view field[:, j]
-        distance_parabolas!(d, f, nx, v, z)
-        field[:, j] .= @view d[1:nx]
-    end
-    return field
+    return dot <= 0 ? 2 + (-cross) / (-cross - dot) : 3 + dot / (dot - cross)
 end
 
 """
-    flood_outside(blocked) -> BitMatrix
+    pivot_step(x, y, buckets, r, p, centre) -> (q, centre) or nothing
 
-Mark the nodes reachable from the grid border without entering `blocked`
-(4-connected flood fill); unreached nodes are the solid plus its enclosed holes.
+Rotate the empty disk of radius `r` counterclockwise about point `p`, starting from
+`centre`, until its rim reaches a second point. Returns that point and the disk
+centre touching both, or `nothing` when nothing lies within `2r` of `p`.
 """
-function flood_outside(blocked::AbstractMatrix{Bool})
-    nx, ny = size(blocked)
-    outside = falses(nx, ny)
-    stack = Int[]
-    visit(i, j) = if !blocked[i, j] && !outside[i, j]
-        outside[i, j] = true
-        push!(stack, (j - 1) * nx + i)
-    end
-    for i in 1:nx
-        visit(i, 1)
-        visit(i, ny)
-    end
-    for j in 1:ny
-        visit(1, j)
-        visit(nx, j)
-    end
-    while !isempty(stack)
-        idx = pop!(stack)
-        i, j = (idx - 1) % nx + 1, (idx - 1) ÷ nx + 1
-        i > 1 && visit(i - 1, j)
-        i < nx && visit(i + 1, j)
-        j > 1 && visit(i, j - 1)
-        j < ny && visit(i, j + 1)
-    end
-    return outside
-end
-
-"""
-    trace_level_set(field, level) -> Vector{Vector{NTuple{2,Float64}}}
-
-Marching-squares contours of `field .== level`, each returned as a closed loop of
-grid-frame vertices (unit = one cell, node 1 at 1.0). Saddle cells are resolved by
-the cell-center average. Loops touching the grid border are dropped.
-"""
-function trace_level_set(field::Matrix{Float64}, level::Float64)
-    nx, ny = size(field)
-    inside(v) = v > level
-    frac(a, b) = (level - a) / (b - a)
-    points = Dict{NTuple{3,Int},NTuple{2,Float64}}()
-    links = Dict{NTuple{3,Int},Vector{NTuple{3,Int}}}()
-    connect(a, b) = begin
-        push!(get!(links, a, NTuple{3,Int}[]), b)
-        push!(get!(links, b, NTuple{3,Int}[]), a)
-    end
-    for j in 1:ny-1, i in 1:nx-1
-        v00, v10 = field[i, j], field[i+1, j]
-        v01, v11 = field[i, j+1], field[i+1, j+1]
-        b00, b10, b01, b11 = inside(v00), inside(v10), inside(v01), inside(v11)
-        b00 == b10 == b01 == b11 && continue
-        bottom, top = (i, j, 0), (i, j + 1, 0)
-        left, right = (i, j, 1), (i + 1, j, 1)
-        b00 != b10 && (points[bottom] = (i + frac(v00, v10), Float64(j)))
-        b01 != b11 && (points[top] = (i + frac(v01, v11), Float64(j + 1)))
-        b00 != b01 && (points[left] = (Float64(i), j + frac(v00, v01)))
-        b10 != b11 && (points[right] = (Float64(i + 1), j + frac(v10, v11)))
-        crossed = [e for (e, c) in ((bottom, b00 != b10), (top, b01 != b11),
-                                    (left, b00 != b01), (right, b10 != b11)) if c]
-        if length(crossed) == 4
-            if inside((v00 + v10 + v01 + v11) / 4) == b00
-                connect(bottom, right)
-                connect(top, left)
-            else
-                connect(bottom, left)
-                connect(top, right)
+function pivot_step(x, y, buckets, r, p, centre)
+    px, py = x[p], y[p]
+    ux, uy = centre[1] - px, centre[2] - py
+    best_turn, best_q, best_centre = Inf, 0, centre
+    i0, j0 = floor(Int, px / 2r), floor(Int, py / 2r)
+    for i in i0-1:i0+1, j in j0-1:j0+1
+        bucket = get(buckets, (i, j), nothing)
+        bucket === nothing && continue
+        for q in bucket
+            q == p && continue
+            dx, dy = x[q] - px, y[q] - py
+            span = dx * dx + dy * dy
+            (span < 1e-24 || span > 4r * r) && continue
+            out = sqrt(max(r * r / span - 0.25, 0.0))
+            mx, my = dx / 2, dy / 2
+            ox, oy = -dy * out, dx * out
+            for (vx, vy) in ((mx + ox, my + oy), (mx - ox, my - oy))
+                (vx - ux)^2 + (vy - uy)^2 < 1e-24 && continue
+                turn = turn_measure(ux * vy - uy * vx, ux * vx + uy * vy)
+                (turn < 1e-9 || turn >= best_turn) && continue
+                best_turn, best_q, best_centre = turn, q, (px + vx, py + vy)
             end
-        else
-            connect(crossed[1], crossed[2])
         end
     end
-    visited = Set{NTuple{3,Int}}()
-    loops = Vector{Vector{NTuple{2,Float64}}}()
-    for start in keys(links)
-        start in visited && continue
-        loop = NTuple{2,Float64}[]
-        prev, current = start, start
-        closed = false
-        while true
-            push!(visited, current)
-            push!(loop, points[current])
-            nbrs = links[current]
-            length(nbrs) == 2 || break
-            prev, current = current, (nbrs[1] == prev ? nbrs[2] : nbrs[1])
-            current == start && (closed = true; break)
-        end
-        closed && push!(loops, loop)
-    end
-    return loops
+    best_q == 0 && return nothing
+    return best_q, best_centre
 end
 
 """
-    grid_sampler(field, x0, y0, cell) -> f(px, py)
+    push_arc!(px, py, cx, cy, radius, from, sweep)
 
-Bilinear interpolant of `field` at physical points; node `(i, j)` sits at
-`(x0 + (i-1)*cell, y0 + (j-1)*cell)`. Queries are clamped to the grid.
+Append the arc about `(cx, cy)` that starts at angle `from` and turns by the signed
+angle `sweep`, endpoints included, stepped fine enough to stay within `1e-6` of the
+true arc. A zero radius appends the centre once.
 """
-function grid_sampler(field::Matrix{Float64}, x0, y0, cell)
-    nx, ny = size(field)
-    return function (px, py)
-        gi = clamp((px - x0) / cell + 1, 1.0, nx - 1e-9)
-        gj = clamp((py - y0) / cell + 1, 1.0, ny - 1e-9)
-        i, j = floor(Int, gi), floor(Int, gj)
-        ti, tj = gi - i, gj - j
-        return (field[i, j] * (1 - ti) + field[i+1, j] * ti) * (1 - tj) +
-               (field[i, j+1] * (1 - ti) + field[i+1, j+1] * ti) * tj
+function push_arc!(px, py, cx, cy, radius, from, sweep)
+    steps = radius < 1e-12 ? 0 :
+            clamp(ceil(Int, abs(sweep) / sqrt(8e-6 / radius)), 1, 400)
+    for k in 0:steps
+        angle = from + sweep * k / max(steps, 1)
+        push!(px, cx + radius * cos(angle))
+        push!(py, cy + radius * sin(angle))
     end
+    return nothing
+end
+
+"""
+    edge_normal(ax, ay, bx, by) -> Float64
+
+Angle of the outward normal of the wrap edge running from `(ax, ay)` to `(bx, by)`,
+which [`pivot_contour`](@ref) traces with the cloud on its left.
+"""
+edge_normal(ax, ay, bx, by) = atan(ax - bx, by - ay)
+
+"""
+    pivot_contour(x, y, r, clearance) -> (px, py)
+
+Trace the alpha shape of the cloud `(x, y)` for alpha `r`, offset outward by
+`clearance`, as a closed polyline. A disk of radius `r` is pivoted around the outside
+of the cloud from its leftmost point; the points it touches are the polygon's
+vertices in order, the ones inside a concavity narrower than the disk having been
+skipped and bridged straight. The offset rounds each convex vertex with an arc of
+radius `clearance` and chamfers each reflex one across the bisector, so it holds that
+distance from every contact.
+"""
+function pivot_contour(x, y, r, clearance)
+    start = argmin(x)
+    buckets = point_buckets(x, y, 2r)
+    contacts, centres = Int[], NTuple{2,Float64}[]
+    p, centre = start, (x[start] - r, y[start])
+    # A single-membrane stretch is touched once from each side, so the cycle closes on
+    # the (point, centre) pair rather than on the point alone.
+    for _ in 1:4*length(x)+100
+        step = pivot_step(x, y, buckets, r, p, centre)
+        step === nothing && break
+        next, centre = step
+        !isempty(contacts) && p == contacts[1] &&
+            hypot(centre[1] - centres[1][1], centre[2] - centres[1][2]) < 1e-12 &&
+            break
+        push!(contacts, p)
+        push!(centres, centre)
+        p = next
+    end
+    px, py = Float64[], Float64[]
+    n = length(contacts)
+    n < 3 && return px, py
+    tail = contacts[n]
+    from = edge_normal(x[tail], y[tail], x[contacts[1]], y[contacts[1]])
+    for k in 1:n
+        i, j = contacts[k], contacts[mod1(k + 1, n)]
+        to = edge_normal(x[i], y[i], x[j], y[j])
+        turn = rem(to - from, 2pi, RoundNearest)
+        if turn >= 0
+            push_arc!(px, py, x[i], y[i], clearance, from, turn)
+        else
+            push!(px, x[i] + clearance * cos(from + turn / 2))
+            push!(py, y[i] + clearance * sin(from + turn / 2))
+        end
+        from = to
+    end
+    return px, py
 end
 
 """
@@ -243,39 +219,78 @@ function largest_linking_gap(x, y)
 end
 
 """
-    smooth_turning!(turn) -> turn
+    smoothed_curvature(node_arclength, turn, band) -> Vector{Float64}
 
-Diffuse the per-node turning-angle density along the contour (in place). A sharp
-corner — e.g. a deflected section's hinge, rounded to `clearance` — otherwise dumps
-its whole turn into one node, and the curvature-weighted resampling then collapses a
-few panels to near-zero length, which XFoil's viscous solver cannot handle. Spreading
-the turn over a short band refines a group of panels gradually instead, the way
-XFoil's `PANGEN` bunches panels on a *smoothed* curvature. The total turn is
-conserved, so leading-edge clustering is preserved.
+Turning per unit arclength at each node, averaged over a window of length `band`
+centred on it. Averaging over a length leaves the measure independent of how densely
+the trace happens to be stepped, which varies by a factor of several between the
+`clearance` arcs and the straight edges between them.
 """
-function smooth_turning!(turn)
+function smoothed_curvature(node_arclength, turn, band)
     m = length(turn)
-    m < 3 && return turn
-    for _ in 1:40
-        prev = turn[1]
-        for k in 2:m-1
-            cur = turn[k]
-            turn[k] = 0.25 * prev + 0.5 * cur + 0.25 * turn[k+1]
-            prev = cur
+    cumulative_turn = cumsum(turn)
+    density = zeros(m)
+    lo, hi = 1, 1
+    for k in 1:m
+        while lo < m && node_arclength[lo] < node_arclength[k] - band / 2
+            lo += 1
         end
+        while hi < m && node_arclength[hi+1] <= node_arclength[k] + band / 2
+            hi += 1
+        end
+        span = node_arclength[hi] - node_arclength[lo]
+        density[k] = span > 0 ?
+            (cumulative_turn[hi] - cumulative_turn[lo] + turn[lo]) / span : 0.0
     end
-    return turn
+    return density
 end
 
 """
-    resample_arc(ax, ay, n, curvature_weight) -> (x, y)
+    enforce_min_spacing!(stations, floor_length) -> stations
+
+Push the sampling `stations` apart until no gap is shorter than `floor_length`, taking
+the room out of the gaps that have it to spare so the first and last station stay put.
+`floor_length` is capped at the mean gap, which a uniform spacing already meets.
+"""
+function enforce_min_spacing!(stations, floor_length)
+    n = length(stations)
+    n < 3 && return stations
+    gap = diff(stations)
+    total = sum(gap)
+    finish = stations[n]
+    floor_length = min(floor_length, total / (n - 1))
+    for _ in 1:20
+        deficit = sum(max(0.0, floor_length - g) for g in gap)
+        deficit <= 1e-15 * total && break
+        spare = sum(max(0.0, g - floor_length) for g in gap)
+        spare <= 0 && break
+        shrink = 1 - min(deficit / spare, 1.0)
+        for k in eachindex(gap)
+            gap[k] = gap[k] < floor_length ? floor_length :
+                     floor_length + (gap[k] - floor_length) * shrink
+        end
+    end
+    gap .*= total / sum(gap)
+    for k in 2:n
+        stations[k] = stations[k-1] + gap[k-1]
+    end
+    stations[n] = finish
+    return stations
+end
+
+"""
+    resample_arc(ax, ay, n, curvature_weight; min_panel_fraction=0.25) -> (x, y)
 
 Resample the polyline `(ax, ay)` at `n` stations cosine-clustered in a measure that
 blends arclength with `curvature_weight` extra length per radian of turning, so both
 ends attract points and sharp features are resolved by several panels regardless of
-their size (like XFoil's curvature-attracted paneling). Endpoints are preserved.
+their size (like XFoil's curvature-attracted paneling). The turning is taken as a
+curvature density smoothed over a few panel lengths ([`smoothed_curvature`](@ref)), so
+the measure grows smoothly and neighbouring panels stay comparable in length. No panel
+is left shorter than `min_panel_fraction` of the mean
+([`enforce_min_spacing!`](@ref)). Endpoints are preserved.
 """
-function resample_arc(ax, ay, n, curvature_weight)
+function resample_arc(ax, ay, n, curvature_weight; min_panel_fraction=0.25)
     m = length(ax)
     turn = zeros(m)
     for k in 2:m-1
@@ -283,14 +298,23 @@ function resample_arc(ax, ay, n, curvature_weight)
         b = atan(ay[k+1] - ay[k], ax[k+1] - ax[k])
         turn[k] = abs(rem(b - a, 2pi, RoundNearest))
     end
-    smooth_turning!(turn)
+    node_arclength = zeros(m)
+    for k in 2:m
+        node_arclength[k] = node_arclength[k-1] +
+                            hypot(ax[k] - ax[k-1], ay[k] - ay[k-1])
+    end
+    curvature = smoothed_curvature(node_arclength, turn,
+                                   3 * node_arclength[end] / max(n - 1, 1))
     w = zeros(m)
     for k in 2:m
-        w[k] = w[k-1] + hypot(ax[k] - ax[k-1], ay[k] - ay[k-1]) +
-               curvature_weight * (turn[k-1] + turn[k]) / 2
+        segment = node_arclength[k] - node_arclength[k-1]
+        w[k] = w[k-1] + segment *
+               (1 + curvature_weight * (curvature[k-1] + curvature[k]) / 2)
     end
+    stations = w[end] .* (1 .- cos.(range(0.0, pi, n))) ./ 2
+    enforce_min_spacing!(stations, min_panel_fraction * w[end] / max(n - 1, 1))
     x_out, y_out = zeros(n), zeros(n)
-    for (k, t) in enumerate(w[end] .* (1 .- cos.(range(0.0, pi, n))) ./ 2)
+    for (k, t) in enumerate(stations)
         idx = clamp(searchsortedlast(w, t), 1, m - 1)
         f = clamp((t - w[idx]) / max(w[idx+1] - w[idx], eps()), 0.0, 1.0)
         x_out[k] = (1 - f) * ax[idx] + f * ax[idx+1]
@@ -303,85 +327,29 @@ end
     shrink_wrap(x, y, method::ShrinkWrap) -> (x, y)
 
 Wrap the point cloud `(x, y)` into a clean closed airfoil in Selig order (TE upper →
-LE → TE lower), following [`ShrinkWrap`](@ref): distance field on a `cell_size`
-grid, closing with the rolling ball (`min_concave_radius`), offset outward by
-`clearance`, traced as a single
-closed contour and resampled to cosine panels in a curvature-weighted arclength
-measure. The first and last point coincide at the
-trailing edge (the TE cap is part of the contour). The output stays in the
+LE → TE lower), following [`ShrinkWrap`](@ref): the rolling ball
+(`min_concave_radius`) is pivoted around the cloud, its contact side offset outward
+by `clearance` ([`pivot_contour`](@ref)), and the resulting arcs are resampled to
+cosine panels in a curvature-weighted arclength measure. The first and last point
+coincide at the
+trailing edge (the TE cap is part of the contour). A closed loop (first and last
+cloud points coincident) keeps its true `clearance`, so `clearance=0` hugs the input
+and leaves a sharp trailing edge sharp; an open single-membrane cloud is floored at
+`min_clearance`. The output stays in the
 normalized frame of the input cloud (chord slightly longer than 1, nose apex near
 `x = -clearance`) and is ready to write as a `.dat` or fit with
 [`LeastSquaresFit`](@ref).
 """
 function shrink_wrap(x, y, method::ShrinkWrap)
     xn, yn, _ = normalize_airfoil(collect(float.(x)), collect(float.(y)))
-    cell = method.cell_size
-    gap = max(method.clearance, cell)
+    closed = hypot(xn[end] - xn[1], yn[end] - yn[1]) < 0.02
+    gap = closed ? method.clearance : max(method.clearance, method.min_clearance)
     linking = largest_linking_gap(xn, yn)
-    ball = max(method.min_concave_radius, gap + 3cell,
-               1.5 * (linking^2 / 4 + gap^2) / (2gap))
-    pad = ball + 3cell
-    x0, y0 = -pad, minimum(yn) - pad
-    nx = ceil(Int, (1.0 + pad - x0) / cell) + 1
-    ny = ceil(Int, (maximum(yn) + pad - y0) / cell) + 1
-
-    far = Float64(nx^2 + ny^2)
-    field = fill(far, nx, ny)
-    for (px, py) in zip(xn, yn)
-        gi, gj = (px - x0) / cell + 1, (py - y0) / cell + 1
-        for i in (floor(Int, gi), floor(Int, gi) + 1),
-            j in (floor(Int, gj), floor(Int, gj) + 1)
-
-            (1 <= i <= nx && 1 <= j <= ny) || continue
-            field[i, j] = min(field[i, j], (gi - i)^2 + (gj - j)^2)
-        end
-    end
-    squared_distance_transform!(field)
-    cloud_dist = sqrt.(field) .* cell
-
-    outside = flood_outside(cloud_dist .<= ball)
-    depth = [outside[i, j] ? 0.0 : far for i in 1:nx, j in 1:ny]
-    squared_distance_transform!(depth)
-    depth .= sqrt.(depth) .* cell
-
-    loops = trace_level_set(depth, ball - gap)
-    isempty(loops) && error("ShrinkWrap traced no contour; the cloud may be too" *
-                            " sparse or thin for cell_size=$(cell).")
-    shoelace(loop) = abs(sum(p[1] * loop[mod1(k + 1, length(loop))][2] -
-                             loop[mod1(k + 1, length(loop))][1] * p[2]
-                             for (k, p) in enumerate(loop))) / 2
-    areas = shoelace.(loops)
-    main = loops[argmax(areas)]
-    if length(loops) > 1 && sort(areas)[end-1] > 0.01 * maximum(areas)
-        @warn "ShrinkWrap discarded a comparable secondary contour; increase" *
-              " min_concave_radius to bridge cloud gaps."
-    end
-    px = [x0 + (p[1] - 1) * cell for p in main]
-    py = [y0 + (p[2] - 1) * cell for p in main]
-
-    dist_at = grid_sampler(cloud_dist, x0, y0, cell)
-    keep_clear(cx, cy) = begin
-        d = dist_at(cx, cy)
-        d >= gap && return (cx, cy)
-        h = cell / 2
-        gx = (dist_at(cx + h, cy) - dist_at(cx - h, cy)) / cell
-        gy = (dist_at(cx, cy + h) - dist_at(cx, cy - h)) / cell
-        len = hypot(gx, gy)
-        len < 1e-9 && return (cx, cy)
-        return (cx + (gap - d) * gx / len, cy + (gap - d) * gy / len)
-    end
+    ball = max(method.min_concave_radius, 1.01 * linking / 2)
+    px, py = pivot_contour(xn, yn, ball, gap)
+    length(px) < 3 && error("ShrinkWrap traced no contour; the cloud may be too" *
+                            " sparse or thin to pivot a ball of $(ball) around.")
     m = length(px)
-    for pass in 0:20
-        ox, oy = copy(px), copy(py)
-        for k in 1:m
-            if pass > 0
-                a, b = mod1(k - 1, m), mod1(k + 1, m)
-                px[k] = ox[k] + 0.4 * (ox[a] - 2ox[k] + ox[b])
-                py[k] = oy[k] + 0.4 * (oy[a] - 2oy[k] + oy[b])
-            end
-            px[k], py[k] = keep_clear(px[k], py[k])
-        end
-    end
 
     anchor = argmax(px)
     px, py = circshift(px, 1 - anchor), circshift(py, 1 - anchor)

@@ -96,7 +96,7 @@ into clean cosine panels and fit [`LeastSquaresFit`](@ref) Kulfan parameters to 
 XFoil consumes the coordinates directly, NeuralFoil the Kulfan parameters.
 
 `flip_thickness_neg` folds a soft membrane about its lower surface for negative `delta`.
-The re-wrap uses zero clearance (it hugs the deflected shape at grid resolution);
+The re-wrap uses zero clearance (it hugs the deflected shape at `min_clearance`);
 the rolling-ball wrap bridges the crease with a `min_concave_radius` fillet instead
 of the overlapping panels that XFoil's own repaneling can hit there. The wrap runs
 for every `delta` including `0`, so all deflections share the same node count

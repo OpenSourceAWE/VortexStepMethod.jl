@@ -146,16 +146,18 @@ get_lower_upper
 turn_trailing_edge!
 ```
 
-### Shrink-wrap distance field
+### Shrink-wrap rolling ball
 ```@docs
-distance_parabolas!
-squared_distance_transform!
-grid_sampler
-flood_outside
-trace_level_set
+point_buckets
+turn_measure
+pivot_step
+push_arc!
+edge_normal
+pivot_contour
 largest_linking_gap
+enforce_min_spacing!
 resample_arc
-smooth_turning!
+smoothed_curvature
 ```
 
 ### NeuralFoil network
