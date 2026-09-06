@@ -47,13 +47,11 @@ end
     panel_axes(le_1, te_1, le_2, te_2, chord_weight=0.5, orient=1)
 
 Airfoil frame and size of the panel between two sections, as
-`(; x_airf, y_airf, z_airf, chord, width)`.
-
-`chord_weight` ([`panel_chord_weight`](@ref)) enters as an offset from the
-midpoint rather than as `w·p₁ + (1-w)·p₂`: the two are equal, but the offset form
-leaves a constant term to fold, which a symbolic consumer builds several times
-faster. `orient` is `±1`, flipping `y_airf`/`z_airf` so the frame does not depend
-on section ordering.
+`(; x_airf, y_airf, z_airf, chord, width)`. `x_airf` is chordwise, `y_airf` runs
+along the quarter-chord line the bound vortex sits on — not square to `x_airf` on
+a swept panel — and `z_airf` is `x_airf × y_airf` normalised. `chord_weight`
+([`panel_chord_weight`](@ref)) is section 1's share of the chord-direction blend;
+`orient` is `±1` and flips `y_airf` and `z_airf` together.
 """
 @inline function panel_axes(le_1, te_1, le_2, te_2, chord_weight=0.5, orient=1)
     lean = chord_weight - 0.5
@@ -63,7 +61,7 @@ on section ordering.
     width = smooth_norm(span_vec)
     x_airf = chord_vec ./ smooth_norm(chord_vec)
     y_airf = orient .* (span_vec ./ width)
-    z_cross = cross(x_airf, le_1 .- le_2)
+    z_cross = cross(x_airf, span_vec)
     z_airf = orient .* (z_cross ./ smooth_norm(z_cross))
     return (; x_airf, y_airf, z_airf,
             chord=panel_chord(le_1, te_1, le_2, te_2), width)

@@ -1,4 +1,5 @@
 using VortexStepMethod: Panel, Section, calculate_relative_alpha_and_relative_velocity, calculate_cl, calculate_cd_cm, reinit!, INVISCID, POLAR_VECTORS, MVec3
+using VortexStepMethod: panel_axes, panel_span_vector
 using Interpolations: linear_interpolation, Line
 using LinearAlgebra
 using Test
@@ -166,5 +167,41 @@ end
             @test isapprox(cd, expected_cd, rtol=1e-5)
             @test isapprox(cm, expected_cm, rtol=1e-5)
         end
+    end
+end
+
+@testset "Panel frame on a swept, twisted panel" begin
+    twist = deg2rad(35)
+    le_1 = [0.0, 0.0, 0.0]
+    te_1 = [2.0, 0.0, 0.0]
+    le_2 = [1.2, 1.0, 0.0]
+    te_2 = le_2 .+ 1.4 .* [cos(twist), 0.0, -sin(twist)]
+    axes = panel_axes(le_1, te_1, le_2, te_2)
+    span_vec = panel_span_vector(le_1, te_1, le_2, te_2)
+
+    leading_edge_normal = cross(axes.x_airf, le_1 .- le_2)
+    leading_edge_normal ./= norm(leading_edge_normal)
+    separation = rad2deg(acos(clamp(abs(dot(leading_edge_normal, axes.z_airf)), -1, 1)))
+
+    @testset "the geometry discriminates the two definitions" begin
+        @test separation > 5
+    end
+
+    @testset "the normal is square to the bound vortex and the chord" begin
+        @test abs(dot(axes.z_airf, span_vec)) < 1e-12
+        @test abs(dot(axes.z_airf, axes.y_airf)) < 1e-12
+        @test abs(dot(axes.z_airf, axes.x_airf)) < 1e-12
+    end
+
+    @testset "the frame closes as z = x cross y" begin
+        closure = cross(axes.x_airf, axes.y_airf)
+        @test isapprox(closure ./ norm(closure), axes.z_airf; atol=1e-12)
+    end
+
+    @testset "orient flips y and z together" begin
+        flipped = panel_axes(le_1, te_1, le_2, te_2, 0.5, -1)
+        @test isapprox(flipped.y_airf, -axes.y_airf; atol=1e-12)
+        @test isapprox(flipped.z_airf, -axes.z_airf; atol=1e-12)
+        @test isapprox(flipped.x_airf, axes.x_airf; atol=1e-12)
     end
 end

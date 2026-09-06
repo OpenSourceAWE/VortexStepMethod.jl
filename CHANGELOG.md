@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- `panel_axes` takes the panel normal from the quarter-chord step, so the frame
+  closes as `z_airf = x_airf × y_airf` and `z_airf` is square to the bound
+  vortex. `alpha` is measured against that normal, so `cl`, `cd` and `cm` were
+  wrong on panels whose two sections have differently-directed chords — twist,
+  sweep or dihedral, not taper alone.
+
 ## VortexStepMethod v4.3.1 2026-09-01
 
 ### Changed
