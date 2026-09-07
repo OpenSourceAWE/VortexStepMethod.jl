@@ -2,6 +2,28 @@
 
 ## Unreleased
 
+### Added
+
+- A wing's settings carry two optional blocks: `mesh:` (`MeshSettings` — the
+  `obj_file` the sections are sliced from, section count, leading-edge marching
+  resolution, the mesh-to-slicer rotation, tip standoff and shrink wrap) and
+  `airfoil:` (`AirfoilSettings` — the 2D backend, its transition settings, the α
+  and δ sweeps, the Reynolds reference and the table format). Both are optional,
+  so a settings file that names neither loads unchanged, and an unnamed `mesh:`
+  block slices and wraps exactly as an unconfigured `obj_to_yaml` call.
+- `airfoil_solver`, `alpha_range`, `delta_range`, `reynolds`, `rotation_matrix`,
+  `slice_args` and `preview_args` turn a block into the arguments `obj_to_yaml`,
+  the section solvers and the live polars already take, and `NeuralFoilSolver`,
+  `XFoilSolver`, `ShrinkWrap` and `LivePolarSettings` each take the block they are
+  configured by.
+- `solver: xfoil` selects the viscous panel code for a whole dataset from the
+  settings file, where the backend used to be a caller's hard-coded choice.
+- The live polars read the `model_size` and `n_crit` the tables were generated at
+  rather than their own defaults, so a wing is not re-solved in flight at
+  different transition settings than it was tabulated at.
+- Reynolds is stated once: `reynolds(set, wing)` takes the air from
+  `solver_settings` and the reference speed and chord from `airfoil:`.
+
 ### Fixed
 
 - `panel_axes` takes the panel normal from the quarter-chord step, so the frame
@@ -313,6 +335,19 @@
   `reduce(vcat, …)` over a generator, which was quadratic in the row count: ~21×
   faster on a 16 MB surface table (2.49 s → 0.12 s), benefiting every existing
   dataset.
+- `shrink_wrap` traces the rolling ball exactly — pivoting it around the cloud
+  and offsetting the polygon through the points it touches (`pivot_contour`) —
+  instead of thresholding and marching-squares-tracing a distance field, so
+  there is no grid resolution left to set. `ShrinkWrap`'s `cell_size` is
+  accordingly named `min_clearance`, still accepted under the old name, and
+  floors `clearance` only
+  for an open single-membrane cloud; a closed loop keeps its true `clearance`, so
+  `clearance=0` hugs the input and leaves its sharp trailing edge sharp. The wrap
+  sits at exactly `clearance` from the cloud instead of a cell over it, so a V3
+  canopy's aft strip comes out `2 * clearance` thick where the grid gave
+  `3.5 * cell_size`. `min_concave_radius` stops costing anything,
+  having padded the grid in both directions before: one V3 slice at radius 0.4
+  drops from 173 ms to 10 ms, and at the default radius from 15 ms to 3 ms.
 - `is_show=true` draws into a window named after the plot title instead of into
   whichever window the backend last used, so a script showing several plots gets
   one window each and re-running it redraws them in place. `show_plot` takes the
