@@ -26,7 +26,9 @@ import YAML
 using StructMapping
 
 # Export public interface
-export SolverSettings, VSMSettings, WingSettings
+export SolverSettings, VSMSettings, WingSettings, MeshSettings, AirfoilSettings
+export airfoil_solver, alpha_range, delta_range, reynolds, rotation_matrix
+export slice_args, preview_args
 export ObjWing, Section, Wing, refine!, reinit!
 export BodyAerodynamics
 export Solver, VSMSolution, linearize, solve, solve!, solve_base!, calc_forces!
@@ -438,6 +440,7 @@ include("plotting_helpers.jl")
 include("airfoil_aero/AirfoilAero.jl")
 include("obj_adapter/ObjAdapter.jl")
 include("surfplan_adapter/SurfplanAdapter.jl")
+include("settings_adapters.jl")
 
 include("precompile.jl")
 
