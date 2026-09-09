@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- `solve!(...; throw_on_fail=true)` throws a `SolveFailure` when the circulation
+  loop missed the solver's tolerances or the coefficients it assembled are not
+  finite — `ForwardDiff.Dual` partials included — so a caller that cannot use a
+  failed solve gets an exception rather than a `VSMSolution` it has to inspect.
+  The default is off: a post-stall solve that misses the tolerances still returns
+  its `solver_status == FAILURE` solution.
+
 ## VortexStepMethod v5.0.0 2026-09-07
 
 ### Added

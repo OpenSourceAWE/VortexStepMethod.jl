@@ -224,8 +224,31 @@ function Solver(body_aero, settings::VSMSettings)
 end
 
 """
+    SolveFailure(msg)
+
+Thrown by `solve!(...; throw_on_fail=true)` when the circulation loop missed the
+solver's tolerances, or when the coefficients it assembled are not finite.
+"""
+struct SolveFailure <: Exception
+    msg::String
+end
+
+Base.showerror(io::IO, failure::SolveFailure) = print(io, failure.msg)
+
+"""
+    finite_full(x) -> Bool
+
+`true` if `x` is finite. A `ForwardDiff.Dual` needs every partial finite too, so
+a non-finite *derivative* of a solve is caught as well as a non-finite value.
+"""
+finite_full(x::Real) = isfinite(x)
+finite_full(x::ForwardDiff.Dual) =
+    isfinite(ForwardDiff.value(x)) && all(isfinite, ForwardDiff.partials(x))
+
+"""
     solve!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=solver.sol.gamma_distribution; 
-          log=false, reference_point=solver.reference_point, moment_frac=0.1)
+          log=false, reference_point=solver.reference_point, moment_frac=0.1,
+          throw_on_fail=false)
 
 Main solving routine for the aerodynamic model. Reference point is in the kite body (KB) frame.
 This version is modifying the `solver.sol` struct and is faster than the `solve` function which returns
@@ -240,12 +263,16 @@ a dictionary.
 - log=false: If true, print the number of iterations and other info.
 - reference_point=solver.reference_point
 - moment_frac=0.1: X-coordinate of normalized panel around which the moment distribution should be calculated.
+- throw_on_fail=false: If true, throw a [`SolveFailure`](@ref) instead of returning a
+  solution that missed the solver's tolerances or carries a non-finite coefficient.
 
 # Returns
-The solution of type [`VSMSolution`](@ref)
+The solution of type [`VSMSolution`](@ref), whose `solver_status` is `FAILURE` when the
+circulation loop missed the solver's tolerances.
 """
 function solve!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics, gamma_distribution=solver.sol.gamma_distribution;
-        log=false, reference_point=solver.reference_point, moment_frac=0.1) where {P, U, T}
+        log=false, reference_point=solver.reference_point, moment_frac=0.1,
+        throw_on_fail=false) where {P, U, T}
 
     # calculate intermediate result
     solve_base!(solver, body_aero, gamma_distribution; log)
@@ -256,7 +283,13 @@ function solve!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics, gamma_dist
         solver.sol.gamma_distribution = gamma_new
     end
 
-    return calc_forces!(solver, body_aero; reference_point, moment_frac)
+    sol = calc_forces!(solver, body_aero; reference_point, moment_frac)
+    throw_on_fail || return sol
+    solver.lr.converged || throw(SolveFailure(
+        "VSM solve did not converge in $(solver.max_iterations) iterations."))
+    all(finite_full, sol.force_coeffs) && all(finite_full, sol.moment_coeffs) ||
+        throw(SolveFailure("VSM solve assembled non-finite coefficients."))
+    return sol
 end
 
 """

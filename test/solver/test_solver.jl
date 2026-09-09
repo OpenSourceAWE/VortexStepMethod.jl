@@ -197,3 +197,16 @@ end
     sol = solve!(solver_on, body_aero)
     @test all(isfinite, sol.gamma_distribution)
 end
+
+@testset "solve! reports a solve that missed the tolerances" begin
+    body_aero = BodyAerodynamics([poststall_wing])
+    solver = Solver(body_aero; solver_type=LOOP, aerodynamic_model_type=VSM,
+        max_iterations=1)
+    set_va!(body_aero, [10.0, 0.0, 0.0])
+
+    sol = solve!(solver, body_aero)
+    @test !solver.lr.converged
+    @test sol.solver_status == FAILURE
+
+    @test_throws SolveFailure solve!(solver, body_aero; throw_on_fail=true)
+end

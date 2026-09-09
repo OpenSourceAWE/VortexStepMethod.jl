@@ -19,6 +19,7 @@ local_lift_slope!
 apply_artificial_viscosity!
 frozen_wake!
 calc_forces!
+finite_full
 calculate_cl
 calculate_cd
 calculate_cm
