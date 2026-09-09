@@ -59,13 +59,13 @@ using Test
         ram_solver = Solver(ram_body;
             aerodynamic_model_type=VSM,
             is_with_artificial_damping=false,
-            rtol=1e-7,
+            rtol=1e-11,
             solver_type=LOOP,
             use_gamma_prev=false,
         )
 
         v_a = 15.0
-        aoa_rad = deg2rad(7.5)  # off-grid (grid is every 1°) to avoid piecewise-linear node discontinuities
+        aoa_rad = deg2rad(7.5)
         y_op = [zeros(4);
                 [cos(aoa_rad), 0.0, sin(aoa_rad)] * v_a;
                 zeros(3)]
@@ -80,11 +80,12 @@ using Test
             ram_solver, ram_body, y_op;
             theta_idxs=1:4, va_idxs=5:7, omega_idxs=8:10,
             aero_coeffs=true,
-            backend=AutoFiniteDiff(absstep=1e-5, relstep=1e-5))
+            # A wider step lets the secant span a knot of the polar's 5° alpha grid.
+            backend=AutoFiniteDiff(absstep=1e-8, relstep=1e-8))
         @test conv_fd
 
         @info "POLAR_MATRICES linearize jacobian norms" norm_fwd=norm(jac_fwd) norm_fd=norm(jac_fd)
         rel_err = maximum(abs.(jac_fwd .- jac_fd)) / maximum(abs, jac_fwd)
-        @test rel_err < 1e-3
+        @test rel_err < 1e-4
     end
 end
