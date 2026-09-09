@@ -1,5 +1,6 @@
 using VortexStepMethod
 using VortexStepMethod.AirfoilAero: lei_poly_coeffs
+using ForwardDiff
 using LinearAlgebra
 using Test
 if !@isdefined(test_data_path)
@@ -209,4 +210,16 @@ end
     @test sol.solver_status == FAILURE
 
     @test_throws SolveFailure solve!(solver, body_aero; throw_on_fail=true)
+    @test_throws "did not converge in 1 iterations" solve!(solver, body_aero;
+        throw_on_fail=true)
+
+    converged = Solver(body_aero; solver_type=LOOP, aerodynamic_model_type=VSM)
+    @test solve!(converged, body_aero; throw_on_fail=true) isa VSMSolution
+end
+
+@testset "finite_full sees a Dual's partials, not just its value" begin
+    @test VortexStepMethod.finite_full(1.0)
+    @test !VortexStepMethod.finite_full(NaN)
+    @test VortexStepMethod.finite_full(ForwardDiff.Dual(1.0, 2.0))
+    @test !VortexStepMethod.finite_full(ForwardDiff.Dual(1.0, Inf))
 end
