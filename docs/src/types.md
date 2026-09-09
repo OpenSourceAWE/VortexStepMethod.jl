@@ -50,4 +50,5 @@ BodyAerodynamics
 ```@docs
 Solver
 VSMSolution
+SolveFailure
 ```
