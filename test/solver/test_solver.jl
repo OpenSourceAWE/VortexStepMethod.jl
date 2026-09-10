@@ -71,6 +71,36 @@ end
     end
 end
 
+@testset "NONLIN converges past stall, where LOOP already did" begin
+    settings_file = create_temp_wing_settings(
+        "solver", "solver_test_wing.yaml";
+        alpha=5.0, beta=0.0, wind_speed=10.0,
+    )
+    try
+        settings = VSMSettings(settings_file)
+        wing = Wing(settings)
+        refine!(wing)
+        body_aero = BodyAerodynamics([wing])
+        va = [10.0, 0.0, 5.0]   # 26.6 deg angle of attack, past stall
+        nonlin = Solver(body_aero; solver_type=NONLIN, aerodynamic_model_type=VSM,
+            type_initial_gamma_distribution=ELLIPTIC)
+        loop = Solver(body_aero; solver_type=LOOP, aerodynamic_model_type=VSM,
+            type_initial_gamma_distribution=ELLIPTIC)
+
+        set_va!(body_aero, va)
+        sol_nonlin = solve!(nonlin, body_aero)
+        gamma_nonlin = copy(sol_nonlin.gamma_distribution)
+        set_va!(body_aero, va)
+        sol_loop = solve!(loop, body_aero)
+
+        @test sol_nonlin.solver_status == FEASIBLE
+        @test sol_loop.solver_status == FEASIBLE
+        @test isapprox(gamma_nonlin, sol_loop.gamma_distribution; rtol=1e-3)
+    finally
+        rm(settings_file; force=true)
+    end
+end
+
 calc_forces_allocs(solver, body_aero) =
     (calc_forces!(solver, body_aero); @allocated calc_forces!(solver, body_aero))
 

@@ -13,6 +13,11 @@
 
 ### Fixed
 
+- The `NONLIN` solver backtracks along each Newton step instead of always taking
+  it whole, so it converges past stall where the full step used to cycle: on the
+  `test/solver/solver_test_wing.yaml` wing at 26.6° it stopped 3.6% below `LOOP`'s
+  peak circulation and reported `FAILURE`, and now lands on the same distribution
+  with a fixed-point residual at machine precision.
 - `panel_axes` takes the panel normal from the quarter-chord step, so the frame
   closes as `z_airf = x_airf × y_airf` and `z_airf` is square to the bound
   vortex. `alpha` is measured against that normal, so `cl`, `cd` and `cm` were
