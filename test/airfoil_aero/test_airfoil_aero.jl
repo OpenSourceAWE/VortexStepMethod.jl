@@ -271,3 +271,20 @@ end
     cp(joinpath(weights_dir, "nn-medium.npz"), joinpath(partial, "nn-medium.npz"))
     @test_throws ErrorException load_neuralfoil_model("medium"; weights_dir=partial)
 end
+
+@testset "generate_airfoils fits the wrapped contour it is handed" begin
+    x_raw, y_raw = read_dat_coords(joinpath(@__DIR__, "data", "test_airfoil.dat"))
+    x_fit, y_fit = shrink_wrap(x_raw, y_raw, ShrinkWrap(clearance=0.0))
+    _, fitted_y = kulfan_to_coordinates(
+        fit_kulfan_parameters(x_fit, y_fit, LeastSquaresFit()))
+    out = mktempdir()
+    _, ok = generate_airfoils([(; id=1, x_fit, y_fit, x_raw, y_raw)], out;
+        Re=5e5, alpha_range=-2:2:2,
+        aero_solver=NeuralFoilSolver(model_size="medium"), verbose=false)
+    @test ok == [1]
+    _, written_y = read_dat_coords(joinpath(out, "airfoils", "1.dat"))
+    # A second shrink wrap inflates the section by its own clearance, 0.006, which is
+    # three orders of magnitude above the resampling error this tolerance allows.
+    @test maximum(abs, collect(extrema(written_y)) .-
+                       collect(extrema(fitted_y))) < 1e-4
+end
