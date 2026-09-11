@@ -80,7 +80,7 @@ using Test
             ram_solver, ram_body, y_op;
             theta_idxs=1:4, va_idxs=5:7, omega_idxs=8:10,
             aero_coeffs=true,
-            # A wider step lets the secant span a knot of the polar's 5° alpha grid.
+            # 1e-8 keeps the secant inside one cell of the polar's 5° alpha grid.
             backend=AutoFiniteDiff(absstep=1e-8, relstep=1e-8))
         @test conv_fd
 
