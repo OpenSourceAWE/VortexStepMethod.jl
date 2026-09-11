@@ -11,6 +11,14 @@
   The default is off: a post-stall solve that misses the tolerances still returns
   its `solver_status == FAILURE` solution.
 
+### Fixed
+
+- The `NONLIN` solver backtracks along each Newton step instead of always taking
+  it whole, so it converges past stall where the full step used to cycle: on the
+  `test/solver/solver_test_wing.yaml` wing at 26.6° it stopped 3.6% below `LOOP`'s
+  peak circulation and reported `FAILURE`, and now lands on the same distribution
+  with a fixed-point residual at machine precision.
+
 ## VortexStepMethod v5.0.0 2026-09-07
 
 ### Added
