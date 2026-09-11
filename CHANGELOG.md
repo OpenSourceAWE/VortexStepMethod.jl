@@ -11,6 +11,12 @@
   The default is off: a post-stall solve that misses the tolerances still returns
   its `solver_status == FAILURE` solution.
 
+### Changed
+
+- `linearize`'s `fd_absstep`/`fd_relstep`, the finite-difference step it takes
+  when handed `backend=nothing`, default to `1e-8` instead of `1e-3` — the
+  `sqrt(eps)` scale the `NONLIN` Newton Jacobian already perturbs by.
+
 ### Fixed
 
 - The `NONLIN` solver backtracks along each Newton step instead of always taking
