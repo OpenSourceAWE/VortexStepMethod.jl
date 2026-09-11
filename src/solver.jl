@@ -861,6 +861,10 @@ end
 
 Main iteration loop for calculating circulation distribution.
 
+The NONLIN solver is a Newton iteration on the fixed-point residual
+`F(gamma) - gamma` with a finite-difference Jacobian, backtracking along each step
+until it reduces the residual.
+
 When `solver.is_with_artificial_viscosity` is set, the LOOP solver replaces the
 explicit target `F(gamma)` with the implicit Li/Gaunaa solution
 `(I - diag(mu) L) gamma = F(gamma)` before relaxation, stabilizing post-stall
@@ -960,34 +964,44 @@ function gamma_loop!(
 
             _, _, info = LinearAlgebra.LAPACK.getrf!(jac, ipiv; check=false)
             info == 0 || break
+            residual_norm = maximum(abs, residual)
             LinearAlgebra.LAPACK.getrs!('N', jac, ipiv, residual)
 
-            max_step = 0.0
+            # Past stall the full Newton step overshoots into a cycle, so take the
+            # largest of 1, 1/2 ... 1/64 of it that brings the residual down.
+            step_fraction = 1.0
+            for _ in 1:7
+                @inbounds for i in 1:n_panels
+                    gamma_perturbed[i] = gamma_iter[i] - step_fraction * residual[i]
+                end
+                update_gamma_candidate!(
+                    residual_perturbed, gamma_perturbed, solver, panels, n_panels,
+                    AIC_x, AIC_y, AIC_z,
+                    velocity_view_x, velocity_view_y, velocity_view_z,
+                    va_array, induced_velocity_all, relative_velocity_array,
+                    y_airf_array, relative_velocity_crossz, v_acrossz_array,
+                    z_airf_array, x_airf_array,
+                    v_normal_array, v_tangential_array,
+                    va_magw_array, cl_dist, chord_array,
+                )
+                @inbounds for i in 1:n_panels
+                    residual_perturbed[i] -= gamma_perturbed[i]
+                end
+                maximum(abs, residual_perturbed) < residual_norm && break
+                step_fraction /= 2
+            end
+
+            max_step = maximum(abs, residual)
             ref = solver.tol_reference_error
             @inbounds for i in 1:n_panels
-                s = abs(residual[i])
-                s > max_step && (max_step = s)
-                gamma_iter[i] -= residual[i]
+                gamma_iter[i] = gamma_perturbed[i]
+                residual[i] = residual_perturbed[i]
                 g = abs(gamma_iter[i])
                 g > ref && (ref = g)
             end
             if max_step < solver.atol + solver.rtol * ref
                 solver.lr.converged = true
                 break
-            end
-
-            update_gamma_candidate!(
-                residual, gamma_iter, solver, panels, n_panels,
-                AIC_x, AIC_y, AIC_z,
-                velocity_view_x, velocity_view_y, velocity_view_z,
-                va_array, induced_velocity_all, relative_velocity_array,
-                y_airf_array, relative_velocity_crossz, v_acrossz_array,
-                z_airf_array, x_airf_array,
-                v_normal_array, v_tangential_array,
-                va_magw_array, cl_dist, chord_array,
-            )
-            @inbounds for i in 1:n_panels
-                residual[i] -= gamma_iter[i]
             end
         end
 
@@ -1240,8 +1254,8 @@ deflections (one per unrefined section), apparent wind `(vx, vy, vz)`, and angul
 `(ωx, ωy, ωz)` respectively.
 
 `backend` accepts any `DifferentiationInterface` backend; `AutoForwardDiff()` (the default)
-requires `solver_type=LOOP`. `fd_absstep`/`fd_relstep` are forwarded only when the backend is
-`AutoFiniteDiff`.
+requires `solver_type=LOOP`. `backend=nothing` builds an `AutoFiniteDiff` from the
+`fd_absstep`/`fd_relstep` steps, which no other backend reads.
 
 Returns `(jac, results, converged)` where `results` is `(F, M, moment_unrefined_dist...)` —
 or the corresponding coefficients when `aero_coeffs=true` — and `converged` is `false` (with a
@@ -1254,8 +1268,8 @@ function linearize(solver::Solver, body_aero::BodyAerodynamics, y::Vector{T};
         omega_idxs=nothing,
         aero_coeffs=false,
         backend = AutoForwardDiff(),
-        fd_absstep::Float64=1e-3,
-        fd_relstep::Float64=1e-3,
+        fd_absstep::Float64=1e-8,
+        fd_relstep::Float64=1e-8,
         kwargs...) where T
 
     !(length(body_aero.wings) == 1) && throw(ArgumentError("Linearization only works for a body_aero with one wing"))
