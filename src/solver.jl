@@ -115,7 +115,7 @@ Main solver structure for the Vortex Step Method.See also: [`solve`](@ref)
 - `aerodynamic_model_type`::Model = VSM: The model type, see: [`Model`](@ref)
 - density::Float64 = 1.225: Air density [kg/m³] 
 - `max_iterations`::Int64 = 1500
-- `rtol`::Float64 = 1e-5: relative error
+- `rtol`::Float64 = 1e-5: Relative tolerance on the fixed-point residual
 - `tol_reference_error`::Float64 = 0.001
 - `relaxation_factor`::Float64 = 0.03: Relaxation factor for convergence 
 
@@ -861,9 +861,10 @@ end
 
 Main iteration loop for calculating circulation distribution.
 
-The NONLIN solver is a Newton iteration on the fixed-point residual
-`F(gamma) - gamma` with a finite-difference Jacobian, backtracking along each step
-until it reduces the residual.
+Both solvers converge on the fixed-point residual `F(gamma) - gamma`, measured
+relative to the largest circulation: the LOOP solver takes under-relaxed steps
+towards `F(gamma)`, the NONLIN solver a Newton step with a finite-difference
+Jacobian, backtracked until it reduces the residual.
 
 When `solver.is_with_artificial_viscosity` is set, the LOOP solver replaces the
 explicit target `F(gamma)` with the implicit Li/Gaunaa solution
@@ -1085,9 +1086,10 @@ function gamma_loop!(
             abs_gamma_new .= abs.(solver.lr.gamma_new)
             reference_error = maximum(abs_gamma_new)
             reference_error = max(reference_error, solver.tol_reference_error)
+            # The relaxed step is `relaxation_factor` times the fixed-point residual.
             abs_gamma_new .= abs.(solver.lr.gamma_new .- gamma)
-            error = maximum(abs_gamma_new)
-            normalized_error = error / reference_error
+            residual = maximum(abs_gamma_new) / relaxation_factor
+            normalized_error = residual / reference_error
 
             @debug "Iteration: $i, normalized_error: $normalized_error"
 

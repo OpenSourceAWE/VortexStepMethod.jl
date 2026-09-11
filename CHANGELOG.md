@@ -18,6 +18,12 @@
   `test/solver/solver_test_wing.yaml` wing at 26.6° it stopped 3.6% below `LOOP`'s
   peak circulation and reported `FAILURE`, and now lands on the same distribution
   with a fixed-point residual at machine precision.
+- The `LOOP` solver tests convergence on the fixed-point residual instead of on
+  the under-relaxed step, so `rtol` is the tolerance it reads rather than
+  `rtol / relaxation_factor`. Every `LOOP` solve is now tighter by that factor —
+  33x at the defaults — which moves coefficients in the last few digits and costs
+  around 1.4x the iterations, and a solve that misses the tolerances is no longer
+  retried at a tolerance its first attempt would have passed.
 
 ## VortexStepMethod v5.0.0 2026-09-07
 
