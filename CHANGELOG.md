@@ -18,6 +18,12 @@
   `test/solver/solver_test_wing.yaml` wing at 26.6° it stopped 3.6% below `LOOP`'s
   peak circulation and reported `FAILURE`, and now lands on the same distribution
   with a fixed-point residual at machine precision.
+- A deflection the 2D solver returned no contour for is no longer written as an
+  all-`NaN` airfoil `.dat`: `write_section_aero` skips that column, so `isfile` stays
+  the honest test for a generated deflection. `read_section_aero` warns and returns
+  `nothing` for a contour that does not hold its `Cp` table's nodes, where it used to
+  read the `NaN`s back and interpolate a `NaN` airfoil shape at *every* deflection,
+  0° included.
 
 ## VortexStepMethod v5.0.0 2026-09-07
 
