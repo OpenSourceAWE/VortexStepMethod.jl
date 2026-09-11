@@ -24,23 +24,6 @@ using Test
 
 const makie_ext = Base.get_extension(VortexStepMethod, :VortexStepMethodMakieExt)
 
-# Helper to robustly delete files on platforms with occasional file locks
-safe_rm(path) = begin
-    if isfile(path)
-        try
-            rm(path; force=true)
-        catch
-            sleep(0.2)
-            try
-                rm(path; force=true)
-            catch
-                # last resort, ignore
-            end
-        end
-    end
-    nothing
-end
-
 global ram_wing = ram_air_matrix_wing(; n_panels=20, n_sections=4,
                           alpha_range=deg2rad.(-1:1.0:1),
                           delta_range=deg2rad.(-1:1.0:1))
@@ -72,7 +55,7 @@ function create_body_aero()
 end
 
 @testset "Plotting (Makie)" begin
-    save_dir = tempdir()
+    save_dir = mktempdir()
     body_aero = create_body_aero()
 
     fig = plot_geometry(
@@ -88,22 +71,10 @@ end
     @test_throws MethodError VortexStepMethod.show_plot(nothing)
     @test_nowarn VortexStepMethod.show_plot(fig)
 
-    @test isfile(joinpath(save_dir,
-                          "Rectangular_wing_geometry_angled_view.png"))
-    safe_rm(joinpath(save_dir,
-                     "Rectangular_wing_geometry_angled_view.png"))
-    @test isfile(joinpath(save_dir,
-                          "Rectangular_wing_geometry_front_view.png"))
-    safe_rm(joinpath(save_dir,
-                     "Rectangular_wing_geometry_front_view.png"))
-    @test isfile(joinpath(save_dir,
-                          "Rectangular_wing_geometry_side_view.png"))
-    safe_rm(joinpath(save_dir,
-                     "Rectangular_wing_geometry_side_view.png"))
-    @test isfile(joinpath(save_dir,
-                          "Rectangular_wing_geometry_top_view.png"))
-    safe_rm(joinpath(save_dir,
-                     "Rectangular_wing_geometry_top_view.png"))
+    for view_name in ("angled", "front", "side", "top")
+        @test isfile(joinpath(save_dir,
+                              "Rectangular_wing_geometry_$(view_name)_view.png"))
+    end
 
     # Initialize the solvers
     vsm_solver = Solver(body_aero; aerodynamic_model_type=VSM)
@@ -144,7 +115,6 @@ end
     )
     @test fig isa Figure
     @test isfile(joinpath(save_dir, "Rectangular_Wing_Polars.png"))
-    safe_rm(joinpath(save_dir, "Rectangular_Wing_Polars.png"))
 
     # Plot polars with CL vs CD (cl_over_cd=false)
     fig = plot_polars(
@@ -224,7 +194,7 @@ end
     )
     @test fig !== nothing
 
-    literature_csv = joinpath(tempdir(), "polar_literature_aoa.csv")
+    literature_csv = joinpath(save_dir, "polar_literature_aoa.csv")
     open(literature_csv, "w") do io
         write(io, "AOA,cl,cd,cs\n")
         write(io, "0.0,0.1,0.01,0.0\n")
@@ -232,20 +202,16 @@ end
         write(io, "10.0,0.9,0.04,0.02\n")
     end
 
-    try
-        fig = plot_polars(
-            Solver[],
-            BodyAerodynamics[],
-            ["Literature"],
-            literature_path_list=[literature_csv],
-            title="Literature AOA Header",
-            is_save=false,
-            is_show=false,
-        )
-        @test fig !== nothing
-    finally
-        safe_rm(literature_csv)
-    end
+    fig = plot_polars(
+        Solver[],
+        BodyAerodynamics[],
+        ["Literature"],
+        literature_path_list=[literature_csv],
+        title="Literature AOA Header",
+        is_save=false,
+        is_show=false,
+    )
+    @test fig !== nothing
 
     # Unit tests for shared extract_literature_polar_data
     using DelimitedFiles
@@ -285,7 +251,7 @@ end
         bad_data, "bad.csv")
 
     # CM coefficient extraction from literature data
-    cm_csv = tempname() * "_lit_cm.csv"
+    cm_csv = joinpath(save_dir, "lit_cm.csv")
     open(cm_csv, "w") do io_cm
         write(io_cm,
             "alpha,cl,cd,cs,cmx,cmy,cmz\n" *
@@ -298,10 +264,9 @@ end
     @test Float64.(cm_result.cmx) == [0.001, 0.004]
     @test Float64.(cm_result.cmy) == [0.002, 0.005]
     @test Float64.(cm_result.cmz) == [0.003, 0.006]
-    safe_rm(cm_csv)
 
     # angle_type="side_slip" literature loading
-    beta_csv = tempname() * "_lit_beta.csv"
+    beta_csv = joinpath(save_dir, "lit_beta.csv")
     open(beta_csv, "w") do io_beta
         write(io_beta,
             "alpha,beta,cl,cd,cs\n" *
@@ -312,10 +277,9 @@ end
         readdlm(beta_csv, ','), beta_csv;
         angle_type="side_slip")
     @test beta_result.polar_data[1] == [0.0, 5.0]
-    safe_rm(beta_csv)
 
     # Integration: literature CSV with AoA alias and no CS
-    lit_no_cs_path = tempname() * "_lit_no_cs.csv"
+    lit_no_cs_path = joinpath(save_dir, "lit_no_cs.csv")
     open(lit_no_cs_path, "w") do io_no_cs
         write(io_no_cs, "aoa,cl,cd\n0.0,0.10,0.010\n5.0,0.20,0.020\n")
     end
@@ -328,10 +292,9 @@ end
         is_show=false
     )
     @test fig_lit_no_cs !== nothing
-    safe_rm(lit_no_cs_path)
 
     # Integration: missing CD column should fail
-    lit_bad_path = tempname() * "_lit_bad.csv"
+    lit_bad_path = joinpath(save_dir, "lit_bad.csv")
     open(lit_bad_path, "w") do io_bad
         write(io_bad, "alpha,cl\n0.0,0.10\n5.0,0.20\n")
     end
@@ -343,10 +306,9 @@ end
         is_save=false,
         is_show=false
     )
-    safe_rm(lit_bad_path)
 
     # Test show_moments=true with literature data
-    cm_lit_path = tempname() * "_lit_moments.csv"
+    cm_lit_path = joinpath(save_dir, "lit_moments.csv")
     open(cm_lit_path, "w") do io_cm_lit
         write(io_cm_lit,
             "alpha,cl,cd,cs,cmx,cmy,cmz\n" *
@@ -363,10 +325,9 @@ end
         is_show=false
     )
     @test fig_moments !== nothing
-    safe_rm(cm_lit_path)
 
     # Test show_moments=false (default)
-    no_cm_path = tempname() * "_lit_no_cm.csv"
+    no_cm_path = joinpath(save_dir, "lit_no_cm.csv")
     open(no_cm_path, "w") do io_no_cm
         write(io_no_cm,
             "alpha,cl,cd\n" *
@@ -382,7 +343,6 @@ end
         is_show=false
     )
     @test fig_no_moments !== nothing
-    safe_rm(no_cm_path)
 
     # Tests for save_plot function
     @testset "_active_backend_prefers_vector_output" begin
@@ -410,60 +370,40 @@ end
     active_backend_prefers_vector_output =
         getfield(makie_ext, :_active_backend_prefers_vector_output)
 
-    save_test_dir = tempdir()
-    
-    # Test 1: save_plot with explicit data_type (".png")
-    VortexStepMethod.save_plot(fig, save_test_dir, "test_explicit_png", data_type=".png")
-    @test isfile(joinpath(save_test_dir, "test_explicit_png.png"))
-    safe_rm(joinpath(save_test_dir, "test_explicit_png.png"))
+    # Explicit data_type picks the extension.
+    VortexStepMethod.save_plot(fig, save_dir, "test_explicit_png", data_type=".png")
+    @test isfile(joinpath(save_dir, "test_explicit_png.png"))
 
-    # Test 2: save_plot with explicit data_type (".pdf")
-    VortexStepMethod.save_plot(fig, save_test_dir, "test_explicit_pdf", data_type=".pdf")
-    @test isfile(joinpath(save_test_dir, "test_explicit_pdf.pdf"))
-    safe_rm(joinpath(save_test_dir, "test_explicit_pdf.pdf"))
+    VortexStepMethod.save_plot(fig, save_dir, "test_explicit_pdf", data_type=".pdf")
+    @test isfile(joinpath(save_dir, "test_explicit_pdf.pdf"))
 
-    # Test 3: save_plot with data_type=nothing (backend-aware detection)
-    backend_aware_dir = mktempdir()
-    try
-        VortexStepMethod.save_plot(fig, backend_aware_dir, "test_backend_aware", data_type=nothing)
-        pdf_path = joinpath(backend_aware_dir, "test_backend_aware.pdf")
-        png_path = joinpath(backend_aware_dir, "test_backend_aware.png")
-        expected_ext = active_backend_prefers_vector_output(Makie) ? ".pdf" : ".png"
+    # data_type=nothing picks it from the active backend, and writes only that one.
+    VortexStepMethod.save_plot(fig, save_dir, "test_backend_aware", data_type=nothing)
+    pdf_path = joinpath(save_dir, "test_backend_aware.pdf")
+    png_path = joinpath(save_dir, "test_backend_aware.png")
+    expected_ext = active_backend_prefers_vector_output(Makie) ? ".pdf" : ".png"
+    @test xor(isfile(pdf_path), isfile(png_path))
+    @test isfile(joinpath(save_dir, "test_backend_aware" * expected_ext))
 
-        @test xor(isfile(pdf_path), isfile(png_path))
-        @test isfile(joinpath(backend_aware_dir, "test_backend_aware" * expected_ext))
-    finally
-        safe_rm(joinpath(backend_aware_dir, "test_backend_aware.pdf"))
-        safe_rm(joinpath(backend_aware_dir, "test_backend_aware.png"))
-        rm(backend_aware_dir; force=true, recursive=true)
+    # Spaces become underscores and percent signs become "pct" in the file name.
+    VortexStepMethod.save_plot(fig, save_dir, "test with spaces", data_type=".png")
+    @test isfile(joinpath(save_dir, "test_with_spaces.png"))
 
-        # Test 4: save_plot with title containing spaces (should be sanitized to underscores)
-        VortexStepMethod.save_plot(fig, save_test_dir, "test with spaces", data_type=".png")
-        @test isfile(joinpath(save_test_dir, "test_with_spaces.png"))
-        safe_rm(joinpath(save_test_dir, "test_with_spaces.png"))
+    VortexStepMethod.save_plot(fig, save_dir, "test%efficiency", data_type=".png")
+    @test isfile(joinpath(save_dir, "testpctefficiency.png"))
 
-        # Test 5: save_plot with title containing percent signs (should be sanitized to "pct")
-        VortexStepMethod.save_plot(fig, save_test_dir, "test%efficiency", data_type=".png")
-        @test isfile(joinpath(save_test_dir, "testpctefficiency.png"))
-        safe_rm(joinpath(save_test_dir, "testpctefficiency.png"))
+    VortexStepMethod.save_plot(fig, save_dir, "test %efficiency metric", data_type=".png")
+    @test isfile(joinpath(save_dir, "test_pctefficiency_metric.png"))
 
-        # Test 6: save_plot with title containing both spaces and percent signs
-        VortexStepMethod.save_plot(fig, save_test_dir, "test %efficiency metric", data_type=".png")
-        @test isfile(joinpath(save_test_dir, "test_pctefficiency_metric.png"))
-        safe_rm(joinpath(save_test_dir, "test_pctefficiency_metric.png"))
+    # A save_path that does not exist yet is created.
+    nested_dir = joinpath(save_dir, "nested_save_plot_dir")
+    @test !isdir(nested_dir)
+    VortexStepMethod.save_plot(fig, nested_dir, "test_nested_dir", data_type=".png")
+    @test isdir(nested_dir)
+    @test isfile(joinpath(nested_dir, "test_nested_dir.png"))
 
-        # Test 7: save_plot creates directory if it doesn't exist
-        nested_dir = joinpath(save_test_dir, "nested_save_plot_dir")
-        !isdir(nested_dir) && @test !isdir(nested_dir)
-        VortexStepMethod.save_plot(fig, nested_dir, "test_nested_dir", data_type=".png")
-        @test isdir(nested_dir)
-        @test isfile(joinpath(nested_dir, "test_nested_dir.png"))
-        safe_rm(joinpath(nested_dir, "test_nested_dir.png"))
-        rm(nested_dir; force=true)
-
-        # Test 8: save_plot raises error when save_path is nothing
-        @test_throws ArgumentError VortexStepMethod.save_plot(fig, nothing, "test_title", data_type=".png")
-    end
+    @test_throws ArgumentError VortexStepMethod.save_plot(fig, nothing, "test_title",
+                                                          data_type=".png")
 end
 
 """

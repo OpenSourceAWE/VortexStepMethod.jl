@@ -6,14 +6,9 @@ using YAML
 using Logging
 
 @testset "load_polar_data Function Tests" begin
-    # Setup temporary files for testing
-    test_csv_path = joinpath(tempdir(), "test_polar.csv")
-    
-    # Clean up function
-    function cleanup_test_files()
-        isfile(test_csv_path) && rm(test_csv_path; force=true)
-    end
-    
+    work_dir = mktempdir()
+    test_csv_path = joinpath(work_dir, "test_polar.csv")
+
     @testset "Valid CSV File" begin
         # Create a valid CSV file with polar data
         csv_content = """alpha,cl,cd,cm
@@ -72,7 +67,7 @@ using Logging
     end
     
     @testset "Missing File" begin
-        nonexistent_path = joinpath(tempdir(), "nonexistent.csv")
+        nonexistent_path = joinpath(work_dir, "nonexistent.csv")
         aero_data, aero_model = suppress_warnings(() -> load_polar_data(nonexistent_path))
         
         @test aero_model == INVISCID
@@ -120,7 +115,4 @@ using Logging
         @test aero_model == INVISCID
         @test aero_data === nothing
     end
-    
-    # Cleanup after all tests
-    cleanup_test_files()
 end
