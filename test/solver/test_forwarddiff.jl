@@ -3,6 +3,8 @@ using DifferentiationInterface
 using LinearAlgebra
 using Test
 
+relative_error(jac, reference) = maximum(abs.(jac .- reference)) / maximum(abs, reference)
+
 @testset "ForwardDiff linearize" begin
     n_panels = 10
     span = 20.0
@@ -37,9 +39,8 @@ using Test
             backend=AutoFiniteDiff(absstep=1e-5, relstep=1e-5))
         @test fd_converged
 
-        @info "INVISCID linearize jacobian norms" norm_fwd=norm(jac_fwd) norm_fd=norm(jac_fd)
-        rel_err = maximum(abs.(jac_fwd .- jac_fd)) / maximum(abs, jac_fwd)
-        @test rel_err < 1e-3
+        @info "INVISCID jacobian norms" norm_fwd=norm(jac_fwd) norm_fd=norm(jac_fd)
+        @test relative_error(jac_fd, jac_fwd) < 1e-3
     end
 
     @testset "NONLIN+ForwardDiff is rejected" begin
@@ -79,13 +80,10 @@ using Test
         jac_fd, _, conv_fd = VortexStepMethod.linearize(
             ram_solver, ram_body, y_op;
             theta_idxs=1:4, va_idxs=5:7, omega_idxs=8:10,
-            aero_coeffs=true,
-            # A wider step lets the secant span a knot of the polar's 5° alpha grid.
-            backend=AutoFiniteDiff(absstep=1e-8, relstep=1e-8))
+            aero_coeffs=true, backend=nothing)
         @test conv_fd
 
-        @info "POLAR_MATRICES linearize jacobian norms" norm_fwd=norm(jac_fwd) norm_fd=norm(jac_fd)
-        rel_err = maximum(abs.(jac_fwd .- jac_fd)) / maximum(abs, jac_fwd)
-        @test rel_err < 1e-4
+        @info "POLAR_MATRICES jacobian norms" norm_fwd=norm(jac_fwd) norm_fd=norm(jac_fd)
+        @test relative_error(jac_fd, jac_fwd) < 1e-4
     end
 end

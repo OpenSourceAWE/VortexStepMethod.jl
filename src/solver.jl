@@ -1240,8 +1240,8 @@ deflections (one per unrefined section), apparent wind `(vx, vy, vz)`, and angul
 `(ωx, ωy, ωz)` respectively.
 
 `backend` accepts any `DifferentiationInterface` backend; `AutoForwardDiff()` (the default)
-requires `solver_type=LOOP`. `fd_absstep`/`fd_relstep` are forwarded only when the backend is
-`AutoFiniteDiff`.
+requires `solver_type=LOOP`. `backend=nothing` builds an `AutoFiniteDiff` from the
+`fd_absstep`/`fd_relstep` steps, which no other backend reads.
 
 Returns `(jac, results, converged)` where `results` is `(F, M, moment_unrefined_dist...)` —
 or the corresponding coefficients when `aero_coeffs=true` — and `converged` is `false` (with a
@@ -1254,8 +1254,8 @@ function linearize(solver::Solver, body_aero::BodyAerodynamics, y::Vector{T};
         omega_idxs=nothing,
         aero_coeffs=false,
         backend = AutoForwardDiff(),
-        fd_absstep::Float64=1e-3,
-        fd_relstep::Float64=1e-3,
+        fd_absstep::Float64=1e-8,
+        fd_relstep::Float64=1e-8,
         kwargs...) where T
 
     !(length(body_aero.wings) == 1) && throw(ArgumentError("Linearization only works for a body_aero with one wing"))
