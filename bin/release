@@ -53,7 +53,7 @@ if [[ -z "$_version" ]]; then
     exit 1
 fi
 
-_changelog_version=$(awk '/^## / {for (i = 1; i <= NF; i++) if ($i ~ /^v[0-9]/) {print $i; exit}}' CHANGELOG.md)
+_changelog_version=$(awk '/^## / {for (i = 1; i <= NF; i++) if ($i ~ /^v[0-9]/) print $i; exit}' CHANGELOG.md)
 if [[ "$_changelog_version" != "v$_version" ]]; then
     echo "Version mismatch: Project.toml is $_version but CHANGELOG top is" \
          "$_changelog_version (expected v$_version)." >&2
