@@ -10,9 +10,9 @@ using Interpolations
 using Serialization
 
 @testset "Kite Geometry Tests" begin
-    # Test data
-    test_obj_path = joinpath(tempdir(), "test.obj")
-    test_dat_path = joinpath(tempdir(), "test.dat")
+    work_dir = mktempdir()
+    test_obj_path = joinpath(work_dir, "test.obj")
+    test_dat_path = joinpath(work_dir, "test.dat")
     
     @testset "OBJ File Reading" begin
         # Create minimal test OBJ file
@@ -90,7 +90,6 @@ using Serialization
         end
         
         # Create test airfoil data file
-        test_dat_path = joinpath(tempdir(), "test.dat")
         write(test_dat_path, "1.0 0.0\n0.0 0.0\n-1.0 0.0\n")
         
         # Create polar data
@@ -112,9 +111,9 @@ using Serialization
         cd_matrix[end] = NaN
         cm_matrix[end] = NaN
         
-        cl_polar_path = joinpath(tempdir(), test_dat_path[1:end-4] * "_cl_polar.csv")
-        cd_polar_path = joinpath(tempdir(), test_dat_path[1:end-4] * "_cd_polar.csv")
-        cm_polar_path = joinpath(tempdir(), test_dat_path[1:end-4] * "_cm_polar.csv")
+        cl_polar_path = test_dat_path[1:end-4] * "_cl_polar.csv"
+        cd_polar_path = test_dat_path[1:end-4] * "_cd_polar.csv"
+        cm_polar_path = test_dat_path[1:end-4] * "_cm_polar.csv"
         
         # Write matrices to CSV
         write_aero_matrix(cl_polar_path, cl_matrix, deg2rad.(alphas), deg2rad.(d_trailing_edge_angles), "C_l")
@@ -175,7 +174,4 @@ using Serialization
         # Rebuild against ram_air_matrix_wing() geometry once its numerics are set.
         @test_skip false
     end
-
-    rm(test_obj_path)
-    rm(test_dat_path)
 end

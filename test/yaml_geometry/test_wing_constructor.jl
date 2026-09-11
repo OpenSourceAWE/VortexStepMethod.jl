@@ -6,32 +6,19 @@ using YAML
 using Logging
 
 @testset "Wing Constructor Tests" begin
-    # Setup temporary files for testing
-    test_yaml_path = joinpath(tempdir(), "test_wing.yaml")
-    test_polar_dir = joinpath(tempdir(), "polars")
-    
-    # Clean up function
-    function cleanup_test_files()
-        test_dir = dirname(test_yaml_path)
-        for file in [test_yaml_path, 
-                     joinpath(test_dir, "standard_airfoil.csv"),
-                     joinpath(test_dir, "alternate_airfoil.csv")]
-            isfile(file) && rm(file; force=true)
-        end
-        isdir(test_polar_dir) && rm(test_polar_dir; recursive=true, force=true)
-    end
-    
-    # Create polar data directory and files
+    work_dir = mktempdir()
+    test_yaml_path = joinpath(work_dir, "test_wing.yaml")
+    test_polar_dir = joinpath(work_dir, "polars")
+
+    # The YAML files under test reach their polars both through `polars/<id>.csv`
+    # and by bare name beside the YAML, so each airfoil is copied to both places.
     mkpath(test_polar_dir)
-    
-    # Copy the actual polar files to the temp directory for tests that reference them
-    cp(test_data_path("yaml_geometry", "standard_airfoil.csv"), joinpath(test_polar_dir, "1.csv"); force=true)
-    cp(test_data_path("yaml_geometry", "alternate_airfoil.csv"), joinpath(test_polar_dir, "2.csv"); force=true)
-    
-    # Also copy them to the test directory itself for direct reference tests
-    test_dir = dirname(test_yaml_path)
-    cp(test_data_path("yaml_geometry", "standard_airfoil.csv"), joinpath(test_dir, "standard_airfoil.csv"); force=true)
-    cp(test_data_path("yaml_geometry", "alternate_airfoil.csv"), joinpath(test_dir, "alternate_airfoil.csv"); force=true)
+    for (airfoil, polar_name) in (("standard_airfoil.csv", "1.csv"),
+                                  ("alternate_airfoil.csv", "2.csv"))
+        source = test_data_path("yaml_geometry", airfoil)
+        cp(source, joinpath(test_polar_dir, polar_name))
+        cp(source, joinpath(work_dir, airfoil))
+    end
     
     @testset "Valid YAML Wing Construction" begin
         # Use the actual YAML file from the test data
@@ -156,7 +143,7 @@ wing_airfoils:
     
     @testset "Relative Path Resolution" begin
         # Test that relative paths in CSV files are resolved relative to YAML file
-        subdir = joinpath(tempdir(), "subtest")
+        subdir = joinpath(work_dir, "subtest")
         mkpath(subdir)
         
         # Copy the simple wing file to subdirectory
@@ -174,9 +161,6 @@ wing_airfoils:
         @test wing.unrefined_sections[1].aero_data isa Tuple
         @test wing.unrefined_sections[2].aero_model == POLAR_VECTORS
         @test wing.unrefined_sections[2].aero_data isa Tuple
-        
-        # Cleanup
-        rm(subdir; recursive=true)
     end
     
     @testset "Complex Wing Geometry" begin
@@ -275,7 +259,4 @@ wing_airfoils:
         @test standard_wing isa Wing
         @test length(standard_wing.unrefined_sections) == 2
     end
-    
-    # Cleanup after all tests
-    cleanup_test_files()
 end
