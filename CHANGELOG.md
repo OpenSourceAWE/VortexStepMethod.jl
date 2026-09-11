@@ -13,6 +13,11 @@
 
 ### Fixed
 
+- `plot_slices_3d` on a generated output directory draws the deflected contour for
+  every deflection that was generated, not just positive whole degrees. It built its
+  own `_d<degrees>.dat` filename tag instead of the `delta_suffix` one the files were
+  written under, which spells a minus sign `m` and a decimal point `p`, so
+  `delta=-10` or `delta=2.5` found no `.dat` and drew nothing.
 - The `NONLIN` solver backtracks along each Newton step instead of always taking
   it whole, so it converges past stall where the full step used to cycle: on the
   `test/solver/solver_test_wing.yaml` wing at 26.6° it stopped 3.6% below `LOOP`'s

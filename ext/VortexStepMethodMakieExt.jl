@@ -1601,8 +1601,7 @@ their written `.dat` airfoils — raw slice, wrap, and the `delta`-degree deform
 when it was generated — assembled for
 [`plot_slices_3d`](@ref VortexStepMethod.ObjAdapter.plot_slices_3d). Nothing is
 re-sliced or re-wrapped; only the Kulfan fits of the stored coordinates are
-recomputed (via
-`fit_pts`), exactly as the polar pipeline fits them.
+recomputed (via `fit_pts`), exactly as the polar pipeline fits them.
 """
 function generated_slices(out_dir, delta, fit_pts)
     geom = VortexStepMethod.YAML.load_file(joinpath(out_dir, "geometry.yaml"))
@@ -1611,9 +1610,8 @@ function generated_slices(out_dir, delta, fit_pts)
     les = [Float64.(r[2:4]) for r in rows]
     tes = [Float64.(r[5:7]) for r in rows]
     n = length(rows)
-    deg = round(float(delta); digits=1)
-    tag = "_d" * (deg == round(deg) ? string(Int(deg)) : string(deg)) * ".dat"
-    missing_deltas = String[]
+    tag = "_$(AirfoilAero.delta_suffix(deg2rad(delta))).dat"
+    missing_dats = String[]
     slices = map(1:n) do i
         id = rows[i][1]
         tangent = normalize(les[min(i + 1, n)] .- les[max(i - 1, 1)])
@@ -1631,16 +1629,16 @@ function generated_slices(out_dir, delta, fit_pts)
                 def3d = map_airfoil_3d(les[i], tes[i], tangent, xd, yd)
                 d2 = (; d2..., def=Point2f.(xd, yd), def_kulfan=fit_pts(xd, yd))
             else
-                push!(missing_deltas, basename(dpath))
+                push!(missing_dats, relpath(dpath, out_dir))
             end
         end
         (; centroid=Point3f((les[i] .+ tes[i]) ./ 2), label_y=les[i][2],
          cloud3d=map_airfoil_3d(les[i], tes[i], tangent, xr, yr),
          wrap3d=map_airfoil_3d(les[i], tes[i], tangent, xw, yw), def3d, d2)
     end
-    isempty(missing_deltas) ||
-        @warn "No generated .dat for delta=$(delta)° ($(join(missing_deltas, ", ")));" *
-              " generated deflections are named airfoils/<i>_d<degrees>.dat."
+    isempty(missing_dats) ||
+        @warn "No generated .dat for delta=$(delta)° in $out_dir: " *
+              join(missing_dats, ", ")
     return slices, reduce(hcat, les), reduce(hcat, tes)
 end
 

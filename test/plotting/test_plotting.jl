@@ -563,4 +563,18 @@ end
     ax_lw = Axis3(fig_lw[1, 1])
     @test_nowarn Makie.plot!(ax_lw, plain_body; border_linewidth=3.0)
 end
+
+@testset "generated_slices reads the deflected .dat under its generated name" begin
+    generated_slices = getfield(makie_ext, :generated_slices)
+    gen_dir, _ = ram_air_matrix_dir(; n_sections=4,
+        alpha_range=deg2rad.(-1:1.0:1), delta_range=deg2rad.(-1:1.0:1))
+    fit_pts(x, y) = Point2f.(x, y)
+
+    for delta in (-1.0, 1.0)
+        slices, _, _ = @test_nowarn generated_slices(gen_dir, delta, fit_pts)
+        @test all(s -> !isempty(s.d2.def), slices)
+        @test all(s -> s.def3d !== nothing, slices)
+    end
+end
+
 nothing
