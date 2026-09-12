@@ -26,8 +26,8 @@
   with a fixed-point residual at machine precision.
 - `plot_slices_3d` in audit mode no longer crashes when a generated deflection
   `.dat` holds no finite coordinates (an all-`NaN` contour from a deflection the
-  solver never converged): it warns and skips that overlay, as it already did
-  for a missing file.
+  2D solver converged at no angle): it skips that overlay and warns, naming the
+  file and whether it was blank or missing.
 
 ## VortexStepMethod v5.0.0 2026-09-07
 
