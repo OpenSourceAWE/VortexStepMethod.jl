@@ -17,7 +17,7 @@ jobs:
     name: Julia ${{ matrix.version }} - ${{ matrix.os }} - ${{ matrix.arch }} - ${{ github.event_name }}
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 40
+    timeout-minutes: 50
     strategy:
       fail-fast: false
       matrix:
@@ -26,19 +26,19 @@ jobs:
           - '1.12'
         os:
           - ubuntu-latest
-        build_is_production_build:
-          - true
         arch:
           - x64
         include:
+          # Merges into the ubuntu/1.12 combination rather than adding a job.
+          - os: ubuntu-latest
+            version: '1.12'
+            coverage: true
           - os: windows-latest
             arch: x64
             version: '1.12'
-            build_is_production_build: true
           - os: macOS-latest
             arch: aarch64
             version: '1.12'
-            build_is_production_build: true
     steps:
       - uses: actions/checkout@v7
       - uses: julia-actions/setup-julia@v3
@@ -50,64 +50,26 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y xvfb libgl1-mesa-dri
-      - uses: actions/cache@v6
-        env:
-          cache-name: cache-artifacts
-        with:
-          path: ~/.julia/artifacts
-          key: ${{ runner.os }}-test-${{ env.cache-name }}-${{ hashFiles('**/Project.toml') }}
-          restore-keys: |
-            ${{ runner.os }}-test-${{ env.cache-name }}-
-            ${{ runner.os }}-test-
-            ${{ runner.os }}-
+      - uses: julia-actions/cache@v2
       - uses: julia-actions/julia-buildpkg@v1
       - uses: julia-actions/julia-runtest@v1
         env:
-          BUILD_IS_PRODUCTION_BUILD: ${{ matrix.build_is_production_build }}
+          BUILD_IS_PRODUCTION_BUILD: true
           # Only Linux gets a virtual display, so runtests.jl skips the plotting tests
           # elsewhere. Julia 1.12.7 precompiles the whole test environment up front,
           # which loads GLMakie before that guard runs; keep it lazy off Linux.
           JULIA_PKG_PRECOMPILE_AUTO: ${{ runner.os == 'Linux' && '1' || '0' }}
         with:
-          coverage: false
+          coverage: ${{ matrix.coverage || false }}
           prefix: ${{ runner.os == 'Linux' && 'xvfb-run -a' || '' }}
-  test-with-code-coverage:
-    name: Julia ${{ matrix.julia_version }} - ${{ matrix.os }} - ${{ matrix.julia_arch }} - with code coverage
-    timeout-minutes: 50
-    strategy:
-      fail-fast: false
-      matrix:
-        julia_version:
-          - "1.11"
-          - "1.12"
-        julia_arch:
-          - x64
-        os:
-          - ubuntu-latest
-    runs-on: ${{ matrix.os }}
-    steps:
-    - uses: actions/checkout@v7
-    - uses: julia-actions/setup-julia@v3
-      with:
-        arch: ${{ matrix.julia_arch }}
-        version: ${{ matrix.julia_version }}
-    - name: Install display dependencies for GLMakie
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y xvfb libgl1-mesa-dri
-    - uses: julia-actions/cache@v2
-    - uses: julia-actions/julia-buildpkg@v1
-    - uses: julia-actions/julia-runtest@v1
-      env:
-        BUILD_IS_PRODUCTION_BUILD: false
-      with:
-        prefix: xvfb-run -a
-    - uses: julia-actions/julia-processcoverage@v1
-    - uses: codecov/codecov-action@v7
-      with:
-        token: ${{ secrets.CODECOV_TOKEN }}
-        files: lcov.info
-      continue-on-error: true
+      - uses: julia-actions/julia-processcoverage@v1
+        if: matrix.coverage
+      - uses: codecov/codecov-action@v7
+        if: matrix.coverage
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: lcov.info
+        continue-on-error: true
   docs:
     name: Documentation
     runs-on: ubuntu-latest

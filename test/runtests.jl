@@ -65,6 +65,8 @@ function include_selected_tests()
     should_run_test("airfoil_aero/test_live_polar.jl") && include("airfoil_aero/test_live_polar.jl")
     should_run_test("obj_adapter/test_obj_adapter.jl") && include("obj_adapter/test_obj_adapter.jl")
     should_run_test("surfplan/test_surfplan.jl") && include("surfplan/test_surfplan.jl")
+    # bin/release is a bash script, so only the unix runners can run it.
+    Sys.isunix() && should_run_test("bin/test_release.jl") && include("bin/test_release.jl")
     should_run_test("Aqua.jl") && include("Aqua.jl")
 end
 

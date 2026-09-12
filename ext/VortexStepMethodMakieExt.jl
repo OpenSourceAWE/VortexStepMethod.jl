@@ -1601,8 +1601,7 @@ their written `.dat` airfoils — raw slice, wrap, and the `delta`-degree deform
 when it was generated — assembled for
 [`plot_slices_3d`](@ref VortexStepMethod.ObjAdapter.plot_slices_3d). Nothing is
 re-sliced or re-wrapped; only the Kulfan fits of the stored coordinates are
-recomputed (via
-`fit_pts`), exactly as the polar pipeline fits them.
+recomputed (via `fit_pts`), exactly as the polar pipeline fits them.
 """
 function generated_slices(out_dir, delta, fit_pts)
     geom = VortexStepMethod.YAML.load_file(joinpath(out_dir, "geometry.yaml"))
@@ -1611,9 +1610,8 @@ function generated_slices(out_dir, delta, fit_pts)
     les = [Float64.(r[2:4]) for r in rows]
     tes = [Float64.(r[5:7]) for r in rows]
     n = length(rows)
-    deg = round(float(delta); digits=1)
-    tag = "_d" * (deg == round(deg) ? string(Int(deg)) : string(deg)) * ".dat"
-    missing_deltas = String[]
+    tag = "_$(AirfoilAero.delta_suffix(deg2rad(delta))).dat"
+    skipped_deltas = String[]
     slices = map(1:n) do i
         id = rows[i][1]
         tangent = normalize(les[min(i + 1, n)] .- les[max(i - 1, 1)])
@@ -1626,21 +1624,25 @@ function generated_slices(out_dir, delta, fit_pts)
         def3d = nothing
         if !iszero(delta)
             dpath = joinpath(out_dir, "airfoils", "$(id)$(tag)")
-            if isfile(dpath)
-                xd, yd = AirfoilAero.read_dat_coordinates(dpath)
+            found = isfile(dpath)
+            xd, yd = found ? AirfoilAero.read_dat_coordinates(dpath) :
+                     (Float64[], Float64[])
+            if isempty(xd)
+                push!(skipped_deltas, relpath(dpath, out_dir) *
+                      (found ? ": no finite coordinates" : ": no such file"))
+            else
                 def3d = map_airfoil_3d(les[i], tes[i], tangent, xd, yd)
                 d2 = (; d2..., def=Point2f.(xd, yd), def_kulfan=fit_pts(xd, yd))
-            else
-                push!(missing_deltas, basename(dpath))
             end
         end
         (; centroid=Point3f((les[i] .+ tes[i]) ./ 2), label_y=les[i][2],
          cloud3d=map_airfoil_3d(les[i], tes[i], tangent, xr, yr),
          wrap3d=map_airfoil_3d(les[i], tes[i], tangent, xw, yw), def3d, d2)
     end
-    isempty(missing_deltas) ||
-        @warn "No generated .dat for delta=$(delta)° ($(join(missing_deltas, ", ")));" *
-              " generated deflections are named airfoils/<i>_d<degrees>.dat."
+    isempty(skipped_deltas) ||
+        @warn "Skipping the delta=$(delta)° overlay in $out_dir for" *
+              " $(join(skipped_deltas, ", ")); a blank one is a deflection the 2D" *
+              " solver converged at no angle."
     return slices, reduce(hcat, les), reduce(hcat, tes)
 end
 
@@ -1673,8 +1675,9 @@ function ObjAdapter.plot_slices_3d(path::String; n_slices::Int=10, rotation=I,
         wrap_method=AirfoilAero.ShrinkWrap(), delta=0.0, crease_frac=0.75,
         obj_path=nothing, is_show::Bool=true)
     kulfan_pts(k) = Point2f.(AirfoilAero.kulfan_to_coordinates(k; n_points=150)...)
-    fit_pts(x, y) = kulfan_pts(AirfoilAero.fit_kulfan_parameters(
-        x, y, AirfoilAero.LeastSquaresFit()))
+    fit_pts(x, y) = isempty(x) ? Point2f[] :
+        kulfan_pts(AirfoilAero.fit_kulfan_parameters(
+            x, y, AirfoilAero.LeastSquaresFit()))
     mesh_path = isdir(path) ? obj_path : path
     vertices = faces = nothing
     if mesh_path !== nothing

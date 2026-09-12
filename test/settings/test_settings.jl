@@ -83,6 +83,26 @@ end
     @test_throws Exception VortexStepMethod.airfoil_settings(Dict("n_crt" => 4.0))
 end
 
+@testset "the documented settings file loads" begin
+    page = joinpath(dirname(dirname(@__DIR__)), "docs", "src", "settings.md")
+    lines = readlines(page)
+    opening = findfirst(==("```yaml"), lines)
+    closing = findnext(==("```"), lines, opening + 1)
+    path = tempname() * ".yaml"
+    write(path, join(lines[opening+1:closing-1], "\n"))
+
+    set = VSMSettings(path; data_prefix = false)
+    wing = set.wings[1]
+    @test rotation_matrix(wing.mesh) == [0 0 -1; -1 0 0; 0 1 0]
+    @test airfoil_solver(wing.airfoil) isa VortexStepMethod.AirfoilAero.XFoilSolver
+    @test set.solver_settings.n_panels == wing.n_panels
+
+    # a field added to either block is a field the page does not yet describe
+    block = VortexStepMethod.YAML.load_file(path)["wings"][1]
+    @test Set(Symbol.(keys(block["mesh"]))) == Set(fieldnames(MeshSettings))
+    @test Set(Symbol.(keys(block["airfoil"]))) == Set(fieldnames(AirfoilSettings))
+end
+
 @testset "an unnamed mesh block slices as an unconfigured call" begin
     vertices, faces = ObjAdapter.read_faces(joinpath(ram_air_dir,
                                                     "ram_air_kite_body.obj"))

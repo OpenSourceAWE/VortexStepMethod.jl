@@ -503,4 +503,44 @@ end
     ax_lw = Axis3(fig_lw[1, 1])
     @test_nowarn Makie.plot!(ax_lw, plain_body; border_linewidth=3.0)
 end
+
+@testset "generated_slices reads the deflected .dat under its generated name" begin
+    gen_dir, _ = ram_air_matrix_dir(; n_sections=4,
+        alpha_range=deg2rad.(-1:1.0:1), delta_range=deg2rad.(-1:1.0:1))
+    fit_pts(x, y) = Point2f.(x, y)
+
+    for delta in (-1.0, 1.0)
+        slices, _, _ = @test_nowarn makie_ext.generated_slices(gen_dir, delta, fit_pts)
+        @test all(s -> !isempty(s.d2.def), slices)
+        @test all(s -> s.def3d !== nothing, slices)
+    end
+end
+
+@testset "Audit slices (Makie)" begin
+    # An all-NaN deflected .dat reads as empty; here a header-only file stands in.
+    gen_dir, _ = ram_air_matrix_dir(; n_sections=4,
+        alpha_range=deg2rad.(-1:1.0:1), delta_range=deg2rad.(-1:1.0:1))
+    obj = joinpath(dirname(@__DIR__), "..", "data", "ram_air_kite",
+                   "ram_air_kite_body.obj")
+    audit_dir = joinpath(mktempdir(), "audit")
+    cp(gen_dir, audit_dir)
+    rows = YAML.load_file(joinpath(audit_dir, "geometry.yaml"))["wing_sections"]["data"]
+    d1 = joinpath(audit_dir, "airfoils", "$(rows[1][1])_d1.dat")
+    @test isfile(d1)
+    open(d1, "w") do io
+        println(io, "deflection")
+    end
+
+    slices, _, _ = @test_logs((:warn, r"no finite coordinates"), match_mode=:any,
+        makie_ext.generated_slices(audit_dir, 1.0, (x, y) -> Point2f[]))
+    skipped = first(slices)
+    @test skipped.def3d === nothing
+    @test isempty(skipped.d2.def)
+    @test isempty(skipped.d2.def_kulfan)
+    @test any(s -> s.def3d !== nothing, slices)
+
+    fig = VortexStepMethod.ObjAdapter.plot_slices_3d(
+        audit_dir; delta=1.0, obj_path=obj, is_show=false)
+    @test fig isa Figure
+end
 nothing
