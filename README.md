@@ -97,6 +97,8 @@ Three kinds of input data is needed:
 
 Wing geometry can also be loaded from YAML files or `.obj` files. See the examples for details.
 
+A whole run — the flight condition, each wing and the solver — is configured by a `vsm_settings.yaml`. See [The settings file](https://OpenSourceAWE.github.io/VortexStepMethod.jl/dev/settings/) for an annotated example.
+
 ### Example for defining the required input:
 ```julia
 

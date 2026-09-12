@@ -19,6 +19,7 @@ makedocs(;
         "Home" => "index.md",
         "How it works" => "explanation.md",
         "CAD mesh to model" => "airfoil_pipeline.md",
+        "Settings file" => "settings.md",
         "Examples" => "examples.md",
         "Exported Functions" => "functions.md",
         "Exported Types" => "types.md",
