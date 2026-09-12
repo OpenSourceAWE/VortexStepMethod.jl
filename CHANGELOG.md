@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- `plot_slices_3d` on a generated output directory draws the deflected contour for
+  every deflection that was generated, not just positive whole degrees. It built its
+  own `_d<degrees>.dat` filename tag instead of the `delta_suffix` one the files were
+  written under, which spells a minus sign `m` and a decimal point `p`, so
+  `delta=-10` or `delta=2.5` found no `.dat` and drew nothing.
+
 ## VortexStepMethod v5.1.0 2026-09-11
 
 ### Added
