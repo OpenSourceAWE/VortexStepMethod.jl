@@ -28,15 +28,17 @@ jobs:
           - ubuntu-latest
         arch:
           - x64
-        # macOS-aarch64 has no code of its own here and is the scarcest hosted pool,
-        # so pull requests get every entry but that one.
-        include: >-
-          ${{ github.event_name == 'pull_request'
-          && fromJSON('[{"os":"ubuntu-latest","version":"1.12","coverage":true},
-          {"os":"windows-latest","arch":"x64","version":"1.12"}]')
-          || fromJSON('[{"os":"ubuntu-latest","version":"1.12","coverage":true},
-          {"os":"windows-latest","arch":"x64","version":"1.12"},
-          {"os":"macOS-latest","arch":"aarch64","version":"1.12"}]') }}
+        include:
+          # Merges into the ubuntu/1.12 combination rather than adding a job.
+          - os: ubuntu-latest
+            version: '1.12'
+            coverage: true
+          - os: windows-latest
+            arch: x64
+            version: '1.12'
+          - os: macOS-latest
+            arch: aarch64
+            version: '1.12'
     steps:
       - uses: actions/checkout@v7
       - uses: julia-actions/setup-julia@v3
