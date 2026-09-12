@@ -283,8 +283,7 @@ end
         aero_solver=NeuralFoilSolver(model_size="medium"), verbose=false)
     @test ok == [1]
     _, written_y = read_dat_coords(joinpath(out, "airfoils", "1.dat"))
-    # A second shrink wrap inflates the section by its own clearance, 0.006, which is
-    # three orders of magnitude above the resampling error this tolerance allows.
+    # A second shrink wrap inflates the section by its clearance, 0.006 — 60x this bound.
     @test maximum(abs, collect(extrema(written_y)) .-
                        collect(extrema(fitted_y))) < 1e-4
 end
