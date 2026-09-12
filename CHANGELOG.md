@@ -11,6 +11,12 @@
   The default is off: a post-stall solve that misses the tolerances still returns
   its `solver_status == FAILURE` solution.
 
+### Changed
+
+- `linearize`'s `fd_absstep`/`fd_relstep`, the finite-difference step it takes
+  when handed `backend=nothing`, default to `1e-8` instead of `1e-3` — the
+  `sqrt(eps)` scale the `NONLIN` Newton Jacobian already perturbs by.
+
 ### Fixed
 
 - `generate_airfoils` fits the contour it is handed rather than shrink-wrapping it a
@@ -24,6 +30,10 @@
   `test/solver/solver_test_wing.yaml` wing at 26.6° it stopped 3.6% below `LOOP`'s
   peak circulation and reported `FAILURE`, and now lands on the same distribution
   with a fixed-point residual at machine precision.
+- `plot_slices_3d` in audit mode no longer crashes when a generated deflection
+  `.dat` holds no finite coordinates (an all-`NaN` contour from a deflection the
+  2D solver converged at no angle): it skips that overlay and warns, naming the
+  file and whether it was blank or missing.
 
 ## VortexStepMethod v5.0.0 2026-09-07
 
