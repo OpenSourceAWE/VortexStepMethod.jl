@@ -21,6 +21,11 @@
   `nothing` for a contour that does not hold its `Cp` table's nodes, where it used to
   read the `NaN`s back and interpolate a `NaN` airfoil shape at *every* deflection,
   0° included.
+- `panel_axes` takes the panel normal from the quarter-chord step, so the frame
+  closes as `z_airf = x_airf × y_airf` and `z_airf` is square to the bound
+  vortex. `alpha` is measured against that normal, so `cl`, `cd` and `cm` were
+  wrong on panels whose two sections have differently-directed chords — twist,
+  sweep or dihedral, not taper alone.
 
 ## VortexStepMethod v5.1.0 2026-09-11
 
