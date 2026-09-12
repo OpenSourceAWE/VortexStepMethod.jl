@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Fixed
+
+- `plot_slices_3d` on a generated output directory draws the deflected contour for
+  every deflection that was generated, not just positive whole degrees. It built its
+  own `_d<degrees>.dat` filename tag instead of the `delta_suffix` one the files were
+  written under, which spells a minus sign `m` and a decimal point `p`, so
+  `delta=-10` or `delta=2.5` found no `.dat` and drew nothing.
+
+## VortexStepMethod v5.1.0 2026-09-11
+
 ### Added
 
 - `solve!(...; throw_on_fail=true)` throws a `SolveFailure` when the circulation
@@ -19,16 +29,15 @@
 
 ### Fixed
 
-- `plot_slices_3d` on a generated output directory draws the deflected contour for
-  every deflection that was generated, not just positive whole degrees. It built its
-  own `_d<degrees>.dat` filename tag instead of the `delta_suffix` one the files were
-  written under, which spells a minus sign `m` and a decimal point `p`, so
-  `delta=-10` or `delta=2.5` found no `.dat` and drew nothing.
 - The `NONLIN` solver backtracks along each Newton step instead of always taking
   it whole, so it converges past stall where the full step used to cycle: on the
   `test/solver/solver_test_wing.yaml` wing at 26.6° it stopped 3.6% below `LOOP`'s
   peak circulation and reported `FAILURE`, and now lands on the same distribution
   with a fixed-point residual at machine precision.
+- `plot_slices_3d` in audit mode no longer crashes when a generated deflection
+  `.dat` holds no finite coordinates (an all-`NaN` contour from a deflection the
+  2D solver converged at no angle): it skips that overlay and warns, naming the
+  file and whether it was blank or missing.
 
 ## VortexStepMethod v5.0.0 2026-09-07
 
