@@ -30,6 +30,10 @@
   33x at the defaults — which moves coefficients in the last few digits and costs
   around 1.4x the iterations, and a solve that misses the tolerances is no longer
   retried at a tolerance its first attempt would have passed.
+- `plot_slices_3d` in audit mode no longer crashes when a generated deflection
+  `.dat` holds no finite coordinates (an all-`NaN` contour from a deflection the
+  2D solver converged at no angle): it skips that overlay and warns, naming the
+  file and whether it was blank or missing.
 
 ## VortexStepMethod v5.0.0 2026-09-07
 
