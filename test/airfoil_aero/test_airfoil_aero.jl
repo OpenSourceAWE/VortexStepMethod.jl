@@ -285,7 +285,7 @@ end
 end
 
 @testset "generate_airfoils fits the wrapped contour it is handed" begin
-    x_raw, y_raw = read_dat_coords(joinpath(@__DIR__, "data", "test_airfoil.dat"))
+    x_raw, y_raw = read_dat_coordinates(joinpath(@__DIR__, "data", "test_airfoil.dat"))
     x_fit, y_fit = shrink_wrap(x_raw, y_raw, ShrinkWrap(clearance=0.0))
     _, fitted_y = kulfan_to_coordinates(
         fit_kulfan_parameters(x_fit, y_fit, LeastSquaresFit()))
@@ -294,7 +294,7 @@ end
         Re=5e5, alpha_range=-2:2:2,
         aero_solver=NeuralFoilSolver(model_size="medium"), verbose=false)
     @test ok == [1]
-    _, written_y = read_dat_coords(joinpath(out, "airfoils", "1.dat"))
+    _, written_y = read_dat_coordinates(joinpath(out, "airfoils", "1.dat"))
     # A second shrink wrap inflates the section by its clearance, 0.006 — 60x this bound.
     @test maximum(abs, collect(extrema(written_y)) .-
                        collect(extrema(fitted_y))) < 1e-4
