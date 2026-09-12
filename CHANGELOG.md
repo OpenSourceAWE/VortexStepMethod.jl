@@ -15,6 +15,12 @@
   fit: on the SK100's 45 mesh sections nine came out with `.dat` coordinates at 1e2 to
   1e4 instead of 0..1, and any consumer mapping the mesh onto a structure rejected the
   geometry.
+- A deflection the 2D solver returned no contour for is no longer written as an
+  all-`NaN` airfoil `.dat`: `write_section_aero` skips that column, so `isfile` stays
+  the honest test for a generated deflection. `read_section_aero` warns and returns
+  `nothing` for a contour that does not hold its `Cp` table's nodes, where it used to
+  read the `NaN`s back and interpolate a `NaN` airfoil shape at *every* deflection,
+  0° included.
 - `panel_axes` takes the panel normal from the quarter-chord step, so the frame
   closes as `z_airf = x_airf × y_airf` and `z_airf` is square to the bound
   vortex. `alpha` is measured against that normal, so `cl`, `cd` and `cm` were
