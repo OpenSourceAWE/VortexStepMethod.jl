@@ -1601,8 +1601,7 @@ their written `.dat` airfoils — raw slice, wrap, and the `delta`-degree deform
 when it was generated — assembled for
 [`plot_slices_3d`](@ref VortexStepMethod.ObjAdapter.plot_slices_3d). Nothing is
 re-sliced or re-wrapped; only the Kulfan fits of the stored coordinates are
-recomputed (via
-`fit_pts`), exactly as the polar pipeline fits them.
+recomputed (via `fit_pts`), exactly as the polar pipeline fits them.
 """
 function generated_slices(out_dir, delta, fit_pts)
     geom = VortexStepMethod.YAML.load_file(joinpath(out_dir, "geometry.yaml"))
@@ -1611,8 +1610,7 @@ function generated_slices(out_dir, delta, fit_pts)
     les = [Float64.(r[2:4]) for r in rows]
     tes = [Float64.(r[5:7]) for r in rows]
     n = length(rows)
-    deg = round(float(delta); digits=1)
-    tag = "_d" * (deg == round(deg) ? string(Int(deg)) : string(deg)) * ".dat"
+    tag = "_$(AirfoilAero.delta_suffix(deg2rad(delta))).dat"
     skipped_deltas = String[]
     slices = map(1:n) do i
         id = rows[i][1]
@@ -1630,7 +1628,7 @@ function generated_slices(out_dir, delta, fit_pts)
             xd, yd = found ? AirfoilAero.read_dat_coordinates(dpath) :
                      (Float64[], Float64[])
             if isempty(xd)
-                push!(skipped_deltas, basename(dpath) *
+                push!(skipped_deltas, relpath(dpath, out_dir) *
                       (found ? ": no finite coordinates" : ": no such file"))
             else
                 def3d = map_airfoil_3d(les[i], tes[i], tangent, xd, yd)
@@ -1642,9 +1640,8 @@ function generated_slices(out_dir, delta, fit_pts)
          wrap3d=map_airfoil_3d(les[i], tes[i], tangent, xw, yw), def3d, d2)
     end
     isempty(skipped_deltas) ||
-        @warn "Skipping the delta=$(delta)° overlay for" *
-              " $(join(skipped_deltas, ", ")); generated deflections are named" *
-              " airfoils/<i>_d<degrees>.dat, and a blank one is a deflection the 2D" *
+        @warn "Skipping the delta=$(delta)° overlay in $out_dir for" *
+              " $(join(skipped_deltas, ", ")); a blank one is a deflection the 2D" *
               " solver converged at no angle."
     return slices, reduce(hcat, les), reduce(hcat, tes)
 end

@@ -101,6 +101,45 @@ end
     end
 end
 
+"""
+    unrelaxed_step(body_aero, gamma)
+
+One unrelaxed fixed-point step `F(gamma)` of the LOOP iteration, so that
+`F(gamma) - gamma` is the residual of `gamma`.
+"""
+function unrelaxed_step(body_aero, gamma)
+    # An infinite rtol accepts the single step, so solve_base! skips its retry.
+    probe = Solver(body_aero; solver_type=LOOP, aerodynamic_model_type=VSM,
+        relaxation_factor=1.0, max_iterations=1, rtol=Inf)
+    VortexStepMethod.solve_base!(probe, body_aero, gamma)
+    return copy(probe.lr.gamma_new)
+end
+
+@testset "LOOP converges on the residual, not on the relaxed step" begin
+    settings_file = create_temp_wing_settings(
+        "solver", "solver_test_wing.yaml";
+        alpha=5.0, beta=0.0, wind_speed=10.0,
+    )
+    try
+        settings = VSMSettings(settings_file)
+        wing = Wing(settings)
+        refine!(wing)
+        body_aero = BodyAerodynamics([wing])
+        solver = Solver(body_aero; solver_type=LOOP, aerodynamic_model_type=VSM,
+            type_initial_gamma_distribution=ELLIPTIC)
+
+        for va in ([10.0, 0.0, 0.0], [10.0, 0.0, 5.0])   # 0 deg, and 26.6 deg past stall
+            set_va!(body_aero, va)
+            gamma = copy(solve!(solver, body_aero).gamma_distribution)
+            @test solver.lr.converged
+            residual = maximum(abs, unrelaxed_step(body_aero, gamma) .- gamma)
+            @test residual < solver.rtol * maximum(abs, gamma)
+        end
+    finally
+        rm(settings_file; force=true)
+    end
+end
+
 calc_forces_allocs(solver, body_aero) =
     (calc_forces!(solver, body_aero); @allocated calc_forces!(solver, body_aero))
 
