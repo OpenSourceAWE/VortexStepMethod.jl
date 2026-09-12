@@ -1,27 +1,4 @@
 """
-    read_dat_coordinates(path) -> (x, y)
-
-Read airfoil coordinates from a Selig-format `.dat` file, skipping header and
-comment lines.
-"""
-function read_dat_coordinates(path::String)
-    x = Float64[]
-    y = Float64[]
-    for line in eachline(path)
-        s = strip(line)
-        (isempty(s) || !(isdigit(s[1]) || s[1] == '-' || s[1] == '.')) && continue
-        parts = split(s)
-        length(parts) >= 2 || continue
-        xp = tryparse(Float64, parts[1])
-        yp = tryparse(Float64, parts[2])
-        (xp === nothing || yp === nothing) && continue
-        push!(x, xp)
-        push!(y, yp)
-    end
-    return x, y
-end
-
-"""
     write_dat(filepath, name, x, y) -> filepath
 
 Write airfoil coordinates to a Selig-format `.dat` file.
