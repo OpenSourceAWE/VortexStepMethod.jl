@@ -29,6 +29,12 @@
 
 ### Fixed
 
+- `generate_airfoils` fits the contour it is handed rather than shrink-wrapping it a
+  second time. Both adapters wrap before they call, with the `wrap_method` their
+  settings name, so the second wrap discarded that setting and degenerated the Kulfan
+  fit: on the SK100's 45 mesh sections nine came out with `.dat` coordinates at 1e2 to
+  1e4 instead of 0..1, and any consumer mapping the mesh onto a structure rejected the
+  geometry.
 - The `NONLIN` solver backtracks along each Newton step instead of always taking
   it whole, so it converges past stall where the full step used to cycle: on the
   `test/solver/solver_test_wing.yaml` wing at 26.6° it stopped 3.6% below `LOOP`'s

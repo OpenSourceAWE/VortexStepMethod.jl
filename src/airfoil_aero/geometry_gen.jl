@@ -42,7 +42,8 @@ function generate_airfoils(airfoils, output_dir::String;
             alphas = deg2rad.(collect(Float64, alpha_range))
             deltas = isnothing(delta_range) ? [0.0] :
                 deg2rad.(collect(Float64, delta_range))
-            aero, sols = generate_airfoil_aero(aero_solver, af.x_fit, af.y_fit;
+            aero, sols = generate_airfoil_aero(aero_solver,
+                fit_kulfan_parameters(af.x_fit, af.y_fit, LeastSquaresFit());
                 alpha_range=alphas, delta_range=deltas,
                 reynolds_number=Float64(Re), crease_frac)
             clvals = collect(sol.cl for sol in sols[1])
