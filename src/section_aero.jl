@@ -118,21 +118,24 @@ function delta_suffix(delta)
 end
 
 """
-    read_dat(path) -> (x, y)
+    read_dat_coordinates(path) -> (x, y)
 
 Read Selig `.dat` airfoil coordinates (two whitespace-separated columns), skipping the
-name/header line and any non-numeric lines.
+name/header line, comments, and any row that is not a finite pair. The single `.dat`
+reader; [`write_dat`](@ref VortexStepMethod.AirfoilAero.write_dat) is its writer.
 """
-function read_dat(path::AbstractString)
+function read_dat_coordinates(path::AbstractString)
     x = Float64[]
     y = Float64[]
-    for ln in eachline(String(path))
-        p = split(strip(ln))
-        length(p) >= 2 || continue
-        xv, yv = tryparse(Float64, p[1]), tryparse(Float64, p[2])
-        (xv === nothing || yv === nothing) && continue
-        push!(x, xv)
-        push!(y, yv)
+    for line in eachline(String(path))
+        fields = split(strip(line))
+        length(fields) >= 2 || continue
+        xp = tryparse(Float64, fields[1])
+        yp = tryparse(Float64, fields[2])
+        (xp === nothing || yp === nothing) && continue
+        (isfinite(xp) && isfinite(yp)) || continue
+        push!(x, xp)
+        push!(y, yp)
     end
     return x, y
 end
@@ -212,10 +215,11 @@ convert_node_table(src::AbstractString, dst::AbstractString) =
     read_section_aero(dat_file, cp_file, cf_file) -> Union{Nothing, SectionAero}
 
 Assemble a [`SectionAero`](@ref) from the human-readable files: the airfoil contour
-(`dat_file`, plus `{stem}_{delta_suffix(δ)}.dat` per non-zero deflection) and the per-node `Cp`
-and `cf` tables in the `.dat` node order, CSV or Arrow as their suffix says (see
-[`read_node_table`](@ref)). Returns `nothing` if any file is missing. This is the single
-loader for both provided and generated aero.
+(`dat_file`, plus `{stem}_{delta_suffix(δ)}.dat` per non-zero deflection) and the
+per-node `Cp` and `cf` tables in the `.dat` node order, CSV or Arrow as their suffix
+says (see [`read_node_table`](@ref)). Returns `nothing` if one of the three named files
+is missing, and `nothing` with a warning if a contour does not hold exactly the tables'
+nodes. This is the single loader for both provided and generated aero.
 """
 function read_section_aero(dat_file::AbstractString, cp_file::AbstractString,
                            cf_file::AbstractString)
@@ -229,8 +233,13 @@ function read_section_aero(dat_file::AbstractString, cp_file::AbstractString,
     x = fill(NaN, n_node, length(delta_range))
     y = fill(NaN, n_node, length(delta_range))
     for (jd, d) in enumerate(delta_range)
-        xd, yd = read_dat(iszero(d) ? String(dat_file) :
-                          "$(stem)_$(delta_suffix(d)).dat")
+        contour = iszero(d) ? String(dat_file) : "$(stem)_$(delta_suffix(d)).dat"
+        xd, yd = isfile(contour) ? read_dat_coordinates(contour) : (Float64[], Float64[])
+        if length(xd) != n_node
+            @warn "$contour holds $(length(xd)) finite coordinates, not the $n_node " *
+                  "nodes of its Cp table; this airfoil gets no surface aero."
+            return nothing
+        end
         x[:, jd] .= xd
         y[:, jd] .= yd
     end

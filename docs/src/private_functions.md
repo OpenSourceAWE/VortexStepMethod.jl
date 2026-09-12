@@ -116,7 +116,7 @@ window_alpha
 assemble_polar_matrix
 load_matrix_polar_data
 read_aero_matrix
-read_dat
+read_dat_coordinates
 read_node_table
 write_node_rows
 convert_node_table
@@ -203,7 +203,6 @@ sigmoid
 create_2d_polars
 lei_poly_coeffs
 resolve_airfoil
-read_dat_coordinates
 write_dat
 write_polar_csv
 write_polar_matrix_csv

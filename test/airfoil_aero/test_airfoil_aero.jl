@@ -14,17 +14,6 @@ seg_dist(px, py, ax, ay, bx, by) = begin
     hypot(px - (ax + t * vx), py - (ay + t * vy))
 end
 
-read_dat_coords(path) = begin
-    x = Float64[]; y = Float64[]
-    for ln in eachline(path)
-        s = strip(ln)
-        (isempty(s) || !(isdigit(s[1]) || s[1] == '-' || s[1] == '.')) && continue
-        p = split(s); length(p) >= 2 || continue
-        push!(x, parse(Float64, p[1])); push!(y, parse(Float64, p[2]))
-    end
-    x, y
-end
-
 @testset "Kulfan fit and NeuralFoil" begin
     @testset "Round-trip recovers known parameters" begin
         truth = KulfanParameters(fill(0.2, 8), fill(-0.2, 8), 0.0, 0.0)
@@ -37,7 +26,7 @@ end
     end
 
     dat = joinpath(@__DIR__, "data", "test_airfoil.dat")
-    xr, yr = read_dat_coords(dat)
+    xr, yr = read_dat_coordinates(dat)
     params = fit_kulfan_parameters(xr, yr)
 
     @testset "Fit matches aerosandbox get_kulfan_parameters" begin
@@ -165,6 +154,29 @@ end
     @test_throws ArgumentError write_section_aero(prefix, aero; table_format=:parquet)
 end
 
+@testset "a deflection with no contour is neither written nor loaded as NaN" begin
+    alpha_range = deg2rad.([-5.0, 0.0, 5.0])
+    delta_range = deg2rad.([0.0, 1.0])
+    xc = [1.0, 0.5, 0.0, 0.5, 1.0]
+    yc = [0.0, 0.06, 0.0, -0.04, 0.0]
+    n_node = length(xc)
+    cp = [float(100i + 10ia + jd) for i in 1:n_node,
+          ia in eachindex(alpha_range), jd in eachindex(delta_range)]
+    aero = SectionAero(alpha_range, delta_range, hcat(xc, fill(NaN, n_node)),
+                       hcat(yc, fill(NaN, n_node)), cp, cp ./ 1000)
+
+    prefix = joinpath(mktempdir(), "af")
+    dat, cp_csv, cf_csv = write_section_aero(prefix, aero)
+    deflected = "$(prefix)_d1.dat"
+    @test !isfile(deflected)
+    @test isapprox(first(read_dat_coordinates(dat)), xc; atol=1e-6)
+    @test (@test_logs (:warn,) read_section_aero(dat, cp_csv, cf_csv)) === nothing
+
+    write_dat(deflected, "section", fill(NaN, n_node), fill(NaN, n_node))
+    @test isempty(first(read_dat_coordinates(deflected)))
+    @test (@test_logs (:warn,) read_section_aero(dat, cp_csv, cf_csv)) === nothing
+end
+
 @testset "generate_section_aero builds a surface table" begin
     truth = KulfanParameters(fill(0.15, 8), fill(-0.15, 8), 0.1, 0.0)
     alpha_range = deg2rad.(-4.0:2.0:4.0)
@@ -181,7 +193,7 @@ end
     _, _, cp_hi_a, _ = section_surface(aero, alpha_range[end], delta_range[1])
     @test maximum(abs.(cp_lo_a .- cp_hi_a)) > 0.1
 
-    xdat, ydat = read_dat_coords(joinpath(@__DIR__, "data", "test_airfoil.dat"))
+    xdat, ydat = read_dat_coordinates(joinpath(@__DIR__, "data", "test_airfoil.dat"))
     aero2 = generate_section_aero(NeuralFoilSolver(model_size="medium"), xdat, ydat;
         alpha_range, delta_range=deg2rad.([0.0, 5.0]), reynolds_number=5e5)
     @test aero2 isa SectionAero
@@ -237,7 +249,7 @@ end
 end
 
 @testset "generate_polar_from_coordinates POLAR_VECTORS sweep" begin
-    x, y = read_dat_coords(joinpath(@__DIR__, "data", "test_airfoil.dat"))
+    x, y = read_dat_coordinates(joinpath(@__DIR__, "data", "test_airfoil.dat"))
     csv = joinpath(mktempdir(), "polar.csv")
     sols = generate_polar_from_coordinates(x, y, csv;
         Re=5e5, alpha_range=-4:2:4, solver=NeuralFoilSolver(model_size="medium"))
@@ -249,7 +261,7 @@ end
 end
 
 @testset "turn_trailing_edge! legacy crease cleanup" begin
-    x, y = read_dat_coords(joinpath(@__DIR__, "data", "test_airfoil.dat"))
+    x, y = read_dat_coordinates(joinpath(@__DIR__, "data", "test_airfoil.dat"))
     crease_frac = 0.7
     for angle in (deg2rad(10.0), deg2rad(-10.0))
         xd, yd = collect(float.(x)), collect(float.(y))
@@ -273,7 +285,7 @@ end
 end
 
 @testset "generate_airfoils fits the wrapped contour it is handed" begin
-    x_raw, y_raw = read_dat_coords(joinpath(@__DIR__, "data", "test_airfoil.dat"))
+    x_raw, y_raw = read_dat_coordinates(joinpath(@__DIR__, "data", "test_airfoil.dat"))
     x_fit, y_fit = shrink_wrap(x_raw, y_raw, ShrinkWrap(clearance=0.0))
     _, fitted_y = kulfan_to_coordinates(
         fit_kulfan_parameters(x_fit, y_fit, LeastSquaresFit()))
@@ -282,7 +294,7 @@ end
         Re=5e5, alpha_range=-2:2:2,
         aero_solver=NeuralFoilSolver(model_size="medium"), verbose=false)
     @test ok == [1]
-    _, written_y = read_dat_coords(joinpath(out, "airfoils", "1.dat"))
+    _, written_y = read_dat_coordinates(joinpath(out, "airfoils", "1.dat"))
     # A second shrink wrap inflates the section by its clearance, 0.006 — 60x this bound.
     @test maximum(abs, collect(extrema(written_y)) .-
                        collect(extrema(fitted_y))) < 1e-4

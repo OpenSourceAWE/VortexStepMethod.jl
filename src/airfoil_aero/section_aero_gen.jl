@@ -119,7 +119,9 @@ end
 
 Write a [`SectionAero`](@ref) as human-readable files. The airfoil contours share
 `dat_prefix`: `{dat_prefix}.dat` (contour at `delta=0`) plus
-`{dat_prefix}_{delta_suffix(δ)}.dat` per non-zero deflection. The per-node `Cp`/`cf`
+`{dat_prefix}_{delta_suffix(δ)}.dat` per non-zero deflection. A deflection whose
+contour is all `NaN` is skipped, and `{dat_prefix}.dat` falls back to the first
+deflection that has one. The per-node `Cp`/`cf`
 tables share `table_prefix` (defaults to `dat_prefix`): `{table_prefix}_cp.{ext}` and
 `{table_prefix}_cf.{ext}`, where `ext` is `table_format`, either `:csv` (default,
 readable) or `:arrow` (binary, an order of magnitude faster to load). Pass a separate
@@ -134,15 +136,15 @@ function write_section_aero(dat_prefix::AbstractString, aero::SectionAero;
         throw(ArgumentError("table_format must be :csv or :arrow, got :$table_format"))
     mkpath(dirname(dat_prefix))
     mkpath(dirname(table_prefix))
+    finite(jd) = any(isfinite, view(aero.x, :, jd))
     for (jd, d) in enumerate(aero.delta_range)
-        iszero(d) && continue
+        (iszero(d) || !finite(jd)) && continue
         write_dat("$(dat_prefix)_$(delta_suffix(d)).dat", "section",
                   aero.x[:, jd], aero.y[:, jd])
     end
-    # never write `$dat_prefix.dat` all-NaN (read_dat_coordinates would drop it to empty)
-    finite(jd) = any(isfinite, view(aero.x, :, jd))
     jz = findfirst(iszero, aero.delta_range)
-    jdat = jz !== nothing && finite(jz) ? jz : findfirst(finite, eachindex(aero.delta_range))
+    jdat = jz !== nothing && finite(jz) ? jz :
+           findfirst(finite, eachindex(aero.delta_range))
     write_dat("$dat_prefix.dat", "section", aero.x[:, jdat], aero.y[:, jdat])
     cp_path = "$(table_prefix)_cp.$table_format"
     cf_path = "$(table_prefix)_cf.$table_format"
