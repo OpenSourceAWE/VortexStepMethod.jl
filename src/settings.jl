@@ -154,7 +154,7 @@ Solver configuration, used within [`VSMSettings`](@ref).
 - `solver_type`: `"LOOP"` or `"NONLIN"` (default `"LOOP"`)
 - `density`: Air density (kg/m^3) (default `1.225`)
 - `max_iterations`: Maximum solver iterations (default `1500`)
-- `rtol`: Relative tolerance (default `1e-5`)
+- `rtol`: Relative tolerance on the fixed-point residual (default `1e-5`)
 - `tol_reference_error`: Reference error tolerance
     (default `0.001`)
 - `relaxation_factor`: Convergence relaxation factor
@@ -187,7 +187,7 @@ Solver configuration, used within [`VSMSettings`](@ref).
     solver_type::String = "LOOP"    # type of solver
     density::Float64 = 1.225                # air density  [kg/m³] 
     max_iterations::Int64 = 1500
-    rtol::Float64 = 1e-5                    # relative error   [-]
+    rtol::Float64 = 1e-5                    # relative residual tolerance [-]
     tol_reference_error::Float64 = 0.001
     relaxation_factor::Float64 = 0.03       # relaxation factor for convergence
     artificial_damping::Bool = false        # whether to apply artificial damping

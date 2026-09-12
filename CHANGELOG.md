@@ -24,6 +24,12 @@
   `test/solver/solver_test_wing.yaml` wing at 26.6° it stopped 3.6% below `LOOP`'s
   peak circulation and reported `FAILURE`, and now lands on the same distribution
   with a fixed-point residual at machine precision.
+- The `LOOP` solver tests convergence on the fixed-point residual instead of on
+  the under-relaxed step, so `rtol` is the tolerance it reads rather than
+  `rtol / relaxation_factor`. Every `LOOP` solve is now tighter by that factor —
+  33x at the defaults — which moves coefficients in the last few digits and costs
+  around 1.4x the iterations, and a solve that misses the tolerances is no longer
+  retried at a tolerance its first attempt would have passed.
 - `plot_slices_3d` in audit mode no longer crashes when a generated deflection
   `.dat` holds no finite coordinates (an all-`NaN` contour from a deflection the
   2D solver converged at no angle): it skips that overlay and warns, naming the
