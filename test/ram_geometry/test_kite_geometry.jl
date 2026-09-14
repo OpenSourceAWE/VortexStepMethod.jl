@@ -188,7 +188,7 @@ using Serialization
 
         # The interpolations must be in the frame the sections are cut in: at the
         # centre they land on the centre section, not a centre-of-mass away from it.
-        le_points = [section.LE_point for section in wing.unrefined_sections]
+        le_points = [section.LE_point for section in wing.refined_sections]
         spacing = maximum(abs(le_points[i + 1][2] - le_points[i][2])
                           for i in 1:length(le_points) - 1)
         le_center = [wing.le_interp[i](0.0) for i in 1:3]
