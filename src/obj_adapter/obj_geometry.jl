@@ -370,3 +370,29 @@ function calc_inertia_y_rotation(I_b_tensor)
 end
 
 
+"""
+    seed_mesh_geometry!(wing, obj_path; mass=1.0)
+
+Fill the mesh-derived fields of a [`Wing`](@ref) built from `obj_path`: the
+`radius` and `gamma_tip` of the arc fitted through the mesh, the `le_interp`,
+`te_interp` and `area_interp` interpolations over that arc, the thin-shell
+`inertia_tensor` about the centre of mass for a wing of `mass` [kg], and
+`T_cad_body`, the centre of mass negated. Positions are in the mesh's own
+coordinates, the frame [`obj_to_yaml`](@ref) writes its sections in.
+"""
+function seed_mesh_geometry!(wing, obj_path; mass=1.0)
+    vertices, faces = read_faces(obj_path)
+    com = -center_to_com!(copy.(vertices), faces; prn=false)
+    circle_center_z, radius, gamma_tip = find_circle_center_and_radius(vertices)
+    le_interp, te_interp, area_interp =
+        create_interpolations(vertices, circle_center_z, radius, gamma_tip)
+    wing.mass = mass
+    wing.inertia_tensor = calculate_inertia_tensor(vertices, faces, mass, com)
+    wing.T_cad_body .= -com
+    wing.gamma_tip = gamma_tip
+    wing.radius = radius
+    wing.le_interp = le_interp
+    wing.te_interp = te_interp
+    wing.area_interp = area_interp
+    return wing
+end

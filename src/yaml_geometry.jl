@@ -443,6 +443,11 @@ polars; the default is `AirfoilAero.NeuralFoilSolver()`.
 
 By default (`remake=false`) an existing `geometry.yaml` in `output_dir` is reused,
 skipping the expensive polar generation. Set `remake=true` to force regeneration.
+
+The mesh-derived fields a wing loaded from YAML alone leaves empty — `gamma_tip`,
+`radius`, `le_interp`, `te_interp`, `area_interp`, `inertia_tensor` and
+`T_cad_body` — are filled from the mesh by
+[`ObjAdapter.seed_mesh_geometry!`](@ref).
 """
 function ObjWing(obj_path, dat_path=nothing;
                  n_panels::Int=56,
@@ -458,6 +463,7 @@ function ObjWing(obj_path, dat_path=nothing;
                  output_dir::String=mktempdir(),
                  crease_frac=0.75,
                  verbose::Bool=false)
+    (!endswith(obj_path, ".obj")) && (obj_path *= ".obj")
     yaml_path = joinpath(output_dir, "geometry.yaml")
     if remake || !isfile(yaml_path)
         n_sec = isnothing(n_sections) ? n_panels + 1 : n_sections
@@ -471,5 +477,7 @@ function ObjWing(obj_path, dat_path=nothing;
                                            crease_frac,
                                            verbose)
     end
-    return Wing(yaml_path; n_panels, spanwise_distribution, spanwise_direction, remove_nan)
+    wing = Wing(yaml_path; n_panels, spanwise_distribution, spanwise_direction,
+                remove_nan)
+    return ObjAdapter.seed_mesh_geometry!(wing, obj_path)
 end

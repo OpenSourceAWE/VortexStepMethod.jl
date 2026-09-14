@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- `ObjWing` fills the mesh-derived fields of the `Wing` it returns again:
+  `gamma_tip`, `radius`, `le_interp`, `te_interp`, `area_interp`,
+  `inertia_tensor` and `T_cad_body`. Building the wing through
+  `ObjAdapter.obj_to_yaml` + `Wing(yaml)` in v4.0.0 left all seven at their
+  empty defaults, so a caller reading the spanwise geometry off an OBJ wing —
+  `wing.le_interp[i](gamma)` is how a bridle is placed on one — hit
+  `nothing`, and the wing's inertia silently fell back to point masses. The
+  values are in the mesh's own coordinates, the frame `obj_to_yaml` cuts its
+  sections in, and `test/ram_geometry/test_kite_geometry.jl` asserts that.
+
 ## VortexStepMethod v5.1.1 2026-09-12
 
 ### Fixed

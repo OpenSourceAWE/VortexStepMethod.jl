@@ -167,11 +167,32 @@ using Serialization
         @test R_b_p2 ≈ I(3)
     end
 
-    @testset "Converted-wing construction and deformation" begin
-        # TODO: redesign. These previously tested ObjWing internals (radius,
-        # gamma_tip, UNCHANGED distribution, obj deform\!) that were dropped when
-        # ObjWing was replaced by convert-then-load (obj_to_matrix_yaml -> Wing).
-        # Rebuild against ram_air_matrix_wing() geometry once its numerics are set.
-        @test_skip false
+    @testset "ObjWing carries the mesh geometry its sections are cut from" begin
+        gen_dir, _ = ram_air_matrix_dir()
+        obj = joinpath(dirname(dirname(@__DIR__)), "data", "ram_air_kite",
+                       "ram_air_kite_body.obj")
+        wing = ObjWing(obj; n_panels=20, output_dir=gen_dir, verbose=false)
+
+        @test wing.gamma_tip > 0
+        @test wing.radius > 0
+        @test !isnothing(wing.le_interp)
+        @test !isnothing(wing.te_interp)
+        @test !isnothing(wing.area_interp)
+        @test wing.area_interp(wing.gamma_tip) > 0
+
+        vertices, faces = read_faces(obj)
+        com = -center_to_com!(vertices, faces)
+        @test wing.T_cad_body ≈ -com
+        @test wing.inertia_tensor ≈ wing.inertia_tensor'
+        @test all(>(0), diag(wing.inertia_tensor))
+
+        # The interpolations must be in the frame the sections are cut in: at the
+        # centre they land on the centre section, not a centre-of-mass away from it.
+        le_points = [section.LE_point for section in wing.unrefined_sections]
+        spacing = maximum(abs(le_points[i + 1][2] - le_points[i][2])
+                          for i in 1:length(le_points) - 1)
+        le_center = [wing.le_interp[i](0.0) for i in 1:3]
+        nearest = argmin(le_point -> abs(le_point[2] - le_center[2]), le_points)
+        @test norm(nearest - le_center) < spacing
     end
 end
