@@ -171,7 +171,8 @@ using Serialization
         gen_dir, _ = ram_air_matrix_dir()
         obj = joinpath(dirname(dirname(@__DIR__)), "data", "ram_air_kite",
                        "ram_air_kite_body.obj")
-        wing = ObjWing(obj; n_panels=20, output_dir=gen_dir, verbose=false)
+        wing = ObjWing(obj; n_panels=20, spanwise_distribution=LINEAR,
+                       output_dir=gen_dir, verbose=false)
 
         @test wing.gamma_tip > 0
         @test wing.radius > 0
