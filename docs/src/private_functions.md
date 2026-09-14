@@ -167,6 +167,14 @@ resample_arc
 smoothed_curvature
 ```
 
+### Section solver preconditions
+```@docs
+validate_xfoil_contour
+crossing_panels
+segments_cross
+side_of_line
+```
+
 ### NeuralFoil network
 ```@docs
 load_neuralfoil_model
