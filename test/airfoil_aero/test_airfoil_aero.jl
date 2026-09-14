@@ -4,7 +4,8 @@ import VortexStepMethod
 using VortexStepMethod.AirfoilAero: KulfanParameters, LeastSquaresFit, ShrinkWrap,
                        shrink_wrap, fit_kulfan_parameters, kulfan_to_coordinates,
                        neuralfoil_aero, class_function, bernstein_basis,
-                       leading_edge_basis, normalize_airfoil
+                       leading_edge_basis, normalize_airfoil, crossing_panels,
+                       DeformedSection, XFoilSolver, analyze_sweep, Xfoil
 using VortexStepMethod: SectionAero, section_surface, read_section_aero
 using VortexStepMethod.AirfoilAero: write_section_aero
 
@@ -298,4 +299,23 @@ end
     # A second shrink wrap inflates the section by its clearance, 0.006 — 60x this bound.
     @test maximum(abs, collect(extrema(written_y)) .-
                        collect(extrema(fitted_y))) < 1e-4
+end
+
+@testset "XFoil refuses a contour it has no solution for" begin
+    clean = KulfanParameters(fill(0.15, 8), fill(-0.15, 8), 0.0, 0.0)
+    x, y = collect.(kulfan_to_coordinates(clean; n_points=60))
+    alphas = deg2rad.([0.0])
+    @test isnothing(crossing_panels(x, y))
+
+    # the upper surface driven through the lower one over a stretch of the chord
+    folded = copy(y)
+    folded[20:40] .= -3 .* folded[20:40]
+    @test !isnothing(crossing_panels(x, folded))
+    @test_throws ArgumentError analyze_sweep(XFoilSolver(),
+        DeformedSection(clean, x, folded), alphas, 1e6)
+
+    crowded_x, crowded_y = collect.(kulfan_to_coordinates(clean; n_points=200))
+    @test length(crowded_x) > Xfoil.IQX - 5
+    @test_throws ArgumentError analyze_sweep(XFoilSolver(),
+        DeformedSection(clean, crowded_x, crowded_y), alphas, 1e6)
 end

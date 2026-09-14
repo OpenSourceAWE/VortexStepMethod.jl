@@ -117,6 +117,41 @@ function deform_section(x, y, delta; crease_frac=0.9, thickness_frac=1.0,
 end
 
 """
+    side_of_line(a, b, p) -> Float64
+
+Twice the signed area of the triangle `a`, `b`, `p`: positive with `p` left of the
+line from `a` to `b`, negative right of it, zero on it.
+"""
+side_of_line(a, b, p) = (b[1] - a[1]) * (p[2] - a[2]) - (b[2] - a[2]) * (p[1] - a[1])
+
+"""
+    segments_cross(p, q, r, s) -> Bool
+
+Whether the segments `p`-`q` and `r`-`s` cross properly, each strictly separating
+the other's endpoints. Touching at an endpoint or lying along each other does not
+count.
+"""
+segments_cross(p, q, r, s) =
+    side_of_line(p, q, r) * side_of_line(p, q, s) < 0 &&
+    side_of_line(r, s, p) * side_of_line(r, s, q) < 0
+
+"""
+    crossing_panels(x, y) -> Tuple{Int,Int} or nothing
+
+The first pair of non-neighbouring panels of the closed contour `(x, y)` that
+cross, or `nothing` when the contour is a simple closed curve.
+"""
+function crossing_panels(x, y)
+    nodes = collect(zip(x, y))
+    last_panel = length(nodes) - 1
+    for i in 1:last_panel, j in (i + 2):last_panel
+        i == 1 && j == last_panel && continue
+        segments_cross(nodes[i], nodes[i+1], nodes[j], nodes[j+1]) && return (i, j)
+    end
+    return nothing
+end
+
+"""
     analyze_sweep(solver, def, alpha_range, Re) -> Vector{SectionSolution}
 
 Analyse a deformed section over `alpha_range` (radians). Generic fallback maps
