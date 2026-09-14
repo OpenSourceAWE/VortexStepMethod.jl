@@ -13,6 +13,11 @@
   `nothing`, and the wing's inertia silently fell back to point masses. The
   values are in the mesh's own coordinates, the frame `obj_to_yaml` cuts its
   sections in, and `test/ram_geometry/test_kite_geometry.jl` asserts that.
+- `ObjWing` hands the `Wing` it builds the `crease_frac` it generated the polars
+  about, instead of leaving it at the default 0.75, and its
+  `spanwise_distribution` defaults to `LINEAR`. `UNCHANGED` keeps whatever
+  sections the geometry file carries, so asking for more panels than it has
+  sections threw a `BoundsError` out of `compute_refined_panel_mapping!`.
 
 ## VortexStepMethod v5.1.1 2026-09-12
 

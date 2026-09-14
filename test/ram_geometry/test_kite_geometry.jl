@@ -196,4 +196,16 @@ using Serialization
         nearest = argmin(le_point -> abs(le_point[2] - le_center[2]), le_points)
         @test norm(nearest - le_center) < spacing
     end
+
+    @testset "ObjWing panels a coarser cut and flies the crease it generated" begin
+        gen_dir, _ = ram_air_matrix_dir()   # four sections
+        obj = joinpath(dirname(dirname(@__DIR__)), "data", "ram_air_kite",
+                       "ram_air_kite_body.obj")
+        wing = ObjWing(obj; n_panels=20, crease_frac=0.82,
+                       output_dir=gen_dir, verbose=false)
+
+        @test wing.n_unrefined_sections == 4
+        @test length(wing.refined_sections) == 21
+        @test wing.crease_frac == 0.82
+    end
 end

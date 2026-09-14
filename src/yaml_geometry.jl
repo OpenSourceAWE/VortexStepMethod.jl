@@ -444,6 +444,11 @@ polars; the default is `AirfoilAero.NeuralFoilSolver()`.
 By default (`remake=false`) an existing `geometry.yaml` in `output_dir` is reused,
 skipping the expensive polar generation. Set `remake=true` to force regeneration.
 
+`spanwise_distribution` defaults to `LINEAR`, so a mesh cut into fewer sections
+than `n_panels + 1` is panelled into that many rather than kept as it is.
+`crease_frac` is the chordwise hinge the polars are deflected about, and the
+wing carries it.
+
 The mesh-derived fields a wing loaded from YAML alone leaves empty — `gamma_tip`,
 `radius`, `le_interp`, `te_interp`, `area_interp`, `inertia_tensor` and
 `T_cad_body` — are filled from the mesh by
@@ -456,7 +461,7 @@ function ObjWing(obj_path, dat_path=nothing;
                  delta_range=-5:1:20,
                  n_sections::Union{Nothing, Int}=nothing,
                  spanwise_direction=[0.0, 1.0, 0.0],
-                 spanwise_distribution=UNCHANGED,
+                 spanwise_distribution=LINEAR,
                  remove_nan::Bool=true,
                  aero_solver=AirfoilAero.NeuralFoilSolver(),
                  remake::Bool=false,
@@ -478,6 +483,6 @@ function ObjWing(obj_path, dat_path=nothing;
                                            verbose)
     end
     wing = Wing(yaml_path; n_panels, spanwise_distribution, spanwise_direction,
-                remove_nan)
+                remove_nan, crease_frac)
     return ObjAdapter.seed_mesh_geometry!(wing, obj_path)
 end
