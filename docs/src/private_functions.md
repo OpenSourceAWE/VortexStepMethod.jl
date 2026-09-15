@@ -246,6 +246,7 @@ find_circle_center_and_radius
 march_edges
 calculate_inertia_tensor
 center_to_com!
+seed_mesh_geometry!
 airfoils_from_yaml
 write_geometry_yaml
 resolve_aero_geometry

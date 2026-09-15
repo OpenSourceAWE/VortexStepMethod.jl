@@ -373,11 +373,11 @@ end
 """
     seed_mesh_geometry!(wing, obj_path; mass=1.0)
 
-Fill the mesh-derived fields of a [`Wing`](@ref) built from `obj_path`: the
-`radius` and `gamma_tip` of the arc fitted through the mesh, the `le_interp`,
-`te_interp` and `area_interp` interpolations over that arc, the thin-shell
-`inertia_tensor` about the centre of mass for a wing of `mass` [kg], and
-`T_cad_body`, the centre of mass negated. Positions are in the mesh's own
+Fill the mesh-derived fields of a [`Wing`](@ref VortexStepMethod.Wing) built from
+`obj_path`: the `radius` and `gamma_tip` of the arc fitted through the mesh, the
+`le_interp`, `te_interp` and `area_interp` interpolations over that arc, the
+thin-shell `inertia_tensor` about the centre of mass for a wing of `mass` [kg],
+and `T_cad_body`, the centre of mass negated. Positions are in the mesh's own
 coordinates, the frame [`obj_to_yaml`](@ref) writes its sections in.
 """
 function seed_mesh_geometry!(wing, obj_path; mass=1.0)
