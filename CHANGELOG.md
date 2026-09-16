@@ -6,6 +6,11 @@
 
 - Requires Julia 1.12 or 1.13; 1.10 and 1.11 keep resolving v5.1.1.
 
+### Fixed
+
+- The `VSMSolution` docstring gives `lift_dist`, `drag_dist` and `panel_moment_dist` in
+  the per-unit-span units they hold, [N/m] and [Nm/m], instead of [N] and [Nm].
+
 ## VortexStepMethod v5.1.1 2026-09-12
 
 ### Fixed
