@@ -8,6 +8,7 @@ Main structure for calculating aerodynamic properties of bodies. Use the constru
 - wings::Vector{W}: A vector of wings of type `W <: AbstractWing`; a body can have multiple wings
 - `va::MVec3` = zeros(MVec3):   A vector of the apparent wind speed, see: [`MVec3`](@ref)
 - `omega`::MVec3 = zeros(MVec3): A vector of the turn rates around the kite body axes
+- `reference_point`::MVec3 = zeros(MVec3): The point `omega` turns the body about [m]
 - `gamma_distribution`=zeros(Float64, P): A vector of the circulation
                         of the velocity field; Length: Number of segments. [m²/s]
 - `alpha_uncorrected`=zeros(Float64, P): angles of attack per panel
@@ -35,6 +36,7 @@ Main structure for calculating aerodynamic properties of bodies. Use the constru
     _va::MVector{3, T} = zeros(MVector{3, T})
     has_distributed_va::Bool = false
     omega::MVector{3, T} = zeros(MVector{3, T})
+    reference_point::MVector{3, T} = zeros(MVector{3, T})
     gamma_distribution::MVector{P, T} = zeros(MVector{P, T})
     alpha_uncorrected::MVector{P, T} = zeros(MVector{P, T})
     alpha_corrected::MVector{P, T} = zeros(MVector{P, T})
@@ -155,6 +157,8 @@ function Base.setproperty!(obj::BodyAerodynamics, sym::Symbol, val)
         set_va!(obj, val)
     elseif sym === :omega
         set_va!(obj, obj._va, val)
+    elseif sym === :reference_point
+        set_va!(obj, obj._va, obj.omega; reference_point=val)
     else
         setfield!(obj, sym, val)
     end
@@ -1066,43 +1070,32 @@ end
 
 
 """
-    set_va!(body_aero::BodyAerodynamics, va::VelVector, omega=zeros(MVec3))
+    set_va!(body_aero::BodyAerodynamics, va::VelVector, omega=zeros(MVec3);
+            reference_point=body_aero.reference_point)
 
-Set velocity array and update wake filaments.
+Set a uniform apparent wind and a body turn rate, and update the wake filaments. Each
+panel sees `va - omega × (control_point - reference_point)`.
 
 # Arguments
 - body_aero::BodyAerodynamics: The [`BodyAerodynamics`](@ref) struct to modify
 - `va::VelVector`: Velocity vector of the apparent wind speed           [m/s]
 - `omega::VelVector`: Turn rate vector around x y and z axis            [rad/s]
+- `reference_point`: Point the body turns about, stored on `body_aero`  [m]
 
 `omega` is also projected onto each panel's spanwise axis into
 `pitch_rate_dist`, which the solver reads when `flow_curvature` is enabled.
 """
-function set_va!(body_aero::BodyAerodynamics{P, W, T}, va::AbstractVector, omega=zeros(MVector{3, T})) where {P, W, T}
-    n_panels = length(body_aero.panels)
-    va_distribution = zeros(T, n_panels, 3)
+function set_va!(body_aero::BodyAerodynamics{P, W, T}, va::AbstractVector,
+                 omega=zeros(MVector{3, T});
+                 reference_point=body_aero.reference_point) where {P, W, T}
     body_aero.omega .= omega
+    body_aero.reference_point .= reference_point
     set_pitch_rate_dist!(body_aero, omega)
 
-    if all(iszero, omega)
-        va_distribution .= reshape(va, 1, 3)
-    else
-        idx = 1
-        for wing in body_aero.wings
-            panel_end = idx + wing.n_panels - 1
-
-            # Calculate velocities for each panel in this wing slice
-            for j in idx:panel_end
-                omega_va = -omega × body_aero.panels[j].control_point
-                va_distribution[j, :] .= omega_va .+ va
-            end
-            idx = panel_end + 1
-        end
-    end
-
-    # Update panel velocities
+    va_distribution = zeros(T, P, 3)
     for (i, panel) in enumerate(body_aero.panels)
-        panel.va .= va_distribution[i,:]
+        panel.va .= va .- omega × (panel.control_point .- body_aero.reference_point)
+        va_distribution[i, :] .= panel.va
     end
 
     # Update wake elements
@@ -1159,7 +1152,8 @@ apparent_wind(alpha, beta, wind_speed) =
     set_va!(body_aero::BodyAerodynamics, settings::VSMSettings)
 
 Set the uniform inflow of `body_aero` to the [`apparent_wind`](@ref) at the `alpha` and
-`beta` [°] and `wind_speed` [m/s] of `settings.condition`.
+`beta` [°] and `wind_speed` [m/s] of `settings.condition`, and turn the body at its
+`yaw_rate` [°/s] about Z_b through `body_aero.reference_point`.
 
 # Example
 ```julia
@@ -1172,5 +1166,6 @@ function set_va!(body_aero::BodyAerodynamics, settings::VSMSettings)
     condition = settings.condition
     va = apparent_wind(deg2rad(condition.alpha), deg2rad(condition.beta),
         condition.wind_speed)
-    set_va!(body_aero, va)
+    omega = [0.0, 0.0, deg2rad(condition.yaw_rate)]
+    set_va!(body_aero, va, omega)
 end

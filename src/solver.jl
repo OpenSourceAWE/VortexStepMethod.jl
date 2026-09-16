@@ -1216,10 +1216,9 @@ function make_dual_shadow(solver::Solver{P, U, Float64},
     length(body_aero.wings) == 1 || throw(ArgumentError(
         "make_dual_shadow currently supports body_aero with one wing"))
     wing_d = _wing_with_eltype(body_aero.wings[1], TD)
-    body_aero_d = BodyAerodynamics([wing_d];
-        va = MVector{3, TD}(body_aero._va),
-        omega = MVector{3, TD}(body_aero.omega),
-    )
+    body_aero_d = BodyAerodynamics([wing_d])
+    set_va!(body_aero_d, MVector{3, TD}(body_aero._va), MVector{3, TD}(body_aero.omega);
+            reference_point=body_aero.reference_point)
     solver_d = Solver(body_aero_d;
         solver_type = solver.solver_type,
         aerodynamic_model_type = solver.aerodynamic_model_type,

@@ -21,19 +21,24 @@ relative_error(jac, reference) = maximum(abs.(jac .- reference)) / maximum(abs, 
     omega = [0.0, 0.0, 0.0]
     y0 = [va; omega]
 
-    @testset "AutoForwardDiff matches AutoFiniteDiff (LOOP, INVISCID)" begin
-        solver = Solver(body_aero;
+    turns = ((omega, zeros(3)), ([0.0, 0.0, 0.2], [0.5, 4.0, 0.0]))
+    @testset "ForwardDiff matches FiniteDiff about $reference_point (LOOP, INVISCID)" for
+            (omega_op, reference_point) in turns
+        pivot_body = BodyAerodynamics([wing])
+        set_va!(pivot_body, va, omega_op; reference_point)
+        y_op = [va; omega_op]
+        solver = Solver(pivot_body;
             use_gamma_prev=false,
             type_initial_gamma_distribution=ELLIPTIC)
 
         jac_fwd, _, fwd_converged = VortexStepMethod.linearize(
-            solver, body_aero, y0;
+            solver, pivot_body, y_op;
             theta_idxs=nothing, va_idxs=1:3, omega_idxs=4:6,
             aero_coeffs=true, backend=AutoForwardDiff())
         @test fwd_converged
 
         jac_fd, _, fd_converged = VortexStepMethod.linearize(
-            solver, body_aero, y0;
+            solver, pivot_body, y_op;
             theta_idxs=nothing, va_idxs=1:3, omega_idxs=4:6,
             aero_coeffs=true,
             backend=AutoFiniteDiff(absstep=1e-5, relstep=1e-5))
