@@ -1213,10 +1213,8 @@ buffers are freshly allocated as `TD`-typed.
 function make_dual_shadow(solver::Solver{P, U, Float64},
                           body_aero::BodyAerodynamics{P, W, Float64},
                           ::Type{TD}) where {P, U, W, TD}
-    length(body_aero.wings) == 1 || throw(ArgumentError(
-        "make_dual_shadow currently supports body_aero with one wing"))
-    wing_d = _wing_with_eltype(body_aero.wings[1], TD)
-    body_aero_d = BodyAerodynamics([wing_d];
+    wings_d = [_wing_with_eltype(wing, TD) for wing in body_aero.wings]
+    body_aero_d = BodyAerodynamics(wings_d;
         va = MVector{3, TD}(body_aero._va),
         omega = MVector{3, TD}(body_aero.omega),
     )
@@ -1251,8 +1249,8 @@ end
               backend=AutoForwardDiff(), kwargs...)
 
 Jacobian of aerodynamic outputs w.r.t. control and kinematic inputs at `y`. Each `*_idxs`
-selects which entries of `y` map to twist angles (one per unrefined section), trailing-edge
-deflections (one per unrefined section), apparent wind `(vx, vy, vz)`, and angular rate
+selects which entries of `y` map to twist angles and trailing-edge deflections (one per
+unrefined section, over all wings in order), apparent wind `(vx, vy, vz)`, and angular rate
 `(ωx, ωy, ωz)` respectively.
 
 `backend` accepts any `DifferentiationInterface` backend; `AutoForwardDiff()` (the default)
@@ -1263,7 +1261,7 @@ Returns `(jac, results, converged)` where `results` is `(F, M, moment_unrefined_
 or the corresponding coefficients when `aero_coeffs=true` — and `converged` is `false` (with a
 warning) if any internal solve missed the solver's tolerances.
 """
-function linearize(solver::Solver, body_aero::BodyAerodynamics, y::Vector{T};
+function linearize(solver::Solver{P, U}, body_aero::BodyAerodynamics, y::Vector{T};
         theta_idxs=1:4,
         delta_idxs=nothing,
         va_idxs=nothing,
@@ -1272,22 +1270,11 @@ function linearize(solver::Solver, body_aero::BodyAerodynamics, y::Vector{T};
         backend = AutoForwardDiff(),
         fd_absstep::Float64=1e-8,
         fd_relstep::Float64=1e-8,
-        kwargs...) where T
+        kwargs...) where {P, U, T}
 
-    !(length(body_aero.wings) == 1) && throw(ArgumentError("Linearization only works for a body_aero with one wing"))
-    wing = body_aero.wings[1]
-
-    # Validate that theta_idxs and delta_idxs match the number of unrefined sections
-    if !isnothing(theta_idxs) && wing.n_unrefined_sections > 0
-        length(theta_idxs) != wing.n_unrefined_sections && throw(ArgumentError(
-            "Length of theta_idxs ($(length(theta_idxs))) must match number of unrefined sections ($(wing.n_unrefined_sections))"))
-    end
-    if !isnothing(delta_idxs) && wing.n_unrefined_sections > 0
-        length(delta_idxs) != wing.n_unrefined_sections && throw(ArgumentError(
-            "Length of delta_idxs ($(length(delta_idxs))) must match number of unrefined sections ($(wing.n_unrefined_sections))"))
-    end
-    if wing.n_unrefined_sections == 0 && (!isnothing(theta_idxs) || !isnothing(delta_idxs))
-        throw(ArgumentError("Cannot use theta_idxs or delta_idxs when wing has no unrefined sections"))
+    for (name, idxs) in (("theta_idxs", theta_idxs), ("delta_idxs", delta_idxs))
+        isnothing(idxs) || length(idxs) == U || throw(ArgumentError(
+            "Length of $name ($(length(idxs))) must match number of unrefined sections ($U)"))
     end
 
     n_failed = Ref(0)
@@ -1298,22 +1285,20 @@ function linearize(solver::Solver, body_aero::BodyAerodynamics, y::Vector{T};
         if TI === Float64
             body_aero_c = body_aero
             solver_c = solver
-            wing_c = wing
         else
             shadow = shadow_ref[]
             if shadow === nothing || eltype(shadow[1]._va) !== TI
                 shadow_ref[] = make_dual_shadow(solver, body_aero, TI)
             end
             body_aero_c, solver_c = shadow_ref[]
-            wing_c = body_aero_c.wings[1]
         end
 
         @views theta_angles = isnothing(theta_idxs) ? nothing : y_in[theta_idxs]
         @views delta_angles = isnothing(delta_idxs) ? nothing : y_in[delta_idxs]
 
         if !isnothing(theta_angles) || !isnothing(delta_angles)
-            VortexStepMethod.unrefined_deform!(wing_c, theta_angles, delta_angles; smooth=false)
-            VortexStepMethod.reinit!(body_aero_c; init_aero=false)
+            unrefined_deform!(body_aero_c, theta_angles, delta_angles)
+            reinit!(body_aero_c; init_aero=false)
         end
 
         va = isnothing(va_idxs) ? MVector{3, TI}(body_aero_c._va) : y_in[va_idxs]

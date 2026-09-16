@@ -253,6 +253,25 @@ function calculate_stall_angle_list!(stall_angles::AbstractVector,
 end
 
 """
+    unrefined_deform!(body_aero::BodyAerodynamics, theta_angles, delta_angles)
+
+Deform each wing of `body_aero` by its entries of `theta_angles` and `delta_angles` [rad],
+which run over the unrefined sections of all wings in order; `nothing` leaves that angle
+unchanged. Call [`reinit!`](@ref) afterwards to update the panels.
+"""
+function unrefined_deform!(body_aero::BodyAerodynamics, theta_angles, delta_angles)
+    first_section = 1
+    for wing in body_aero.wings
+        wing_sections = first_section:first_section + wing.n_unrefined_sections - 1
+        unrefined_deform!(wing,
+            isnothing(theta_angles) ? nothing : view(theta_angles, wing_sections),
+            isnothing(delta_angles) ? nothing : view(delta_angles, wing_sections))
+        first_section += wing.n_unrefined_sections
+    end
+    return nothing
+end
+
+"""
     reinit!(body_aero::BodyAerodynamics; init_aero, va, omega, refine_mesh, recompute_mapping, sort_sections)
 
 Initialize a BodyAerodynamics struct in-place by setting up panels and coefficients.

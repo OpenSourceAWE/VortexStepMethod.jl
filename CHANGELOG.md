@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Added
+
+- `linearize` takes a `BodyAerodynamics` with more than one wing; `theta_idxs` and
+  `delta_idxs` then run over the unrefined sections of all wings in order.
+
 ### Changed
 
 - Requires Julia 1.12 or 1.13; 1.10 and 1.11 keep resolving v5.1.1.

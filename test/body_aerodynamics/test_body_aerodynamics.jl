@@ -512,6 +512,24 @@ function solve_wings(wings)
     return body_aero, solve!(Solver(body_aero), body_aero)
 end
 
+"""
+    linearize_wings(wings; kwargs...)
+
+`linearize` at zero twist and deflection of the body [`solve_wings`](@ref) builds from
+`wings`, over the twist and the deflection of every unrefined section, then the inflow
+and the angular rate.
+"""
+function linearize_wings(wings; kwargs...)
+    n_sections = sum(wing -> wing.n_unrefined_sections, wings)
+    body_aero = BodyAerodynamics(wings; va=[10.0, 0.0, 1.0])
+    solver = Solver(body_aero; use_gamma_prev=false, rtol=1e-10)
+    y0 = [zeros(2n_sections); body_aero.va; zeros(3)]
+    return VortexStepMethod.linearize(solver, body_aero, y0;
+        theta_idxs=1:n_sections, delta_idxs=n_sections+1:2n_sections,
+        va_idxs=2n_sections+1:2n_sections+3, omega_idxs=2n_sections+4:2n_sections+6,
+        kwargs...)
+end
+
 @testset "solve! on a two-wing body" begin
     n_panels = 6
     section_y = [2.0, 0.0, -2.0]
@@ -543,5 +561,33 @@ end
         @test gamma ≈ reverse(gamma) rtol=1e-6
         @test gamma[n_panels] > 1.05single.gamma_distribution[n_panels]
         @test sol.force[3] > 2single.force[3]
+    end
+
+    n_sections = 2length(section_y)
+    @testset "linearize: theta of each wing moves that wing's sections" begin
+        wings = [inviscid_wing(section_y; n_panels),
+                 inviscid_wing(section_y .- 1e4; n_panels)]
+        jac, _, converged = linearize_wings(wings)
+        wing_rows = (7:6+length(section_y), 7+length(section_y):6+n_sections)
+        wing_columns = (1:length(section_y), length(section_y)+1:n_sections)
+
+        @test converged
+        @test norm(jac[wing_rows[1], wing_columns[1]]) > 0
+        @test jac[wing_rows[2], wing_columns[2]] ≈ jac[wing_rows[1], wing_columns[1]] rtol=1e-4
+        @test norm(jac[wing_rows[1], wing_columns[2]]) < 1e-4norm(jac[wing_rows[1], wing_columns[1]])
+        @test norm(jac[wing_rows[2], wing_columns[1]]) < 1e-4norm(jac[wing_rows[1], wing_columns[1]])
+    end
+
+    @testset "linearize: AutoForwardDiff matches AutoFiniteDiff" begin
+        wings = [inviscid_wing(section_y; n_panels),
+                 inviscid_wing(section_y .- (span + 1.0); n_panels)]
+        jac_fwd, _, fwd_converged = linearize_wings(wings)
+        jac_fd, _, fd_converged = linearize_wings(wings; backend=nothing,
+            fd_absstep=1e-6, fd_relstep=1e-6)
+
+        @test fwd_converged
+        @test fd_converged
+        @test norm(jac_fwd[:, 1:n_sections]) > 0
+        @test jac_fwd ≈ jac_fd rtol=1e-4
     end
 end
