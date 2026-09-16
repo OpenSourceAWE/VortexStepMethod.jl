@@ -14,9 +14,9 @@ Struct for storing the solution of the [`solve!`](@ref) function. Must contain a
 - cl_dist::Vector{Float64}: Lift coefficients of the panels [-]
 - cd_dist::Vector{Float64}: Drag coefficients of the panels [-]
 - cm_dist::Vector{Float64}: Pitching moment coefficients of the panels [-]
-- lift_dist::Vector{Float64}: Lift force of the panels [N]
-- drag_dist::Vector{Float64}: Drag force of the panels [N]
-- panel_moment_dist::Vector{Float64}: Pitching moment around the spanwise vector of the panels [Nm]
+- lift_dist::Vector{Float64}: Lift force per unit span of the panels [N/m]
+- drag_dist::Vector{Float64}: Drag force per unit span of the panels [N/m]
+- panel_moment_dist::Vector{Float64}: Pitching moment per unit span about y_airf [Nm/m]
 - `f_body_3D`::Matrix{Float64}: Matrix of the aerodynamic forces (x, y, z vectors) [N]
 - `m_body_3D`::Matrix{Float64}: Matrix of the aerodynamic moments [Nm]
 - `gamma_distribution`::Union{Nothing, Vector{Float64}}: Vector containing the panel circulations.

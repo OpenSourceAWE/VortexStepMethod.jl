@@ -284,8 +284,8 @@ end
         write(io_no_cs, "aoa,cl,cd\n0.0,0.10,0.010\n5.0,0.20,0.020\n")
     end
     fig_lit_no_cs = plot_polars(
-        Any[],
-        Any[],
+        Solver[],
+        BodyAerodynamics[],
         ["Literature no CS"];
         literature_path_list=[lit_no_cs_path],
         is_save=false,
@@ -299,8 +299,8 @@ end
         write(io_bad, "alpha,cl\n0.0,0.10\n5.0,0.20\n")
     end
     @test_throws ArgumentError plot_polars(
-        Any[],
-        Any[],
+        Solver[],
+        BodyAerodynamics[],
         ["Literature bad"];
         literature_path_list=[lit_bad_path],
         is_save=false,
@@ -316,8 +316,8 @@ end
             "5.0,0.5,0.02,0.01,0.004,0.005,0.006\n")
     end
     fig_moments = plot_polars(
-        Any[],
-        Any[],
+        Solver[],
+        BodyAerodynamics[],
         ["Literature with moments"];
         literature_path_list=[cm_lit_path],
         show_moments=true,
@@ -334,8 +334,8 @@ end
             "0.0,0.1,0.01\n5.0,0.5,0.02\n")
     end
     fig_no_moments = plot_polars(
-        Any[],
-        Any[],
+        Solver[],
+        BodyAerodynamics[],
         ["Literature no moments"];
         literature_path_list=[no_cm_path],
         show_moments=false,
@@ -453,6 +453,7 @@ end
     ax = Axis3(fig[1, 1])
     plots = Makie.plot!(ax, body_aero; airfoils=true)
     @test !isempty(plots)
+    @test plots isa Vector{Makie.AbstractPlot}
 
     # Observable airfoil-skin plot registers the body for pose updates.
     fig_obs = Figure()
@@ -501,7 +502,9 @@ end
     # border_linewidth flows through the standard (non-airfoil) panel plot.
     fig_lw = Figure()
     ax_lw = Axis3(fig_lw[1, 1])
-    @test_nowarn Makie.plot!(ax_lw, plain_body; border_linewidth=3.0)
+    plots_lw = @test_nowarn Makie.plot!(ax_lw, plain_body; border_linewidth=3.0)
+    @test plots_lw isa Vector{Makie.AbstractPlot}
+    @test length(plots_lw) == 2 * length(plain_body.panels)
 end
 
 @testset "generated_slices reads the deflected .dat under its generated name" begin

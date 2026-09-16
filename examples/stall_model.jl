@@ -32,19 +32,15 @@ csv_file_path = joinpath(
 )
 
 df = CSV.read(csv_file_path, DataFrame)
-rib_list = []
-for row in eachrow(df)
-    LE = [row.LE_x, row.LE_y, row.LE_z]
-    TE = [row.TE_x, row.TE_y, row.TE_z]
-    push!(rib_list, (LE, TE, LEI_AIRFOIL_BREUKELS,
-                     lei_poly_coeffs(row.d_tube, row.camber)))
-end
 
 # Create wing geometry
 # n_unrefined_sections will be automatically set to the number of ribs (18 sections)
 CAD_wing = Wing(n_panels; spanwise_distribution)
-for rib in rib_list
-    add_section!(CAD_wing, rib[1], rib[2], rib[3], rib[4])
+for row in eachrow(df)
+    LE = [row.LE_x, row.LE_y, row.LE_z]
+    TE = [row.TE_x, row.TE_y, row.TE_z]
+    add_section!(CAD_wing, LE, TE, LEI_AIRFOIL_BREUKELS,
+                 lei_poly_coeffs(row.d_tube, row.camber))
 end
 refine!(CAD_wing)
 body_aero = BodyAerodynamics([CAD_wing])

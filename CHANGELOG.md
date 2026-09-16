@@ -16,6 +16,14 @@
 ### Changed
 
 - Requires Julia 1.12 or 1.13; 1.10 and 1.11 keep resolving v5.1.1.
+- The Makie `plot!` methods for a `Panel` or a `BodyAerodynamics` return a
+  `Vector{Makie.AbstractPlot}` instead of a `Vector{Any}`; for a `BodyAerodynamics`
+  drawn as flat panels it is one flat list rather than a list per panel.
+
+### Fixed
+
+- The `VSMSolution` docstring gives `lift_dist`, `drag_dist` and `panel_moment_dist` in
+  the per-unit-span units they hold, [N/m] and [Nm/m], instead of [N] and [Nm].
 
 ## VortexStepMethod v5.1.1 2026-09-12
 
