@@ -1,4 +1,5 @@
-using VortexStepMethod: BoundFilament, velocity_3D_bound_vortex!, reinit!
+using VortexStepMethod: BoundFilament, velocity_3D_bound_vortex!,
+    velocity_3D_trailing_vortex!, reinit!, ALPHA0, NU
 using LinearAlgebra
 using Test
 
@@ -248,6 +249,26 @@ end
             @test isapprox(v[2], 0.0; atol=expected_mag * 1e-4)
             @test isapprox(abs(v[3]), expected_mag; rtol=1e-3)
             @test v[3] > 0
+        end
+    end
+
+    @testset "Trailing vortex velocity is azimuthal inside and outside the core" begin
+        filament = create_test_filament()
+        r0 = [1.0, 0.0, 0.0]
+        v_a = 1e-4
+        core_radius = sqrt(4 * ALPHA0 * NU * 0.5 / v_a)
+
+        for d in (0.25, 0.5, 0.99, 1.01, 2.0) .* core_radius
+            for phi in (0.0, π/4, π/2, π, -π/3)
+                p = [0.5, d * cos(phi), d * sin(phi)]
+                v = zeros(3)
+                velocity_3D_trailing_vortex!(v, filament, p, gamma, v_a, work_vectors)
+
+                r_radial = [0.0, p[2], p[3]]
+                @test norm(v) > 1e-3
+                @test isapprox(dot(v, r0), 0.0; atol=1e-10)
+                @test isapprox(dot(v, r_radial), 0.0; atol=1e-10)
+            end
         end
     end
 end

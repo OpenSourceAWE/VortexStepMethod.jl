@@ -62,6 +62,7 @@ panel_loads
 ```@docs
 velocity_3D_bound_vortex!
 velocity_3D_trailing_vortex!
+velocity_3D_vortex_segment!
 velocity_3D_trailing_vortex_semiinfinite!
 calculate_velocity_induced_bound_2D!
 calculate_velocity_induced_single_ring_semiinfinite!
