@@ -507,3 +507,59 @@ end
     end
     @test body_aero.omega ≈ new_omega
 end
+
+"""
+    rectangular_wing(y_center; n_panels=6, span=4.0, chord=1.0)
+
+A refined flat rectangular `INVISCID` wing with three sections, centred at `y_center`.
+"""
+function rectangular_wing(y_center; n_panels=6, span=4.0, chord=1.0)
+    wing = Wing(n_panels; spanwise_distribution=LINEAR)
+    for y in (span / 2, 0.0, -span / 2)
+        add_section!(wing, [0.0, y_center + y, 0.0], [chord, y_center + y, 0.0], INVISCID)
+    end
+    refine!(wing)
+    return wing
+end
+
+"""
+    solve_wings(wings; va=[10.0, 0.0, 1.0])
+
+The `BodyAerodynamics` built from `wings` and its `solve!` solution.
+"""
+function solve_wings(wings; va=[10.0, 0.0, 1.0])
+    body_aero = BodyAerodynamics(wings; va)
+    return body_aero, solve!(Solver(body_aero), body_aero)
+end
+
+@testset "solve! on a two-wing body" begin
+    n_panels = 6
+    span = 4.0
+    single_aero, single = solve_wings([rectangular_wing(0.0; n_panels, span)])
+
+    @testset "wings far apart each act as the isolated wing" begin
+        wings = [rectangular_wing(0.0; n_panels, span),
+                 rectangular_wing(-1e4; n_panels, span)]
+        body_aero, sol = solve_wings(wings)
+
+        @test length(body_aero.panels) == 2n_panels
+        @test sol.solver_status == FEASIBLE
+        @test body_aero.projected_area ≈ 2single_aero.projected_area
+        @test sol.gamma_distribution ≈ repeat(single.gamma_distribution, 2) rtol=1e-6
+        @test sol.cl_unrefined_dist ≈ repeat(single.cl_unrefined_dist, 2) rtol=1e-6
+        @test sol.force ≈ 2single.force rtol=1e-6
+        @test sol.force_coeffs ≈ single.force_coeffs rtol=1e-6
+    end
+
+    @testset "wings one chord apart induce on each other" begin
+        wings = [rectangular_wing(0.0; n_panels, span),
+                 rectangular_wing(-(span + 1.0); n_panels, span)]
+        _, sol = solve_wings(wings)
+        gamma = sol.gamma_distribution
+
+        @test sol.solver_status == FEASIBLE
+        @test gamma ≈ reverse(gamma) rtol=1e-6
+        @test gamma[n_panels] > 1.05single.gamma_distribution[n_panels]
+        @test sol.force[3] > 2single.force[3]
+    end
+end
