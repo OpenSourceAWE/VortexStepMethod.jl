@@ -38,7 +38,7 @@ slices as an unconfigured call.
     trace (default `60`).
 - `rotation`: Rows of the mesh-to-slicer rotation, which brings the mesh into the
     slicer's convention of x = chord, y = span, z = up (default the identity).
-- `wingtip_distance`: Arc length [m] the outermost sections stop short of each tip
+- `wingtip_distance`: Spanwise length [m] the outermost sections stop short of each tip
     (default `0.0`).
 - `clearance`: Shrink-wrap offset [chord fraction] the contour holds outside every
     cloud point, and the radius its convex corners are rounded at (default

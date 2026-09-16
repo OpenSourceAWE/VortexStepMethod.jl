@@ -27,7 +27,7 @@ The conversion runs four stages per spanwise station:
 ## 1. Slice
 
 [`perpendicular_sections`](@ref VortexStepMethod.ObjAdapter.perpendicular_sections)
-places `n_sections` stations at equal leading-edge arc-length intervals and cuts the
+places `n_sections` stations evenly over the span and cuts the
 mesh *perpendicular to the local span*, rather than along a fixed global plane. On a
 curved kite tip a fixed-plane cut would smear the profile out and exaggerate the
 chord; a perpendicular cut keeps each airfoil undistorted. Each slice comes back as a
@@ -113,8 +113,8 @@ For each unique airfoil id `j`, `obj_to_yaml` writes into `output_dir`:
   directory
 
 A tip that tapers to a point has no airfoil to slice, so the outermost stations stop at
-the last slice that still has a chord; `wingtip_distance` moves them a further arc length
-inboard when the slices just short of the tip are still too thin to analyse. A
+the last slice that still has a chord; `wingtip_distance` moves them a further spanwise
+length inboard when the slices just short of the tip are still too thin to analyse. A
 near-vanishing slice that does get through can shrink-wrap to an implausibly thick blob;
 such a degenerate section reuses its nearest valid neighbour's airfoil and polar while
 keeping its own edge positions, and a warning lists the reuse. All floats are rounded to millimetre

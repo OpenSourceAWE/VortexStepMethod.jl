@@ -8,6 +8,10 @@
 - The Makie `plot!` methods for a `Panel` or a `BodyAerodynamics` return a
   `Vector{Makie.AbstractPlot}` instead of a `Vector{Any}`; for a `BodyAerodynamics`
   drawn as flat panels it is one flat list rather than a list per panel.
+- `obj_to_yaml` and `perpendicular_sections` spread the sections evenly over the span,
+  measured along the quarter-chord line without its chordwise component, instead of
+  over leading-edge arc length, and `wingtip_distance` is that spanwise length. A tip
+  whose leading edge runs aft no longer gathers sections into its last centimetres.
 
 ### Fixed
 
