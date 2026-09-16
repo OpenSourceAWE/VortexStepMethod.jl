@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Added
+
+- `set_va!(body_aero, va, omega; reference_point)` turns the body about
+  `reference_point` [m] instead of the origin. The point is stored on
+  `BodyAerodynamics`, starts at the origin, and is kept by later `set_va!`, `reinit!`
+  and `linearize` calls until it is given again.
+
 ### Changed
 
 - Requires Julia 1.12 or 1.13; 1.10 and 1.11 keep resolving v5.1.1.
@@ -11,6 +18,8 @@
 
 ### Fixed
 
+- `set_va!(body_aero, settings)` applies `condition.yaw_rate` as a turn rate about the
+  body z axis; it was read from the settings file and ignored.
 - The `VSMSolution` docstring gives `lift_dist`, `drag_dist` and `panel_moment_dist` in
   the per-unit-span units they hold, [N/m] and [Nm/m], instead of [N] and [Nm].
 
