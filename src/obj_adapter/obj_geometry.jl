@@ -227,6 +227,11 @@ function create_interpolations(vertices, circle_center_z, radius, gamma_tip, R=I
     return (le_interp, te_interp, area_interp)
 end
 
+function depwarn_inertia(name::Symbol)
+    Base.depwarn("`$name` is deprecated and will be removed in the next breaking release; " *
+        "SymbolicAWEModels computes mesh mass properties.", name)
+end
+
 """
     center_to_com!(vertices, faces)
 
@@ -242,8 +247,11 @@ Calculate center of mass of a mesh and translate vertices so that COM is at orig
 # Notes
 - Non-triangular faces are automatically triangulated into triangles
 - Assumes uniform surface density
+
+Deprecated; removed in the next breaking release.
 """
 function center_to_com!(vertices, faces; prn=true)
+    depwarn_inertia(:center_to_com!)
     area_total = 0.0
     com = zeros(3)
 
@@ -298,8 +306,11 @@ Uses the thin shell approximation where:
 
 # Returns
 - 3×3 matrix representing the inertia tensor in kg⋅m²
+
+Deprecated; removed in the next breaking release.
 """
 function calculate_inertia_tensor(vertices, faces, mass, com)
+    depwarn_inertia(:calculate_inertia_tensor)
     # Initialize inertia tensor
     I = zeros(3, 3)
     total_area = 0.0
@@ -338,7 +349,16 @@ function calculate_inertia_tensor(vertices, faces, mass, com)
     return (mass / total_area) * I / 3
 end
 
+"""
+    calc_inertia_y_rotation(I_b_tensor)
+
+Rotate the inertia tensor `I_b_tensor` about the y-axis until its xz product of inertia
+vanishes. Returns the rotated tensor and the rotation matrix `R_b_p`.
+
+Deprecated; removed in the next breaking release.
+"""
 function calc_inertia_y_rotation(I_b_tensor)
+    depwarn_inertia(:calc_inertia_y_rotation)
     # Function for nonlinear solver - off-diagonal element should be zero
     function eq!(F, theta, _)
         # Rotation matrix around y-axis
@@ -368,5 +388,3 @@ function calc_inertia_y_rotation(I_b_tensor)
     @assert isapprox(I_diag[1,3], 0.0, atol=1e-5)
     return I_diag, R_b_p
 end
-
-

@@ -7,7 +7,6 @@ using VortexStepMethod.ObjAdapter: create_interpolations, find_circle_center_and
     calculate_inertia_tensor, center_to_com!, read_faces, calc_inertia_y_rotation
 using LinearAlgebra
 using Interpolations
-using Serialization
 
 @testset "Kite Geometry Tests" begin
     work_dir = mktempdir()
@@ -38,7 +37,7 @@ using Serialization
         vertices = [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 0.0, 1.0]]
         faces = [[1, 2, 3]]
         
-        com = center_to_com!(vertices, faces)
+        com = @test_deprecated center_to_com!(vertices, faces)
         expected_com = [-1/3, 0.0, -1/3]
         
         @test isapprox(com, expected_com, rtol=1e-5)
@@ -50,7 +49,7 @@ using Serialization
         mass = 1.0
         com = [1/3, 1/3, 0.0]
         
-        I = calculate_inertia_tensor(vertices, faces, mass, com)
+        I = @test_deprecated calculate_inertia_tensor(vertices, faces, mass, com)
         
         # Test properties of inertia tensor
         @test size(I) == (3,3)
@@ -120,7 +119,7 @@ using Serialization
         write_aero_matrix(cd_polar_path, cd_matrix, deg2rad.(alphas), deg2rad.(d_trailing_edge_angles), "C_d")
         write_aero_matrix(cm_polar_path, cm_matrix, deg2rad.(alphas), deg2rad.(d_trailing_edge_angles), "C_m")
         
-        # Create and serialize obj file
+        # Create obj file
         faces = [[i, i+1, i+2] for i in 1:3:length(vertices)-2]
         open(test_obj_path, "w") do io
             for v in vertices
@@ -139,15 +138,8 @@ using Serialization
         @test alphas_read ≈ deg2rad.(alphas)
         @test deltas_read ≈ deg2rad.(d_trailing_edge_angles)
         
-        # Create info file
-        info_path = test_obj_path[1:end-4] * "_info.bin"
         le_interp, te_interp, area_interp = create_interpolations(vertices, z_center, r, π/4, I(3))
-        center_of_mass = center_to_com!(vertices, faces)
-        inertia_tensor = calculate_inertia_tensor(vertices, faces, 1.0, zeros(3))
-        
-        serialize(info_path, (inertia_tensor, center_of_mass, I(3), r, π/4, 
-            le_interp, te_interp, area_interp))
-        
+
         # Test interpolation at middle point
         @test isapprox([le_interp[i](0.0) for i in 1:3], [0.0, 0.0, r+z_center], atol=0.03)
         @test isapprox([te_interp[i](0.0) for i in 1:3], [1.0, 0.0, r+z_center], atol=0.03)
@@ -157,7 +149,7 @@ using Serialization
         vertices, faces = read_faces(test_obj_path)
         center_of_mass = center_to_com!(vertices, faces)
         inertia_tensor_b = calculate_inertia_tensor(vertices, faces, 1.0, zeros(3))
-        inertia_tensor_p, R_b_p = calc_inertia_y_rotation(inertia_tensor_b)
+        inertia_tensor_p, R_b_p = @test_deprecated calc_inertia_y_rotation(inertia_tensor_b)
         for v in vertices
             v .= R_b_p * v
         end
