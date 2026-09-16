@@ -117,7 +117,7 @@ If `use_observables=true`, creates observables for dynamic updates.
 """
 function Makie.plot!(ax, panel::VortexStepMethod.Panel; color=(:red, 0.2), R_b_w=nothing, T_b_w=nothing,
     use_observables=false, border_linewidth=1.5, transparency=true, kwargs...)
-    plots = []
+    plots = Makie.AbstractPlot[]
     points = panel_plate_geometry(panel; R_b_w, T_b_w)
 
     if use_observables
@@ -253,7 +253,7 @@ function Makie.plot!(ax, body::VortexStepMethod.BodyAerodynamics; color=(:red, 0
     use_observables=false, airfoils=false,
     airfoil_color=:deepskyblue, airfoil_opacity=0.2, rib_color=:black,
     border_linewidth=1.5, transparency=true, kwargs...)
-    plots = []
+    plots = Makie.AbstractPlot[]
 
     if airfoils
         vertices, faces, ribs = airfoil_skin_geometry(body; R_b_w, T_b_w)
@@ -316,9 +316,8 @@ function Makie.plot!(ax, body::VortexStepMethod.BodyAerodynamics; color=(:red, 0
     else
         # Static plotting (original behavior)
         for panel in body.panels
-            p = Makie.plot!(ax, panel; color, R_b_w, T_b_w, use_observables=false,
-                            border_linewidth, transparency, kwargs...)
-            push!(plots, p)
+            append!(plots, Makie.plot!(ax, panel; color, R_b_w, T_b_w,
+                use_observables=false, border_linewidth, transparency, kwargs...))
         end
     end
 
@@ -931,8 +930,8 @@ function VortexStepMethod.plot_polars(
     main_title = replace(title, " " => "_")
 
     # Generate polar data
-    polar_data_list = []
-    cm_data_list = []
+    polar_data_list = Vector{Array{Float64}}[]
+    cm_data_list = NamedTuple{(:cmx, :cmy, :cmz), NTuple{3, Vector{Float64}}}[]
     labels_with_re = copy(label_list)
     for (i, (solver, body_aero)) in enumerate(zip(solver_list, body_aero_list))
         result = VortexStepMethod.generate_polar_data(

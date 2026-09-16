@@ -225,7 +225,7 @@ wing = Wing(settings)
 """
 @Base.kwdef mutable struct VSMSettings
     condition::ConditionSettings = ConditionSettings()
-    wings::Vector{WingSettings} = []
+    wings::Vector{WingSettings} = WingSettings[]
     solver_settings::SolverSettings = SolverSettings()
 end
 
