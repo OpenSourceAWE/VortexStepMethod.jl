@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Added
+
+- `stability_derivatives` gives the force and moment coefficients and their derivatives
+  with respect to angle of attack and sideslip, and `trim_angle` the angles of attack at
+  which `CMy` changes sign, with the slope that says whether each trim is stable.
+
 ### Changed
 
 - Requires Julia 1.12 or 1.13; 1.10 and 1.11 keep resolving v5.1.1.
