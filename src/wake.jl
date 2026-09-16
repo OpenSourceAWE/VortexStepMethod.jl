@@ -17,7 +17,8 @@ Replaces older filaments if present by checking length of filaments.
 function frozen_wake!(body_aero::BodyAerodynamics, va_vec_dist)
     n_panels = length(body_aero.panels)
     size(va_vec_dist) == (n_panels, 3) ||
-        throw(ArgumentError("va_vec_dist must be shape ($(n_panels), 3), got $(size(va_vec_dist))"))
+        throw(ArgumentError(
+            "va_vec_dist must be shape ($(n_panels), 3), got $(size(va_vec_dist))"))
 
     panel_areas = [panel.chord * panel.width for panel in body_aero.panels]
     wake_velocity = _compute_reference_velocity_from_distribution(

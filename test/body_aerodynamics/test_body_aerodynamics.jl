@@ -79,7 +79,8 @@ end
 
         # Calculate new matrices
         va_dist = fill(norm(va_vec), length(body_aero.panels))
-        va_unit_dist = repeat(reshape(va_vec ./ norm(va_vec), 1, 3), length(body_aero.panels))
+        va_unit_dist = repeat(reshape(va_vec ./ norm(va_vec), 1, 3),
+                              length(body_aero.panels))
         calculate_AIC_matrices!(
             body_aero,
             LLT,
@@ -114,7 +115,8 @@ end
 
         # Calculate new matrices
         va_dist = fill(norm(va_vec), length(body_aero.panels))
-        va_unit_dist = repeat(reshape(va_vec ./ norm(va_vec), 1, 3), length(body_aero.panels))
+        va_unit_dist = repeat(reshape(va_vec ./ norm(va_vec), 1, 3),
+                              length(body_aero.panels))
         calculate_AIC_matrices!(
             body_aero,
             VSM,

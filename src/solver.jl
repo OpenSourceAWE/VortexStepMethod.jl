@@ -625,7 +625,8 @@ function solve_base!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics, gamma
                log=false) where {P, U, T}
     
     # check arguments
-    isnothing(body_aero.panels[1].va) && throw(ArgumentError("Inflow conditions are not set, use set_va!(body_aero, va_vec)"))
+    isnothing(body_aero.panels[1].va) && throw(ArgumentError(
+        "Inflow conditions are not set, use set_va!(body_aero, va_vec)"))
     
     # Initialize variables
     panels = body_aero.panels

@@ -1072,13 +1072,14 @@ Set velocity array and update wake filaments.
 
 # Arguments
 - body_aero::BodyAerodynamics: The [`BodyAerodynamics`](@ref) struct to modify
-- `va_vec::VelVector`: Velocity vector of the apparent wind speed           [m/s]
+- `va_vec::VelVector`: Velocity vector of the apparent wind speed       [m/s]
 - `omega::VelVector`: Turn rate vector around x y and z axis            [rad/s]
 
 `omega` is also projected onto each panel's spanwise axis into
 `pitch_rate_dist`, which the solver reads when `flow_curvature` is enabled.
 """
-function set_va!(body_aero::BodyAerodynamics{P, W, T}, va_vec::AbstractVector, omega=zeros(MVector{3, T})) where {P, W, T}
+function set_va!(body_aero::BodyAerodynamics{P, W, T}, va_vec::AbstractVector,
+                 omega=zeros(MVector{3, T})) where {P, W, T}
     n_panels = length(body_aero.panels)
     va_vec_dist = zeros(T, n_panels, 3)
     body_aero.omega .= omega

@@ -648,7 +648,7 @@ Calculate the velocity induced by a vortex ring at a control point.
 - filaments
 - `evaluation_point`::MVec3:         Point where induced velocity is evaluated
 - `evaluation_point_on_bound`::Bool: Whether evaluation point is on bound vortex
-- `va`::Float64:                Norm of apparent velocity
+- `va`::Float64:                     Norm of apparent velocity
 - `va_unit`::MVec3:                  Unit vector of apparent velocity
 - `gamma`::Float64:                  Circulation strength
 - `core_radius_fraction`::Float64:   Vortex core radius as fraction of panel width

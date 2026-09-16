@@ -128,7 +128,8 @@ end
         solver = Solver(body_aero; solver_type=LOOP, aerodynamic_model_type=VSM,
             type_initial_gamma_distribution=ELLIPTIC)
 
-        for va_vec in ([10.0, 0.0, 0.0], [10.0, 0.0, 5.0])   # 0 deg, and 26.6 deg past stall
+        # 0 deg, and 26.6 deg past stall
+        for va_vec in ([10.0, 0.0, 0.0], [10.0, 0.0, 5.0])
             set_va!(body_aero, va_vec)
             gamma = copy(solve!(solver, body_aero).gamma_distribution)
             @test solver.lr.converged

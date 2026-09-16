@@ -233,7 +233,8 @@ Represents a semi-infinite vortex filament.
     initialized::Bool = false
 end
 
-function reinit!(filament::SemiInfiniteFilament{T}, x1::AbstractVector, direction::AbstractVector, va::Real, filament_direction::Real) where T
+function reinit!(filament::SemiInfiniteFilament{T}, x1::AbstractVector,
+                 direction::AbstractVector, va::Real, filament_direction::Real) where T
     filament.x1 .= x1
     filament.direction .= direction
     filament.vel_mag = va
