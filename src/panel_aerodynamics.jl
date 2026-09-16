@@ -70,18 +70,18 @@ on section ordering.
 end
 
 """
-    section_pitch_rate(delta_va, z_airf, chord)
+    section_pitch_rate(delta_va_vec, z_airf, chord)
     section_pitch_rate(velocity_leading, velocity_trailing, z_airf, chord)
 
-Rate a section rotates about its own spanwise axis, positive nose-up. `delta_va`
+Rate a section rotates about its own spanwise axis, positive nose-up. `delta_va_vec`
 is the trailing minus leading edge apparent wind; apparent wind is
 `wind - velocity`, so that is the leading minus trailing edge velocity, hence the
 reversed order in the four-argument form. Chordwise wind variation enters here
 too. Builds a `pitch_rate_dist` for [`set_va!`](@ref) on a deforming structure,
 where no single body rate describes every section.
 """
-@inline section_pitch_rate(delta_va, z_airf, chord) =
-    ifelse(chord > 0, dot(delta_va, z_airf) / smooth_norm(chord), zero(chord))
+@inline section_pitch_rate(delta_va_vec, z_airf, chord) =
+    ifelse(chord > 0, dot(delta_va_vec, z_airf) / smooth_norm(chord), zero(chord))
 @inline section_pitch_rate(velocity_leading, velocity_trailing, z_airf, chord) =
     section_pitch_rate(velocity_leading .- velocity_trailing, z_airf, chord)
 
@@ -106,23 +106,23 @@ geometric angle still turns the force, so a lag shifts the coefficients only.
 @inline effective_alpha(alpha, deficiency) = alpha - deficiency
 
 """
-    panel_inflow(axes, va_1, va_2, v_ind, dva_1=nothing, dva_2=nothing,
+    panel_inflow(axes, va_vec_1, va_vec_2, v_ind, dva_vec_1=nothing, dva_vec_2=nothing,
                  deficiency=0)
 
 Flow a panel sees, as `(; v_eff, alpha, alpha_eff, v_span, pitch_rate)`, where
 `v_span` is the effective velocity across the span. `axes` is a
-[`panel_axes`](@ref) result. `dva_1`/`dva_2` are the sections' trailing minus
+[`panel_axes`](@ref) result. `dva_vec_1`/`dva_vec_2` are the sections' trailing minus
 leading edge apparent wind, giving the [`section_pitch_rate`](@ref); `nothing`
 leaves it zero. `deficiency` feeds [`effective_alpha`](@ref).
 """
-@inline function panel_inflow(axes, va_1, va_2, v_ind, dva_1=nothing,
-                              dva_2=nothing, deficiency=0)
+@inline function panel_inflow(axes, va_vec_1, va_vec_2, v_ind, dva_vec_1=nothing,
+                              dva_vec_2=nothing, deficiency=0)
     (; x_airf, y_airf, z_airf, chord) = axes
-    v_eff = 0.5 .* (va_1 .+ va_2) .+ v_ind
+    v_eff = 0.5 .* (va_vec_1 .+ va_vec_2) .+ v_ind
     alpha = atan(dot(v_eff, z_airf), dot(v_eff, x_airf))
     v_span = cross(v_eff, y_airf)
-    pitch_rate = isnothing(dva_1) ? zero(chord) :
-        section_pitch_rate(0.5 .* (dva_1 .+ dva_2), z_airf, chord)
+    pitch_rate = isnothing(dva_vec_1) ? zero(chord) :
+        section_pitch_rate(0.5 .* (dva_vec_1 .+ dva_vec_2), z_airf, chord)
     return (; v_eff, alpha, alpha_eff=effective_alpha(alpha, deficiency),
             v_span, pitch_rate)
 end

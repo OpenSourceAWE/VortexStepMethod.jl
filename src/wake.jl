@@ -1,6 +1,6 @@
 
 """
-    frozen_wake(body_aero::BodyAerodynamics, va_distribution)
+    frozen_wake(body_aero::BodyAerodynamics, va_vec_dist)
 
 Update the filaments of the panels with frozen wake model.
 Uses one shared wake vector computed from area-weighted distributed inflow.
@@ -9,19 +9,19 @@ Replaces older filaments if present by checking length of filaments.
 
 # Arguments
 - `body_aero`::BodyAerodynamics: see: [`BodyAerodynamics`](@ref) 
-- `va_distribution::Matrix{Float64}`: Array of velocity vectors at each panel
+- `va_vec_dist::Matrix{Float64}`: Array of velocity vectors at each panel
 
 # Returns
 - nothing
 """
-function frozen_wake!(body_aero::BodyAerodynamics, va_distribution)
+function frozen_wake!(body_aero::BodyAerodynamics, va_vec_dist)
     n_panels = length(body_aero.panels)
-    size(va_distribution) == (n_panels, 3) ||
-        throw(ArgumentError("va_distribution must be shape ($(n_panels), 3), got $(size(va_distribution))"))
+    size(va_vec_dist) == (n_panels, 3) ||
+        throw(ArgumentError("va_vec_dist must be shape ($(n_panels), 3), got $(size(va_vec_dist))"))
 
     panel_areas = [panel.chord * panel.width for panel in body_aero.panels]
     wake_velocity = _compute_reference_velocity_from_distribution(
-        va_distribution,
+        va_vec_dist,
         n_panels,
         panel_areas
     )

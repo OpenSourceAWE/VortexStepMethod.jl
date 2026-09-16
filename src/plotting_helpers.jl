@@ -76,7 +76,7 @@ end
 """
     generate_polar_data(solver, body_aero, angle_range;
         angle_type="angle_of_attack", angle_of_attack=0.0,
-        side_slip=0.0, v_a=10.0)
+        side_slip=0.0, va=10.0)
 
 Sweep over `angle_range` (degrees), solving at each angle. Returns
 a named tuple `(polar_data, cmx, cmy, cmz, rey)` where `polar_data`
@@ -90,7 +90,7 @@ function generate_polar_data(
     angle_type="angle_of_attack",
     angle_of_attack=0.0,
     side_slip=0.0,
-    v_a=10.0
+    va=10.0
 )
     n_panels = length(body_aero.panels)
     n_angles = length(angle_range)
@@ -121,7 +121,7 @@ function generate_polar_data(
         end
 
         set_va!(body_aero,
-            [cos(α) * cos(β), sin(β), sin(α)] * v_a)
+            [cos(α) * cos(β), sin(β), sin(α)] * va)
 
         results = solve(solver, body_aero,
             gamma_distribution[i, :])
