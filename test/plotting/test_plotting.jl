@@ -29,7 +29,7 @@ global ram_wing = ram_air_matrix_wing(; n_panels=20, n_sections=4,
                           alpha_range=deg2rad.(-1:1.0:1),
                           delta_range=deg2rad.(-1:1.0:1))
 
-function create_body_aero()
+function create_body_aero(; aero_model=INVISCID, aero_data=nothing)
     n_panels = 20          # Number of panels
     span = 20.0            # Wing span [m]
     chord = 1.0            # Chord length [m]
@@ -42,11 +42,11 @@ function create_body_aero()
     add_section!(wing,
         [0.0, span/2, 0.0],
         [chord, span/2, 0.0],
-        INVISCID)
+        aero_model, aero_data)
     add_section!(wing,
         [0.0, -span/2, 0.0],
         [chord, -span/2, 0.0],
-        INVISCID)
+        aero_model, aero_data)
 
     refine!(wing)
     body_aero = BodyAerodynamics([wing])
@@ -435,60 +435,72 @@ function create_body_aero_with_skin(; n_panels=4)
 end
 
 """
-The `(cl, cd, cm)` curves [`plot_section_polars`](@ref) drew for its `curve`-th panel.
+The `(cl, cd, cm)` curves `plot_section_polars` drew for its `curve`-th panel.
 """
 section_polar_curves(plt, curve) = Tuple(channel[curve] for channel in plt.Y)
 
 @testset "plot_section_polars draws cl, cd and cm per panel for every aero model" begin
     alphas = deg2rad.(-2:1.0:2)
-
     inviscid = create_body_aero()
-    plt = plot_section_polars(inviscid; panels=[1, 20], alphas, is_show=false)
-    @test plt.X ≈ rad2deg.(alphas)
-    @test length(plt.Y) == 3 && all(length(channel) == 2 for channel in plt.Y)
-    cl, cd, cm = section_polar_curves(plt, 2)
-    @test cl ≈ 2π .* alphas
-    @test all(iszero, cd) && all(iszero, cm)
-    @test length(plot_section_polars(inviscid; is_show=false).Y[1]) == 20
+    inviscid_plt = plot_section_polars(inviscid; panels=[1, 20], alphas, is_show=false)
 
-    vectors, _ = create_body_aero_with_skin()
-    plt = plot_section_polars(vectors; panels=1, alphas, is_show=false)
-    cl, cd, cm = section_polar_curves(plt, 1)
-    @test cl ≈ 0.5 .+ 0.25 .* rad2deg.(alphas)
-    @test cd ≈ fill(0.02, length(alphas)) && cm ≈ fill(-0.05, length(alphas))
+    @testset "one curve per chosen panel, all panels by default" begin
+        @test inviscid_plt.X ≈ rad2deg.(alphas)
+        @test length(inviscid_plt.Y) == 3
+        @test all(length(channel) == 2 for channel in inviscid_plt.Y)
+        all_panels = plot_section_polars(inviscid; is_show=false)
+        @test length(all_panels.Y[1]) == length(inviscid.panels)
+    end
 
-    cl_coeffs, cd_coeffs, cm_coeffs = lei_poly_coeffs(2.0, 0.5)
-    wing = Wing(2; spanwise_distribution=LINEAR)
-    add_section!(wing, [0.0, 2.0, 0.0], [1.0, 2.0, 0.0], POLY,
-                 (cl_coeffs, cd_coeffs, cm_coeffs))
-    add_section!(wing, [0.0, -2.0, 0.0], [1.0, -2.0, 0.0], POLY,
-                 (cl_coeffs, cd_coeffs, cm_coeffs))
-    refine!(wing)
-    poly = BodyAerodynamics([wing])
-    cl, cd, cm = section_polar_curves(
-        plot_section_polars(poly; panels=[2], alphas, is_show=false), 1)
-    @test cl ≈ evalpoly.(rad2deg.(alphas), Ref(cl_coeffs))
-    @test cd ≈ evalpoly.(rad2deg.(alphas), Ref(cd_coeffs))
-    @test cm ≈ evalpoly.(rad2deg.(alphas), Ref(cm_coeffs))
+    @testset "INVISCID panel is thin-airfoil lift without drag or moment" begin
+        cl, cd, cm = section_polar_curves(inviscid_plt, 2)
+        @test cl ≈ 2π .* alphas
+        @test all(iszero, cd)
+        @test all(iszero, cm)
+    end
 
-    matrices = BodyAerodynamics([ram_wing])
-    panel = matrices.panels[3]
-    flap_alphas = deg2rad.(-1:0.5:1)
-    delta = deg2rad(1.0)
-    deflected = section_polar_curves(plot_section_polars(matrices; panels=[3],
-        alphas=flap_alphas, delta, is_show=false), 1)
-    stored = section_polar_curves(plot_section_polars(matrices; panels=[3],
-        alphas=flap_alphas, is_show=false), 1)
-    @test deflected[1] ≈ panel.cl_interp.(flap_alphas, delta)
-    @test deflected[2] ≈ panel.cd_interp.(flap_alphas, delta)
-    @test deflected[3] ≈ panel.cm_interp.(flap_alphas, delta)
-    @test stored[2] ≈ panel.cd_interp.(flap_alphas, panel.delta)
-    @test deflected[2] != stored[2]
+    @testset "POLAR_VECTORS panel follows its polar table" begin
+        vectors, _ = create_body_aero_with_skin()
+        plt = plot_section_polars(vectors; panels=1, alphas, is_show=false)
+        cl, cd, cm = section_polar_curves(plt, 1)
+        @test cl ≈ 0.5 .+ 0.25 .* rad2deg.(alphas)
+        @test cd ≈ fill(0.02, length(alphas))
+        @test cm ≈ fill(-0.05, length(alphas))
+    end
 
-    save_dir = mktempdir()
-    plot_section_polars(inviscid; panels=[1], alphas, is_show=false, is_save=true,
-                        save_path=save_dir)
-    @test isfile(joinpath(save_dir, "section_polars.png"))
+    @testset "POLY panel follows its Breukels polynomials" begin
+        cl_coeffs, cd_coeffs, cm_coeffs = lei_poly_coeffs(2.0, 0.5)
+        poly = create_body_aero(; aero_model=POLY,
+                                aero_data=(cl_coeffs, cd_coeffs, cm_coeffs))
+        plt = plot_section_polars(poly; panels=2, alphas, is_show=false)
+        cl, cd, cm = section_polar_curves(plt, 1)
+        @test cl ≈ evalpoly.(rad2deg.(alphas), Ref(cl_coeffs))
+        @test cd ≈ evalpoly.(rad2deg.(alphas), Ref(cd_coeffs))
+        @test cm ≈ evalpoly.(rad2deg.(alphas), Ref(cm_coeffs))
+    end
+
+    @testset "POLAR_MATRICES panel is evaluated at the passed delta" begin
+        matrices = BodyAerodynamics([ram_wing])
+        panel = matrices.panels[3]
+        flap_alphas = deg2rad.(-1:0.5:1)
+        delta = deg2rad(1.0)
+        deflected = section_polar_curves(plot_section_polars(matrices; panels=3,
+            alphas=flap_alphas, delta, is_show=false), 1)
+        stored = section_polar_curves(plot_section_polars(matrices; panels=3,
+            alphas=flap_alphas, is_show=false), 1)
+        @test deflected[1] ≈ panel.cl_interp.(flap_alphas, delta)
+        @test deflected[2] ≈ panel.cd_interp.(flap_alphas, delta)
+        @test deflected[3] ≈ panel.cm_interp.(flap_alphas, delta)
+        @test stored[2] ≈ panel.cd_interp.(flap_alphas, panel.delta)
+        @test deflected[2] != stored[2]
+    end
+
+    @testset "is_save writes section_polars.png" begin
+        save_dir = mktempdir()
+        plot_section_polars(inviscid; panels=1, alphas, is_show=false, is_save=true,
+                            save_path=save_dir)
+        @test isfile(joinpath(save_dir, "section_polars.png"))
+    end
 end
 
 @testset "Airfoil skin (Makie)" begin

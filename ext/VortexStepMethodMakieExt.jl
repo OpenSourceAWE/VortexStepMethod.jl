@@ -1347,13 +1347,12 @@ function VortexStepMethod.plot_combined_analysis(
             xlabel="α [°]",
             ylabel="Cm")
 
-        cl_vals = [first_body.panels[1].cl_interp(a) for a in alphas]
-        cd_vals = [first_body.panels[1].cd_interp(a) for a in alphas]
-        cm_vals = [first_body.panels[1].cm_interp(a) for a in alphas]
+        panel = first_body.panels[1]
+        cl, cd, cm = panel_polar_curves([panel], alphas, panel.delta)
 
-        lines!(ax_cl_curve, alphas_deg, cl_vals; color=:blue, linewidth=2)
-        lines!(ax_cd_curve, alphas_deg, cd_vals; color=:red, linewidth=2)
-        lines!(ax_cm_curve, alphas_deg, cm_vals; color=:green, linewidth=2)
+        lines!(ax_cl_curve, alphas_deg, only(cl); color=:blue, linewidth=2)
+        lines!(ax_cd_curve, alphas_deg, only(cd); color=:red, linewidth=2)
+        lines!(ax_cm_curve, alphas_deg, only(cm); color=:green, linewidth=2)
     end
 
     # [2,1] Spanwise Distributions (3×3 grid)
@@ -1500,9 +1499,21 @@ function VortexStepMethod.plot_combined_analysis(
 end
 
 """
-    plot_section_polars(body_aero; panels=eachindex(body_aero.panels),
-                        alphas=deg2rad.(-20:0.5:30), delta=nothing, is_show=true,
-                        is_save=false, save_path=nothing, data_type=".png")
+    panel_polar_curves(panels, alphas, deltas) -> (cl, cd, cm)
+
+Lift, drag and moment coefficients of each of `panels` over `alphas` [rad], each panel
+at its flap deflection in `deltas` [rad] (or one shared deflection), as one vector per
+panel per coefficient.
+"""
+function panel_polar_curves(panels, alphas, deltas)
+    cl = collect.(eachrow(calculate_cl.(panels, alphas', deltas)))
+    cd = collect.(eachrow(calculate_cd.(panels, alphas', deltas)))
+    cm = collect.(eachrow(calculate_cm.(panels, alphas', deltas)))
+    return cl, cd, cm
+end
+
+"""
+    plot_section_polars(body_aero; kwargs...)
 
 Implementation of [`plot_section_polars`](@ref); rendered through `MakieControlPlots`.
 """
@@ -1511,16 +1522,15 @@ function VortexStepMethod.plot_section_polars(body_aero::BodyAerodynamics;
     is_show::Bool=true, is_save::Bool=false, save_path=nothing,
     data_type::String=".png")
 
-    indices = vcat(panels)
-    selected = body_aero.panels[indices]
-    deltas = something.(delta, getproperty.(selected, :delta))
-    cl = collect.(eachrow(calculate_cl.(selected, alphas', deltas)))
-    cd = collect.(eachrow(calculate_cd.(selected, alphas', deltas)))
-    cm = collect.(eachrow(calculate_cm.(selected, alphas', deltas)))
-    labels = ["panel $i ($(panel.aero_model))" for (i, panel) in zip(indices, selected)]
+    panel_indices = vcat(panels)
+    chosen_panels = body_aero.panels[panel_indices]
+    deltas = something.(delta, getproperty.(chosen_panels, :delta))
+    cl, cd, cm = panel_polar_curves(chosen_panels, alphas, deltas)
+    labels = ["panel $i ($(panel.aero_model))"
+              for (i, panel) in zip(panel_indices, chosen_panels)]
 
     plt = MakieControlPlots.plotx(rad2deg.(alphas), cl, cd, cm;
-        xlabel="α [deg]", ylabels=["cl", "cd", "cm"], title="Panel polars",
+        xlabel="α [deg]", ylabels=["cl", "cd", "cm"], title="Section polars",
         labels=[labels], disp=(is_show || is_save))
 
     if is_save && !isnothing(save_path)
