@@ -19,7 +19,7 @@ Example output is shown in the figure below, where the aerodynamic predictions o
 ![Example output](docs/v3_example_output.png)
 
 ## Installation
-Install [Julia 1.10](https://ufechner7.github.io/2024/08/09/installing-julia-with-juliaup.html) or later, 
+Install [Julia 1.12](https://ufechner7.github.io/2024/08/09/installing-julia-with-juliaup.html) or later, 
 if you haven't already.
 
 Before installing this software it is suggested to create a new project, for
