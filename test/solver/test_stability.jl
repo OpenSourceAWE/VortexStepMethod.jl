@@ -59,8 +59,8 @@ end
         trim = only(trims)
         @test abs(coeffs_at(solver, body_aero, trim.alpha, beta, wind_speed)[5]) < 1e-5
         @test trim.dCMy_dalpha < 0
-        @test trim.dCMy_dalpha ≈
-              stability_derivatives(solver, body_aero, trim.alpha, beta, wind_speed).dalpha[5]
+        derivatives = stability_derivatives(solver, body_aero, trim.alpha, beta, wind_speed)
+        @test trim.dCMy_dalpha ≈ derivatives.dalpha[5]
     end
 
     @testset "moments about the trailing edge: unstable trim" begin

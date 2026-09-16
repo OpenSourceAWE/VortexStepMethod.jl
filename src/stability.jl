@@ -14,8 +14,10 @@ function stability_derivatives(solver::Solver, body_aero::BodyAerodynamics, alph
     va = apparent_wind(alpha, beta, wind_speed)
     jac, results, converged = linearize(solver, body_aero, va;
         theta_idxs=nothing, va_idxs=1:3, aero_coeffs=true, kwargs...)
-    dva_dalpha = ForwardDiff.derivative(a -> apparent_wind(a, beta, wind_speed), alpha)
-    dva_dbeta = ForwardDiff.derivative(b -> apparent_wind(alpha, b, wind_speed), beta)
+    dva_dalpha = ForwardDiff.derivative(
+        angle -> apparent_wind(angle, beta, wind_speed), alpha)
+    dva_dbeta = ForwardDiff.derivative(
+        angle -> apparent_wind(alpha, angle, wind_speed), beta)
     coeff_jac = jac[1:6, :]
     return (coeffs=results[1:6], dalpha=coeff_jac * dva_dalpha,
         dbeta=coeff_jac * dva_dbeta, converged)
@@ -33,13 +35,14 @@ stable where `dCMy_dalpha < 0`.
 """
 function trim_angle(solver::Solver, body_aero::BodyAerodynamics, beta, wind_speed;
         alpha_range=deg2rad.(-5:2:15), alpha_tol=1e-5, kwargs...)
+    is_nose_down =
+        alpha -> pitch_moment_coeff(solver, body_aero, alpha, beta, wind_speed) < 0
+    nose_down = is_nose_down.(alpha_range)
     trims = @NamedTuple{alpha::Float64, dCMy_dalpha::Float64}[]
-    nose_down = [pitch_moment_coeff(solver, body_aero, alpha, beta, wind_speed) < 0
-                 for alpha in alpha_range]
     for i in 1:length(alpha_range)-1
         nose_down[i] == nose_down[i+1] && continue
-        alpha = bisect_trim(solver, body_aero, alpha_range[i], alpha_range[i+1],
-            nose_down[i], beta, wind_speed, alpha_tol)
+        alpha = bisect_sign_change(is_nose_down, alpha_range[i], alpha_range[i+1],
+            alpha_tol)
         derivatives = stability_derivatives(solver, body_aero, alpha, beta, wind_speed;
             kwargs...)
         push!(trims, (alpha=alpha, dCMy_dalpha=derivatives.dalpha[5]))
@@ -59,23 +62,20 @@ function pitch_moment_coeff(solver, body_aero, alpha, beta, wind_speed)
 end
 
 """
-    bisect_trim(solver, body_aero, alpha_low, alpha_high, nose_down_low, beta, wind_speed,
-                alpha_tol)
+    bisect_sign_change(predicate, low, high, tol)
 
-Bisect `[alpha_low, alpha_high]` [rad], across which the sign of `CMy` changes and
-`nose_down_low` is whether it is negative at `alpha_low`, to a width of `alpha_tol` [rad],
-and return its midpoint.
+Bisect `[low, high]`, across which the boolean `predicate` flips, to a width of `tol` and
+return the midpoint.
 """
-function bisect_trim(solver, body_aero, alpha_low, alpha_high, nose_down_low, beta,
-        wind_speed, alpha_tol)
-    while alpha_high - alpha_low > alpha_tol
-        alpha = (alpha_low + alpha_high) / 2
-        nose_down = pitch_moment_coeff(solver, body_aero, alpha, beta, wind_speed) < 0
-        if nose_down == nose_down_low
-            alpha_low = alpha
+function bisect_sign_change(predicate, low, high, tol)
+    predicate_low = predicate(low)
+    while high - low > tol
+        middle = (low + high) / 2
+        if predicate(middle) == predicate_low
+            low = middle
         else
-            alpha_high = alpha
+            high = middle
         end
     end
-    return (alpha_low + alpha_high) / 2
+    return (low + high) / 2
 end
