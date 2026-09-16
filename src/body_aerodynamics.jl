@@ -260,13 +260,13 @@ which run over the unrefined sections of all wings in order; `nothing` leaves th
 unchanged. Call [`reinit!`](@ref) afterwards to update the panels.
 """
 function unrefined_deform!(body_aero::BodyAerodynamics, theta_angles, delta_angles)
-    first_section = 1
+    section_offset = 0
     for wing in body_aero.wings
-        wing_sections = first_section:first_section + wing.n_unrefined_sections - 1
+        section_idxs = section_offset .+ (1:wing.n_unrefined_sections)
         unrefined_deform!(wing,
-            isnothing(theta_angles) ? nothing : view(theta_angles, wing_sections),
-            isnothing(delta_angles) ? nothing : view(delta_angles, wing_sections))
-        first_section += wing.n_unrefined_sections
+            isnothing(theta_angles) ? nothing : view(theta_angles, section_idxs),
+            isnothing(delta_angles) ? nothing : view(delta_angles, section_idxs))
+        section_offset += wing.n_unrefined_sections
     end
     return nothing
 end

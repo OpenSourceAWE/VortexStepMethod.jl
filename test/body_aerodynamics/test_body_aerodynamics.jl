@@ -513,15 +513,23 @@ function solve_wings(wings)
 end
 
 """
-    linearize_wings(wings; kwargs...)
+    wing_pair(section_y, n_panels, offset)
 
-`linearize` at zero twist and deflection of the body [`solve_wings`](@ref) builds from
-`wings`, over the twist and the deflection of every unrefined section, then the inflow
-and the angular rate.
+Two `inviscid_wing`s of `n_panels` panels, the second shifted by `-offset` [m] in y.
 """
-function linearize_wings(wings; kwargs...)
-    n_sections = sum(wing -> wing.n_unrefined_sections, wings)
-    body_aero = BodyAerodynamics(wings; va=[10.0, 0.0, 1.0])
+function wing_pair(section_y, n_panels, offset)
+    return [inviscid_wing(section_y; n_panels),
+            inviscid_wing(section_y .- offset; n_panels)]
+end
+
+"""
+    linearize_body(body_aero; kwargs...)
+
+`linearize` of `body_aero` at zero twist and deflection over the twist and the deflection of
+every unrefined section, then the inflow and the angular rate.
+"""
+function linearize_body(body_aero; kwargs...)
+    n_sections = sum(wing -> wing.n_unrefined_sections, body_aero.wings)
     solver = Solver(body_aero; use_gamma_prev=false, rtol=1e-10)
     y0 = [zeros(2n_sections); body_aero.va; zeros(3)]
     return VortexStepMethod.linearize(solver, body_aero, y0;
@@ -538,9 +546,7 @@ end
     @test single.solver_status == FEASIBLE
 
     @testset "wings far apart each act as the isolated wing" begin
-        wings = [inviscid_wing(section_y; n_panels),
-                 inviscid_wing(section_y .- 1e4; n_panels)]
-        body_aero, sol = solve_wings(wings)
+        body_aero, sol = solve_wings(wing_pair(section_y, n_panels, 1e4))
 
         @test length(body_aero.panels) == 2n_panels
         @test sol.solver_status == FEASIBLE
@@ -552,9 +558,7 @@ end
     end
 
     @testset "wings one chord apart induce on each other" begin
-        wings = [inviscid_wing(section_y; n_panels),
-                 inviscid_wing(section_y .- (span + 1.0); n_panels)]
-        _, sol = solve_wings(wings)
+        _, sol = solve_wings(wing_pair(section_y, n_panels, span + 1.0))
         gamma = sol.gamma_distribution
 
         @test sol.solver_status == FEASIBLE
@@ -563,31 +567,30 @@ end
         @test sol.force[3] > 2single.force[3]
     end
 
-    n_sections = 2length(section_y)
+    n_wing_sections = length(section_y)
     @testset "linearize: theta of each wing moves that wing's sections" begin
-        wings = [inviscid_wing(section_y; n_panels),
-                 inviscid_wing(section_y .- 1e4; n_panels)]
-        jac, _, converged = linearize_wings(wings)
-        wing_rows = (7:6+length(section_y), 7+length(section_y):6+n_sections)
-        wing_columns = (1:length(section_y), length(section_y)+1:n_sections)
+        body_aero, _ = solve_wings(wing_pair(section_y, n_panels, 1e4))
+        jac, _, converged = linearize_body(body_aero)
+        first_sections = 1:n_wing_sections
+        second_sections = n_wing_sections+1:2n_wing_sections
+        own_first = jac[6 .+ first_sections, first_sections]
 
         @test converged
-        @test norm(jac[wing_rows[1], wing_columns[1]]) > 0
-        @test jac[wing_rows[2], wing_columns[2]] ≈ jac[wing_rows[1], wing_columns[1]] rtol=1e-4
-        @test norm(jac[wing_rows[1], wing_columns[2]]) < 1e-4norm(jac[wing_rows[1], wing_columns[1]])
-        @test norm(jac[wing_rows[2], wing_columns[1]]) < 1e-4norm(jac[wing_rows[1], wing_columns[1]])
+        @test norm(own_first) > 0
+        @test jac[6 .+ second_sections, second_sections] ≈ own_first rtol=1e-4
+        @test norm(jac[6 .+ first_sections, second_sections]) < 1e-4norm(own_first)
+        @test norm(jac[6 .+ second_sections, first_sections]) < 1e-4norm(own_first)
     end
 
     @testset "linearize: AutoForwardDiff matches AutoFiniteDiff" begin
-        wings = [inviscid_wing(section_y; n_panels),
-                 inviscid_wing(section_y .- (span + 1.0); n_panels)]
-        jac_fwd, _, fwd_converged = linearize_wings(wings)
-        jac_fd, _, fd_converged = linearize_wings(wings; backend=nothing,
+        body_aero, _ = solve_wings(wing_pair(section_y, n_panels, span + 1.0))
+        jac_fwd, _, fwd_converged = linearize_body(body_aero)
+        jac_fd, _, fd_converged = linearize_body(body_aero; backend=nothing,
             fd_absstep=1e-6, fd_relstep=1e-6)
 
         @test fwd_converged
         @test fd_converged
-        @test norm(jac_fwd[:, 1:n_sections]) > 0
+        @test norm(jac_fwd[:, 1:2n_wing_sections]) > 0
         @test jac_fwd ≈ jac_fd rtol=1e-4
     end
 end

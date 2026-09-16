@@ -1177,8 +1177,10 @@ function _wing_with_eltype(wing::Wing{P, Float64}, ::Type{TD}) where {P, TD}
         wing.spanwise_distribution,
         PanelProperties{P, TD}(),
         MVector{3, TD}(wing.spanwise_direction),
-        Section{TD}[_section_with_eltype(s, TD) for s in wing.unrefined_sections],
-        Section{TD}[_section_with_eltype(s, TD) for s in wing.refined_sections],
+        Section{TD}[_section_with_eltype(section, TD)
+                    for section in wing.unrefined_sections],
+        Section{TD}[_section_with_eltype(section, TD)
+                    for section in wing.refined_sections],
         wing.remove_nan,
         wing.use_prior_polar,
         wing.billowing_percentage,
@@ -1186,7 +1188,8 @@ function _wing_with_eltype(wing::Wing{P, Float64}, ::Type{TD}) where {P, TD}
         copy(wing.refined_panel_mapping),
         copy(wing.refined_section_left_idx),
         Vector{TD}(wing.refined_section_weight),
-        Section{TD}[_section_with_eltype(s, TD) for s in wing.non_deformed_sections],
+        Section{TD}[_section_with_eltype(section, TD)
+                    for section in wing.non_deformed_sections],
         Vector{TD}(wing.theta_dist),
         Vector{TD}(wing.delta_dist),
         TD(wing.mass),
@@ -1261,7 +1264,7 @@ Returns `(jac, results, converged)` where `results` is `(F, M, moment_unrefined_
 or the corresponding coefficients when `aero_coeffs=true` — and `converged` is `false` (with a
 warning) if any internal solve missed the solver's tolerances.
 """
-function linearize(solver::Solver{P, U}, body_aero::BodyAerodynamics, y::Vector{T};
+function linearize(solver::Solver{<:Any, U}, body_aero::BodyAerodynamics, y::Vector{T};
         theta_idxs=1:4,
         delta_idxs=nothing,
         va_idxs=nothing,
@@ -1270,11 +1273,12 @@ function linearize(solver::Solver{P, U}, body_aero::BodyAerodynamics, y::Vector{
         backend = AutoForwardDiff(),
         fd_absstep::Float64=1e-8,
         fd_relstep::Float64=1e-8,
-        kwargs...) where {P, U, T}
+        kwargs...) where {U, T}
 
     for (name, idxs) in (("theta_idxs", theta_idxs), ("delta_idxs", delta_idxs))
         isnothing(idxs) || length(idxs) == U || throw(ArgumentError(
-            "Length of $name ($(length(idxs))) must match number of unrefined sections ($U)"))
+            "Length of $name ($(length(idxs))) must match number of unrefined sections " *
+            "($U)"))
     end
 
     n_failed = Ref(0)
@@ -1302,8 +1306,8 @@ function linearize(solver::Solver{P, U}, body_aero::BodyAerodynamics, y::Vector{
         end
 
         va = isnothing(va_idxs) ? MVector{3, TI}(body_aero_c._va) : y_in[va_idxs]
-        om = isnothing(omega_idxs) ? MVector{3, TI}(body_aero_c.omega) : y_in[omega_idxs]
-        set_va!(body_aero_c, va, om)
+        omega = isnothing(omega_idxs) ? MVector{3, TI}(body_aero_c.omega) : y_in[omega_idxs]
+        set_va!(body_aero_c, va, omega)
 
         solve!(solver_c, body_aero_c; kwargs...)
         solver_c.lr.converged || (n_failed[] += 1)
@@ -1319,13 +1323,13 @@ function linearize(solver::Solver{P, U}, body_aero::BodyAerodynamics, y::Vector{
         return nothing
     end
 
-    n_results = 3 + 3 + length(solver.sol.moment_unrefined_dist)
+    n_results = 3 + 3 + U
     jac = zeros(n_results, length(y))
     results = zeros(n_results)
-    be = backend === nothing ?
+    ad_backend = backend === nothing ?
         AutoFiniteDiff(absstep=fd_absstep, relstep=fd_relstep) : backend
-    prep = prepare_jacobian(calc_results!, results, be, y)
-    jacobian!(calc_results!, results, jac, prep, be, y)
+    prep = prepare_jacobian(calc_results!, results, ad_backend, y)
+    jacobian!(calc_results!, results, jac, prep, ad_backend, y)
     calc_results!(results, y)
     converged = n_failed[] == 0
     if !converged
