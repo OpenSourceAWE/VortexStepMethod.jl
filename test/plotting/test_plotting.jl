@@ -32,7 +32,7 @@ function create_body_aero()
     n_panels = 20          # Number of panels
     span = 20.0            # Wing span [m]
     chord = 1.0            # Chord length [m]
-    v_a = 20.0             # Magnitude of inflow velocity [m/s]
+    va = 20.0              # Magnitude of inflow velocity [m/s]
     alpha_deg = 30.0       # Angle of attack [degrees]
     alpha = deg2rad(alpha_deg)
 
@@ -49,8 +49,8 @@ function create_body_aero()
 
     refine!(wing)
     body_aero = BodyAerodynamics([wing])
-    vel_app = [cos(alpha), 0.0, sin(alpha)] .* v_a
-    set_va!(body_aero, vel_app)
+    va_vec = [cos(alpha), 0.0, sin(alpha)] .* va
+    set_va!(body_aero, va_vec)
     body_aero
 end
 
@@ -98,7 +98,7 @@ end
     @test fig isa Figure
 
     # Plot polar curves
-    v_a = 20.0
+    va = 20.0
     angle_range = range(0, 20, 20)
     fig = plot_polars(
         [llt_solver, vsm_solver],
@@ -106,7 +106,7 @@ end
         ["VSM", "LLT"],
         angle_range=angle_range,
         angle_type="angle_of_attack",
-        v_a=v_a,
+        v_a=va,
         title="Rectangular Wing Polars",
         data_type=".png",
         save_path=save_dir,
@@ -123,7 +123,7 @@ end
         ["VSM", "LLT"],
         angle_range=angle_range,
         angle_type="angle_of_attack",
-        v_a=v_a,
+        v_a=va,
         title="Polars CL vs CD",
         is_save=false,
         is_show=false,
@@ -137,7 +137,7 @@ end
         angle_range=angle_range,
         angle_type="angle_of_attack",
         angle_of_attack=30.0,
-        v_a=v_a,
+        v_a=va,
         title="Combined Analysis",
         is_save=false,
         is_show=false,
@@ -151,7 +151,7 @@ end
         angle_range=angle_range,
         angle_type="angle_of_attack",
         angle_of_attack=30.0,
-        v_a=v_a,
+        v_a=va,
         title="Combined CL vs CD",
         is_save=false,
         is_show=false,
@@ -182,8 +182,8 @@ end
 
     body_aero_distributed = create_body_aero()
     n_panels = length(body_aero_distributed.panels)
-    va_distribution = repeat([12.0 0.0 1.0], n_panels, 1)
-    set_va!(body_aero_distributed, va_distribution)
+    va_vec_dist = repeat([12.0 0.0 1.0], n_panels, 1)
+    set_va!(body_aero_distributed, va_vec_dist)
 
     @test body_aero_distributed.has_distributed_va
     fig = plot_geometry(

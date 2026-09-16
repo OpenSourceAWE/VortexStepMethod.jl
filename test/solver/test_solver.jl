@@ -25,8 +25,8 @@ end
             @test solver.density == 1.225
 
             # Test that the solver can solve
-            va = [10.0, 0.0, 0.0]
-            set_va!(body_aero, va)
+            va_vec = [10.0, 0.0, 0.0]
+            set_va!(body_aero, va_vec)
             sol = solve!(solver, body_aero)
             @test sol isa VSMSolution
 
@@ -81,16 +81,16 @@ end
         wing = Wing(settings)
         refine!(wing)
         body_aero = BodyAerodynamics([wing])
-        va = [10.0, 0.0, 5.0]   # 26.6 deg angle of attack, past stall
+        va_vec = [10.0, 0.0, 5.0]   # 26.6 deg angle of attack, past stall
         nonlin = Solver(body_aero; solver_type=NONLIN, aerodynamic_model_type=VSM,
             type_initial_gamma_distribution=ELLIPTIC)
         loop = Solver(body_aero; solver_type=LOOP, aerodynamic_model_type=VSM,
             type_initial_gamma_distribution=ELLIPTIC)
 
-        set_va!(body_aero, va)
+        set_va!(body_aero, va_vec)
         sol_nonlin = solve!(nonlin, body_aero)
         gamma_nonlin = copy(sol_nonlin.gamma_distribution)
-        set_va!(body_aero, va)
+        set_va!(body_aero, va_vec)
         sol_loop = solve!(loop, body_aero)
 
         @test sol_nonlin.solver_status == FEASIBLE
@@ -128,8 +128,8 @@ end
         solver = Solver(body_aero; solver_type=LOOP, aerodynamic_model_type=VSM,
             type_initial_gamma_distribution=ELLIPTIC)
 
-        for va in ([10.0, 0.0, 0.0], [10.0, 0.0, 5.0])   # 0 deg, and 26.6 deg past stall
-            set_va!(body_aero, va)
+        for va_vec in ([10.0, 0.0, 0.0], [10.0, 0.0, 5.0])   # 0 deg, and 26.6 deg past stall
+            set_va!(body_aero, va_vec)
             gamma = copy(solve!(solver, body_aero).gamma_distribution)
             @test solver.lr.converged
             residual = maximum(abs, unrelaxed_step(body_aero, gamma) .- gamma)

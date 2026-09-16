@@ -162,16 +162,16 @@ end
 
     @testset "Constant azimuthal direction inside core" begin
         filament = create_test_filament2()
-        v_a = filament.vel_mag
+        va = filament.vel_mag
 
         d_inside = 1e-4
         v1 = zeros(3); v2 = zeros(3)
         velocity_3D_trailing_vortex_semiinfinite!(
             v1, filament, filament.direction,
-            [0.5, d_inside, 0.0], gamma, v_a, work_vectors)
+            [0.5, d_inside, 0.0], gamma, va, work_vectors)
         velocity_3D_trailing_vortex_semiinfinite!(
             v2, filament, filament.direction,
-            [0.5, 2 * d_inside, 0.0], gamma, v_a, work_vectors)
+            [0.5, 2 * d_inside, 0.0], gamma, va, work_vectors)
 
         @test isapprox(normalize(v2), normalize(v1); atol=1e-8)
     end
