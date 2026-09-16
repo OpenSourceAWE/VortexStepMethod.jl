@@ -9,6 +9,21 @@ if !@isdefined(create_temp_wing_settings)
     include("../test_data_utils.jl")
 end
 
+"""
+    inviscid_wing(section_y; n_panels=length(section_y) - 1)
+
+A refined flat `INVISCID` wing of unit chord [m] in the plane z = 0, with one section at
+each spanwise position in `section_y` [m].
+"""
+function inviscid_wing(section_y; n_panels=length(section_y) - 1)
+    wing = Wing(n_panels)
+    for y in section_y
+        add_section!(wing, [0.0, y, 0.0], [1.0, y, 0.0], INVISCID)
+    end
+    refine!(wing)
+    return wing
+end
+
 @testset "Induction Matrix Creation" begin
     # Setup
     n_panels = 3
@@ -119,12 +134,7 @@ end
 
 @testset "Wing Geometry Creation" begin
     @testset "Origin Translation" begin
-        # Create minimal wing with three sections (2 panels)
-        wing = Wing(2)
-        add_section!(wing, [0.0, 0.0, 0.0], [1.0, 0.0, 0.0], INVISCID)
-        add_section!(wing, [0.0, 1.0, 0.0], [1.0, 1.0, 0.0], INVISCID)
-        add_section!(wing, [0.0, 2.0, 0.0], [1.0, 2.0, 0.0], INVISCID)
-        refine!(wing)
+        wing = inviscid_wing([0.0, 1.0, 2.0])
 
         # Test non-zero origin translation
         origin = MVec3(1.0, 2.0, 3.0)
@@ -443,12 +453,7 @@ end
 end
 
 @testset "set_va! with distributed inflow blocks body_aero.va access" begin
-    wing = Wing(2)
-    add_section!(wing, [0.0, 0.0, 0.0], [1.0, 0.0, 0.0], INVISCID)
-    add_section!(wing, [0.0, 1.0, 0.0], [1.0, 1.0, 0.0], INVISCID)
-    add_section!(wing, [0.0, 2.0, 0.0], [1.0, 2.0, 0.0], INVISCID)
-    refine!(wing)
-    body_aero = BodyAerodynamics([wing])
+    body_aero = BodyAerodynamics([inviscid_wing([0.0, 1.0, 2.0])])
 
     va_distribution = [
         10.0 0.0 0.0
@@ -471,19 +476,8 @@ end
 end
 
 @testset "set_va! with omega on multi-wing body" begin
-    wing1 = Wing(2; spanwise_distribution=UNCHANGED)
-    add_section!(wing1, [0.0, 0.0, 0.0], [1.0, 0.0, 0.0], INVISCID)
-    add_section!(wing1, [0.0, 1.0, 0.0], [1.0, 1.0, 0.0], INVISCID)
-    add_section!(wing1, [0.0, 2.0, 0.0], [1.0, 2.0, 0.0], INVISCID)
-
-    wing2 = Wing(2; spanwise_distribution=UNCHANGED)
-    add_section!(wing2, [0.0, 10.0, 0.0], [1.0, 10.0, 0.0], INVISCID)
-    add_section!(wing2, [0.0, 11.0, 0.0], [1.0, 11.0, 0.0], INVISCID)
-    add_section!(wing2, [0.0, 12.0, 0.0], [1.0, 12.0, 0.0], INVISCID)
-
-    refine!(wing1)
-    refine!(wing2)
-    body_aero = BodyAerodynamics([wing1, wing2])
+    body_aero = BodyAerodynamics([inviscid_wing([0.0, 1.0, 2.0]),
+                                  inviscid_wing([10.0, 11.0, 12.0])])
 
     va = [10.0, 0.0, 0.0]
     omega = [0.0, 0.0, 1.0]
@@ -509,37 +503,25 @@ end
 end
 
 """
-    rectangular_wing(y_center; n_panels=6, span=4.0, chord=1.0)
+    solve_wings(wings)
 
-A refined flat rectangular `INVISCID` wing with three sections, centred at `y_center`.
+The `BodyAerodynamics` built from `wings` in a 10 m/s inflow and its `solve!` solution.
 """
-function rectangular_wing(y_center; n_panels=6, span=4.0, chord=1.0)
-    wing = Wing(n_panels; spanwise_distribution=LINEAR)
-    for y in (span / 2, 0.0, -span / 2)
-        add_section!(wing, [0.0, y_center + y, 0.0], [chord, y_center + y, 0.0], INVISCID)
-    end
-    refine!(wing)
-    return wing
-end
-
-"""
-    solve_wings(wings; va=[10.0, 0.0, 1.0])
-
-The `BodyAerodynamics` built from `wings` and its `solve!` solution.
-"""
-function solve_wings(wings; va=[10.0, 0.0, 1.0])
-    body_aero = BodyAerodynamics(wings; va)
+function solve_wings(wings)
+    body_aero = BodyAerodynamics(wings; va=[10.0, 0.0, 1.0])
     return body_aero, solve!(Solver(body_aero), body_aero)
 end
 
 @testset "solve! on a two-wing body" begin
     n_panels = 6
-    span = 4.0
-    single_aero, single = solve_wings([rectangular_wing(0.0; n_panels, span)])
+    section_y = [2.0, 0.0, -2.0]
+    span = section_y[1] - section_y[end]
+    single_aero, single = solve_wings([inviscid_wing(section_y; n_panels)])
+    @test single.solver_status == FEASIBLE
 
     @testset "wings far apart each act as the isolated wing" begin
-        wings = [rectangular_wing(0.0; n_panels, span),
-                 rectangular_wing(-1e4; n_panels, span)]
+        wings = [inviscid_wing(section_y; n_panels),
+                 inviscid_wing(section_y .- 1e4; n_panels)]
         body_aero, sol = solve_wings(wings)
 
         @test length(body_aero.panels) == 2n_panels
@@ -552,8 +534,8 @@ end
     end
 
     @testset "wings one chord apart induce on each other" begin
-        wings = [rectangular_wing(0.0; n_panels, span),
-                 rectangular_wing(-(span + 1.0); n_panels, span)]
+        wings = [inviscid_wing(section_y; n_panels),
+                 inviscid_wing(section_y .- (span + 1.0); n_panels)]
         _, sol = solve_wings(wings)
         gamma = sol.gamma_distribution
 
