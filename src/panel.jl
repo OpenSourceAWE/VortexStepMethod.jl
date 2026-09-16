@@ -600,7 +600,7 @@ Calculate filaments for plotting with their positions and colors.
   - Color string
 """
 function calculate_filaments_for_plotting(panel::Panel)
-    filaments_plot = []
+    filaments_plot = Tuple{Vector{Float64}, Vector{Float64}, String}[]
     
     for (i, filament) in enumerate(panel.filaments)
         x1 = filament.x1
