@@ -180,6 +180,25 @@ end
     @test all(small .== 0.0)
 end
 
+@testset "smooth_circulation! damps a rough interior, clears damp when smooth" begin
+    rough = [0.0, 1.0, 3.0, 1.0, 0.0]
+    damp = zeros(5)
+    @test VortexStepMethod.smooth_circulation!(damp, rough, 0.1, 0.5) === true
+    @test damp ≈ [0.0, 7/18, -7/9, 7/18, 0.0]
+    @test sum(rough .+ damp) ≈ sum(rough)
+
+    # `damp` still holds the rough correction from above.
+    smooth = [0.0, 1.0, 1.0, 1.0, 0.0]
+    @test VortexStepMethod.smooth_circulation!(damp, smooth, 0.1, 0.5) === false
+    @test all(iszero, damp)
+
+    no_interior_differences = [0.0, 2.0, 0.0]
+    damp_short = ones(3)
+    @test VortexStepMethod.smooth_circulation!(damp_short, no_interior_differences,
+        0.1, 0.5) === false
+    @test all(iszero, damp_short)
+end
+
 """
     flat_plate_wing(; n_panels=20, span=20.0, chord=1.0)
 

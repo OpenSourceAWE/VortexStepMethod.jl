@@ -6,6 +6,11 @@
 
 - Requires Julia 1.12 or 1.13; 1.10 and 1.11 keep resolving v5.1.1.
 
+### Fixed
+
+- With `artificial_damping` on, an iteration whose circulation is already smooth no longer
+  re-applies the previous iteration's damping correction.
+
 ## VortexStepMethod v5.1.1 2026-09-12
 
 ### Fixed
