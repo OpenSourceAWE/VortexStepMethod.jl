@@ -5,8 +5,10 @@
 ### Added
 
 - `stability_derivatives` gives the force and moment coefficients and their derivatives
-  with respect to angle of attack and sideslip, and `trim_angle` the angles of attack at
-  which `CMy` changes sign, with the slope that says whether each trim is stable.
+  with respect to angle of attack, sideslip and the nondimensional roll, pitch and yaw
+  rates p̂ = pb/2V, q̂ = q c_ref/2V, r̂ = rb/2V, turning about `solver.reference_point`,
+  and `trim_angle` the angles of attack at which `CMy` changes sign, with the slope that
+  says whether each trim is stable.
 - `set_va!(body_aero, va, omega; reference_point)` turns the body about
   `reference_point` [m] instead of the origin. The point is stored on
   `BodyAerodynamics`, starts at the origin, and is kept by later `set_va!`, `reinit!`
