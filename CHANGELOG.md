@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### Added
+
+- `Solver(settings)` and `Solver(n_panels, n_unrefined_sections)` build a solver without
+  a `BodyAerodynamics`; keyword arguments override the settings.
+
+### Fixed
+
+- `solve!` and `solve` throw a `DimensionMismatch` naming both sizes for a `body_aero` whose
+  panel or unrefined-section count differs from the solver's, where they failed on a
+  broadcast partway through or silently left section results at zero.
+
 ### Changed
 
 - Requires Julia 1.12 or 1.13; 1.10 and 1.11 keep resolving v5.1.1.

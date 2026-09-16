@@ -30,6 +30,29 @@ end
             sol = solve!(solver, body_aero)
             @test sol isa VSMSolution
 
+            @testset "Solver from VSMSettings alone matches the one on body_aero" begin
+                solver_from_settings = Solver(settings)
+                @test solver_from_settings isa typeof(solver)
+                @test solve!(solver_from_settings, body_aero).force ≈ sol.force
+                @test Solver(settings; density=1.0).density == 1.0
+            end
+
+            @testset "Solver from panel and section counts" begin
+                n_sections = wing.n_unrefined_sections
+                solver_from_counts = Solver(wing.n_panels, n_sections)
+                @test solver_from_counts isa typeof(solver)
+                @test solve!(solver_from_counts, body_aero).force ≈ sol.force
+            end
+
+            @testset "solve refuses a body_aero sized for another solver" begin
+                n_sections = wing.n_unrefined_sections
+                for other in (Solver(wing.n_panels + 1, n_sections),
+                              Solver(wing.n_panels, n_sections + 1))
+                    @test_throws DimensionMismatch solve!(other, body_aero)
+                    @test_throws "Solver built for" solve!(other, body_aero)
+                    @test_throws DimensionMismatch solve(other, body_aero)
+                end
+            end
         finally
             # Cleanup
             rm(settings_file; force=true)
