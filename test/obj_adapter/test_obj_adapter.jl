@@ -113,6 +113,11 @@ obj_path = normpath(joinpath(@__DIR__, "..", "..",
                                            tables) == ""
     end
 
+    @testset "center_to_com! rejects non-triangular faces" begin
+        verts = [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [1.0, 1.0, 0.0]]
+        @test_throws ArgumentError center_to_com!(verts, [[1, 2, 3, 4]]; prn=false)
+    end
+
     @testset "write_yaml emits nested and scalar values" begin
         dir = mktempdir()
         nested = joinpath(dir, "nested.yaml")

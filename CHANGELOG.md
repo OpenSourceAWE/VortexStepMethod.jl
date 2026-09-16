@@ -4,9 +4,9 @@
 
 ### Changed
 
-- BREAKING: `ObjAdapter` no longer exports `center_to_com!`, `calculate_inertia_tensor`
-  or `calc_inertia_y_rotation`; they are gone. Mesh mass properties are computed by
-  SymbolicAWEModels, which reads the mesh with `read_faces`.
+- `ObjAdapter.center_to_com!`, `calculate_inertia_tensor` and `calc_inertia_y_rotation`
+  are deprecated and will be removed in the next breaking release. Mesh mass properties
+  are computed by SymbolicAWEModels, which reads the mesh with `read_faces`.
 - Requires Julia 1.12 or 1.13; 1.10 and 1.11 keep resolving v5.1.1.
 
 ## VortexStepMethod v5.1.1 2026-09-12
