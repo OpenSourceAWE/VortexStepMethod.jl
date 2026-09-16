@@ -60,6 +60,9 @@ test/
 │   └── test_polars.jl
 ├── ram_geometry/               # Tests for src/ram_geometry.jl
 │   └── test_kite_geometry.jl
+├── verification/               # Python verification cases: wings against theory, CFD and RANS
+│   ├── test_verification.jl
+│   └── data/                   # Section polars and reference results
 ├── wake/                       # Tests for src/wake.jl
 │   └── test_wake.jl
 ├── wing_geometry/              # Tests for src/wing_geometry.jl
