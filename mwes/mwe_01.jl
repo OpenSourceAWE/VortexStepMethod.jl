@@ -1,4 +1,4 @@
-# Replace va_norm_dist = norm.(eachrow(solver.sol.va_dist)) with a for loop
+# Replace va_norm_dist = norm.(eachrow(solver.sol._va_dist)) with a for loop
 
 # Testcase that shows that the new function is equivalent to the old, allocating line of code.
 using Test
@@ -32,8 +32,8 @@ end
     n = @allocated va_norm_dist = norm.(eachrow(mock_solver.sol.va_dist))
     println(n)
 
-    va_norm_array2 = zeros(3)
-    m = @allocated calc_norm_dist!(va_norm_array2, sample_va_dist)
+    va_norm_dist2 = zeros(3)
+    m = @allocated calc_norm_dist!(va_norm_dist2, sample_va_dist)
     println(m)
 
     # Expected results (calculated manually)
@@ -52,12 +52,12 @@ end
     @test va_norm_dist[2] ≈ norm(sample_va_dist[2, :]) atol=1e-10
     @test va_norm_dist[3] ≈ norm(sample_va_dist[3, :]) atol=1e-10
 
-    @test length(va_norm_array2) == size(sample_va_dist, 1)
-    @test va_norm_array2 ≈ expected_norms atol=1e-10
+    @test length(va_norm_dist2) == size(sample_va_dist, 1)
+    @test va_norm_dist2 ≈ expected_norms atol=1e-10
 
     # Test individual values
-    @test va_norm_array2[1] ≈ norm(sample_va_dist[1, :]) atol=1e-10
-    @test va_norm_array2[2] ≈ norm(sample_va_dist[2, :]) atol=1e-10
-    @test va_norm_array2[3] ≈ norm(sample_va_dist[3, :]) atol=1e-10
+    @test va_norm_dist2[1] ≈ norm(sample_va_dist[1, :]) atol=1e-10
+    @test va_norm_dist2[2] ≈ norm(sample_va_dist[2, :]) atol=1e-10
+    @test va_norm_dist2[3] ≈ norm(sample_va_dist[3, :]) atol=1e-10
 end
 nothing

@@ -384,10 +384,8 @@ end
 end
 
 """
-    calculate_AIC_matrices!(body_aero::BodyAerodynamics, model::Model, 
-                         core_radius_fraction,
-                         va_norm_dist, 
-                         va_unit_dist)
+    calculate_AIC_matrices!(body_aero::BodyAerodynamics, model::Model, core_radius_fraction,
+                            va_norm_dist, va_unit_dist, target=body_aero.AIC)
 
 Calculate Aerodynamic Influence Coefficient matrices.
 
@@ -746,15 +744,11 @@ function set_pitch_rate_dist!(body_aero::BodyAerodynamics, omega)
 end
 
 """
-    calculate_results(body_aero::BodyAerodynamics, gamma_new,
-                     density,
-                     core_radius_fraction, mu,
-                     alpha_dist, v_a_dist,
-                     chord_dist, x_airf_dist,
-                     z_airf_dist,
-                     va_dist, va_norm_dist,
-                     va_unit_dist, panels::Vector{<:Panel},
-                     is_only_f_and_gamma_output::Bool)
+    calculate_results(body_aero::BodyAerodynamics, gamma_new, reference_point, density,
+                      core_radius_fraction, mu, alpha_dist, v_a_dist, chord_dist,
+                      x_airf_dist, z_airf_dist, va_dist, va_norm_dist, va_unit_dist,
+                      panels::Vector{<:Panel}, is_only_f_and_gamma_output::Bool;
+                      correct_aoa=false, flow_curvature=false)
 
 Calculate final aerodynamic results. Reference point is in the kite body (KB) frame.
 
