@@ -29,19 +29,11 @@ end
     reference_point(scale) = scale .* [-0.4, 0.3, 0.2]
 
     @testset "solve!" begin
-        sols = map((1.0, k)) do scale
+        small, large = map((1.0, k)) do scale
             body_aero = scaled_wing_aero(scale)
-            solver = Solver(body_aero; reference_point=reference_point(scale))
-            sol = solve!(solver, body_aero)
-            @test sol.solver_status == FEASIBLE
-            (; force=copy(sol.force), moment=copy(sol.moment),
-             m_body_3D=copy(sol.m_body_3D), moment_dist=copy(sol.moment_dist),
-             moment_unrefined_dist=copy(sol.moment_unrefined_dist),
-             panel_moment_dist=copy(sol.panel_moment_dist),
-             moment_coeffs=copy(sol.moment_coeffs),
-             moment_coeff_dist=copy(sol.moment_coeff_dist))
+            solve!(Solver(body_aero; reference_point=reference_point(scale)), body_aero)
         end
-        small, large = sols
+        @test small.solver_status == large.solver_status == FEASIBLE
         @test all(!iszero, small.panel_moment_dist)
         @test large.force ≈ k^2 .* small.force rtol = 1e-6
         @test large.moment ≈ k^3 .* small.moment rtol = 1e-6
