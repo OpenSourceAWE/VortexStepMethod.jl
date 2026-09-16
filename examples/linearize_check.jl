@@ -31,17 +31,17 @@ solver = Solver(body_aero;
     use_gamma_prev=false,
 )
 
-va        = 15.0
-aoa_deg   = 10.0
-aoa_rad   = deg2rad(aoa_deg)
-side_slip = 0.0
+va         = 15.0
+aoa_deg    = 10.0
+aoa_rad    = deg2rad(aoa_deg)
+side_slip  = 0.0
 va_vec_b_0 = [
     cos(aoa_rad) * cos(side_slip),
     sin(side_slip),
     sin(aoa_rad),
 ] * va
-omega_b_0 = zeros(3)
-theta_0   = zeros(n_unrefined)
+omega_b_0  = zeros(3)
+theta_0    = zeros(n_unrefined)
 
 theta_idxs = 1:n_unrefined
 va_idxs    = (n_unrefined + 1):(n_unrefined + 3)

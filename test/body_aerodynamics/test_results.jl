@@ -54,10 +54,10 @@ end
     # differ at the noise floor (~sqrt(eps)) and that floor dominates
     # the small Δ used at scale=1.
     function evaluate_at!(input_vec)
-        perturbed_theta = input_vec[1:4]
+        perturbed_theta  = input_vec[1:4]
         perturbed_va_vec = input_vec[5:7]
-        perturbed_omega = input_vec[8:10]
-        perturbed_delta = input_vec[11:14]
+        perturbed_omega  = input_vec[8:10]
+        perturbed_delta  = input_vec[11:14]
         VortexStepMethod.unrefined_deform!(
             ram_wing, perturbed_theta, perturbed_delta; smooth=false)
         reinit!(body_aero; init_aero=false,

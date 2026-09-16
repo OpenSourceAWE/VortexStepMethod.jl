@@ -337,7 +337,8 @@ the area-weighted mean direction.
     panel_areas::Union{Nothing, AbstractVector}=nothing
 )
     length(va_input) == 3 ||
-        throw(ArgumentError("'va' must be shape (3,) or ($(n_panels), 3); got length $(length(va_input))"))
+        throw(ArgumentError("va_vec must be shape (3,) or va_vec_dist ($(n_panels), 3); " *
+                            "got length $(length(va_input))"))
     T = eltype(va_input)
     return MVector{3, T}(va_input[1], va_input[2], va_input[3])
 end
@@ -348,7 +349,8 @@ end
     panel_areas::Union{Nothing, AbstractVector}=nothing
 )
     size(va_input) == (n_panels, 3) ||
-        throw(ArgumentError("'va' must be shape (3,) or ($(n_panels), 3); got $(size(va_input))"))
+        throw(ArgumentError("va_vec must be shape (3,) or va_vec_dist ($(n_panels), 3); " *
+                            "got $(size(va_input))"))
     if !isnothing(panel_areas)
         length(panel_areas) == n_panels ||
             throw(ArgumentError("panel_areas must be shape ($(n_panels),), got length $(length(panel_areas))"))
@@ -870,7 +872,7 @@ function calculate_results(
     end
     @inbounds for k in 1:3
         va_ref_vec[k] = va_ref_vec[k] / direction_norm *
-                           reference_speed
+                        reference_speed
     end
     va_ref = norm3(va_ref_vec)
     va_ref > 0.0 || throw(ArgumentError(
@@ -931,9 +933,9 @@ function calculate_results(
             (dot3(lift_induced_va, panel.va) +
              dot3(drag_induced_va, panel.va)) / va_panel
         cross3!(temp_vec, dir_lift_prescribed_va, panel.va)
-        inv_vpm = 1.0 / va_panel
+        inv_va_panel = 1.0 / va_panel
         @inbounds for k in 1:3
-            temp_vec[k] *= inv_vpm
+            temp_vec[k] *= inv_va_panel
         end
         side_prescribed_va =
             dot3(lift_induced_va, temp_vec) +
@@ -1127,7 +1129,8 @@ silently feed the `flow_curvature` moment.
 function set_va!(body_aero::BodyAerodynamics, va_vec_dist::AbstractMatrix;
                  pitch_rate_dist=nothing)
     size(va_vec_dist, 1) != length(body_aero.panels) &&
-        throw(ArgumentError("Number of rows in va distribution should be equal to number of panels."))
+        throw(ArgumentError(
+            "Number of rows in va_vec_dist should be equal to number of panels."))
     if isnothing(pitch_rate_dist)
         body_aero.pitch_rate_dist .= 0
     else

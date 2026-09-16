@@ -3,7 +3,7 @@
 ### Introduction
 Reference frames are needed for following purposes:
 - for creating a CAD model of the wing (or the wings)
-- for defining the apparent wind speed vector $v_a$
+- for defining the apparent wind speed vector `va_vec`
 - for calculating the lift and drag and side force coefficients
 - for calculating the resulting forces and moments
 
