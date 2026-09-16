@@ -8,6 +8,8 @@
 
 ### Fixed
 
+- The `VSMSolution` docstring gives `lift_dist`, `drag_dist` and `panel_moment_dist` in
+  the per-unit-span units they hold, [N/m] and [Nm/m], instead of [N] and [Nm].
 - `panel_axes` takes the panel normal from the quarter-chord step, so the frame
   closes as `z_airf = x_airf × y_airf` and `z_airf` is square to the bound
   vortex. `alpha` is measured against that normal, so `cl`, `cd` and `cm` were
