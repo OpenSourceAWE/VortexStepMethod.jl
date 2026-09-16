@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Changed
+
+- Requires Julia 1.12 or 1.13; 1.10 and 1.11 keep resolving v5.1.1.
+
 ### Fixed
 
 - `panel_axes` takes the panel normal from the quarter-chord step, so the frame

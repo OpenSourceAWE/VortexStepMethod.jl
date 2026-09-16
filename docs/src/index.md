@@ -13,7 +13,7 @@ The software presented here includes a couple of examples: a rectangular wing, a
 This package was translated from the Python code version 1.0.0 available at [https://github.com/ocayon/Vortex-Step-Method](https://github.com/ocayon/Vortex-Step-Method) with some extensions as documented in [News.md](https://github.com/OpenSourceAWE/VortexStepMethod.jl/blob/main/NEWS.md).
 
 ## Installation
-Install [Julia 1.11](https://ufechner7.github.io/2024/08/09/installing-julia-with-juliaup.html)
+Install [Julia 1.12](https://ufechner7.github.io/2024/08/09/installing-julia-with-juliaup.html)
 or later, if you haven't already.
 
 Before installing this software it is suggested to create a new project, for
