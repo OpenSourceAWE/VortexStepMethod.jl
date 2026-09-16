@@ -38,7 +38,7 @@ vel_app = [cos(alpha), 0.0, sin(alpha)] .* v_a
 set_va!(body_aero, vel_app)
 
 # Step 4: Initialize solvers for both LLT and VSM methods
-vsm_solver = Solver(body_aero; aerodynamic_model_type=VSM)
+vsm_solver = Solver(wing.n_panels, wing.n_unrefined_sections; aerodynamic_model_type=VSM)
 
 # Step 5: Solve using both methods
 result = @benchmark  solve_base!($vsm_solver, $body_aero, nothing)  # 34 allocations

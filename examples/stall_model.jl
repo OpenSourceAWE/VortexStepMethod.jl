@@ -46,11 +46,11 @@ refine!(CAD_wing)
 body_aero = BodyAerodynamics([CAD_wing])
 
 # Create solvers
-vsm_solver = Solver(body_aero;
+vsm_solver = Solver(CAD_wing.n_panels, CAD_wing.n_unrefined_sections;
     aerodynamic_model_type=VSM,
     is_with_artificial_damping=false
 )
-VSM_with_stall_correction = Solver(body_aero;
+VSM_with_stall_correction = Solver(CAD_wing.n_panels, CAD_wing.n_unrefined_sections;
     aerodynamic_model_type=VSM,
     is_with_artificial_damping=true
 )

@@ -27,7 +27,7 @@ refine!(wing)
 body_aero = BodyAerodynamics([wing])
 vel_app = [cos(alpha), 0.0, sin(alpha)] .* 20.0
 set_va!(body_aero, vel_app)
-solver = Solver(body_aero)
+solver = Solver(wing.n_panels, wing.n_unrefined_sections)
 
 va_norm_array = ones(n_panels)
 va_unit_array = ones(n_panels, 3)

@@ -14,7 +14,7 @@ vsm_settings = VSMSettings("pyramid_model/vsm_settings.yaml")
 wing = Wing(vsm_settings)
 refine!(wing)
 body_aero = BodyAerodynamics([wing])
-solver = Solver(body_aero, vsm_settings)
+solver = Solver(vsm_settings)
 
 # Set flight conditions from settings
 set_va!(body_aero, vsm_settings)

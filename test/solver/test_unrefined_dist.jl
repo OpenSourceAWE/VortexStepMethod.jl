@@ -21,7 +21,7 @@ using Test
             wing = Wing(settings)
             refine!(wing)
             body_aero = BodyAerodynamics([wing])
-            solver = Solver(body_aero, settings)
+            solver = Solver(settings)
 
             # Set conditions and solve
             va = [10.0, 0.0, 0.0]
@@ -96,7 +96,7 @@ using Test
             wing = Wing(settings)
             refine!(wing)
             body_aero = BodyAerodynamics([wing])
-            solver = Solver(body_aero, settings)
+            solver = Solver(settings)
 
             va = [10.0, 0.0, 0.0]
             set_va!(body_aero, va)
@@ -169,7 +169,7 @@ using Test
                 wing = Wing(settings)
                 refine!(wing)
                 body_aero = BodyAerodynamics([wing])
-                solver = Solver(body_aero, settings)
+                solver = Solver(settings)
 
                 va = [10.0, 0.0, 0.0]
                 set_va!(body_aero, va)

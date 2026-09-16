@@ -325,7 +325,7 @@ end
     set_va!(body_aero, v_a)
 
     # Run analysis
-    loop_solver = Solver(body_aero;
+    loop_solver = Solver(wing.n_panels, wing.n_unrefined_sections;
         aerodynamic_model_type=model,
         core_radius_fraction=core_radius_fraction,
         solver_type=LOOP,
@@ -333,7 +333,7 @@ end
         atol=1e-8,
         rtol=1e-8
     )
-    nonlin_solver = Solver(body_aero;
+    nonlin_solver = Solver(wing.n_panels, wing.n_unrefined_sections;
         aerodynamic_model_type=model,
         core_radius_fraction=core_radius_fraction,
         solver_type=NONLIN,
@@ -509,7 +509,9 @@ The `BodyAerodynamics` built from `wings` in a 10 m/s inflow and its `solve!` so
 """
 function solve_wings(wings)
     body_aero = BodyAerodynamics(wings; va=[10.0, 0.0, 1.0])
-    return body_aero, solve!(Solver(body_aero), body_aero)
+    solver = Solver(sum(wing -> wing.n_panels, wings),
+                    sum(wing -> wing.n_unrefined_sections, wings))
+    return body_aero, solve!(solver, body_aero)
 end
 
 @testset "solve! on a two-wing body" begin

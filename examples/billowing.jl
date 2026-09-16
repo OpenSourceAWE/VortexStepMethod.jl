@@ -84,8 +84,8 @@ body_aero_bill = BodyAerodynamics([wing_bill])
 VortexStepMethod.reinit!(body_aero_bill)
 
 # --- Build solvers ---
-function make_solver(body_aero)
-    Solver(body_aero;
+function make_solver(wing)
+    Solver(wing.n_panels, wing.n_unrefined_sections;
         solver_type=(solver_cfg["solver_type"] == "NONLIN" ?
             NONLIN : LOOP),
         aerodynamic_model_type=getproperty(
@@ -114,8 +114,8 @@ function make_solver(body_aero)
     )
 end
 
-solver_flat = make_solver(body_aero_flat)
-solver_bill = make_solver(body_aero_bill)
+solver_flat = make_solver(wing_flat)
+solver_bill = make_solver(wing_bill)
 
 # --- Set flight conditions ---
 wind_speed = condition_cfg["wind_speed"]

@@ -22,7 +22,7 @@ relative_error(jac, reference) = maximum(abs.(jac .- reference)) / maximum(abs, 
     y0 = [va; omega]
 
     @testset "AutoForwardDiff matches AutoFiniteDiff (LOOP, INVISCID)" begin
-        solver = Solver(body_aero;
+        solver = Solver(wing.n_panels, wing.n_unrefined_sections;
             use_gamma_prev=false,
             type_initial_gamma_distribution=ELLIPTIC)
 
@@ -44,7 +44,7 @@ relative_error(jac, reference) = maximum(abs.(jac .- reference)) / maximum(abs, 
     end
 
     @testset "NONLIN+ForwardDiff is rejected" begin
-        solver_nl = Solver(body_aero; solver_type=NONLIN)
+        solver_nl = Solver(wing.n_panels, wing.n_unrefined_sections; solver_type=NONLIN)
         @test_throws ErrorException VortexStepMethod.linearize(
             solver_nl, body_aero, y0;
             theta_idxs=nothing, va_idxs=1:3, omega_idxs=4:6,
@@ -57,7 +57,7 @@ relative_error(jac, reference) = maximum(abs.(jac .- reference)) / maximum(abs, 
             delta_range=deg2rad.(-3:3:3),
         )
         ram_body = BodyAerodynamics([ram_wing])
-        ram_solver = Solver(ram_body;
+        ram_solver = Solver(ram_wing.n_panels, ram_wing.n_unrefined_sections;
             aerodynamic_model_type=VSM,
             is_with_artificial_damping=false,
             rtol=1e-11,

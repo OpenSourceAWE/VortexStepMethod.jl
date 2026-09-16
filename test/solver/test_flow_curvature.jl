@@ -102,8 +102,8 @@ end
         @test sign(dot(dv, panel.z_airf)) == sign(q_local)
     end
 
-    solver_off = Solver(body_aero; flow_curvature=false)
-    solver_on = Solver(body_aero; flow_curvature=true)
+    solver_off = Solver(wing.n_panels, wing.n_unrefined_sections; flow_curvature=false)
+    solver_on = Solver(wing.n_panels, wing.n_unrefined_sections; flow_curvature=true)
 
     function moment_at(solver, omega)
         set_va!(body_aero, [V, 0.0, 0.0], omega)
@@ -128,7 +128,7 @@ end
     end
 
     @testset "defaults to off" begin
-        @test Solver(body_aero).flow_curvature == false
+        @test Solver(wing.n_panels, wing.n_unrefined_sections).flow_curvature == false
         @test VortexStepMethod.SolverSettings().flow_curvature == false
     end
 

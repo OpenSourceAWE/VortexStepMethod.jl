@@ -193,15 +193,15 @@ end
 """
     Solver(n_panels, n_unrefined_sections, T=Float64; reference_point=[0.0, 0.0, 0.0],
            kwargs...)
-    Solver(body_aero::BodyAerodynamics; kwargs...)
     Solver(settings::VSMSettings; kwargs...)
-    Solver(body_aero, settings::VSMSettings)
 
 Build a [`Solver`](@ref) for `n_panels` panels and `n_unrefined_sections` unrefined
-sections of element type `T`, with `kwargs` setting its fields. `body_aero` supplies the
-counts and `T`; `settings` supplies the counts from the `n_panels` and `geometry_file` of
-its wings, and from its `solver_settings` the fields `kwargs` leaves unset.
-[`solve!`](@ref) throws a `DimensionMismatch` for a body of other counts.
+sections of element type `T`, with `kwargs` setting its fields. `settings` supplies the
+counts from the `n_panels` and `geometry_file` of its wings, and from its
+`solver_settings` the fields `kwargs` leaves unset. [`solve!`](@ref) throws a
+`DimensionMismatch` for a body of other counts.
+
+`Solver(body_aero; kwargs...)` and `Solver(body_aero, settings)` are deprecated.
 """
 function Solver(n_panels::Integer, n_unrefined_sections::Integer, ::Type{T}=Float64;
         reference_point=[0.0, 0.0, 0.0], kwargs...) where {T}
@@ -210,9 +210,6 @@ function Solver(n_panels::Integer, n_unrefined_sections::Integer, ::Type{T}=Floa
         reference_point=reference_point_checked, kwargs...)
 end
 
-Solver(body_aero::BodyAerodynamics{P, W, T}; kwargs...) where {P, W, T} =
-    Solver(P, n_unrefined_sections(body_aero), T; kwargs...)
-
 function Solver(settings::VSMSettings; kwargs...)
     n_panels = sum(wing.n_panels for wing in settings.wings)
     n_sections = sum(n_unrefined_sections, settings.wings)
@@ -220,8 +217,20 @@ function Solver(settings::VSMSettings; kwargs...)
         kwargs...)
 end
 
-Solver(body_aero, settings::VSMSettings) =
-    Solver(body_aero; solver_kwargs(settings.solver_settings)...)
+function Solver(body_aero::BodyAerodynamics{P, W, T}; kwargs...) where {P, W, T}
+    Base.depwarn("`Solver(body_aero; kwargs...)` is deprecated, use " *
+        "`Solver(n_panels, n_unrefined_sections; kwargs...)` or " *
+        "`Solver(settings; kwargs...)`.", :Solver; force=true)
+    return Solver(P, n_unrefined_sections(body_aero), T; kwargs...)
+end
+
+function Solver(body_aero::BodyAerodynamics{P, W, T}, settings::VSMSettings
+        ) where {P, W, T}
+    Base.depwarn("`Solver(body_aero, settings)` is deprecated, use `Solver(settings)`.",
+        :Solver; force=true)
+    return Solver(P, n_unrefined_sections(body_aero), T;
+        solver_kwargs(settings.solver_settings)...)
+end
 
 """
     n_unrefined_sections(body_aero::BodyAerodynamics) -> Int
@@ -1272,7 +1281,7 @@ function make_dual_shadow(solver::Solver{P, U, Float64},
         va = MVector{3, TD}(body_aero._va),
         omega = MVector{3, TD}(body_aero.omega),
     )
-    solver_d = Solver(body_aero_d;
+    solver_d = Solver(P, U, TD;
         solver_type = solver.solver_type,
         aerodynamic_model_type = solver.aerodynamic_model_type,
         density = TD(solver.density),

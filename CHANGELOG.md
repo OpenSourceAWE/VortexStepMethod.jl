@@ -12,6 +12,8 @@
 - `solve!` and `solve` throw a `DimensionMismatch` naming both sizes for a `body_aero` whose
   panel or unrefined-section count differs from the solver's, where they failed on a
   broadcast partway through or silently left section results at zero.
+- The `VSMSolution` docstring gives `lift_dist`, `drag_dist` and `panel_moment_dist` in
+  the per-unit-span units they hold, [N/m] and [Nm/m], instead of [N] and [Nm].
 
 ### Changed
 
@@ -19,11 +21,9 @@
 - The Makie `plot!` methods for a `Panel` or a `BodyAerodynamics` return a
   `Vector{Makie.AbstractPlot}` instead of a `Vector{Any}`; for a `BodyAerodynamics`
   drawn as flat panels it is one flat list rather than a list per panel.
-
-### Fixed
-
-- The `VSMSolution` docstring gives `lift_dist`, `drag_dist` and `panel_moment_dist` in
-  the per-unit-span units they hold, [N/m] and [Nm/m], instead of [N] and [Nm].
+- `Solver(body_aero; kwargs...)` and `Solver(body_aero, settings)` are deprecated and warn
+  on use; build the solver with `Solver(settings)` or
+  `Solver(n_panels, n_unrefined_sections)` instead.
 
 ## VortexStepMethod v5.1.1 2026-09-12
 
