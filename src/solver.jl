@@ -602,11 +602,11 @@ function solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=n
     return results
 end
 
-@inline @inbounds function calc_norm_array!(va_norm_dist, va_array)
-    for i in axes(va_array, 1)
+@inline @inbounds function calc_norm_dist!(va_norm_dist, va_dist)
+    for i in axes(va_dist, 1)
         va_norm_dist[i] = sqrt(
-            va_array[i,1]^2 + va_array[i,2]^2 +
-            va_array[i,3]^2)
+            va_dist[i,1]^2 + va_dist[i,2]^2 +
+            va_dist[i,3]^2)
     end
 end
 
@@ -651,7 +651,7 @@ function solve_base!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics, gamma
     end
 
     # Calculate unit vectors
-    calc_norm_array!(solver.br.va_norm_dist, solver.sol._va_dist)
+    calc_norm_dist!(solver.br.va_norm_dist, solver.sol._va_dist)
     @inbounds for i in 1:n_panels
         inv_norm = 1.0 / solver.br.va_norm_dist[i]
         for k in 1:3
@@ -709,70 +709,70 @@ end
     velocity_view_x,
     velocity_view_y,
     velocity_view_z,
-    va_array,
+    va_dist,
     induced_velocity_all,
-    relative_velocity_array,
-    y_airf_array,
+    relative_velocity_dist,
+    y_airf_dist,
     relative_velocity_crossz,
-    v_acrossz_array,
-    z_airf_array,
-    x_airf_array,
-    v_normal_array,
-    v_tangential_array,
-    va_magw_array,
+    v_acrossz_dist,
+    z_airf_dist,
+    x_airf_dist,
+    v_normal_dist,
+    v_tangential_dist,
+    va_magw_dist,
     cl_dist,
-    chord_array,
+    chord_dist,
 )
     mul!(velocity_view_x, AIC_x, gamma_in)
     mul!(velocity_view_y, AIC_y, gamma_in)
     mul!(velocity_view_z, AIC_z, gamma_in)
 
-    relative_velocity_array .= va_array .+ induced_velocity_all
+    relative_velocity_dist .= va_dist .+ induced_velocity_all
     @inbounds for i in 1:n_panels
-        ax = relative_velocity_array[i,1]
-        ay = relative_velocity_array[i,2]
-        az = relative_velocity_array[i,3]
-        bx = y_airf_array[i,1]
-        by = y_airf_array[i,2]
-        bz = y_airf_array[i,3]
+        ax = relative_velocity_dist[i,1]
+        ay = relative_velocity_dist[i,2]
+        az = relative_velocity_dist[i,3]
+        bx = y_airf_dist[i,1]
+        by = y_airf_dist[i,2]
+        bz = y_airf_dist[i,3]
         relative_velocity_crossz[i,1] = ay*bz - az*by
         relative_velocity_crossz[i,2] = az*bx - ax*bz
         relative_velocity_crossz[i,3] = ax*by - ay*bx
-        ax = va_array[i,1]
-        ay = va_array[i,2]
-        az = va_array[i,3]
-        v_acrossz_array[i,1] = ay*bz - az*by
-        v_acrossz_array[i,2] = az*bx - ax*bz
-        v_acrossz_array[i,3] = ax*by - ay*bx
+        ax = va_dist[i,1]
+        ay = va_dist[i,2]
+        az = va_dist[i,3]
+        v_acrossz_dist[i,1] = ay*bz - az*by
+        v_acrossz_dist[i,2] = az*bx - ax*bz
+        v_acrossz_dist[i,3] = ax*by - ay*bx
     end
 
     @inbounds for i in 1:n_panels
-        v_normal_array[i] =
-            z_airf_array[i,1]*relative_velocity_array[i,1] +
-            z_airf_array[i,2]*relative_velocity_array[i,2] +
-            z_airf_array[i,3]*relative_velocity_array[i,3]
-        v_tangential_array[i] =
-            x_airf_array[i,1]*relative_velocity_array[i,1] +
-            x_airf_array[i,2]*relative_velocity_array[i,2] +
-            x_airf_array[i,3]*relative_velocity_array[i,3]
+        v_normal_dist[i] =
+            z_airf_dist[i,1]*relative_velocity_dist[i,1] +
+            z_airf_dist[i,2]*relative_velocity_dist[i,2] +
+            z_airf_dist[i,3]*relative_velocity_dist[i,3]
+        v_tangential_dist[i] =
+            x_airf_dist[i,1]*relative_velocity_dist[i,1] +
+            x_airf_dist[i,2]*relative_velocity_dist[i,2] +
+            x_airf_dist[i,3]*relative_velocity_dist[i,3]
     end
-    solver.lr.alpha_dist .= atan.(v_normal_array, v_tangential_array)
+    solver.lr.alpha_dist .= atan.(v_normal_dist, v_tangential_dist)
 
     @inbounds for i in 1:n_panels
         solver.lr.v_a_dist[i] = smooth_sqrt(
             relative_velocity_crossz[i,1]^2 +
             relative_velocity_crossz[i,2]^2 +
             relative_velocity_crossz[i,3]^2)
-        va_magw_array[i] = smooth_sqrt(
-            v_acrossz_array[i,1]^2 +
-            v_acrossz_array[i,2]^2 +
-            v_acrossz_array[i,3]^2)
+        va_magw_dist[i] = smooth_sqrt(
+            v_acrossz_dist[i,1]^2 +
+            v_acrossz_dist[i,2]^2 +
+            v_acrossz_dist[i,3]^2)
     end
 
     for (i, (panel, alpha)) in enumerate(zip(panels, solver.lr.alpha_dist))
         cl_dist[i] = calculate_cl(panel, alpha)
     end
-    gamma_out .= 0.5 .* solver.lr.v_a_dist.^2 ./ va_magw_array .* cl_dist .* chord_array
+    gamma_out .= 0.5 .* solver.lr.v_a_dist.^2 ./ va_magw_dist .* cl_dist .* chord_dist
     return nothing
 end
 
@@ -822,7 +822,7 @@ end
 
 """
     apply_artificial_viscosity!(gamma, panels, alpha_dist, laplacian, viscosity_matrix,
-                                lift_slope, mu_array, gamma_target, planform_area, factor)
+                                lift_slope, mu_dist, gamma_target, planform_area, factor)
 
 Apply one implicit Li/Gaunaa artificial-viscosity step to `gamma` in place and return
 `true` when it fired. The per-panel viscosity is
@@ -834,21 +834,21 @@ post-stall (`mu_i > 0`), `gamma` is replaced by the solution of
 remaining arguments are preallocated work buffers reused across iterations.
 """
 function apply_artificial_viscosity!(gamma, panels, alpha_dist, laplacian, viscosity_matrix,
-        lift_slope, mu_array, gamma_target, planform_area, factor)
+        lift_slope, mu_dist, gamma_target, planform_area, factor)
     n_panels = length(panels)
     local_lift_slope!(lift_slope, panels, alpha_dist)
     any_stalled = false
     @inbounds for i in 1:n_panels
         m = -factor * planform_area * lift_slope[i] / panels[i].width^2
-        mu_array[i] = max(zero(eltype(mu_array)), m)
-        mu_array[i] > 0 && (any_stalled = true)
+        mu_dist[i] = max(zero(eltype(mu_dist)), m)
+        mu_dist[i] > 0 && (any_stalled = true)
     end
     any_stalled || return false
     gamma_target .= gamma
     one_t, zero_t = one(eltype(viscosity_matrix)), zero(eltype(viscosity_matrix))
     @inbounds for col in 1:n_panels, row in 1:n_panels
         viscosity_matrix[row, col] =
-            (row == col ? one_t : zero_t) - mu_array[row] * laplacian[row, col]
+            (row == col ? one_t : zero_t) - mu_dist[row] * laplacian[row, col]
     end
     ldiv!(gamma, lu!(viscosity_matrix), gamma_target)
     return true
@@ -880,28 +880,28 @@ function gamma_loop!(
     relaxation_factor;
     log::Bool = true
 ) where {P, U, T}
-    va_array = solver.sol._va_dist
-    chord_array = solver.sol._chord_dist
-    x_airf_array = solver.sol._x_airf_dist
-    y_airf_array = solver.sol._y_airf_dist
-    z_airf_array = solver.sol._z_airf_dist
+    va_dist = solver.sol._va_dist
+    chord_dist = solver.sol._chord_dist
+    x_airf_dist = solver.sol._x_airf_dist
+    y_airf_dist = solver.sol._y_airf_dist
+    z_airf_dist = solver.sol._z_airf_dist
     solver.lr.converged   = false
     n_panels    = length(body_aero.panels)
     solver.lr.alpha_dist .= body_aero.alpha_dist
     solver.lr.v_a_dist   .= body_aero.v_a_dist
     
-    va_magw_array            = solver.cache[1][solver.lr.v_a_dist]
+    va_magw_dist             = solver.cache[1][solver.lr.v_a_dist]
     gamma                    = solver.cache[2][solver.lr.gamma_new]
     abs_gamma_new            = solver.cache[3][solver.lr.gamma_new]
-    induced_velocity_all     = solver.cache[4][va_array]
-    relative_velocity_array  = solver.cache[5][va_array]
-    relative_velocity_crossz = solver.cache[6][va_array]
-    v_acrossz_array          = solver.cache[7][va_array]
-    cl_dist                 = solver.cache[8][solver.lr.gamma_new]
+    induced_velocity_all     = solver.cache[4][va_dist]
+    relative_velocity_dist   = solver.cache[5][va_dist]
+    relative_velocity_crossz = solver.cache[6][va_dist]
+    v_acrossz_dist           = solver.cache[7][va_dist]
+    cl_dist                  = solver.cache[8][solver.lr.gamma_new]
     damp                     = solver.cache[9][solver.lr.gamma_new]
     damp                    .= zero(T)
-    v_normal_array           = solver.cache[10][solver.lr.gamma_new]
-    v_tangential_array       = solver.cache[11][solver.lr.gamma_new]
+    v_normal_dist            = solver.cache[10][solver.lr.gamma_new]
+    v_tangential_dist        = solver.cache[11][solver.lr.gamma_new]
 
     AIC_x = @view body_aero.AIC[:, :, 1]
     AIC_y = @view body_aero.AIC[:, :, 2]
@@ -928,11 +928,11 @@ function gamma_loop!(
             residual, gamma_iter, solver, panels, n_panels,
             AIC_x, AIC_y, AIC_z,
             velocity_view_x, velocity_view_y, velocity_view_z,
-            va_array, induced_velocity_all, relative_velocity_array,
-            y_airf_array, relative_velocity_crossz, v_acrossz_array,
-            z_airf_array, x_airf_array,
-            v_normal_array, v_tangential_array,
-            va_magw_array, cl_dist, chord_array,
+            va_dist, induced_velocity_all, relative_velocity_dist,
+            y_airf_dist, relative_velocity_crossz, v_acrossz_dist,
+            z_airf_dist, x_airf_dist,
+            v_normal_dist, v_tangential_dist,
+            va_magw_dist, cl_dist, chord_dist,
         )
         @inbounds for i in 1:n_panels
             residual[i] -= gamma_iter[i]
@@ -950,11 +950,11 @@ function gamma_loop!(
                     residual_perturbed, gamma_perturbed, solver, panels, n_panels,
                     AIC_x, AIC_y, AIC_z,
                     velocity_view_x, velocity_view_y, velocity_view_z,
-                    va_array, induced_velocity_all, relative_velocity_array,
-                    y_airf_array, relative_velocity_crossz, v_acrossz_array,
-                    z_airf_array, x_airf_array,
-                    v_normal_array, v_tangential_array,
-                    va_magw_array, cl_dist, chord_array,
+                    va_dist, induced_velocity_all, relative_velocity_dist,
+                    y_airf_dist, relative_velocity_crossz, v_acrossz_dist,
+                    z_airf_dist, x_airf_dist,
+                    v_normal_dist, v_tangential_dist,
+                    va_magw_dist, cl_dist, chord_dist,
                 )
                 inv_step = 1.0 / step
                 for i in 1:n_panels
@@ -979,11 +979,11 @@ function gamma_loop!(
                     residual_perturbed, gamma_perturbed, solver, panels, n_panels,
                     AIC_x, AIC_y, AIC_z,
                     velocity_view_x, velocity_view_y, velocity_view_z,
-                    va_array, induced_velocity_all, relative_velocity_array,
-                    y_airf_array, relative_velocity_crossz, v_acrossz_array,
-                    z_airf_array, x_airf_array,
-                    v_normal_array, v_tangential_array,
-                    va_magw_array, cl_dist, chord_array,
+                    va_dist, induced_velocity_all, relative_velocity_dist,
+                    y_airf_dist, relative_velocity_crossz, v_acrossz_dist,
+                    z_airf_dist, x_airf_dist,
+                    v_normal_dist, v_tangential_dist,
+                    va_magw_dist, cl_dist, chord_dist,
                 )
                 @inbounds for i in 1:n_panels
                     residual_perturbed[i] -= gamma_perturbed[i]
@@ -1016,13 +1016,13 @@ function gamma_loop!(
         laplacian        = use_viscosity ? zeros(T, n_panels, n_panels) : zeros(T, 0, 0)
         viscosity_matrix = use_viscosity ? zeros(T, n_panels, n_panels) : zeros(T, 0, 0)
         lift_slope       = use_viscosity ? zeros(T, n_panels) : zeros(T, 0)
-        mu_array         = use_viscosity ? zeros(T, n_panels) : zeros(T, 0)
+        mu_dist          = use_viscosity ? zeros(T, n_panels) : zeros(T, 0)
         gamma_target     = use_viscosity ? zeros(T, n_panels) : zeros(T, 0)
         planform_area    = zero(T)
         if use_viscosity
             build_spanwise_laplacian!(laplacian, n_panels)
             @inbounds for i in 1:n_panels
-                planform_area += panels[i].width * chord_array[i]
+                planform_area += panels[i].width * chord_dist[i]
             end
         end
 
@@ -1040,25 +1040,25 @@ function gamma_loop!(
                 velocity_view_x,
                 velocity_view_y,
                 velocity_view_z,
-                va_array,
+                va_dist,
                 induced_velocity_all,
-                relative_velocity_array,
-                y_airf_array,
+                relative_velocity_dist,
+                y_airf_dist,
                 relative_velocity_crossz,
-                v_acrossz_array,
-                z_airf_array,
-                x_airf_array,
-                v_normal_array,
-                v_tangential_array,
-                va_magw_array,
+                v_acrossz_dist,
+                z_airf_dist,
+                x_airf_dist,
+                v_normal_dist,
+                v_tangential_dist,
+                va_magw_dist,
                 cl_dist,
-                chord_array,
+                chord_dist,
             )
             # Gate the linear solve on any(mu > 0): fires exactly in post-stall.
             if use_viscosity
                 apply_artificial_viscosity!(
                     gamma_new, panels, solver.lr.alpha_dist, laplacian,
-                    viscosity_matrix, lift_slope, mu_array, gamma_target,
+                    viscosity_matrix, lift_slope, mu_dist, gamma_target,
                     planform_area, solver.artificial_viscosity_factor,
                 )
             end

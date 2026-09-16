@@ -386,8 +386,8 @@ end
 """
     calculate_AIC_matrices!(body_aero::BodyAerodynamics, model::Model, 
                          core_radius_fraction,
-                         va_norm_array, 
-                         va_unit_array)
+                         va_norm_dist, 
+                         va_unit_dist)
 
 Calculate Aerodynamic Influence Coefficient matrices.
 
@@ -397,8 +397,8 @@ Returns: nothing
 """
 @inline function calculate_AIC_matrices!(body_aero::BodyAerodynamics{P, W, T}, model::Model,
                               core_radius_fraction,
-                              va_norm_array::AbstractVector{T},
-                              va_unit_array::AbstractMatrix{T},
+                              va_norm_dist::AbstractVector{T},
+                              va_unit_dist::AbstractMatrix{T},
                               target::AbstractArray{T, 3}=body_aero.AIC) where {P, W, T}
     # Determine evaluation point based on model
     evaluation_point = model == VSM ? :control_point : :aero_center
@@ -414,7 +414,7 @@ Returns: nothing
     panel_areas = [panel.chord * panel.width for panel in body_aero.panels]
     va_distribution = zeros(T, length(body_aero.panels), 3)
     @inbounds for i in 1:length(body_aero.panels), k in 1:3
-        va_distribution[i, k] = va_unit_array[i, k] * va_norm_array[i]
+        va_distribution[i, k] = va_unit_dist[i, k] * va_norm_dist[i]
     end
     wake_velocity = _compute_reference_velocity_from_distribution(
         va_distribution,
@@ -488,13 +488,9 @@ function calculate_circulation_distribution_elliptical_wing(gamma_i, body_aero::
 end
 
 """
-    update_effective_angle_of_attack_if_VSM(body_aero::BodyAerodynamics, gamma,
-                                          core_radius_fraction,
-                                          z_airf_array,
-                                          x_airf_array,
-                                          va_array,
-                                          va_norm_array,
-                                          va_unit_array)
+    update_effective_angle_of_attack!(alpha_corrected, body_aero::BodyAerodynamics, gamma,
+                                      core_radius_fraction, z_airf_dist, x_airf_dist,
+                                      va_dist, va_norm_dist, va_unit_dist)
 
 Update angle of attack at aerodynamic center for VSM method.
 
@@ -505,25 +501,25 @@ function update_effective_angle_of_attack!(alpha_corrected,
     body_aero::BodyAerodynamics, 
     gamma,
     core_radius_fraction,
-    z_airf_array,
-    x_airf_array,
-    va_array,
-    va_norm_array,
-    va_unit_array)
+    z_airf_dist,
+    x_airf_dist,
+    va_dist,
+    va_norm_dist,
+    va_unit_dist)
 
     # Its own buffer: `AIC` holds the control-point matrix the circulation was solved
     # against, so overwriting it here would leave post-solve readers on the LLT one.
-    calculate_AIC_matrices!(body_aero, LLT, core_radius_fraction, va_norm_array,
-                            va_unit_array, body_aero.AIC_aero_center)
+    calculate_AIC_matrices!(body_aero, LLT, core_radius_fraction, va_norm_dist,
+                            va_unit_dist, body_aero.AIC_aero_center)
 
-    induced_velocity = body_aero.cache[1][va_array]
+    induced_velocity = body_aero.cache[1][va_dist]
     for k in 1:3
         mul!(view(induced_velocity, :, k), view(body_aero.AIC_aero_center, :, :, k), gamma)
     end
 
     # In-place relative velocity calculation
-    relative_velocity = body_aero.cache[2][va_array]
-    relative_velocity .= va_array .+ induced_velocity
+    relative_velocity = body_aero.cache[2][va_dist]
+    relative_velocity .= va_dist .+ induced_velocity
 
     # Preallocate and compute dot products manually
     n = size(relative_velocity, 1)
@@ -534,8 +530,8 @@ function update_effective_angle_of_attack!(alpha_corrected,
         vn = 0.0
         vt = 0.0
         for j in 1:3
-            vn += z_airf_array[i, j] * relative_velocity[i, j]
-            vt += x_airf_array[i, j] * relative_velocity[i, j]
+            vn += z_airf_dist[i, j] * relative_velocity[i, j]
+            vt += x_airf_dist[i, j] * relative_velocity[i, j]
         end
         v_normal[i] = vn
         v_tangential[i] = vt
@@ -614,13 +610,13 @@ end
 
 function find_center_of_pressure(
     body_aero::BodyAerodynamics,
-    force_array,
-    moment_array,
+    force,
+    moment,
     reference_point;
     force_tol::Float64 = 1e-12
 )
-    F = force_array
-    M0 = moment_array
+    F = force
+    M0 = moment
     r0 = reference_point
     F_norm_sq = dot3(F, F)
     # Treat near-zero forces as "CoP undefined"
@@ -754,10 +750,10 @@ end
                      density,
                      core_radius_fraction, mu,
                      alpha_dist, v_a_dist,
-                     chord_array, x_airf_array,
-                     z_airf_array,
-                     va_array, va_norm_array,
-                     va_unit_array, panels::Vector{<:Panel},
+                     chord_dist, x_airf_dist,
+                     z_airf_dist,
+                     va_dist, va_norm_dist,
+                     va_unit_dist, panels::Vector{<:Panel},
                      is_only_f_and_gamma_output::Bool)
 
 Calculate final aerodynamic results. Reference point is in the kite body (KB) frame.
@@ -777,12 +773,12 @@ function calculate_results(
     mu,
     alpha_dist,
     v_a_dist,
-    chord_array,
-    x_airf_array,
-    z_airf_array,
-    va_array,
-    va_norm_array,
-    va_unit_array,
+    chord_dist,
+    x_airf_dist,
+    z_airf_dist,
+    va_dist,
+    va_norm_dist,
+    va_unit_dist,
     panels::Vector{<:Panel},
     is_only_f_and_gamma_output::Bool;
     correct_aoa::Bool=false,
@@ -794,10 +790,10 @@ function calculate_results(
         append!(body_aero.cache, [LazyBufferCache() for _ in 1:(15 - length(body_aero.cache))])
     end
 
-    cl_array = body_aero.cache[5][alpha_dist]
-    cd_array = body_aero.cache[6][alpha_dist]
-    cm_array = body_aero.cache[7][alpha_dist]
-    panel_width_array = body_aero.cache[8][alpha_dist]
+    cl_dist = body_aero.cache[5][alpha_dist]
+    cd_dist = body_aero.cache[6][alpha_dist]
+    cm_dist = body_aero.cache[7][alpha_dist]
+    panel_width_dist = body_aero.cache[8][alpha_dist]
     alpha_corrected = body_aero.cache[9][alpha_dist]
     cl_prescribed_va = body_aero.cache[10][alpha_dist]
     cd_prescribed_va = body_aero.cache[11][alpha_dist]
@@ -811,15 +807,15 @@ function calculate_results(
 
     # Calculate coefficients and geometric AoA for each panel
     for (i, panel) in enumerate(panels)
-        cl_array[i] = calculate_cl(panel, alpha_dist[i])
-        cd_array[i], cm_array[i] = calculate_cd_cm(
+        cl_dist[i] = calculate_cl(panel, alpha_dist[i])
+        cd_dist[i], cm_dist[i] = calculate_cd_cm(
             panel, alpha_dist[i])
         if flow_curvature
-            cm_array[i] += flow_curvature_cm(
-                body_aero.pitch_rate_dist[i], chord_array[i], v_a_dist[i])
+            cm_dist[i] += flow_curvature_cm(
+                body_aero.pitch_rate_dist[i], chord_dist[i], v_a_dist[i])
         end
-        panel_width_array[i] = panel.width
-        va_norm = va_norm_array[i]
+        panel_width_dist[i] = panel.width
+        va_norm = va_norm_dist[i]
         x_norm = norm3(panel.x_airf)
         z_norm = norm3(panel.z_airf)
         if va_norm == 0.0 || x_norm == 0.0 || z_norm == 0.0
@@ -841,11 +837,11 @@ function calculate_results(
             body_aero,
             gamma_new,
             core_radius_fraction,
-            z_airf_array,
-            x_airf_array,
-            va_array,
-            va_norm_array,
-            va_unit_array
+            z_airf_dist,
+            x_airf_dist,
+            va_dist,
+            va_norm_dist,
+            va_unit_dist
         )
     else
         alpha_corrected .= alpha_dist
@@ -862,13 +858,13 @@ function calculate_results(
     weighted_speed_sq = 0.0
     total_area = 0.0
     @inbounds for i in 1:n_panels
-        area_i = chord_array[i] * panel_width_array[i]
+        area_i = chord_dist[i] * panel_width_dist[i]
         total_area += area_i
-        speed_i = va_norm_array[i]
+        speed_i = va_norm_dist[i]
         weighted_speed_sq += area_i * speed_i^2
-        va_ref_vector[1] += area_i * va_array[i, 1]
-        va_ref_vector[2] += area_i * va_array[i, 2]
-        va_ref_vector[3] += area_i * va_array[i, 3]
+        va_ref_vector[1] += area_i * va_dist[i, 1]
+        va_ref_vector[2] += area_i * va_dist[i, 2]
+        va_ref_vector[3] += area_i * va_dist[i, 3]
     end
     total_area > 0.0 || throw(ArgumentError(
         "Total panel area must be positive."))
@@ -918,14 +914,14 @@ function calculate_results(
         dirs = panel_force_directions(axes, alpha_corrected[i], spanwise_unit)
         loads = panel_loads(axes, dirs,
             dynamic_pressure(density, density, v_a_dist[i]),
-            cl_array[i], cd_array[i], cm_array[i])
+            cl_dist[i], cd_dist[i], cm_dist[i])
         moment_i = loads.moment
         @inbounds for k in 1:3
             lift_induced_va[k] = loads.lift * dirs.dir_lift[k]
             drag_induced_va[k] = loads.drag * dirs.dir_drag[k]
         end
 
-        va_panel_mag = va_norm_array[i]
+        va_panel_mag = va_norm_dist[i]
         va_panel_mag > 0.0 || throw(ArgumentError(
             "Panel $i has non-positive apparent " *
             "velocity magnitude."))

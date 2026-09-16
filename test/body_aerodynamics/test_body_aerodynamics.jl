@@ -63,14 +63,14 @@ end
         )
 
         # Calculate new matrices
-        va_norm_array = fill(norm(v_a), length(coord))
-        va_unit_array = repeat(reshape(v_a ./ norm(v_a), 1, 3), length(coord))
+        va_norm_dist = fill(norm(v_a), length(body_aero.panels))
+        va_unit_dist = repeat(reshape(v_a ./ norm(v_a), 1, 3), length(body_aero.panels))
         calculate_AIC_matrices!(
             body_aero,
             LLT,
             core_radius_fraction,
-            va_norm_array,
-            va_unit_array
+            va_norm_dist,
+            va_unit_dist
         )
         AIC_x, AIC_y, AIC_z = @views body_aero.AIC[:, :, 1], body_aero.AIC[:, :, 2], body_aero.AIC[:, :, 3]
 
@@ -98,14 +98,14 @@ end
         )
 
         # Calculate new matrices
-        va_norm_array = fill(norm(v_a), length(coord))
-        va_unit_array = repeat(reshape(v_a ./ norm(v_a), 1, 3), length(coord))
+        va_norm_dist = fill(norm(v_a), length(body_aero.panels))
+        va_unit_dist = repeat(reshape(v_a ./ norm(v_a), 1, 3), length(body_aero.panels))
         calculate_AIC_matrices!(
             body_aero,
             VSM,
             core_radius_fraction,
-            va_norm_array,
-            va_unit_array
+            va_norm_dist,
+            va_unit_dist
         )
         AIC_x, AIC_y, AIC_z = body_aero.AIC[:, :, 1], body_aero.AIC[:, :, 2], body_aero.AIC[:, :, 3]
 
