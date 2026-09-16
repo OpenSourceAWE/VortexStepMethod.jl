@@ -43,6 +43,18 @@ end
         @test params.TE_thickness ≈ 0.0 atol = 1e-12
     end
 
+    @testset "Fit to stations crowded into a narrow band stays airfoil-sized" begin
+        spread = (1 .- cos.(range(0, pi, 121))) ./ 2
+        crowded = vcat(0.0, range(0.30, 0.31, 118), 1.0)
+        surface(weights, xs) = class_function(xs) .* (bernstein_basis(xs, 7) * weights)
+        y_upper = surface(fill(0.2, 8), crowded) .+ 0.005 .* sin.(40pi .* crowded)
+        y_lower = surface(fill(-0.1, 8), spread)
+        x = vcat(reverse(crowded), spread[2:end])
+        y = vcat(reverse(y_upper), y_lower[2:end])
+        _, y_fit = kulfan_to_coordinates(fit_kulfan_parameters(x, y))
+        @test maximum(abs, y_fit) < 2 * maximum(abs, y)
+    end
+
     @testset "Shrink-wrap encloses points with clearance" begin
         xn, yn, _ = normalize_airfoil(collect(float.(xr)), collect(float.(yr)))
         cloud_to_wrap(xw, yw) = minimum(

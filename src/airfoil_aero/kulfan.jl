@@ -106,6 +106,8 @@ function leading_edge_basis(x::AbstractVector{T}, n_weights::Int) where T
     return x .* max.(1 .- x, zero(T)).^(n_weights + 0.5)
 end
 
+const KULFAN_FIT_RTOL = 1e-4 # [-] singular values dropped below this times the largest
+
 """
     fit_kulfan_parameters(x::Vector, y::Vector, method::KulfanFitMethod)
     fit_kulfan_parameters(x::Vector, y::Vector; n_weights=8)
@@ -128,7 +130,8 @@ end
 
 Least-squares fit matching AeroSandbox's `get_kulfan_parameters`: both surfaces
 share a single least-squares system with a shared leading-edge weight and a
-trailing-edge thickness.
+trailing-edge thickness. Singular values below `1e-4` times the largest are dropped, so
+stations crowded into part of the chord give bounded weights.
 """
 function fit_kulfan_parameters(x::Vector{T}, y::Vector{T},
                                method::LeastSquaresFit) where T
@@ -144,12 +147,11 @@ function fit_kulfan_parameters(x::Vector{T}, y::Vector{T},
     te_col = ifelse.(is_upper, xv ./ 2, .-xv ./ 2)
 
     A = hcat((.!is_upper) .* CS, is_upper .* CS, le_col, te_col)
-    coeffs = A \ y_norm
+    coeffs = pinv(A; rtol=KULFAN_FIT_RTOL) * y_norm
     TE_thickness = coeffs[end]
 
     if TE_thickness < 0
-        A = hcat((.!is_upper) .* CS, is_upper .* CS, le_col)
-        coeffs = A \ y_norm
+        coeffs = pinv(A[:, 1:end-1]; rtol=KULFAN_FIT_RTOL) * y_norm
         TE_thickness = zero(T)
     end
 

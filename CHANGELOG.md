@@ -13,6 +13,10 @@
 
 - The `VSMSolution` docstring gives `lift_dist`, `drag_dist` and `panel_moment_dist` in
   the per-unit-span units they hold, [N/m] and [Nm/m], instead of [N] and [Nm].
+- `fit_kulfan_parameters` with `LeastSquaresFit` drops singular values below `1e-4`
+  times the largest, so a contour whose stations crowd into a narrow band of the chord
+  fits to an airfoil-sized shape instead of weights that resample it to 1e4 scale.
+  Fits of well-spread stations are unchanged.
 
 ## VortexStepMethod v5.1.1 2026-09-12
 
