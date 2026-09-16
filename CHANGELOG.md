@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- BREAKING: `ObjAdapter` no longer exports `center_to_com!`, `calculate_inertia_tensor`
+  or `calc_inertia_y_rotation`; they are gone. Mesh mass properties are computed by
+  SymbolicAWEModels, which reads the mesh with `read_faces`.
+
 ## VortexStepMethod v5.1.1 2026-09-12
 
 ### Fixed
