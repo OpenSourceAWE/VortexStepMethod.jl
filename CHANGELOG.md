@@ -8,6 +8,11 @@
 - The Makie `plot!` methods for a `Panel` or a `BodyAerodynamics` return a
   `Vector{Makie.AbstractPlot}` instead of a `Vector{Any}`; for a `BodyAerodynamics`
   drawn as flat panels it is one flat list rather than a list per panel.
+- BREAKING - `plot_section_polars(body_aero; panels, alphas, delta)` draws cl, cd and cm
+  against α in one figure, one curve per panel, through each panel's
+  `calculate_cl`/`calculate_cd`/`calculate_cm`, so it covers every aero model;
+  `delta` [rad] sets the flap deflection a `POLAR_MATRICES` panel is evaluated at.
+  The positional `coefficient` argument is gone.
 
 ### Fixed
 

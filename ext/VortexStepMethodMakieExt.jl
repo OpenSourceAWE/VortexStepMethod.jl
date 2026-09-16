@@ -1,7 +1,8 @@
 module VortexStepMethodMakieExt
 using MakieControlPlots.Makie, VortexStepMethod, LinearAlgebra, Statistics, DelimitedFiles
 import MakieControlPlots
-import VortexStepMethod: calculate_filaments_for_plotting
+import VortexStepMethod: calculate_filaments_for_plotting, calculate_cl, calculate_cd,
+    calculate_cm
 import VortexStepMethod: ObjAdapter, AirfoilAero
 
 export plot_geometry, plot_distribution, plot_polars, save_plot, show_plot,
@@ -1499,48 +1500,32 @@ function VortexStepMethod.plot_combined_analysis(
 end
 
 """
-    plot_section_polars(body_aero, coefficient=:cl; is_show=true,
+    plot_section_polars(body_aero; panels=eachindex(body_aero.panels),
+                        alphas=deg2rad.(-20:0.5:30), delta=nothing, is_show=true,
                         is_save=false, save_path=nothing, data_type=".png")
 
 Implementation of [`plot_section_polars`](@ref); rendered through `MakieControlPlots`.
 """
-function VortexStepMethod.plot_section_polars(body_aero::BodyAerodynamics,
-    coefficient::Symbol=:cl; is_show::Bool=true, is_save::Bool=false,
-    save_path=nothing, data_type::String=".png")
+function VortexStepMethod.plot_section_polars(body_aero::BodyAerodynamics;
+    panels=eachindex(body_aero.panels), alphas=deg2rad.(-20:0.5:30), delta=nothing,
+    is_show::Bool=true, is_save::Bool=false, save_path=nothing,
+    data_type::String=".png")
 
-    coefficient in (:cl, :cd, :cm) ||
-        throw(ArgumentError("coefficient must be :cl, :cd, or :cm, got :$coefficient"))
-    idx = coefficient === :cl ? 2 : coefficient === :cd ? 3 : 4
-    label = uppercasefirst(string(coefficient))
+    indices = vcat(panels)
+    selected = body_aero.panels[indices]
+    deltas = something.(delta, getproperty.(selected, :delta))
+    cl = collect.(eachrow(calculate_cl.(selected, alphas', deltas)))
+    cd = collect.(eachrow(calculate_cd.(selected, alphas', deltas)))
+    cm = collect.(eachrow(calculate_cm.(selected, alphas', deltas)))
+    labels = ["panel $i ($(panel.aero_model))" for (i, panel) in zip(indices, selected)]
 
-    alphas_deg = nothing
-    series = Vector{Float64}[]
-    labels = String[]
-    for wing in body_aero.wings
-        for (s, section) in enumerate(wing.unrefined_sections)
-            section.aero_model == POLAR_VECTORS || continue
-            aero = section.aero_data
-            aero === nothing && continue
-            section_alphas = rad2deg.(aero[1])
-            if isnothing(alphas_deg)
-                alphas_deg = collect(section_alphas)
-            elseif length(section_alphas) != length(alphas_deg)
-                @warn "section $s has a different α grid; plotting against the first section's α"
-            end
-            push!(series, Float64.(aero[idx]))
-            push!(labels, "section $s")
-        end
-    end
-    isempty(series) && error("No POLAR_VECTORS sections found in body")
-
-    plt = MakieControlPlots.plot(alphas_deg, series;
-        xlabel="α [deg]", ylabel=label, title="$label per section",
-        labels=labels, disp=(is_show || is_save))
+    plt = MakieControlPlots.plotx(rad2deg.(alphas), cl, cd, cm;
+        xlabel="α [deg]", ylabels=["cl", "cd", "cm"], title="Panel polars",
+        labels=[labels], disp=(is_show || is_save))
 
     if is_save && !isnothing(save_path)
         isdir(save_path) || mkpath(save_path)
-        MakieControlPlots.savefig(
-            joinpath(save_path, "section_polars_$(coefficient)$(data_type)"))
+        MakieControlPlots.savefig(joinpath(save_path, "section_polars$(data_type)"))
     end
     return plt
 end
