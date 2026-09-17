@@ -55,6 +55,7 @@ effective_alpha
 panel_inflow
 dynamic_pressure
 flow_curvature_cm
+spanwise_flow_drag
 panel_force_directions
 panel_moment
 panel_couple_force

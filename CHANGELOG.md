@@ -13,6 +13,10 @@
   `reference_point` [m] instead of the origin. The point is stored on
   `BodyAerodynamics`, starts at the origin, and is kept by later `set_va!`, `reinit!`
   and `linearize` calls until it is given again.
+- Spanwise-flow viscous drag correction (Gaunaa et al. 2024,
+  doi:10.1088/1742-6596/2767/2/022068): each section gets a drag increment and a force
+  along its span from the flow across it, in `solve!`, `solve` and `linearize`. Opt-in
+  via `is_with_viscous_drag_correction` (default `false`) on the solver settings.
 
 ### Changed
 
