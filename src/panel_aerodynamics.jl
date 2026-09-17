@@ -167,18 +167,34 @@ the panel normal at its leading and trailing edge.
     scale * width * cm * q_dyn * chord
 
 """
-    panel_loads(axes, dirs, q_dyn, cl, cd, cm, scale=1)
+    spanwise_flow_drag(v_a, v_span, chord, density, mu)
+
+Viscous force increments from spanwise flow (Gaunaa et al. 2024,
+doi:10.1088/1742-6596/2767/2/022068), as `(; delta_cd, c_span)`: an addition to the
+section drag coefficient and a force coefficient along `y_airf`. Both refer to `v_a`,
+the speed normal to the span; `v_span` is the velocity along `y_airf`.
+"""
+@inline function spanwise_flow_drag(v_a, v_span, chord, density, mu)
+    f0 = 0.062 * (density * v_a * chord / mu)^(-1 / 7)
+    skew_factor = (hypot(v_a, v_span) / v_a)^(5 / 7)
+    return (; delta_cd = f0 * (skew_factor - 1), c_span = f0 * v_span / v_a * skew_factor)
+end
+
+"""
+    panel_loads(axes, dirs, q_dyn, cl, cd, cm, scale=1; c_span=0)
 
 Panel load from its polar coefficients, [`panel_axes`](@ref) and
 [`panel_force_directions`](@ref), as `(; lift, drag, moment, force,
 pitching_moment)`. The first three are per unit span; `force` and
-`pitching_moment` are the whole panel's, `scale` included.
+`pitching_moment` are the whole panel's, `scale` included. `c_span` adds a force
+along `y_airf`, as [`spanwise_flow_drag`](@ref) gives it.
 """
-@inline function panel_loads(axes, dirs, q_dyn, cl, cd, cm, scale=1)
-    (; chord, width) = axes
+@inline function panel_loads(axes, dirs, q_dyn, cl, cd, cm, scale=1; c_span=0)
+    (; y_airf, chord, width) = axes
     lift = cl * q_dyn * chord
     drag = cd * q_dyn * chord
     moment = panel_moment(cm, q_dyn, chord)
-    force = (scale * width) .* (lift .* dirs.dir_lift .+ drag .* dirs.dir_drag)
+    force = (scale * width) .* (lift .* dirs.dir_lift .+ drag .* dirs.dir_drag .+
+                                (c_span * q_dyn * chord) .* y_airf)
     return (; lift, drag, moment, force, pitching_moment=scale * width * moment)
 end
