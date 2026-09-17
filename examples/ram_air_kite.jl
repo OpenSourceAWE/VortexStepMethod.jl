@@ -11,7 +11,7 @@ using LinearAlgebra
 
 PLOT = true
 USE_TEX = false
-v_a = 15.0
+va = 15.0
 RE = 1e6
 
 # Shared boundary-layer transition settings — both backends use the e^N model.
@@ -97,7 +97,7 @@ if PLOT
         [body_xfoil, body_nf],
         ["XFoil", "NeuralFoil"];
         angle_range=range(-5, 25, length=31),
-        v_a=v_a,
+        v_a=va,
         title="Ram Air Kite: XFoil vs NeuralFoil",
         is_save=false,
         use_tex=USE_TEX
