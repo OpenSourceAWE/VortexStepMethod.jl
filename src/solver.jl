@@ -85,6 +85,7 @@ end
     gamma_new::MVector{P, T}         = zeros(MVector{P, T})
     alpha_dist::MVector{P, T}        = zeros(MVector{P, T})
     v_a_dist::MVector{P, T}          = zeros(MVector{P, T})
+    v_span_dist::MVector{P, T}       = zeros(MVector{P, T})
 end
 
 @with_kw struct BaseResult{P, T}
@@ -138,6 +139,8 @@ Main solver structure for the Vortex Step Method.See also: [`solve`](@ref)
 - `is_only_f_and_gamma_output`::Bool = false: Whether to only output f and gamma
 - `flow_curvature`::Bool = false: Add the thin-airfoil pitch-rate moment
     increment `-(π/4) q̂` to each section, see: [`flow_curvature_cm`](@ref)
+- `is_with_viscous_drag_correction`::Bool = false: Add the spanwise-flow viscous drag
+    and side force to each section, see: [`spanwise_flow_drag`](@ref)
 - `reference_point`::MVec3 = [0.0, 0.0, 0.0]: Moment reference point in body frame
 
 ## Solution
@@ -177,6 +180,7 @@ sol::VSMSolution = VSMSolution(): The result of calling [`solve!`](@ref)
     is_only_f_and_gamma_output::Bool = false
     correct_aoa::Bool = false
     flow_curvature::Bool = false
+    is_with_viscous_drag_correction::Bool = false
     reference_point::MVector{3, T} = zeros(MVector{3, T})
 
     # Intermediate results
@@ -219,6 +223,7 @@ function Solver(body_aero, settings::VSMSettings)
         is_only_f_and_gamma_output=ss.calc_only_f_and_gamma,
         correct_aoa=ss.correct_aoa,
         flow_curvature=ss.flow_curvature,
+        is_with_viscous_drag_correction=ss.is_with_viscous_drag_correction,
         reference_point=reference_point,
     )
 end
@@ -405,9 +410,16 @@ function calc_forces!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics;
 
         axes = panel_axes(panel)
         dirs = panel_force_directions(axes, alpha_corrected[i], spanwise_unit)
+        c_span = zero(T)
+        if solver.is_with_viscous_drag_correction
+            viscous = spanwise_flow_drag(v_rel_dist[i], solver.lr.v_span_dist[i],
+                panel.chord, density, solver.mu)
+            cd_dist[i] += viscous.delta_cd
+            c_span = viscous.c_span
+        end
         loads = panel_loads(axes, dirs,
             dynamic_pressure(density, density, v_rel_dist[i]),
-            cl_dist[i], cd_dist[i], cm_dist[i])
+            cl_dist[i], cd_dist[i], cm_dist[i]; c_span)
         lift[i] = loads.lift
         drag[i] = loads.drag
         panel_moment_dist[i] = loads.moment
@@ -593,7 +605,9 @@ function solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=n
         body_aero.panels,
         solver.is_only_f_and_gamma_output;
         correct_aoa=solver.correct_aoa,
-        flow_curvature=solver.flow_curvature
+        flow_curvature=solver.flow_curvature,
+        is_with_viscous_drag_correction=solver.is_with_viscous_drag_correction,
+        v_span_dist=solver.lr.v_span_dist,
     )
     # Attach geometric AoA (already computed in calculate_results) to solver.sol
     if haskey(results, "alpha_geometric")
@@ -756,6 +770,10 @@ end
             x_airf_dist[i,1]*relative_velocity_dist[i,1] +
             x_airf_dist[i,2]*relative_velocity_dist[i,2] +
             x_airf_dist[i,3]*relative_velocity_dist[i,3]
+        solver.lr.v_span_dist[i] =
+            y_airf_dist[i,1]*relative_velocity_dist[i,1] +
+            y_airf_dist[i,2]*relative_velocity_dist[i,2] +
+            y_airf_dist[i,3]*relative_velocity_dist[i,3]
     end
     solver.lr.alpha_dist .= atan.(v_normal_dist, v_tangential_dist)
 
@@ -1241,6 +1259,7 @@ function make_dual_shadow(solver::Solver{P, U, Float64},
         is_only_f_and_gamma_output = solver.is_only_f_and_gamma_output,
         correct_aoa = solver.correct_aoa,
         flow_curvature = solver.flow_curvature,
+        is_with_viscous_drag_correction = solver.is_with_viscous_drag_correction,
         reference_point = MVector{3, TD}(solver.reference_point),
     )
     return body_aero_d, solver_d

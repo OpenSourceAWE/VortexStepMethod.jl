@@ -750,12 +750,15 @@ end
                       core_radius_fraction, mu, alpha_dist, v_rel_dist, chord_dist,
                       x_airf_dist, z_airf_dist, va_vec_dist, va_dist, va_unit_dist,
                       panels::Vector{<:Panel}, is_only_f_and_gamma_output::Bool;
-                      correct_aoa=false, flow_curvature=false)
+                      correct_aoa=false, flow_curvature=false,
+                      is_with_viscous_drag_correction=false, v_span_dist=nothing)
 
 Calculate final aerodynamic results. Reference point is in the kite body (KB) frame.
 
 `flow_curvature` adds [`flow_curvature_cm`](@ref) to every section moment, read
-from `body_aero.omega`.
+from `body_aero.omega`. `is_with_viscous_drag_correction` adds
+[`spanwise_flow_drag`](@ref) to every section, from the velocity along `y_airf` in
+`v_span_dist`.
 
 Returns:
     Dict: Results including forces, coefficients and distributions
@@ -779,6 +782,8 @@ function calculate_results(
     is_only_f_and_gamma_output::Bool;
     correct_aoa::Bool=false,
     flow_curvature::Bool=false,
+    is_with_viscous_drag_correction::Bool=false,
+    v_span_dist=nothing,
 )
 
     n_panels = length(panels)
@@ -895,8 +900,6 @@ function calculate_results(
     cross3!(dir_side_ref, dir_lift_ref, va_ref_unit)
     q_ref = 0.5 * density * va_ref^2
 
-    lift_induced_va = body_aero.work_vectors[7]
-    drag_induced_va = body_aero.work_vectors[8]
     dir_lift_prescribed_va = body_aero.work_vectors[9]
     temp_vec = body_aero.work_vectors[10]
     spanwise_unit = SVector{3}(spanwise_direction)
@@ -908,14 +911,17 @@ function calculate_results(
 
         axes = panel_axes(panel)
         dirs = panel_force_directions(axes, alpha_corrected[i], spanwise_unit)
+        c_span = 0.0
+        if is_with_viscous_drag_correction
+            viscous = spanwise_flow_drag(v_rel_dist[i], v_span_dist[i], panel.chord,
+                density, mu)
+            cd_dist[i] += viscous.delta_cd
+            c_span = viscous.c_span
+        end
         loads = panel_loads(axes, dirs,
             dynamic_pressure(density, density, v_rel_dist[i]),
-            cl_dist[i], cd_dist[i], cm_dist[i])
-        moment_i = loads.moment
-        @inbounds for k in 1:3
-            lift_induced_va[k] = loads.lift * dirs.dir_lift[k]
-            drag_induced_va[k] = loads.drag * dirs.dir_drag[k]
-        end
+            cl_dist[i], cd_dist[i], cm_dist[i]; c_span)
+        force = loads.force
 
         va_panel = va_dist[i]
         va_panel > 0.0 || throw(ArgumentError(
@@ -926,54 +932,32 @@ function calculate_results(
                 panel.va, spanwise_direction)
         normalize3!(dir_lift_prescribed_va)
 
-        lift_prescribed_va =
-            dot3(lift_induced_va, dir_lift_prescribed_va) +
-            dot3(drag_induced_va, dir_lift_prescribed_va)
-        drag_prescribed_va =
-            (dot3(lift_induced_va, panel.va) +
-             dot3(drag_induced_va, panel.va)) / va_panel
         cross3!(temp_vec, dir_lift_prescribed_va, panel.va)
         inv_va_panel = 1.0 / va_panel
         @inbounds for k in 1:3
             temp_vec[k] *= inv_va_panel
         end
-        side_prescribed_va =
-            dot3(lift_induced_va, temp_vec) +
-            dot3(drag_induced_va, temp_vec)
+        lift_prescribed_va = dot(force, dir_lift_prescribed_va)
+        drag_prescribed_va = dot(force, panel.va) * inv_va_panel
+        side_prescribed_va = dot(force, temp_vec)
 
-        width = panel.width
-        @inbounds for k in 1:3
-            f_body_3D[k, i] = (lift_induced_va[k] +
-                               drag_induced_va[k]) * width
-        end
-
-        lift_wing_3D_sum += lift_prescribed_va * width *
+        lift_wing_3D_sum += lift_prescribed_va *
             dot3(dir_lift_prescribed_va, dir_lift_ref)
-        drag_wing_3D_sum += drag_prescribed_va * width *
-            (dot3(panel.va, va_ref_unit) / va_panel)
-        side_wing_3D_sum += side_prescribed_va * width *
+        drag_wing_3D_sum += drag_prescribed_va *
+            (dot3(panel.va, va_ref_unit) * inv_va_panel)
+        side_wing_3D_sum += side_prescribed_va *
             dot3(temp_vec, dir_side_ref)
 
-        inv_qc = 1.0 / (q_panel * panel.chord)
-        cl_prescribed_va[i] = lift_prescribed_va * inv_qc
-        cd_prescribed_va[i] = drag_prescribed_va * inv_qc
-        cs_prescribed_va[i] = side_prescribed_va * inv_qc
+        inv_q_area = 1.0 / (q_panel * panel_area)
+        cl_prescribed_va[i] = lift_prescribed_va * inv_q_area
+        cd_prescribed_va[i] = drag_prescribed_va * inv_q_area
+        cs_prescribed_va[i] = side_prescribed_va * inv_q_area
 
-        ### Moment ###
-        # r_vector = panel.aero_center - reference_point
-        # M_shift = cross(r_vector, f_body_3D[:,i])
-        # m_body_3D[:,i] = moment_i * panel.y_airf * width + M_shift
+        arm = SVector{3}(panel.aero_center) - SVector{3}(reference_point)
+        moment = loads.pitching_moment .* axes.y_airf .+ cross(arm, force)
         @inbounds for k in 1:3
-            dir_lift_prescribed_va[k] = panel.aero_center[k] -
-                                        reference_point[k]
-            drag_induced_va[k] = f_body_3D[k, i]
-        end
-        cross3!(temp_vec,
-                dir_lift_prescribed_va, drag_induced_va)
-        local_moment_scale = moment_i * width
-        @inbounds for k in 1:3
-            m_body_3D[k, i] = local_moment_scale *
-                              panel.y_airf[k] + temp_vec[k]
+            f_body_3D[k, i] = force[k]
+            m_body_3D[k, i] = moment[k]
         end
     end
 
