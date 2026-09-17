@@ -24,6 +24,11 @@
 - The `VSMSolution` docstring gives `lift_dist`, `drag_dist` and `panel_moment_dist` in
   the per-unit-span units they hold, [N/m] and [Nm/m], instead of [N] and [Nm].
 
+### Fixed
+
+- With `artificial_damping` on, an iteration whose circulation is already smooth no longer
+  re-applies the previous iteration's damping correction.
+
 ## VortexStepMethod v5.1.1 2026-09-12
 
 ### Fixed

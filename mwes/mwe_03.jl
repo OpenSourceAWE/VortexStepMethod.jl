@@ -9,7 +9,7 @@ using VortexStepMethod, PreallocationTools
 n_panels = 20          # Number of panels
 span = 20.0            # Wing span [m]
 chord = 1.0            # Chord length [m]
-v_a = 20.0             # Magnitude of inflow velocity [m/s]
+va = 20.0              # Magnitude of inflow velocity [m/s]
 density = 1.225        # Air density [kg/m³]
 alpha_deg = 30.0       # Angle of attack [degrees]
 alpha = deg2rad(alpha_deg)

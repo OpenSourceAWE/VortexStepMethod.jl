@@ -11,8 +11,8 @@ Returns `(coeffs, dalpha, dbeta, converged)`.
 """
 function stability_derivatives(solver::Solver, body_aero::BodyAerodynamics, alpha, beta,
         wind_speed; kwargs...)
-    va = apparent_wind(alpha, beta, wind_speed)
-    jac, results, converged = linearize(solver, body_aero, va;
+    va_vec = apparent_wind(alpha, beta, wind_speed)
+    jac, results, converged = linearize(solver, body_aero, va_vec;
         theta_idxs=nothing, va_idxs=1:3, aero_coeffs=true, kwargs...)
     dva_dalpha = ForwardDiff.derivative(
         angle -> apparent_wind(angle, beta, wind_speed), alpha)
