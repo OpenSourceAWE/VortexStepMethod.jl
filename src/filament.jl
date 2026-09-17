@@ -122,14 +122,14 @@ end
 
 """
     velocity_3D_trailing_vortex(vel, filament::BoundFilament, 
-                              XVP, gamma, v_a, work_vectors)
+                              XVP, gamma, va, work_vectors)
 
 Calculate induced velocity by a trailing vortex filament.
 
 # Arguments
 - `XVP`: Control point coordinates
 - `gamma`: Vortex strength
-- `v_a`: Inflow velocity magnitude
+- `va`: Inflow velocity magnitude
 - work_vectors: preallocated array of intermediate variables
 
 Reference: Rick Damiani et al. "A vortex step method for nonlinear airfoil polar data 
@@ -140,7 +140,7 @@ as implemented in KiteAeroDyn".
     filament::BoundFilament,
     XVP,
     gamma,
-    v_a,
+    va,
     work_vectors
 )
     r1 = work_vectors[2]
@@ -161,7 +161,7 @@ as implemented in KiteAeroDyn".
 
     # Cut-off radius. The perpendicular component has length |r1.r0|/|r0|, so the
     # vector itself is only needed inside the core.
-    epsilon = sqrt(4 * ALPHA0 * NU * abs(d_r1_r0) / nr0 / v_a)
+    epsilon = sqrt(4 * ALPHA0 * NU * abs(d_r1_r0) / nr0 / va)
 
     cross3!(r1Xr0, r1, r0)
 
@@ -233,10 +233,11 @@ Represents a semi-infinite vortex filament.
     initialized::Bool = false
 end
 
-function reinit!(filament::SemiInfiniteFilament{T}, x1::AbstractVector, direction::AbstractVector, vel_mag::Real, filament_direction::Real) where T
+function reinit!(filament::SemiInfiniteFilament{T}, x1::AbstractVector,
+                 direction::AbstractVector, va::Real, filament_direction::Real) where T
     filament.x1 .= x1
     filament.direction .= direction
-    filament.vel_mag = vel_mag
+    filament.vel_mag = va
     filament.filament_direction = filament_direction
     filament.initialized = true
     return nothing
@@ -244,7 +245,7 @@ end
 
 """
     velocity_3D_trailing_vortex_semiinfinite(filament::SemiInfiniteFilament, 
-                                             Vf, XVP, GAMMA, v_a, work_vectors)
+                                             Vf, XVP, GAMMA, va, work_vectors)
 
 Calculate induced velocity by a semi-infinite trailing vortex filament.
 """
@@ -254,7 +255,7 @@ function velocity_3D_trailing_vortex_semiinfinite!(
     Vf,
     XVP,
     GAMMA,
-    v_a,
+    va,
     work_vectors
 )
     r1 = work_vectors[1]
@@ -266,7 +267,7 @@ function velocity_3D_trailing_vortex_semiinfinite!(
     # the vector itself is only needed inside the core.
     d_r1_Vf = dot3(r1, Vf)
     nVf = norm3(Vf)
-    epsilon = sqrt(4 * ALPHA0 * NU * abs(d_r1_Vf) * nVf / v_a)
+    epsilon = sqrt(4 * ALPHA0 * NU * abs(d_r1_Vf) * nVf / va)
 
     cross3!(r1XVf, r1, Vf)
 

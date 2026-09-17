@@ -26,8 +26,8 @@ end
             @test Solver(settings; density=1.0).density == 1.0
 
             # Test that the solver can solve
-            va = [10.0, 0.0, 0.0]
-            set_va!(body_aero, va)
+            va_vec = [10.0, 0.0, 0.0]
+            set_va!(body_aero, va_vec)
             sol = solve!(solver, body_aero)
             @test sol isa VSMSolution
 
@@ -113,16 +113,16 @@ end
         wing = Wing(settings)
         refine!(wing)
         body_aero = BodyAerodynamics([wing])
-        va = [10.0, 0.0, 5.0]   # 26.6 deg angle of attack, past stall
+        va_vec = [10.0, 0.0, 5.0]   # 26.6 deg angle of attack, past stall
         nonlin = Solver(wing.n_panels, wing.n_unrefined_sections; solver_type=NONLIN,
             aerodynamic_model_type=VSM, type_initial_gamma_distribution=ELLIPTIC)
         loop = Solver(wing.n_panels, wing.n_unrefined_sections; solver_type=LOOP,
             aerodynamic_model_type=VSM, type_initial_gamma_distribution=ELLIPTIC)
 
-        set_va!(body_aero, va)
+        set_va!(body_aero, va_vec)
         sol_nonlin = solve!(nonlin, body_aero)
         gamma_nonlin = copy(sol_nonlin.gamma_distribution)
-        set_va!(body_aero, va)
+        set_va!(body_aero, va_vec)
         sol_loop = solve!(loop, body_aero)
 
         @test sol_nonlin.solver_status == FEASIBLE
@@ -161,8 +161,9 @@ end
         solver = Solver(wing.n_panels, wing.n_unrefined_sections; solver_type=LOOP,
             aerodynamic_model_type=VSM, type_initial_gamma_distribution=ELLIPTIC)
 
-        for va in ([10.0, 0.0, 0.0], [10.0, 0.0, 5.0])   # 0 deg, and 26.6 deg past stall
-            set_va!(body_aero, va)
+        # 0 deg, and 26.6 deg past stall
+        for va_vec in ([10.0, 0.0, 0.0], [10.0, 0.0, 5.0])
+            set_va!(body_aero, va_vec)
             gamma = copy(solve!(solver, body_aero).gamma_distribution)
             @test solver.lr.converged
             residual = maximum(abs, unrelaxed_step(body_aero, gamma) .- gamma)
@@ -211,6 +212,25 @@ end
     small = zeros(2, 2)
     VortexStepMethod.build_spanwise_laplacian!(small, 2)
     @test all(small .== 0.0)
+end
+
+@testset "smooth_circulation! damps a rough interior, clears damp when smooth" begin
+    rough = [0.0, 1.0, 3.0, 1.0, 0.0]
+    damp = zeros(5)
+    @test VortexStepMethod.smooth_circulation!(damp, rough, 0.1, 0.5) === true
+    @test damp ≈ [0.0, 7/18, -7/9, 7/18, 0.0]
+    @test sum(rough .+ damp) ≈ sum(rough)
+
+    # `damp` still holds the rough correction from above.
+    smooth = [0.0, 1.0, 1.0, 1.0, 0.0]
+    @test VortexStepMethod.smooth_circulation!(damp, smooth, 0.1, 0.5) === false
+    @test all(iszero, damp)
+
+    no_interior_differences = [0.0, 2.0, 0.0]
+    damp_short = ones(3)
+    @test VortexStepMethod.smooth_circulation!(damp_short, no_interior_differences,
+        0.1, 0.5) === false
+    @test all(iszero, damp_short)
 end
 
 """

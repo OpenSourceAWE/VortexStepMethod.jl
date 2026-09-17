@@ -29,6 +29,11 @@
   on use; build the solver with `Solver(settings)` or
   `Solver(n_panels, n_unrefined_sections)` instead.
 
+### Fixed
+
+- With `artificial_damping` on, an iteration whose circulation is already smooth no longer
+  re-applies the previous iteration's damping correction.
+
 ## VortexStepMethod v5.1.1 2026-09-12
 
 ### Fixed

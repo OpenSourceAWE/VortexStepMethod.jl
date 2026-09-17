@@ -38,9 +38,9 @@ end
     @debug "N: $N"
     @debug "size(coord): $(size(coord))"
 
-    v_a = 20.0
+    va = 20.0
     aoa = 5.7106 * π / 180
-    v_a = [cos(aoa), 0.0, sin(aoa)] .* v_a
+    va_vec = [cos(aoa), 0.0, sin(aoa)] .* va
 
     # Create wing geometry
     core_radius_fraction = 1e-20
@@ -57,11 +57,11 @@ end
     
     refine!(wing)
     body_aero = BodyAerodynamics([wing])
-    set_va!(body_aero, v_a)
+    set_va!(body_aero, va_vec)
 
     # Calculate reference matrices using thesis functions
     controlpoints, rings, bladepanels, ringvec, coord_L =
-        create_geometry_general(coord, v_a, N, "5fil", LLT)
+        create_geometry_general(coord, va_vec, N, "5fil", LLT)
     
     # Test LLT matrices
     @testset "LLT Matrices" begin
@@ -70,7 +70,7 @@ end
             deepcopy(ringvec),
             deepcopy(controlpoints),
             deepcopy(rings),
-            deepcopy(v_a),
+            deepcopy(va_vec),
             zeros(N-1),
             nothing,  # data_airf not needed
             nothing,  # conv_crit not needed
@@ -78,13 +78,14 @@ end
         )
 
         # Calculate new matrices
-        va_norm_dist = fill(norm(v_a), length(body_aero.panels))
-        va_unit_dist = repeat(reshape(v_a ./ norm(v_a), 1, 3), length(body_aero.panels))
+        va_dist = fill(norm(va_vec), length(body_aero.panels))
+        va_unit_dist = repeat(reshape(va_vec ./ norm(va_vec), 1, 3),
+                              length(body_aero.panels))
         calculate_AIC_matrices!(
             body_aero,
             LLT,
             core_radius_fraction,
-            va_norm_dist,
+            va_dist,
             va_unit_dist
         )
         AIC_x, AIC_y, AIC_z = @views body_aero.AIC[:, :, 1], body_aero.AIC[:, :, 2], body_aero.AIC[:, :, 3]
@@ -99,13 +100,13 @@ end
     @testset "VSM Matrices" begin
         # Calculate reference matrices for VSM
         controlpoints, rings, bladepanels, ringvec, coord_L = 
-            create_geometry_general(coord, v_a, N, "5fil", VSM)
+            create_geometry_general(coord, va_vec, N, "5fil", VSM)
         
         MatrixU, MatrixV, MatrixW = thesis_induction_matrix_creation(
             deepcopy(ringvec),
             deepcopy(controlpoints),
             deepcopy(rings),
-            deepcopy(v_a),
+            deepcopy(va_vec),
             zeros(N-1),
             nothing,
             nothing,
@@ -113,13 +114,14 @@ end
         )
 
         # Calculate new matrices
-        va_norm_dist = fill(norm(v_a), length(body_aero.panels))
-        va_unit_dist = repeat(reshape(v_a ./ norm(v_a), 1, 3), length(body_aero.panels))
+        va_dist = fill(norm(va_vec), length(body_aero.panels))
+        va_unit_dist = repeat(reshape(va_vec ./ norm(va_vec), 1, 3),
+                              length(body_aero.panels))
         calculate_AIC_matrices!(
             body_aero,
             VSM,
             core_radius_fraction,
-            va_norm_dist,
+            va_dist,
             va_unit_dist
         )
         AIC_x, AIC_y, AIC_z = body_aero.AIC[:, :, 1], body_aero.AIC[:, :, 2], body_aero.AIC[:, :, 3]
@@ -154,9 +156,9 @@ end
         span = 17.0
         AR = span^2 / (π * span * max_chord / 4)
         @debug "AR: $AR"
-        v_a = 20.0
+        va = 20.0
         aoa = 5.7106 * π / 180
-        v_a = [cos(aoa), 0.0, sin(aoa)] .* v_a
+        va_vec = [cos(aoa), 0.0, sin(aoa)] .* va
     
         coord = if wing_type === :rectangular
             theta = range(-0.5, 0.5, length=N)
@@ -191,23 +193,23 @@ end
         end
         refine!(wing)
         body_aero = BodyAerodynamics([wing])
-        set_va!(body_aero, v_a)
+        set_va!(body_aero, va_vec)
 
-        return body_aero, coord, v_a, model
+        return body_aero, coord, va_vec, model
     end
 
     for model in [VSM, LLT]
         @debug "model: $model"
         for wing_type in [:rectangular, :curved, :elliptical]
             @debug "wing_type: $wing_type"
-            body_aero, coord, v_a, model = create_geometry(
+            body_aero, coord, va_vec, model = create_geometry(
                 model=model, wing_type=wing_type
             )
             
             # Generate geometry
             expected_controlpoints, expected_rings, expected_bladepanels, 
                 expected_ringvec, expected_coord_L = create_geometry_general(
-                coord, v_a, div(size(coord,1), 2), "5fil", model
+                coord, va_vec, div(size(coord,1), 2), "5fil", model
             )
 
             for i in 1:length(body_aero.panels)
@@ -298,10 +300,10 @@ end
     N = 40
     max_chord = 1.0
     span = 15.709  # AR = 20
-    v_a = 20.0
+    va = 20.0
     AR = span^2 / (π * span * max_chord / 4)
     aoa = deg2rad(5)
-    v_a = [cos(aoa), 0.0, sin(aoa)] .* v_a
+    va_vec = [cos(aoa), 0.0, sin(aoa)] .* va
     model = VSM
 
     # Setup wing geometry
@@ -322,7 +324,7 @@ end
     
     refine!(wing)
     body_aero = BodyAerodynamics([wing])
-    set_va!(body_aero, v_a)
+    set_va!(body_aero, va_vec)
 
     # Run analysis
     loop_solver = Solver(wing.n_panels, wing.n_unrefined_sections;
@@ -374,7 +376,7 @@ end
 
     # Calculate forces using uncorrected alpha
     alpha = results_NEW["alpha_uncorrected"]
-    dyn_visc = 0.5 * density * norm(v_a)^2
+    dyn_visc = 0.5 * density * norm(va_vec)^2
     n_panels = length(body_aero.panels)
     lift = zeros(n_panels)
     drag = zeros(n_panels)
@@ -404,7 +406,7 @@ end
     Atot = calculate_projected_area(wing)
 
     F_rel_ref, F_gl_ref, Ltot_ref, Dtot_ref, CL_ref, CD_ref, CS_ref = 
-        output_results(Fmag, aero_coeffs, ringvec, v_a, controlpoints, Atot)
+        output_results(Fmag, aero_coeffs, ringvec, va_vec, controlpoints, Atot)
 
     # Compare results
     @info "Comparing results"
@@ -441,12 +443,12 @@ end
         set_va!(body_aero, settings)
 
         α, β, wind_speed = deg2rad(10.0), deg2rad(5.0), 15.0
-        expected_va = wind_speed .* [cos(α)*cos(β), sin(β), sin(α)*cos(β)]
+        expected_va_vec = wind_speed .* [cos(α)*cos(β), sin(β), sin(α)*cos(β)]
 
         for p in body_aero.panels
-            @test p.va ≈ expected_va atol=1e-10
+            @test p.va ≈ expected_va_vec atol=1e-10
         end
-        @test body_aero._va ≈ expected_va atol=1e-10
+        @test body_aero._va ≈ expected_va_vec atol=1e-10
     finally
         isfile(settings_file) && rm(settings_file; force=true)
     end
@@ -455,11 +457,11 @@ end
 @testset "set_va! with distributed inflow blocks body_aero.va access" begin
     body_aero = BodyAerodynamics([inviscid_wing([0.0, 1.0, 2.0])])
 
-    va_distribution = [
+    va_vec_dist = [
         10.0 0.0 0.0
         9.0 0.0 1.0
     ]
-    set_va!(body_aero, va_distribution)
+    set_va!(body_aero, va_vec_dist)
 
     @test body_aero.has_distributed_va
     try
@@ -479,25 +481,25 @@ end
     body_aero = BodyAerodynamics([inviscid_wing([0.0, 1.0, 2.0]),
                                   inviscid_wing([10.0, 11.0, 12.0])])
 
-    va = [10.0, 0.0, 0.0]
+    va_vec = [10.0, 0.0, 0.0]
     omega = [0.0, 0.0, 1.0]
-    set_va!(body_aero, va, omega)
+    set_va!(body_aero, va_vec, omega)
 
     for panel in body_aero.panels
-        expected_va = va .+ (-omega × panel.control_point)
-        @test panel.va ≈ expected_va atol=1e-12
+        expected_va_vec = va_vec .+ (-omega × panel.control_point)
+        @test panel.va ≈ expected_va_vec atol=1e-12
     end
     @test body_aero.omega ≈ omega
     @test !body_aero.has_distributed_va
-    @test body_aero.va ≈ va
+    @test body_aero.va ≈ va_vec
 
     new_omega = [0.0, 0.0, 2.0]
-    @test body_aero._va ≈ va
+    @test body_aero._va ≈ va_vec
     body_aero.omega = new_omega
 
     for panel in body_aero.panels
-        expected_va = va .+ (-new_omega × panel.control_point)
-        @test panel.va ≈ expected_va atol=1e-12
+        expected_va_vec = va_vec .+ (-new_omega × panel.control_point)
+        @test panel.va ≈ expected_va_vec atol=1e-12
     end
     @test body_aero.omega ≈ new_omega
 end

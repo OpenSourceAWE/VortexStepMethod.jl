@@ -69,7 +69,7 @@ nf_yaml = obj_to_yaml(OBJ_PATH, gen_dir; n_sections=N_SLICES, Re=RE,
     rotation=ROTATION, wrap_method=WRAP, aero_solver=NF_SOLVER, verbose=true)
 
 # Flight conditions
-v_a = 10.0
+va = 10.0
 angle_range = range(-5, 25, length=31)
 
 # Load settings and create wing with CFD polars
@@ -109,7 +109,7 @@ fig = plot_polars(
      "Wind tunnel (Poland 2025)"];
     literature_path_list=literature_paths,
     angle_range,
-    v_a,
+    v_a=va,
     title="TU Delft V3 Kite: CFD vs NeuralFoil (Re=$RE)",
     is_save=false,
 )

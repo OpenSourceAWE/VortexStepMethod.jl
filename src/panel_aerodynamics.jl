@@ -70,18 +70,18 @@ on section ordering.
 end
 
 """
-    section_pitch_rate(delta_va, z_airf, chord)
+    section_pitch_rate(delta_va_vec, z_airf, chord)
     section_pitch_rate(velocity_leading, velocity_trailing, z_airf, chord)
 
-Rate a section rotates about its own spanwise axis, positive nose-up. `delta_va`
+Rate a section rotates about its own spanwise axis, positive nose-up. `delta_va_vec`
 is the trailing minus leading edge apparent wind; apparent wind is
 `wind - velocity`, so that is the leading minus trailing edge velocity, hence the
 reversed order in the four-argument form. Chordwise wind variation enters here
 too. Builds a `pitch_rate_dist` for [`set_va!`](@ref) on a deforming structure,
 where no single body rate describes every section.
 """
-@inline section_pitch_rate(delta_va, z_airf, chord) =
-    ifelse(chord > 0, dot(delta_va, z_airf) / smooth_norm(chord), zero(chord))
+@inline section_pitch_rate(delta_va_vec, z_airf, chord) =
+    ifelse(chord > 0, dot(delta_va_vec, z_airf) / smooth_norm(chord), zero(chord))
 @inline section_pitch_rate(velocity_leading, velocity_trailing, z_airf, chord) =
     section_pitch_rate(velocity_leading .- velocity_trailing, z_airf, chord)
 
@@ -106,23 +106,23 @@ geometric angle still turns the force, so a lag shifts the coefficients only.
 @inline effective_alpha(alpha, deficiency) = alpha - deficiency
 
 """
-    panel_inflow(axes, va_1, va_2, v_ind, dva_1=nothing, dva_2=nothing,
+    panel_inflow(axes, va_vec_1, va_vec_2, v_ind, dva_vec_1=nothing, dva_vec_2=nothing,
                  deficiency=0)
 
 Flow a panel sees, as `(; v_eff, alpha, alpha_eff, v_span, pitch_rate)`, where
 `v_span` is the effective velocity across the span. `axes` is a
-[`panel_axes`](@ref) result. `dva_1`/`dva_2` are the sections' trailing minus
+[`panel_axes`](@ref) result. `dva_vec_1`/`dva_vec_2` are the sections' trailing minus
 leading edge apparent wind, giving the [`section_pitch_rate`](@ref); `nothing`
 leaves it zero. `deficiency` feeds [`effective_alpha`](@ref).
 """
-@inline function panel_inflow(axes, va_1, va_2, v_ind, dva_1=nothing,
-                              dva_2=nothing, deficiency=0)
+@inline function panel_inflow(axes, va_vec_1, va_vec_2, v_ind, dva_vec_1=nothing,
+                              dva_vec_2=nothing, deficiency=0)
     (; x_airf, y_airf, z_airf, chord) = axes
-    v_eff = 0.5 .* (va_1 .+ va_2) .+ v_ind
+    v_eff = 0.5 .* (va_vec_1 .+ va_vec_2) .+ v_ind
     alpha = atan(dot(v_eff, z_airf), dot(v_eff, x_airf))
     v_span = cross(v_eff, y_airf)
-    pitch_rate = isnothing(dva_1) ? zero(chord) :
-        section_pitch_rate(0.5 .* (dva_1 .+ dva_2), z_airf, chord)
+    pitch_rate = isnothing(dva_vec_1) ? zero(chord) :
+        section_pitch_rate(0.5 .* (dva_vec_1 .+ dva_vec_2), z_airf, chord)
     return (; v_eff, alpha, alpha_eff=effective_alpha(alpha, deficiency),
             v_span, pitch_rate)
 end
@@ -167,17 +167,17 @@ the panel normal at its leading and trailing edge.
     scale * width * cm * q_dyn * chord
 
 """
-    spanwise_flow_drag(v_a, v_span, chord, density, mu)
+    spanwise_flow_drag(v_rel, v_span, chord, density, mu)
 
 Viscous force increments from spanwise flow (Gaunaa et al. 2024,
 doi:10.1088/1742-6596/2767/2/022068), as `(; delta_cd, c_span)`: an addition to the
-section drag coefficient and a force coefficient along `y_airf`. Both refer to `v_a`,
+section drag coefficient and a force coefficient along `y_airf`. Both refer to `v_rel`,
 the speed normal to the span; `v_span` is the velocity along `y_airf`.
 """
-@inline function spanwise_flow_drag(v_a, v_span, chord, density, mu)
-    f0 = 0.062 * (density * v_a * chord / mu)^(-1 / 7)
-    skew_factor = (hypot(v_a, v_span) / v_a)^(5 / 7)
-    return (; delta_cd = f0 * (skew_factor - 1), c_span = f0 * v_span / v_a * skew_factor)
+@inline function spanwise_flow_drag(v_rel, v_span, chord, density, mu)
+    f0 = 0.062 * (density * v_rel * chord / mu)^(-1 / 7)
+    skew_factor = (hypot(v_rel, v_span) / v_rel)^(5 / 7)
+    return (; delta_cd = f0 * (skew_factor - 1), c_span = f0 * v_span / v_rel * skew_factor)
 end
 
 """

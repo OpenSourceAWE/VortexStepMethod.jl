@@ -16,7 +16,7 @@ OUTPUT_DIR = joinpath(dirname(@__DIR__), "output")
 n_panels = 20          # Number of panels
 span = 20.0            # Wing span [m]
 chord = 1.0            # Chord length [m]
-v_a = 20.0             # Magnitude of inflow velocity [m/s]
+va = 20.0              # Magnitude of inflow velocity [m/s]
 density = 1.225        # Air density [kg/m³]
 alpha_deg = 30.0       # Angle of attack [degrees]
 alpha = deg2rad(alpha_deg)
@@ -41,8 +41,8 @@ refine!(wing)
 body_aero = BodyAerodynamics([wing])
 
 # Set inflow conditions
-vel_app = [cos(alpha), 0.0, sin(alpha)] .* v_a
-set_va!(body_aero, vel_app, [0, 0, 0.1])
+va_vec = [cos(alpha), 0.0, sin(alpha)] .* va
+set_va!(body_aero, va_vec, [0, 0, 0.1])
 
 # Step 4: Initialize solvers for both LLT and VSM methods
 llt_solver = Solver(wing.n_panels, wing.n_unrefined_sections; aerodynamic_model_type=LLT)
@@ -94,7 +94,7 @@ PLOT && plot_polars(
     ["LLT", "VSM"];
     angle_range,
     angle_type="angle_of_attack",
-    v_a,
+    v_a=va,
     title="Rectangular Wing Polars",
     save_path=OUTPUT_DIR,
     is_save=false || SAVE_ALL,

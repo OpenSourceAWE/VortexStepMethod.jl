@@ -23,7 +23,7 @@ end
     #      the Jacobian columns reflect true local sensitivity rather than
     #      numerical noise (a noise-driven Jacobian would not extrapolate).
 
-    va = [15.0, 1.0, 0.5]
+    va_vec = [15.0, 1.0, 0.5]
     theta = deg2rad.([2.0, 1.0, -1.0, -2.0])
     delta = deg2rad.([1.0, 0.5, -0.5, -1.0])
     omega = [0.0, 0.1, 0.0]
@@ -31,7 +31,7 @@ end
     fd_step = 1e-3
 
     VortexStepMethod.unrefined_deform!(ram_wing, theta, delta; smooth=false)
-    body_aero = BodyAerodynamics([ram_wing]; va, omega)
+    body_aero = BodyAerodynamics([ram_wing]; va=va_vec, omega)
     solver = Solver(ram_wing.n_panels, ram_wing.n_unrefined_sections;
         aerodynamic_model_type=VSM,
         is_with_artificial_damping=false,
@@ -40,7 +40,7 @@ end
         solver_type=NONLIN,
     )
 
-    base_inputs = [theta; va; omega; delta]
+    base_inputs = [theta; va_vec; omega; delta]
     jac, lin_res, lin_converged = VortexStepMethod.linearize(
         solver, body_aero, base_inputs;
         theta_idxs=1:4, va_idxs=5:7, omega_idxs=8:10, delta_idxs=11:14,
@@ -54,14 +54,14 @@ end
     # differ at the noise floor (~sqrt(eps)) and that floor dominates
     # the small Δ used at scale=1.
     function evaluate_at!(input_vec)
-        perturbed_theta = input_vec[1:4]
-        perturbed_va    = input_vec[5:7]
-        perturbed_omega = input_vec[8:10]
-        perturbed_delta = input_vec[11:14]
+        perturbed_theta  = input_vec[1:4]
+        perturbed_va_vec = input_vec[5:7]
+        perturbed_omega  = input_vec[8:10]
+        perturbed_delta  = input_vec[11:14]
         VortexStepMethod.unrefined_deform!(
             ram_wing, perturbed_theta, perturbed_delta; smooth=false)
         reinit!(body_aero; init_aero=false,
-            va=perturbed_va, omega=perturbed_omega)
+            va=perturbed_va_vec, omega=perturbed_omega)
         VortexStepMethod.solve!(solver, body_aero; log=false)
         return [solver.sol.force; solver.sol.moment;
                 solver.sol.moment_unrefined_dist]

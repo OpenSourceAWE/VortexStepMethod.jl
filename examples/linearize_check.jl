@@ -31,22 +31,22 @@ solver = Solver(wing.n_panels, wing.n_unrefined_sections;
     use_gamma_prev=false,
 )
 
-v_a       = 15.0
-aoa_deg   = 10.0
-aoa_rad   = deg2rad(aoa_deg)
-side_slip = 0.0
-va_b_0    = [
+va         = 15.0
+aoa_deg    = 10.0
+aoa_rad    = deg2rad(aoa_deg)
+side_slip  = 0.0
+va_vec_b_0 = [
     cos(aoa_rad) * cos(side_slip),
     sin(side_slip),
     sin(aoa_rad),
-] * v_a
-omega_b_0 = zeros(3)
-theta_0   = zeros(n_unrefined)
+] * va
+omega_b_0  = zeros(3)
+theta_0    = zeros(n_unrefined)
 
 theta_idxs = 1:n_unrefined
 va_idxs    = (n_unrefined + 1):(n_unrefined + 3)
 omega_idxs = (n_unrefined + 4):(n_unrefined + 6)
-y0         = [theta_0; va_b_0; omega_b_0]
+y0         = [theta_0; va_vec_b_0; omega_b_0]
 
 @info "Computing FiniteDiff Jacobian …"
 t_fd = @elapsed begin
@@ -97,7 +97,7 @@ n_outputs = length(output_labels)
 
 input_scales = [
     fill(0.05, n_unrefined)...,    # θ [rad] : ±0.05 rad ≈ ±2.9°
-    fill(1.0, 3)...,               # va: ±1 m/s
+    fill(1.0, 3)...,               # va_vec: ±1 m/s
     fill(0.05, 3)...,              # ω : ±0.05 rad/s
 ]
 n_sweep      = 11
@@ -109,14 +109,14 @@ last_theta = fill(NaN, n_unrefined)
 
 function solve_at!(y)
     theta = y[theta_idxs]
-    va    = y[va_idxs]
+    va_vec = y[va_idxs]
     omega = y[omega_idxs]
     if !all(theta .== last_theta)
         unrefined_deform!(wing, theta, nothing; smooth=false)
         reinit!(body_aero; init_aero=false)
         last_theta .= theta
     end
-    set_va!(body_aero, va, omega)
+    set_va!(body_aero, va_vec, omega)
     solve!(solver, body_aero; log=false)
     return [
         solver.sol.force_coeffs...,
