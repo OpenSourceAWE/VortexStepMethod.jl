@@ -12,7 +12,7 @@ using VortexStepMethod: solve_base!
 n_panels = 20          # Number of panels
 span = 20.0            # Wing span [m]
 chord = 1.0            # Chord length [m]
-v_a = 20.0             # Magnitude of inflow velocity [m/s]
+va = 20.0              # Magnitude of inflow velocity [m/s]
 density = 1.225        # Air density [kg/m³]
 alpha_deg = 30.0       # Angle of attack [degrees]
 alpha = deg2rad(alpha_deg)
@@ -37,8 +37,8 @@ refine!(wing)
 body_aero = BodyAerodynamics([wing])
 
 # Set inflow conditions
-vel_app = [cos(alpha), 0.0, sin(alpha)] .* v_a
-set_va!(body_aero, vel_app)
+va_vec = [cos(alpha), 0.0, sin(alpha)] .* va
+set_va!(body_aero, va_vec)
 
 # Step 4: Initialize solvers for both LLT and VSM methods
 llt_solver = Solver(body_aero; aerodynamic_model_type=LLT)
@@ -73,17 +73,17 @@ vsm_solver = Solver(
 )
 
 # Setting velocity conditions
-v_a = 15.0
+va = 15.0
 aoa = 15.0
 side_slip = 0.0
 yaw_rate = 0.0
 aoa_rad = deg2rad(aoa)
-vel_app = [
+va_vec = [
     cos(aoa_rad) * cos(side_slip),
     sin(side_slip),
     sin(aoa_rad)
-] * v_a
-set_va!(body_aero, vel_app)
+] * va
+set_va!(body_aero, va_vec)
 
 # Solving
 solve_base!(vsm_solver, body_aero, nothing)

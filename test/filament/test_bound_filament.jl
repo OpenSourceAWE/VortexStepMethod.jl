@@ -178,11 +178,11 @@ end
 
     @testset "Velocity is azimuthal inside and outside the core" begin
         filament = create_test_filament()
-        v_a = 1e-4
-        trailing_core_radius = sqrt(4 * ALPHA0 * NU * 0.5 / v_a)
+        va = 1e-4
+        trailing_core_radius = sqrt(4 * ALPHA0 * NU * 0.5 / va)
         vortices = (
             (velocity_3D_bound_vortex!, core_radius_fraction, core_radius_fraction),
-            (velocity_3D_trailing_vortex!, v_a, trailing_core_radius),
+            (velocity_3D_trailing_vortex!, va, trailing_core_radius),
         )
 
         for (velocity_3D_vortex!, core_parameter, core_radius) in vortices
