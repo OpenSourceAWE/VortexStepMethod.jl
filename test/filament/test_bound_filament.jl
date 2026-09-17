@@ -176,21 +176,30 @@ end
         @test isapprox(velocities[2], -v_neg)
     end
 
-    @testset "Velocity is azimuthal (perpendicular to axis and radius)" begin
+    @testset "Velocity is azimuthal inside and outside the core" begin
         filament = create_test_filament()
-        r0 = [1.0, 0.0, 0.0]
+        v_a = 1e-4
+        trailing_core_radius = sqrt(4 * ALPHA0 * NU * 0.5 / v_a)
+        vortices = (
+            (velocity_3D_bound_vortex!, core_radius_fraction, core_radius_fraction),
+            (velocity_3D_trailing_vortex!, v_a, trailing_core_radius),
+        )
 
-        for d in (0.25, 0.5, 0.99, 1.0, 1.01, 2.0) .* core_radius_fraction
-            for phi in (0.0, π/4, π/2, π, -π/3)
-                p = [0.5, d * cos(phi), d * sin(phi)]
-                v = zeros(3)
-                velocity_3D_bound_vortex!(
-                    v, filament, p, gamma,
-                    core_radius_fraction, work_vectors)
+        for (velocity_3D_vortex!, core_parameter, core_radius) in vortices
+            @testset "$velocity_3D_vortex!" begin
+                for distance in (0.25, 0.5, 0.99, 1.0, 1.01, 2.0) .* core_radius
+                    for phi in (0.0, π/4, π/2, π, -π/3)
+                        radial = [0.0, distance * cos(phi), distance * sin(phi)]
+                        point = [0.5, 0.0, 0.0] + radial
+                        velocity = zeros(3)
+                        velocity_3D_vortex!(velocity, filament, point, gamma,
+                            core_parameter, work_vectors)
 
-                r_radial = [0.0, p[2], p[3]]
-                @test isapprox(dot(v, r0), 0.0; atol=1e-10)
-                @test isapprox(dot(v, r_radial), 0.0; atol=1e-8)
+                        @test norm(velocity) > 1e-3
+                        @test isapprox(dot(velocity, filament.r0), 0.0; atol=1e-10)
+                        @test isapprox(dot(velocity, radial), 0.0; atol=1e-10)
+                    end
+                end
             end
         end
     end
@@ -249,26 +258,6 @@ end
             @test isapprox(v[2], 0.0; atol=expected_mag * 1e-4)
             @test isapprox(abs(v[3]), expected_mag; rtol=1e-3)
             @test v[3] > 0
-        end
-    end
-
-    @testset "Trailing vortex velocity is azimuthal inside and outside the core" begin
-        filament = create_test_filament()
-        r0 = [1.0, 0.0, 0.0]
-        v_a = 1e-4
-        core_radius = sqrt(4 * ALPHA0 * NU * 0.5 / v_a)
-
-        for d in (0.25, 0.5, 0.99, 1.01, 2.0) .* core_radius
-            for phi in (0.0, π/4, π/2, π, -π/3)
-                p = [0.5, d * cos(phi), d * sin(phi)]
-                v = zeros(3)
-                velocity_3D_trailing_vortex!(v, filament, p, gamma, v_a, work_vectors)
-
-                r_radial = [0.0, p[2], p[3]]
-                @test norm(v) > 1e-3
-                @test isapprox(dot(v, r0), 0.0; atol=1e-10)
-                @test isapprox(dot(v, r_radial), 0.0; atol=1e-10)
-            end
         end
     end
 end
