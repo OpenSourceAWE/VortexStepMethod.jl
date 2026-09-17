@@ -1127,14 +1127,12 @@ function gamma_loop!(
 end
 
 """
-    smooth_circulation!(damp, circulation, 
-                      smoothness_factor::Float64, 
-                      damping_factor::Float64)
+    smooth_circulation!(damp, circulation, smoothness_factor, damping_factor) -> Bool
 
-Smooth circulation distribution if needed.
-
-Returns:
-- Tuple of smoothed circulation and boolean indicating if smoothing was applied
+Write into `damp` the correction that moves each interior value of `circulation` toward
+the mean of its neighbours by `damping_factor`, scaled to keep the total circulation.
+Smoothing applies only where an interior jump exceeds `smoothness_factor` times the
+interior mean; otherwise `damp` is zeroed. Returns whether smoothing was applied.
 """
 function smooth_circulation!(
     damp,
@@ -1142,37 +1140,20 @@ function smooth_circulation!(
     smoothness_factor::Float64,
     damping_factor::Float64
 )
-    # Calculate mean circulation excluding endpoints
-    circulation_mean = mean(circulation[2:end-1])
-    smoothness_threshold = smoothness_factor * circulation_mean
-
-    # Calculate differences between adjacent points
-    differences = diff(circulation[2:end-1])
-    @debug "circulation_mean: $circulation_mean, diff: $differences"
-
-    # Check smoothness
-    if isempty(differences)
-        return zeros(length(circulation)), false
+    interior = circulation[2:end-1]
+    differences = diff(interior)
+    if isempty(differences) ||
+            maximum(abs, differences) <= smoothness_factor * mean(interior)
+        damp .= 0.0
+        return false
     end
 
-    if maximum(abs.(differences)) <= smoothness_threshold
-        return zeros(length(circulation)), false
-    end
-
-    # Apply smoothing
     smoothed = copy(circulation)
     for i in 2:length(circulation)-1
-        left = circulation[i-1]
-        center = circulation[i]
-        right = circulation[i+1]
-        avg = (left + right) / 2
-        smoothed[i] = center + damping_factor * (avg - center)
+        neighbour_mean = (circulation[i-1] + circulation[i+1]) / 2
+        smoothed[i] += damping_factor * (neighbour_mean - circulation[i])
     end
-
-    # Preserve total circulation
-    total_original = sum(circulation)
-    total_smoothed = sum(smoothed)
-    smoothed .*= total_original / total_smoothed
+    smoothed .*= sum(circulation) / sum(smoothed)
 
     damp .= smoothed .- circulation
     return true
