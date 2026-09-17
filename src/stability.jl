@@ -13,9 +13,9 @@ Returns `(coeffs, dalpha, dbeta, dp, dq, dr, converged)`.
 """
 function stability_derivatives(solver::Solver, body_aero::BodyAerodynamics, alpha, beta,
         wind_speed; kwargs...)
-    va = apparent_wind(alpha, beta, wind_speed)
-    set_va!(body_aero, va, body_aero.omega; reference_point=solver.reference_point)
-    jac, results, converged = linearize(solver, body_aero, [va; body_aero.omega];
+    va_vec = apparent_wind(alpha, beta, wind_speed)
+    set_va!(body_aero, va_vec, body_aero.omega; reference_point=solver.reference_point)
+    jac, results, converged = linearize(solver, body_aero, [va_vec; body_aero.omega];
         theta_idxs=nothing, va_idxs=1:3, omega_idxs=4:6, aero_coeffs=true, kwargs...)
     dva_dalpha = ForwardDiff.derivative(
         angle -> apparent_wind(angle, beta, wind_speed), alpha)
@@ -32,42 +32,53 @@ end
 
 """
     trim_angle(solver, body_aero, beta, wind_speed; alpha_range=deg2rad.(-5:2:15),
-               alpha_tol=1e-5, kwargs...)
+               alpha_tol=1e-5, backend=AutoForwardDiff())
 
 Angles of attack [rad] at which `CMy` of `body_aero` about `solver.reference_point` changes
 sign between neighbouring entries of `alpha_range`, bisected to `alpha_tol` [rad], at
 sideslip `beta` [rad] and `wind_speed` [m/s]. Returns one `(alpha, dCMy_dalpha)` per trim,
-the slope [1/rad] from [`stability_derivatives`](@ref) with `kwargs`; a trim is statically
-stable where `dCMy_dalpha < 0`.
+the slope [1/rad] from [`stability_derivatives`](@ref) with `backend`; a trim is statically
+stable where `dCMy_dalpha < 0`. Throws a [`SolveFailure`](@ref) if a solve misses the
+solver's tolerances.
 """
 function trim_angle(solver::Solver, body_aero::BodyAerodynamics, beta, wind_speed;
-        alpha_range=deg2rad.(-5:2:15), alpha_tol=1e-5, kwargs...)
-    is_nose_down =
-        alpha -> pitch_moment_coeff(solver, body_aero, alpha, beta, wind_speed) < 0
-    nose_down = is_nose_down.(alpha_range)
+        alpha_range=deg2rad.(-5:2:15), alpha_tol=1e-5, backend=AutoForwardDiff())
+    is_nose_down = alpha -> nose_down(solver, body_aero, alpha, beta, wind_speed)
+    nose_down_range = is_nose_down.(alpha_range)
     trims = @NamedTuple{alpha::Float64, dCMy_dalpha::Float64}[]
     for i in 1:length(alpha_range)-1
-        nose_down[i] == nose_down[i+1] && continue
+        nose_down_range[i] == nose_down_range[i+1] && continue
         alpha = bisect_sign_change(is_nose_down, alpha_range[i], alpha_range[i+1],
             alpha_tol)
         derivatives = stability_derivatives(solver, body_aero, alpha, beta, wind_speed;
-            kwargs...)
+            backend, throw_on_fail=true)
         push!(trims, (alpha=alpha, dCMy_dalpha=derivatives.dalpha[5]))
     end
     return trims
 end
 
 """
-    pitch_moment_coeff(solver, body_aero, alpha, beta, wind_speed)
+    coeffs_at_angles(solver, body_aero, alpha, beta, wind_speed)
 
-`CMy` of `body_aero` solved at angle of attack `alpha` [rad], sideslip `beta` [rad] and
-`wind_speed` [m/s], at the rotation rate `body_aero.omega` about `solver.reference_point`.
+Aerodynamic coefficients `[CFx, CFy, CFz, CMx, CMy, CMz]` of `body_aero` solved at angle of
+attack `alpha` [rad], sideslip `beta` [rad] and `wind_speed` [m/s], at the rotation rate
+`body_aero.omega` about `solver.reference_point`. Throws a [`SolveFailure`](@ref) if the
+solve misses the solver's tolerances.
 """
-function pitch_moment_coeff(solver, body_aero, alpha, beta, wind_speed)
+function coeffs_at_angles(solver, body_aero, alpha, beta, wind_speed)
     set_va!(body_aero, apparent_wind(alpha, beta, wind_speed), body_aero.omega;
         reference_point=solver.reference_point)
-    return solve!(solver, body_aero).moment_coeffs[2]
+    sol = solve!(solver, body_aero; throw_on_fail=true)
+    return [sol.force_coeffs; sol.moment_coeffs]
 end
+
+"""
+    nose_down(solver, body_aero, alpha, beta, wind_speed)
+
+Whether `CMy` from [`coeffs_at_angles`](@ref) is negative.
+"""
+nose_down(solver, body_aero, alpha, beta, wind_speed) =
+    coeffs_at_angles(solver, body_aero, alpha, beta, wind_speed)[5] < 0
 
 """
     bisect_sign_change(predicate, low, high, tol)
