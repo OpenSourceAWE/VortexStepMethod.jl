@@ -57,8 +57,16 @@ relative_error(jac, reference) = maximum(abs.(jac .- reference)) / maximum(abs, 
     end
 
     @testset "AutoForwardDiff matches AutoFiniteDiff (LOOP, POLAR_MATRICES)" begin
+        # At this operating point the LOOP solve converges the mid-span
+        # panels' local alpha to ~6.5-9.1deg and the tip panels' to
+        # ~14.9-15.0deg. The default 5deg-spaced alpha_range=-5:5:15 puts the
+        # tip cluster within ulp-scale distance of the 15deg knot on some
+        # platforms (Windows, Julia 1.12), so AutoForwardDiff and the FD
+        # reference land on opposite sides of that non-differentiable kink
+        # and disagree by several percent (#360). Offset the grid so no knot
+        # is near either cluster (margin >0.8deg here vs <0.04deg before).
         ram_wing = ram_air_matrix_wing(; n_panels=8, n_sections=4,
-            alpha_range=deg2rad.(-5:5:15),
+            alpha_range=deg2rad.(-2:5:23),
             delta_range=deg2rad.(-3:3:3),
         )
         ram_body = BodyAerodynamics([ram_wing])
