@@ -244,7 +244,7 @@ roughness(v) = sum(abs, @views v[1:end-2] .- 2 .* v[2:end-1] .+ v[3:end])
     VortexStepMethod.build_spanwise_laplacian!(laplacian, n)
     viscosity_matrix = zeros(n, n)
     lift_slope = zeros(n)
-    mu_array = zeros(n)
+    mu_dist = zeros(n)
     gamma_target = zeros(n)
     planform_area = sum(p.width * p.chord for p in panels)
 
@@ -256,7 +256,7 @@ roughness(v) = sum(abs, @views v[1:end-2] .- 2 .* v[2:end-1] .+ v[3:end])
     # the solve is skipped, and gamma is returned untouched.
     gamma_attached = spiky()
     fired_attached = VortexStepMethod.apply_artificial_viscosity!(gamma_attached,
-        panels, attached, laplacian, viscosity_matrix, lift_slope, mu_array,
+        panels, attached, laplacian, viscosity_matrix, lift_slope, mu_dist,
         gamma_target, planform_area, 0.035)
     @test !fired_attached
     @test gamma_attached == spiky()
@@ -265,7 +265,7 @@ roughness(v) = sum(abs, @views v[1:end-2] .- 2 .* v[2:end-1] .+ v[3:end])
     gamma_stalled = spiky()
     rough_before = roughness(gamma_stalled)
     fired_stalled = VortexStepMethod.apply_artificial_viscosity!(gamma_stalled,
-        panels, post_stall, laplacian, viscosity_matrix, lift_slope, mu_array,
+        panels, post_stall, laplacian, viscosity_matrix, lift_slope, mu_dist,
         gamma_target, planform_area, 0.035)
     @test fired_stalled
     @test roughness(gamma_stalled) < rough_before
@@ -273,10 +273,10 @@ roughness(v) = sum(abs, @views v[1:end-2] .- 2 .* v[2:end-1] .+ v[3:end])
     # The attached (hot) path must not allocate.
     gamma_alloc = spiky()
     VortexStepMethod.apply_artificial_viscosity!(gamma_alloc, panels, attached,
-        laplacian, viscosity_matrix, lift_slope, mu_array, gamma_target,
+        laplacian, viscosity_matrix, lift_slope, mu_dist, gamma_target,
         planform_area, 0.035)
     allocs = @allocated VortexStepMethod.apply_artificial_viscosity!(gamma_alloc,
-        panels, attached, laplacian, viscosity_matrix, lift_slope, mu_array,
+        panels, attached, laplacian, viscosity_matrix, lift_slope, mu_dist,
         gamma_target, planform_area, 0.035)
     @test allocs == 0
 end

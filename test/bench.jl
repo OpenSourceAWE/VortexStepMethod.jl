@@ -83,8 +83,8 @@ using LinearAlgebra
     AIC_z = similar(AIC_x)
     v_ind = zeros(3)
     point = rand(3)
-    va_norm_array = ones(n_panels)
-    va_unit_array = ones(n_panels, 3)
+    va_norm_dist = ones(n_panels)
+    va_unit_dist = ones(n_panels, 3)
     
     models = [VSM, LLT]
     core_radius_fractions = [0.001, 10.0]
@@ -94,7 +94,7 @@ using LinearAlgebra
         for model in models
             for frac in core_radius_fractions
                 @testset "Model $model Core Radius Fraction $frac" begin
-                    result = @benchmark calculate_AIC_matrices!($body_aero, $model, $frac, $va_norm_array, $va_unit_array) samples=1 evals=1
+                    result = @benchmark calculate_AIC_matrices!($body_aero, $model, $frac, $va_norm_dist, $va_unit_dist) samples=1 evals=1
                     @test result.allocs ≤ 30
                     @info "Model: $(model) \t Core radius fraction: $(frac) \t Allocations: $(result.allocs) \t Memory: $(result.memory)"
                 end
@@ -106,19 +106,19 @@ using LinearAlgebra
         @info "Gamma Loop"
         # Pre-allocate arrays
         gamma_new = zeros(n_panels)
-        va_array = zeros(n_panels, 3)
-        chord_array = zeros(n_panels)
-        x_airf_array = zeros(n_panels, 3)
-        y_airf_array = zeros(n_panels, 3)
-        z_airf_array = zeros(n_panels, 3)
+        va_dist = zeros(n_panels, 3)
+        chord_dist = zeros(n_panels)
+        x_airf_dist = zeros(n_panels, 3)
+        y_airf_dist = zeros(n_panels, 3)
+        z_airf_dist = zeros(n_panels, 3)
         
         # Fill arrays with data
         for (i, panel) in enumerate(body_aero.panels)
-            va_array[i, :] .= panel.va
-            chord_array[i] = panel.chord
-            x_airf_array[i, :] .= panel.x_airf
-            y_airf_array[i, :] .= panel.y_airf
-            z_airf_array[i, :] .= panel.z_airf
+            va_dist[i, :] .= panel.va
+            chord_dist[i] = panel.chord
+            x_airf_dist[i, :] .= panel.x_airf
+            y_airf_dist[i, :] .= panel.y_airf
+            z_airf_dist[i, :] .= panel.z_airf
         end
 
         alphas = collect(-20.0:30.0)
@@ -145,11 +145,11 @@ using LinearAlgebra
                 solver = Solver(wing.n_panels, wing.n_unrefined_sections;
                     aerodynamic_model_type=model
                 )
-                solver.sol._va_dist .= va_array
-                solver.sol._chord_dist .= chord_array
-                solver.sol._x_airf_dist .= x_airf_array
-                solver.sol._y_airf_dist .= y_airf_array
-                solver.sol._z_airf_dist .= z_airf_array
+                solver.sol._va_dist .= va_dist
+                solver.sol._chord_dist .= chord_dist
+                solver.sol._x_airf_dist .= x_airf_dist
+                solver.sol._y_airf_dist .= y_airf_dist
+                solver.sol._z_airf_dist .= z_airf_dist
                 result = @benchmark gamma_loop!(
                     $solver,
                     $body_aero,
@@ -165,29 +165,29 @@ using LinearAlgebra
     
     @testset "Results Calculation" begin
         # Pre-allocate arrays
-        alpha_array = zeros(n_panels)
-        v_a_array = zeros(n_panels)
-        chord_array = zeros(n_panels)
-        x_airf_array = zeros(n_panels, 3)
-        y_airf_array = zeros(n_panels, 3)
-        z_airf_array = zeros(n_panels, 3)
-        va_array = zeros(n_panels, 3)
-        va_norm_array = zeros(n_panels)
-        va_unit_array = zeros(n_panels, 3)
+        alpha_dist = zeros(n_panels)
+        v_a_dist = zeros(n_panels)
+        chord_dist = zeros(n_panels)
+        x_airf_dist = zeros(n_panels, 3)
+        y_airf_dist = zeros(n_panels, 3)
+        z_airf_dist = zeros(n_panels, 3)
+        va_dist = zeros(n_panels, 3)
+        va_norm_dist = zeros(n_panels)
+        va_unit_dist = zeros(n_panels, 3)
         reference_point = zeros(3)
         
 
         set_va!(body_aero, vel_app)
         # Fill arrays with panel data to satisfy calculate_results preconditions.
         for (i, panel) in enumerate(body_aero.panels)
-            chord_array[i] = panel.chord
-            x_airf_array[i, :] .= panel.x_airf
-            y_airf_array[i, :] .= panel.y_airf
-            z_airf_array[i, :] .= panel.z_airf
-            va_array[i, :] .= panel.va
-            va_norm_array[i] = norm(panel.va)
-            va_unit_array[i, :] .= va_norm_array[i] > 0.0 ? panel.va ./ va_norm_array[i] : [1.0, 0.0, 0.0]
-            v_a_array[i] = va_norm_array[i]
+            chord_dist[i] = panel.chord
+            x_airf_dist[i, :] .= panel.x_airf
+            y_airf_dist[i, :] .= panel.y_airf
+            z_airf_dist[i, :] .= panel.z_airf
+            va_dist[i, :] .= panel.va
+            va_norm_dist[i] = norm(panel.va)
+            va_unit_dist[i, :] .= va_norm_dist[i] > 0.0 ? panel.va ./ va_norm_dist[i] : [1.0, 0.0, 0.0]
+            v_a_dist[i] = va_norm_dist[i]
         end
         results = @MVector zeros(3)
         
@@ -198,14 +198,14 @@ using LinearAlgebra
             $density,
             1e-20,
             0.0,
-            $alpha_array,
-            $v_a_array,
-            $chord_array,
-            $x_airf_array,
-            $z_airf_array,
-            $va_array,
-            $va_norm_array,
-            $va_unit_array,
+            $alpha_dist,
+            $v_a_dist,
+            $chord_dist,
+            $x_airf_dist,
+            $z_airf_dist,
+            $va_dist,
+            $va_norm_dist,
+            $va_unit_dist,
             $body_aero.panels,
             false
         ) samples=1 evals=1
