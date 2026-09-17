@@ -26,7 +26,8 @@ calculate_cm
 calculate_cd_cm
 set_pitch_rate_dist!
 apparent_wind
-pitch_moment_coeff
+coeffs_at_angles
+nose_down
 bisect_sign_change
 calculate_relative_alpha_and_velocity
 calculate_relative_alpha_and_relative_velocity
