@@ -5,8 +5,14 @@
 ### Added
 
 - `stability_derivatives` gives the force and moment coefficients and their derivatives
-  with respect to angle of attack and sideslip, and `trim_angle` the angles of attack at
-  which `CMy` changes sign, with the slope that says whether each trim is stable.
+  with respect to angle of attack, sideslip and the nondimensional roll, pitch and yaw
+  rates p̂ = pb/2V, q̂ = q c_ref/2V, r̂ = rb/2V, turning about `solver.reference_point`,
+  and `trim_angle` the angles of attack at which `CMy` changes sign, with the slope that
+  says whether each trim is stable.
+- `set_va!(body_aero, va_vec, omega; reference_point)` turns the body about
+  `reference_point` [m] instead of the origin. The point is stored on
+  `BodyAerodynamics`, starts at the origin, and is kept by later `set_va!`, `reinit!`
+  and `linearize` calls until it is given again.
 - Spanwise-flow viscous drag correction (Gaunaa et al. 2024,
   doi:10.1088/1742-6596/2767/2/022068): each section gets a drag increment and a force
   along its span from the flow across it, in `solve!`, `solve` and `linearize`. Opt-in
@@ -21,11 +27,10 @@
 
 ### Fixed
 
+- `set_va!(body_aero, settings)` applies `condition.yaw_rate` as a turn rate about the
+  body z axis; it was read from the settings file and ignored.
 - The `VSMSolution` docstring gives `lift_dist`, `drag_dist` and `panel_moment_dist` in
   the per-unit-span units they hold, [N/m] and [Nm/m], instead of [N] and [Nm].
-
-### Fixed
-
 - With `artificial_damping` on, an iteration whose circulation is already smooth no longer
   re-applies the previous iteration's damping correction.
 
