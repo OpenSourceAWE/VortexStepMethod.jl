@@ -23,9 +23,6 @@
 - Inside its vortex core, `velocity_3D_trailing_vortex!` induces an azimuthal velocity
   instead of a radial one. Only points within the millimetre-scale Oseen core of a
   panel's chordwise trailing segment were affected.
-
-### Fixed
-
 - With `artificial_damping` on, an iteration whose circulation is already smooth no longer
   re-applies the previous iteration's damping correction.
 
