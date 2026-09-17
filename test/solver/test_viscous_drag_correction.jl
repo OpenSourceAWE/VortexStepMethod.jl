@@ -32,19 +32,20 @@ end
     solver_off = Solver(body_aero; use_gamma_prev=false)
     solver_on = Solver(body_aero; use_gamma_prev=false,
                        is_with_viscous_drag_correction=true)
-    va_sideslip = V .* [cos(alpha) * cos(beta), sin(beta), sin(alpha) * cos(beta)]
-    va_straight = V .* [cos(alpha), 0.0, sin(alpha)]
+    va_vec_sideslip = V .* [cos(alpha) * cos(beta), sin(beta), sin(alpha) * cos(beta)]
+    va_vec_straight = V .* [cos(alpha), 0.0, sin(alpha)]
 
-    function force_dist_at(solver, va)
-        set_va!(body_aero, va)
+    function force_dist_at(solver, va_vec)
+        set_va!(body_aero, va_vec)
         solve!(solver, body_aero)
         return copy(solver.sol.f_body_3D)
     end
 
     @testset "adds the model's drag and spanwise force to each panel" begin
         density, mu = solver_on.density, solver_on.mu
-        for va in (va_sideslip, va_straight)
-            delta_force = force_dist_at(solver_on, va) .- force_dist_at(solver_off, va)
+        for va_vec in (va_vec_sideslip, va_vec_straight)
+            delta_force = force_dist_at(solver_on, va_vec) .-
+                          force_dist_at(solver_off, va_vec)
             for (i, panel) in enumerate(body_aero.panels)
                 v_normal = solver_on.lr.v_a_dist[i]
                 v_span = solver_on.lr.v_span_dist[i]
@@ -61,16 +62,17 @@ end
     end
 
     @testset "sideslip drives the spanwise flow and raises the drag" begin
-        delta_force = force_dist_at(solver_on, va_sideslip) .-
-                      force_dist_at(solver_off, va_sideslip)
+        delta_force = force_dist_at(solver_on, va_vec_sideslip) .-
+                      force_dist_at(solver_off, va_vec_sideslip)
         for (i, panel) in enumerate(body_aero.panels)
-            @test solver_on.lr.v_span_dist[i] ≈ dot(va_sideslip, panel.y_airf) rtol = 0.05
-            @test dot(delta_force[:, i], va_sideslip) > 0
+            @test solver_on.lr.v_span_dist[i] ≈
+                  dot(va_vec_sideslip, panel.y_airf) rtol = 0.05
+            @test dot(delta_force[:, i], va_vec_sideslip) > 0
         end
     end
 
     @testset "solve reports the corrected forces" begin
-        set_va!(body_aero, va_sideslip)
+        set_va!(body_aero, va_vec_sideslip)
         solve!(solver_on, body_aero)
         results = solve(solver_on, body_aero)
         @test [results["Fx"], results["Fy"], results["Fz"]] ≈ solver_on.sol.force
@@ -78,16 +80,16 @@ end
     end
 
     @testset "linearize reports the corrected forces" begin
-        y = [va_sideslip; zeros(3)]
+        y = [va_vec_sideslip; zeros(3)]
         results_for(solver) = VortexStepMethod.linearize(solver, body_aero, y;
             theta_idxs=nothing, va_idxs=1:3, omega_idxs=4:6)[2]
         results_on, results_off = results_for(solver_on), results_for(solver_off)
-        @test results_on[1:3] ≈ vec(sum(force_dist_at(solver_on, va_sideslip); dims=2))
+        @test results_on[1:3] ≈ vec(sum(force_dist_at(solver_on, va_vec_sideslip); dims=2))
         @test !(results_on[1:3] ≈ results_off[1:3])
     end
 
     @testset "calc_forces! stays zero-alloc" begin
-        set_va!(body_aero, va_sideslip)
+        set_va!(body_aero, va_vec_sideslip)
         solve!(solver_on, body_aero)
         calc_forces!(solver_on, body_aero)
         @test (@allocated calc_forces!(solver_on, body_aero)) == 0

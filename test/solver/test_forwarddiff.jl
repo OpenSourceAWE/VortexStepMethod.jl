@@ -17,16 +17,16 @@ relative_error(jac, reference) = maximum(abs.(jac .- reference)) / maximum(abs, 
     refine!(wing)
     body_aero = BodyAerodynamics([wing])
 
-    va = [15.0, 1.0, 2.0]
+    va_vec = [15.0, 1.0, 2.0]
     omega = [0.0, 0.0, 0.0]
-    y0 = [va; omega]
+    y0 = [va_vec; omega]
 
     turns = ((omega, zeros(3)), ([0.0, 0.0, 0.2], [0.5, 4.0, 0.0]))
     @testset "ForwardDiff matches FiniteDiff about $reference_point (LOOP, INVISCID)" for
             (omega_op, reference_point) in turns
         pivot_body = BodyAerodynamics([wing])
-        set_va!(pivot_body, va, omega_op; reference_point)
-        y_op = [va; omega_op]
+        set_va!(pivot_body, va_vec, omega_op; reference_point)
+        y_op = [va_vec; omega_op]
         solver = Solver(pivot_body;
             use_gamma_prev=false,
             type_initial_gamma_distribution=ELLIPTIC)
@@ -70,10 +70,10 @@ relative_error(jac, reference) = maximum(abs.(jac .- reference)) / maximum(abs, 
             use_gamma_prev=false,
         )
 
-        v_a = 15.0
+        va = 15.0
         aoa_rad = deg2rad(7.5)
         y_op = [zeros(4);
-                [cos(aoa_rad), 0.0, sin(aoa_rad)] * v_a;
+                [cos(aoa_rad), 0.0, sin(aoa_rad)] * va;
                 zeros(3)]
 
         jac_fwd, _, conv_fwd = VortexStepMethod.linearize(
