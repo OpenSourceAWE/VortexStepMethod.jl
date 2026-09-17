@@ -481,13 +481,13 @@ function calc_forces!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics;
         fill!(unrefined_count_dist, 0)
 
         panel_idx = 1
-        unrefined_idx = 1
-        for wing in body_aero.wings
+        for (wing_idx, wing) in enumerate(body_aero.wings)
             if wing.n_unrefined_sections > 0
+                section_range = unrefined_section_range(body_aero, wing_idx)
                 for local_panel_idx in 1:wing.n_panels
                     panel = body_aero.panels[panel_idx]
                     original_section_idx = wing.refined_panel_mapping[local_panel_idx]
-                    target_unrefined_idx = unrefined_idx + original_section_idx - 1
+                    target_unrefined_idx = section_range[original_section_idx]
 
                     # Accumulate coefficients and moments
                     moment_unrefined_dist[target_unrefined_idx] += moment_dist[panel_idx]
@@ -511,8 +511,7 @@ function calc_forces!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics;
 
                 # Average coefficients and geometry. width and
                 # moment_coeff_unrefined_dist stay summed (extensive).
-                for i in 1:wing.n_unrefined_sections
-                    target_unrefined_idx = unrefined_idx + i - 1
+                for target_unrefined_idx in section_range
                     if unrefined_count_dist[target_unrefined_idx] > 0
                         count = unrefined_count_dist[target_unrefined_idx]
                         moment_unrefined_dist[target_unrefined_idx] /= count
@@ -529,7 +528,6 @@ function calc_forces!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics;
                         # sum of panel widths in the unrefined section
                     end
                 end
-                unrefined_idx += wing.n_unrefined_sections
             else
                 # Skip panels for wings with no unrefined sections
                 panel_idx += wing.n_panels

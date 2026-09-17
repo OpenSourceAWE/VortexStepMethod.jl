@@ -568,18 +568,36 @@ end
     end
 
     n_wing_sections = length(section_y)
+    first_sections = 1:n_wing_sections
+    second_sections = n_wing_sections+1:2n_wing_sections
+    @testset "unrefined_deform! hands each wing its own run of angles" begin
+        body_aero = BodyAerodynamics(wing_pair(section_y, n_panels, span + 1.0))
+        isolated = wing_pair(section_y, n_panels, span + 1.0)
+        theta = deg2rad.(1.0:2n_wing_sections)
+        delta = -2theta
+        VortexStepMethod.unrefined_deform!(body_aero, theta, delta)
+
+        for (wing_idx, section_range) in enumerate((first_sections, second_sections))
+            wing = isolated[wing_idx]
+            VortexStepMethod.unrefined_deform!(wing, theta[section_range],
+                delta[section_range])
+            @test VortexStepMethod.unrefined_section_range(body_aero, wing_idx) ==
+                  section_range
+            @test body_aero.wings[wing_idx].theta_dist == wing.theta_dist
+            @test body_aero.wings[wing_idx].delta_dist == wing.delta_dist
+        end
+    end
+
     @testset "linearize: theta of each wing moves that wing's sections" begin
         body_aero, _ = solve_wings(wing_pair(section_y, n_panels, 1e4))
         jac, _, converged = linearize_body(body_aero)
-        first_sections = 1:n_wing_sections
-        second_sections = n_wing_sections+1:2n_wing_sections
         own_first = jac[6 .+ first_sections, first_sections]
 
         @test converged
         @test norm(own_first) > 0
-        @test jac[6 .+ second_sections, second_sections] ≈ own_first rtol=1e-4
-        @test norm(jac[6 .+ first_sections, second_sections]) < 1e-4norm(own_first)
-        @test norm(jac[6 .+ second_sections, first_sections]) < 1e-4norm(own_first)
+        @test jac[6 .+ second_sections, second_sections] ≈ own_first rtol=1e-9
+        @test norm(jac[6 .+ first_sections, second_sections]) < 1e-7norm(own_first)
+        @test norm(jac[6 .+ second_sections, first_sections]) < 1e-7norm(own_first)
     end
 
     @testset "linearize: AutoForwardDiff matches AutoFiniteDiff" begin
