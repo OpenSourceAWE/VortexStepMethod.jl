@@ -633,7 +633,7 @@ end
         filaments,
         evaluation_point::MVec3,
         evaluation_point_on_bound::Bool,
-        va_norm::Float64,
+        va::Float64,
         va_unit::MVec3,
         gamma::Float64,
         core_radius_fraction::Float64,
@@ -648,7 +648,7 @@ Calculate the velocity induced by a vortex ring at a control point.
 - filaments
 - `evaluation_point`::MVec3:         Point where induced velocity is evaluated
 - `evaluation_point_on_bound`::Bool: Whether evaluation point is on bound vortex
-- `va_norm`::Float64:                Norm of apparent velocity
+- `va`::Float64:                     Norm of apparent velocity
 - `va_unit`::MVec3:                  Unit vector of apparent velocity
 - `gamma`::Float64:                  Circulation strength
 - `core_radius_fraction`::Float64:   Vortex core radius as fraction of panel width
@@ -663,7 +663,7 @@ Calculate the velocity induced by a vortex ring at a control point.
     filaments,
     evaluation_point::AbstractVector{T},
     evaluation_point_on_bound::Bool,
-    va_norm::T,
+    va::T,
     va_unit::AbstractVector{T},
     gamma::T,
     core_radius_fraction::Real,
@@ -691,7 +691,7 @@ Calculate the velocity induced by a vortex ring at a control point.
         "Filament not initialized: 2."))
     velocity_3D_trailing_vortex!(
         tempvel, f2, evaluation_point, gamma,
-        va_norm, work_vectors)
+        va, work_vectors)
     velind .+= tempvel
 
     # Filament 3: trailing filament (BoundFilament)
@@ -700,7 +700,7 @@ Calculate the velocity induced by a vortex ring at a control point.
         "Filament not initialized: 3."))
     velocity_3D_trailing_vortex!(
         tempvel, f3, evaluation_point, gamma,
-        va_norm, work_vectors)
+        va, work_vectors)
     velind .+= tempvel
 
     # Filament 4: semi-infinite trailing (SemiInfiniteFilament)
@@ -709,7 +709,7 @@ Calculate the velocity induced by a vortex ring at a control point.
         "Filament not initialized: 4."))
     velocity_3D_trailing_vortex_semiinfinite!(
         tempvel, f4, va_unit, evaluation_point, gamma,
-        va_norm, work_vectors)
+        va, work_vectors)
     velind .+= tempvel
 
     # Filament 5: semi-infinite trailing (SemiInfiniteFilament)
@@ -718,7 +718,7 @@ Calculate the velocity induced by a vortex ring at a control point.
         "Filament not initialized: 5."))
     velocity_3D_trailing_vortex_semiinfinite!(
         tempvel, f5, va_unit, evaluation_point, gamma,
-        va_norm, work_vectors)
+        va, work_vectors)
     velind .+= tempvel
 
     return nothing

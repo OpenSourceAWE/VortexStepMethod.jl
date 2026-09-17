@@ -316,7 +316,7 @@ function calc_forces!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics;
     alpha_dist = solver.lr.alpha_dist
     alpha_corrected = solver.sol.alpha_dist
     alpha_geometric_dist = solver.sol.alpha_geometric_dist
-    v_a_dist = solver.lr.v_a_dist
+    v_rel_dist = solver.lr.v_a_dist
     panels = body_aero.panels
    
     width_dist = solver.sol.width_dist
@@ -334,7 +334,7 @@ function calc_forces!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics;
         if solver.flow_curvature
             cm_dist[i] += flow_curvature_cm(
                 body_aero.pitch_rate_dist[i], solver.sol._chord_dist[i],
-                v_a_dist[i])
+                v_rel_dist[i])
         end
         width_dist[i] = panel.width
 
@@ -344,7 +344,7 @@ function calc_forces!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics;
             va1 = solver.sol._va_dist[i,1]
             va2 = solver.sol._va_dist[i,2]
             va3 = solver.sol._va_dist[i,3]
-            va_norm = sqrt(va1^2 + va2^2 + va3^2)
+            va = sqrt(va1^2 + va2^2 + va3^2)
             x1 = solver.sol._x_airf_dist[i,1]
             x2 = solver.sol._x_airf_dist[i,2]
             x3 = solver.sol._x_airf_dist[i,3]
@@ -353,10 +353,10 @@ function calc_forces!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics;
             z2 = solver.sol._z_airf_dist[i,2]
             z3 = solver.sol._z_airf_dist[i,3]
             z_norm = sqrt(z1^2 + z2^2 + z3^2)
-            if va_norm == 0 || x_norm == 0 || z_norm == 0
+            if va == 0 || x_norm == 0 || z_norm == 0
                 alpha_geometric_dist[i] = NaN
             else
-                inv_va = -1.0 / va_norm
+                inv_va = -1.0 / va
                 vu1 = va1 * inv_va
                 vu2 = va2 * inv_va
                 vu3 = va3 * inv_va
@@ -412,13 +412,13 @@ function calc_forces!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics;
         dirs = panel_force_directions(axes, alpha_corrected[i], spanwise_unit)
         c_span = zero(T)
         if solver.is_with_viscous_drag_correction
-            viscous = spanwise_flow_drag(v_a_dist[i], solver.lr.v_span_dist[i],
+            viscous = spanwise_flow_drag(v_rel_dist[i], solver.lr.v_span_dist[i],
                 panel.chord, density, solver.mu)
             cd_dist[i] += viscous.delta_cd
             c_span = viscous.c_span
         end
         loads = panel_loads(axes, dirs,
-            dynamic_pressure(density, density, v_a_dist[i]),
+            dynamic_pressure(density, density, v_rel_dist[i]),
             cl_dist[i], cd_dist[i], cm_dist[i]; c_span)
         lift[i] = loads.lift
         drag[i] = loads.drag
@@ -437,14 +437,14 @@ function calc_forces!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics;
     end
 
     # Python parity: normalize with area-weighted reference velocity for distributed inflow.
-    va_ref_vector = _compute_reference_velocity_from_distribution(
+    va_ref_vec = _compute_reference_velocity_from_distribution(
         solver.sol._va_dist,
         length(panels),
         panel_areas
     )
-    va_ref_mag = norm(va_ref_vector)
-    va_ref_mag > 0.0 || throw(ArgumentError("Reference freestream magnitude must be positive."))
-    q_ref = 0.5 * density * va_ref_mag^2
+    va_ref = norm(va_ref_vec)
+    va_ref > 0.0 || throw(ArgumentError("Reference freestream magnitude must be positive."))
+    q_ref = 0.5 * density * va_ref^2
     moment_coeff_dist .= moment_dist ./ (q_ref * projected_area * c_ref)
 
     # Only compute unrefined arrays if there are unrefined sections
@@ -614,11 +614,11 @@ function solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=n
     return results
 end
 
-@inline @inbounds function calc_norm_dist!(va_norm_dist, va_dist)
-    for i in axes(va_dist, 1)
-        va_norm_dist[i] = sqrt(
-            va_dist[i,1]^2 + va_dist[i,2]^2 +
-            va_dist[i,3]^2)
+@inline @inbounds function calc_norm_dist!(va_dist, va_vec_dist)
+    for i in axes(va_vec_dist, 1)
+        va_dist[i] = sqrt(
+            va_vec_dist[i,1]^2 + va_vec_dist[i,2]^2 +
+            va_vec_dist[i,3]^2)
     end
 end
 
@@ -637,7 +637,8 @@ function solve_base!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics, gamma
                log=false) where {P, U, T}
     
     # check arguments
-    isnothing(body_aero.panels[1].va) && throw(ArgumentError("Inflow conditions are not set, use set_va!(body_aero, va)"))
+    isnothing(body_aero.panels[1].va) && throw(ArgumentError(
+        "Inflow conditions are not set, use set_va!(body_aero, va_vec)"))
     
     # Initialize variables
     panels = body_aero.panels
@@ -721,7 +722,7 @@ end
     velocity_view_x,
     velocity_view_y,
     velocity_view_z,
-    va_dist,
+    va_vec_dist,
     induced_velocity_all,
     relative_velocity_dist,
     y_airf_dist,
@@ -739,7 +740,7 @@ end
     mul!(velocity_view_y, AIC_y, gamma_in)
     mul!(velocity_view_z, AIC_z, gamma_in)
 
-    relative_velocity_dist .= va_dist .+ induced_velocity_all
+    relative_velocity_dist .= va_vec_dist .+ induced_velocity_all
     @inbounds for i in 1:n_panels
         ax = relative_velocity_dist[i,1]
         ay = relative_velocity_dist[i,2]
@@ -750,9 +751,9 @@ end
         relative_velocity_crossz[i,1] = ay*bz - az*by
         relative_velocity_crossz[i,2] = az*bx - ax*bz
         relative_velocity_crossz[i,3] = ax*by - ay*bx
-        ax = va_dist[i,1]
-        ay = va_dist[i,2]
-        az = va_dist[i,3]
+        ax = va_vec_dist[i,1]
+        ay = va_vec_dist[i,2]
+        az = va_vec_dist[i,3]
         v_acrossz_dist[i,1] = ay*bz - az*by
         v_acrossz_dist[i,2] = az*bx - ax*bz
         v_acrossz_dist[i,3] = ax*by - ay*bx
@@ -896,7 +897,7 @@ function gamma_loop!(
     relaxation_factor;
     log::Bool = true
 ) where {P, U, T}
-    va_dist = solver.sol._va_dist
+    va_vec_dist = solver.sol._va_dist
     chord_dist = solver.sol._chord_dist
     x_airf_dist = solver.sol._x_airf_dist
     y_airf_dist = solver.sol._y_airf_dist
@@ -909,10 +910,10 @@ function gamma_loop!(
     va_magw_dist             = solver.cache[1][solver.lr.v_a_dist]
     gamma                    = solver.cache[2][solver.lr.gamma_new]
     abs_gamma_new            = solver.cache[3][solver.lr.gamma_new]
-    induced_velocity_all     = solver.cache[4][va_dist]
-    relative_velocity_dist   = solver.cache[5][va_dist]
-    relative_velocity_crossz = solver.cache[6][va_dist]
-    v_acrossz_dist           = solver.cache[7][va_dist]
+    induced_velocity_all     = solver.cache[4][va_vec_dist]
+    relative_velocity_dist   = solver.cache[5][va_vec_dist]
+    relative_velocity_crossz = solver.cache[6][va_vec_dist]
+    v_acrossz_dist           = solver.cache[7][va_vec_dist]
     cl_dist                  = solver.cache[8][solver.lr.gamma_new]
     damp                     = solver.cache[9][solver.lr.gamma_new]
     damp                    .= zero(T)
@@ -944,7 +945,7 @@ function gamma_loop!(
             residual, gamma_iter, solver, panels, n_panels,
             AIC_x, AIC_y, AIC_z,
             velocity_view_x, velocity_view_y, velocity_view_z,
-            va_dist, induced_velocity_all, relative_velocity_dist,
+            va_vec_dist, induced_velocity_all, relative_velocity_dist,
             y_airf_dist, relative_velocity_crossz, v_acrossz_dist,
             z_airf_dist, x_airf_dist,
             v_normal_dist, v_tangential_dist,
@@ -966,7 +967,7 @@ function gamma_loop!(
                     residual_perturbed, gamma_perturbed, solver, panels, n_panels,
                     AIC_x, AIC_y, AIC_z,
                     velocity_view_x, velocity_view_y, velocity_view_z,
-                    va_dist, induced_velocity_all, relative_velocity_dist,
+                    va_vec_dist, induced_velocity_all, relative_velocity_dist,
                     y_airf_dist, relative_velocity_crossz, v_acrossz_dist,
                     z_airf_dist, x_airf_dist,
                     v_normal_dist, v_tangential_dist,
@@ -995,7 +996,7 @@ function gamma_loop!(
                     residual_perturbed, gamma_perturbed, solver, panels, n_panels,
                     AIC_x, AIC_y, AIC_z,
                     velocity_view_x, velocity_view_y, velocity_view_z,
-                    va_dist, induced_velocity_all, relative_velocity_dist,
+                    va_vec_dist, induced_velocity_all, relative_velocity_dist,
                     y_airf_dist, relative_velocity_crossz, v_acrossz_dist,
                     z_airf_dist, x_airf_dist,
                     v_normal_dist, v_tangential_dist,
@@ -1056,7 +1057,7 @@ function gamma_loop!(
                 velocity_view_x,
                 velocity_view_y,
                 velocity_view_z,
-                va_dist,
+                va_vec_dist,
                 induced_velocity_all,
                 relative_velocity_dist,
                 y_airf_dist,
@@ -1125,14 +1126,12 @@ function gamma_loop!(
 end
 
 """
-    smooth_circulation!(damp, circulation, 
-                      smoothness_factor::Float64, 
-                      damping_factor::Float64)
+    smooth_circulation!(damp, circulation, smoothness_factor, damping_factor) -> Bool
 
-Smooth circulation distribution if needed.
-
-Returns:
-- Tuple of smoothed circulation and boolean indicating if smoothing was applied
+Write into `damp` the correction that moves each interior value of `circulation` toward
+the mean of its neighbours by `damping_factor`, scaled to keep the total circulation.
+Smoothing applies only where an interior jump exceeds `smoothness_factor` times the
+interior mean; otherwise `damp` is zeroed. Returns whether smoothing was applied.
 """
 function smooth_circulation!(
     damp,
@@ -1140,37 +1139,20 @@ function smooth_circulation!(
     smoothness_factor::Float64,
     damping_factor::Float64
 )
-    # Calculate mean circulation excluding endpoints
-    circulation_mean = mean(circulation[2:end-1])
-    smoothness_threshold = smoothness_factor * circulation_mean
-
-    # Calculate differences between adjacent points
-    differences = diff(circulation[2:end-1])
-    @debug "circulation_mean: $circulation_mean, diff: $differences"
-
-    # Check smoothness
-    if isempty(differences)
-        return zeros(length(circulation)), false
+    interior = circulation[2:end-1]
+    differences = diff(interior)
+    if isempty(differences) ||
+            maximum(abs, differences) <= smoothness_factor * mean(interior)
+        damp .= 0.0
+        return false
     end
 
-    if maximum(abs.(differences)) <= smoothness_threshold
-        return zeros(length(circulation)), false
-    end
-
-    # Apply smoothing
     smoothed = copy(circulation)
     for i in 2:length(circulation)-1
-        left = circulation[i-1]
-        center = circulation[i]
-        right = circulation[i+1]
-        avg = (left + right) / 2
-        smoothed[i] = center + damping_factor * (avg - center)
+        neighbour_mean = (circulation[i-1] + circulation[i+1]) / 2
+        smoothed[i] += damping_factor * (neighbour_mean - circulation[i])
     end
-
-    # Preserve total circulation
-    total_original = sum(circulation)
-    total_smoothed = sum(smoothed)
-    smoothed .*= total_original / total_smoothed
+    smoothed .*= sum(circulation) / sum(smoothed)
 
     damp .= smoothed .- circulation
     return true
@@ -1322,9 +1304,9 @@ function linearize(solver::Solver{<:Any, U}, body_aero::BodyAerodynamics, y::Vec
             reinit!(body_aero_c; init_aero=false)
         end
 
-        va = isnothing(va_idxs) ? MVector{3, TI}(body_aero_c._va) : y_in[va_idxs]
+        va_vec = isnothing(va_idxs) ? MVector{3, TI}(body_aero_c._va) : y_in[va_idxs]
         omega = isnothing(omega_idxs) ? MVector{3, TI}(body_aero_c.omega) : y_in[omega_idxs]
-        set_va!(body_aero_c, va, omega)
+        set_va!(body_aero_c, va_vec, omega)
 
         solve!(solver_c, body_aero_c; kwargs...)
         solver_c.lr.converged || (n_failed[] += 1)
