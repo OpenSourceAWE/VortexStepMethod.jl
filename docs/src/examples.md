@@ -35,7 +35,7 @@ julia> using VortexStepMethod
 julia> n_panels = 20          # Number of panels
 julia> span = 20.0            # Wing span [m]
 julia> chord = 1.0            # Chord length [m]
-julia> v_a = 20.0             # Magnitude of inflow velocity [m/s]
+julia> va = 20.0              # Magnitude of inflow velocity [m/s]
 julia> alpha_deg = 30.0       # Angle of attack [degrees]
 julia> alpha = deg2rad(alpha_deg)
 ```
@@ -77,8 +77,8 @@ multiple wings.
 ###### Set inflow conditions
 
 ```julia
-julia> vel_app = [cos(alpha), 0.0, sin(alpha)] .* v_a
-julia> set_va!(body_aero, vel_app, [0, 0, 0.1])
+julia> va_vec = [cos(alpha), 0.0, sin(alpha)] .* va
+julia> set_va!(body_aero, va_vec, [0, 0, 0.1])
 ```
 
 #### Step 5: Initialize solvers for both LLT and VSM methods
@@ -118,7 +118,7 @@ julia> plot_combined_analysis(
            solver_label=["LLT", "VSM"],
            angle_range=angle_range,
            angle_type="angle_of_attack",
-           v_a=v_a,
+           v_a=va,
            title="Rectangular Wing",
            is_show=true,
        )

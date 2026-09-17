@@ -124,9 +124,9 @@ sideslip_deg = condition_cfg["beta"]
 
 α0 = deg2rad(angle_of_attack_deg)
 β0 = deg2rad(sideslip_deg)
-va = wind_speed .* [cos(α0) * cos(β0), sin(β0), sin(α0) * cos(β0)]
-set_va!(body_aero_flat, va)
-set_va!(body_aero_bill, va)
+va_vec = wind_speed .* [cos(α0) * cos(β0), sin(β0), sin(α0) * cos(β0)]
+set_va!(body_aero_flat, va_vec)
+set_va!(body_aero_bill, va_vec)
 
 # --- Solve and compare ---
 results_flat = VortexStepMethod.solve(
