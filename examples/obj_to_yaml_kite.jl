@@ -25,7 +25,7 @@ using LinearAlgebra
 
 PLOT = true
 USE_TEX = false
-v_a = 15.0
+va = 15.0
 project_dir = dirname(@__DIR__)
 obj_path = joinpath(project_dir, "data", "ram_air_kite", "ram_air_kite_body.obj")
 output_dir = joinpath(project_dir, "output", "ram_air_kite_converted")
@@ -73,7 +73,7 @@ body_aero = BodyAerodynamics([wing])
 VortexStepMethod.reinit!(body_aero)
 
 solver = Solver(body_aero; aerodynamic_model_type=VSM, rtol=1e-5, solver_type=LOOP)
-set_va!(body_aero, [cos(deg2rad(8)) * v_a, 0.0, sin(deg2rad(8)) * v_a])
+set_va!(body_aero, [cos(deg2rad(8)) * va, 0.0, sin(deg2rad(8)) * va])
 results = VortexStepMethod.solve(solver, body_aero; log=true)
 
 if PLOT
@@ -85,7 +85,7 @@ if PLOT
     plot_section_polars(body_aero; panels=[1, 10], is_show=true)
 
     plot_polars([solver], [body_aero], ["VSM (NeuralFoil polars from .obj)"];
-        angle_range=range(-5, 20, length=26), v_a=v_a,
+        angle_range=range(-5, 20, length=26), v_a=va,
         title="Ram air kite: obj_to_yaml route", is_save=false, use_tex=USE_TEX)
 end
 
