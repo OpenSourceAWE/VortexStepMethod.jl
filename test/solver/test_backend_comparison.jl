@@ -39,10 +39,13 @@ using Test
         return wing
     end
     function lift(matrices)
-        body = BodyAerodynamics([flat_wing(matrices)])
+        wing = flat_wing(matrices)
+        body = BodyAerodynamics([wing])
         aoa = deg2rad(4.0)
         set_va!(body, [cos(aoa), 0.0, sin(aoa)] * 15.0)
-        return collect(solve!(Solver(body; aerodynamic_model_type=VSM), body).force_coeffs)
+        solver = Solver(wing.n_panels, wing.n_unrefined_sections;
+            aerodynamic_model_type=VSM)
+        return collect(solve!(solver, body).force_coeffs)
     end
     fc_nf, fc_xf = lift(nf), lift(xf)
     @test fc_nf[3] > 0 && fc_xf[3] > 0          # positive lift at positive alpha

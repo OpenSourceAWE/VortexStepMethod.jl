@@ -327,7 +327,7 @@ end
     set_va!(body_aero, va_vec)
 
     # Run analysis
-    loop_solver = Solver(body_aero;
+    loop_solver = Solver(wing.n_panels, wing.n_unrefined_sections;
         aerodynamic_model_type=model,
         core_radius_fraction=core_radius_fraction,
         solver_type=LOOP,
@@ -335,7 +335,7 @@ end
         atol=1e-8,
         rtol=1e-8
     )
-    nonlin_solver = Solver(body_aero;
+    nonlin_solver = Solver(wing.n_panels, wing.n_unrefined_sections;
         aerodynamic_model_type=model,
         core_radius_fraction=core_radius_fraction,
         solver_type=NONLIN,
@@ -511,7 +511,9 @@ The `BodyAerodynamics` built from `wings` in a 10 m/s inflow and its `solve!` so
 """
 function solve_wings(wings)
     body_aero = BodyAerodynamics(wings; va=[10.0, 0.0, 1.0])
-    return body_aero, solve!(Solver(body_aero), body_aero)
+    solver = Solver(sum(wing -> wing.n_panels, wings),
+                    sum(wing -> wing.n_unrefined_sections, wings))
+    return body_aero, solve!(solver, body_aero)
 end
 
 """
@@ -532,7 +534,8 @@ every unrefined section, then the inflow and the angular rate.
 """
 function linearize_body(body_aero; kwargs...)
     n_sections = sum(wing -> wing.n_unrefined_sections, body_aero.wings)
-    solver = Solver(body_aero; use_gamma_prev=false, rtol=1e-10)
+    solver = Solver(sum(wing -> wing.n_panels, body_aero.wings), n_sections;
+                    use_gamma_prev=false, rtol=1e-10)
     y0 = [zeros(2n_sections); body_aero.va; zeros(3)]
     return VortexStepMethod.linearize(solver, body_aero, y0;
         theta_idxs=1:n_sections, delta_idxs=n_sections+1:2n_sections,

@@ -12,6 +12,9 @@ settings_range
 
 ### Solver, forces and circulation
 ```@docs
+n_unrefined_sections
+solver_kwargs
+check_dimensions
 calculate_AIC_matrices!
 gamma_loop!
 build_spanwise_laplacian!

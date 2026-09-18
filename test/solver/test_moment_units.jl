@@ -31,7 +31,10 @@ end
     @testset "solve!" begin
         small, large = map((1.0, k)) do scale
             body_aero = scaled_wing_aero(scale)
-            solve!(Solver(body_aero; reference_point=reference_point(scale)), body_aero)
+            wing = only(body_aero.wings)
+            solver = Solver(wing.n_panels, wing.n_unrefined_sections;
+                reference_point=reference_point(scale))
+            solve!(solver, body_aero)
         end
         @test small.solver_status == large.solver_status == FEASIBLE
         @test all(!iszero, small.panel_moment_dist)
@@ -48,7 +51,9 @@ end
     @testset "solve" begin
         small, large = map((1.0, k)) do scale
             body_aero = scaled_wing_aero(scale)
-            solve(Solver(body_aero), body_aero; reference_point=reference_point(scale))
+            wing = only(body_aero.wings)
+            solver = Solver(wing.n_panels, wing.n_unrefined_sections)
+            solve(solver, body_aero; reference_point=reference_point(scale))
         end
         for key in ("Mx", "My", "Mz", "M_distribution")
             @test large[key] ≈ k^3 .* small[key] rtol = 1e-6
