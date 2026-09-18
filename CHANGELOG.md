@@ -4,6 +4,9 @@
 
 ### Added
 
+- `stability_derivatives` gives the force and moment coefficients and their derivatives
+  with respect to angle of attack and sideslip, and `trim_angle` the angles of attack at
+  which `CMy` changes sign, with the slope that says whether each trim is stable.
 - Spanwise-flow viscous drag correction (Gaunaa et al. 2024,
   doi:10.1088/1742-6596/2767/2/022068): each section gets a drag increment and a force
   along its span from the flow across it, in `solve!`, `solve` and `linearize`. Opt-in
