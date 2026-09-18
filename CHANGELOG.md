@@ -23,9 +23,9 @@
 - The `VSMSolution` docstring gives `lift_dist`, `drag_dist` and `panel_moment_dist` in
   the per-unit-span units they hold, [N/m] and [Nm/m], instead of [N] and [Nm].
 - `fit_kulfan_parameters` with `LeastSquaresFit` drops singular values below `1e-4`
-  times the largest, so a contour whose stations crowd into a narrow band of the chord
-  fits to an airfoil-sized shape instead of weights that resample it to 1e4 scale.
-  Fits of well-spread stations are unchanged.
+  times the largest and warns when it does, so a contour whose stations crowd into a
+  narrow band of the chord gets bounded weights instead of ones that resample it to 1e4
+  scale. Fits of well-spread stations are unchanged.
 - Inside its vortex core, `velocity_3D_trailing_vortex!` induces an azimuthal velocity
   instead of a radial one. Only points within the millimetre-scale Oseen core of a
   panel's chordwise trailing segment were affected.

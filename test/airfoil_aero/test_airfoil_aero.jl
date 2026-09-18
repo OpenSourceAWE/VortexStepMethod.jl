@@ -51,8 +51,13 @@ end
         y_lower = surface(fill(-0.1, 8), spread)
         x = vcat(reverse(crowded), spread[2:end])
         y = vcat(reverse(y_upper), y_lower[2:end])
-        _, y_fit = kulfan_to_coordinates(fit_kulfan_parameters(x, y))
+        crowded_fit = @test_logs (:warn, r"dropped \d+ of \d+ singular values") (
+            fit_kulfan_parameters(x, y))
+        _, y_fit = kulfan_to_coordinates(crowded_fit)
         @test maximum(abs, y_fit) < 2 * maximum(abs, y)
+
+        y_spread = vcat(reverse(surface(fill(0.2, 8), spread)), y_lower[2:end])
+        @test_logs fit_kulfan_parameters(vcat(reverse(spread), spread[2:end]), y_spread)
     end
 
     @testset "Shrink-wrap encloses points with clearance" begin

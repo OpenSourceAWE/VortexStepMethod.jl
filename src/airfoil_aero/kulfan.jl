@@ -109,6 +109,19 @@ end
 const KULFAN_FIT_RTOL = 1e-4 # [-] singular values dropped below this times the largest
 
 """
+    truncated_least_squares(A, b)
+
+Minimum-norm least-squares solution of `A * coeffs = b` with the singular values of `A`
+below `KULFAN_FIT_RTOL` times the largest dropped. Returns `(coeffs, n_dropped)`.
+"""
+function truncated_least_squares(A::AbstractMatrix, b::AbstractVector)
+    F = svd(A)
+    kept = F.S .> KULFAN_FIT_RTOL * F.S[1]
+    coeffs = F.V[:, kept] * ((F.U[:, kept]' * b) ./ F.S[kept])
+    return coeffs, count(!, kept)
+end
+
+"""
     fit_kulfan_parameters(x::Vector, y::Vector, method::KulfanFitMethod)
     fit_kulfan_parameters(x::Vector, y::Vector; n_weights=8)
 
@@ -131,7 +144,7 @@ end
 Least-squares fit matching AeroSandbox's `get_kulfan_parameters`: both surfaces
 share a single least-squares system with a shared leading-edge weight and a
 trailing-edge thickness. Singular values below `1e-4` times the largest are dropped, so
-stations crowded into part of the chord give bounded weights.
+stations crowded into part of the chord give bounded weights, and a warning says so.
 """
 function fit_kulfan_parameters(x::Vector{T}, y::Vector{T},
                                method::LeastSquaresFit) where T
@@ -147,13 +160,16 @@ function fit_kulfan_parameters(x::Vector{T}, y::Vector{T},
     te_col = ifelse.(is_upper, xv ./ 2, .-xv ./ 2)
 
     A = hcat((.!is_upper) .* CS, is_upper .* CS, le_col, te_col)
-    coeffs = pinv(A; rtol=KULFAN_FIT_RTOL) * y_norm
+    coeffs, n_dropped = truncated_least_squares(A, y_norm)
     TE_thickness = coeffs[end]
 
     if TE_thickness < 0
-        coeffs = pinv(A[:, 1:end-1]; rtol=KULFAN_FIT_RTOL) * y_norm
+        coeffs, n_dropped = truncated_least_squares(A[:, 1:end-1], y_norm)
         TE_thickness = zero(T)
     end
+    n_dropped > 0 && @warn "Kulfan fit dropped $n_dropped of $(length(coeffs)) singular \
+        values: the stations leave part of the shape unconstrained, as when they crowd \
+        into a narrow band of the chord."
 
     lower_weights = coeffs[1:n_weights]
     upper_weights = coeffs[n_weights+1:2n_weights]
