@@ -1,4 +1,5 @@
-using VortexStepMethod: BoundFilament, velocity_3D_bound_vortex!, reinit!
+using VortexStepMethod: BoundFilament, velocity_3D_bound_vortex!,
+    velocity_3D_trailing_vortex!, reinit!, ALPHA0, NU
 using LinearAlgebra
 using Test
 
@@ -175,21 +176,30 @@ end
         @test isapprox(velocities[2], -v_neg)
     end
 
-    @testset "Velocity is azimuthal (perpendicular to axis and radius)" begin
+    @testset "Velocity is azimuthal inside and outside the core" begin
         filament = create_test_filament()
-        r0 = [1.0, 0.0, 0.0]
+        va = 1e-4
+        trailing_core_radius = sqrt(4 * ALPHA0 * NU * 0.5 / va)
+        vortices = (
+            (velocity_3D_bound_vortex!, core_radius_fraction, core_radius_fraction),
+            (velocity_3D_trailing_vortex!, va, trailing_core_radius),
+        )
 
-        for d in (0.25, 0.5, 0.99, 1.0, 1.01, 2.0) .* core_radius_fraction
-            for phi in (0.0, π/4, π/2, π, -π/3)
-                p = [0.5, d * cos(phi), d * sin(phi)]
-                v = zeros(3)
-                velocity_3D_bound_vortex!(
-                    v, filament, p, gamma,
-                    core_radius_fraction, work_vectors)
+        for (velocity_3D_vortex!, core_parameter, core_radius) in vortices
+            @testset "$velocity_3D_vortex!" begin
+                for distance in (0.25, 0.5, 0.99, 1.0, 1.01, 2.0) .* core_radius
+                    for phi in (0.0, π/4, π/2, π, -π/3)
+                        radial = [0.0, distance * cos(phi), distance * sin(phi)]
+                        point = [0.5, 0.0, 0.0] + radial
+                        velocity = zeros(3)
+                        velocity_3D_vortex!(velocity, filament, point, gamma,
+                            core_parameter, work_vectors)
 
-                r_radial = [0.0, p[2], p[3]]
-                @test isapprox(dot(v, r0), 0.0; atol=1e-10)
-                @test isapprox(dot(v, r_radial), 0.0; atol=1e-8)
+                        @test norm(velocity) > 1e-3
+                        @test isapprox(dot(velocity, filament.r0), 0.0; atol=1e-10)
+                        @test isapprox(dot(velocity, radial), 0.0; atol=1e-10)
+                    end
+                end
             end
         end
     end

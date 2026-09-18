@@ -10,14 +10,8 @@
   doi:10.1088/1742-6596/2767/2/022068): each section gets a drag increment and a force
   along its span from the flow across it, in `solve!`, `solve` and `linearize`. Opt-in
   via `is_with_viscous_drag_correction` (default `false`) on the solver settings.
-
-### Fixed
-
-- `solve!` and `solve` throw a `DimensionMismatch` naming both sizes for a `body_aero` whose
-  panel or unrefined-section count differs from the solver's, where they failed on a
-  broadcast partway through or silently left section results at zero.
-- The `VSMSolution` docstring gives `lift_dist`, `drag_dist` and `panel_moment_dist` in
-  the per-unit-span units they hold, [N/m] and [Nm/m], instead of [N] and [Nm].
+- `linearize` takes a `BodyAerodynamics` with more than one wing; `theta_idxs` and
+  `delta_idxs` then run over the unrefined sections of all wings in order.
 
 ### Changed
 
@@ -31,6 +25,14 @@
 
 ### Fixed
 
+- `solve!` and `solve` throw a `DimensionMismatch` naming both sizes for a `body_aero` whose
+  panel or unrefined-section count differs from the solver's, where they failed on a
+  broadcast partway through or silently left section results at zero.
+- The `VSMSolution` docstring gives `lift_dist`, `drag_dist` and `panel_moment_dist` in
+  the per-unit-span units they hold, [N/m] and [Nm/m], instead of [N] and [Nm].
+- Inside its vortex core, `velocity_3D_trailing_vortex!` induces an azimuthal velocity
+  instead of a radial one. Only points within the millimetre-scale Oseen core of a
+  panel's chordwise trailing segment were affected.
 - With `artificial_damping` on, an iteration whose circulation is already smooth no longer
   re-applies the previous iteration's damping correction.
 
