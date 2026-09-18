@@ -257,6 +257,37 @@ function calculate_stall_angle_list!(stall_angles::AbstractVector,
 end
 
 """
+    unrefined_section_range(body_aero::BodyAerodynamics, wing_idx)
+
+Indices of the unrefined sections of wing `wing_idx` in a distribution that runs over the
+unrefined sections of all wings in order, such as `moment_unrefined_dist`.
+"""
+function unrefined_section_range(body_aero::BodyAerodynamics, wing_idx)
+    offset = 0
+    for i in 1:wing_idx-1
+        offset += body_aero.wings[i].n_unrefined_sections
+    end
+    return offset .+ (1:body_aero.wings[wing_idx].n_unrefined_sections)
+end
+
+"""
+    unrefined_deform!(body_aero::BodyAerodynamics, theta_angles, delta_angles)
+
+Deform each wing of `body_aero` by its entries of `theta_angles` and `delta_angles` [rad],
+which run over the unrefined sections of all wings in order; `nothing` leaves that angle
+unchanged. Call [`reinit!`](@ref) afterwards to update the panels.
+"""
+function unrefined_deform!(body_aero::BodyAerodynamics, theta_angles, delta_angles)
+    for (wing_idx, wing) in enumerate(body_aero.wings)
+        section_range = unrefined_section_range(body_aero, wing_idx)
+        unrefined_deform!(wing,
+            isnothing(theta_angles) ? nothing : view(theta_angles, section_range),
+            isnothing(delta_angles) ? nothing : view(delta_angles, section_range))
+    end
+    return nothing
+end
+
+"""
     reinit!(body_aero::BodyAerodynamics; init_aero, va, omega, refine_mesh, recompute_mapping, sort_sections)
 
 Initialize a BodyAerodynamics struct in-place by setting up panels and coefficients.
