@@ -83,6 +83,7 @@ calculate_filaments_for_plotting
 ### Mesh refinement and billowing
 ```@docs
 unrefined_deform!
+unrefined_section_range
 deform!
 compute_refined_panel_mapping!
 compute_refined_section_interpolation!
