@@ -253,6 +253,37 @@ function calculate_stall_angle_list!(stall_angles::AbstractVector,
 end
 
 """
+    unrefined_section_range(body_aero::BodyAerodynamics, wing_idx)
+
+Indices of the unrefined sections of wing `wing_idx` in a distribution that runs over the
+unrefined sections of all wings in order, such as `moment_unrefined_dist`.
+"""
+function unrefined_section_range(body_aero::BodyAerodynamics, wing_idx)
+    offset = 0
+    for i in 1:wing_idx-1
+        offset += body_aero.wings[i].n_unrefined_sections
+    end
+    return offset .+ (1:body_aero.wings[wing_idx].n_unrefined_sections)
+end
+
+"""
+    unrefined_deform!(body_aero::BodyAerodynamics, theta_angles, delta_angles)
+
+Deform each wing of `body_aero` by its entries of `theta_angles` and `delta_angles` [rad],
+which run over the unrefined sections of all wings in order; `nothing` leaves that angle
+unchanged. Call [`reinit!`](@ref) afterwards to update the panels.
+"""
+function unrefined_deform!(body_aero::BodyAerodynamics, theta_angles, delta_angles)
+    for (wing_idx, wing) in enumerate(body_aero.wings)
+        section_range = unrefined_section_range(body_aero, wing_idx)
+        unrefined_deform!(wing,
+            isnothing(theta_angles) ? nothing : view(theta_angles, section_range),
+            isnothing(delta_angles) ? nothing : view(delta_angles, section_range))
+    end
+    return nothing
+end
+
+"""
     reinit!(body_aero::BodyAerodynamics; init_aero, va, omega, refine_mesh, recompute_mapping, sort_sections)
 
 Initialize a BodyAerodynamics struct in-place by setting up panels and coefficients.
@@ -337,7 +368,8 @@ the area-weighted mean direction.
     panel_areas::Union{Nothing, AbstractVector}=nothing
 )
     length(va_input) == 3 ||
-        throw(ArgumentError("'va' must be shape (3,) or ($(n_panels), 3); got length $(length(va_input))"))
+        throw(ArgumentError("va_vec must be shape (3,) or va_vec_dist ($(n_panels), 3); " *
+                            "got length $(length(va_input))"))
     T = eltype(va_input)
     return MVector{3, T}(va_input[1], va_input[2], va_input[3])
 end
@@ -348,7 +380,8 @@ end
     panel_areas::Union{Nothing, AbstractVector}=nothing
 )
     size(va_input) == (n_panels, 3) ||
-        throw(ArgumentError("'va' must be shape (3,) or ($(n_panels), 3); got $(size(va_input))"))
+        throw(ArgumentError("va_vec must be shape (3,) or va_vec_dist ($(n_panels), 3); " *
+                            "got $(size(va_input))"))
     if !isnothing(panel_areas)
         length(panel_areas) == n_panels ||
             throw(ArgumentError("panel_areas must be shape ($(n_panels),), got length $(length(panel_areas))"))
@@ -385,7 +418,7 @@ end
 
 """
     calculate_AIC_matrices!(body_aero::BodyAerodynamics, model::Model, core_radius_fraction,
-                            va_norm_dist, va_unit_dist, target=body_aero.AIC)
+                            va_dist, va_unit_dist, target=body_aero.AIC)
 
 Calculate Aerodynamic Influence Coefficient matrices.
 
@@ -395,7 +428,7 @@ Returns: nothing
 """
 @inline function calculate_AIC_matrices!(body_aero::BodyAerodynamics{P, W, T}, model::Model,
                               core_radius_fraction,
-                              va_norm_dist::AbstractVector{T},
+                              va_dist::AbstractVector{T},
                               va_unit_dist::AbstractMatrix{T},
                               target::AbstractArray{T, 3}=body_aero.AIC) where {P, W, T}
     # Determine evaluation point based on model
@@ -410,19 +443,19 @@ Returns: nothing
 
     # Python parity: one shared area-weighted wake vector for all panels.
     panel_areas = [panel.chord * panel.width for panel in body_aero.panels]
-    va_distribution = zeros(T, length(body_aero.panels), 3)
+    va_vec_dist = zeros(T, length(body_aero.panels), 3)
     @inbounds for i in 1:length(body_aero.panels), k in 1:3
-        va_distribution[i, k] = va_unit_dist[i, k] * va_norm_dist[i]
+        va_vec_dist[i, k] = va_unit_dist[i, k] * va_dist[i]
     end
     wake_velocity = _compute_reference_velocity_from_distribution(
-        va_distribution,
+        va_vec_dist,
         length(body_aero.panels),
         panel_areas
     )
     wake_speed = norm(wake_velocity)
     wake_speed > 0.0 || throw(ArgumentError("Wake reference speed must be positive."))
     va_unit .= wake_velocity ./ wake_speed
-    va_norm = wake_speed
+    va = wake_speed
     
     # Calculate influence coefficients
     for jring in eachindex(body_aero.panels)
@@ -438,7 +471,7 @@ Returns: nothing
                 filaments,
                 ep,
                 evaluation_point_on_bound,
-                va_norm,
+                va,
                 va_unit,
                 one(T),
                 core_radius_fraction,
@@ -488,7 +521,7 @@ end
 """
     update_effective_angle_of_attack!(alpha_corrected, body_aero::BodyAerodynamics, gamma,
                                       core_radius_fraction, z_airf_dist, x_airf_dist,
-                                      va_dist, va_norm_dist, va_unit_dist)
+                                      va_vec_dist, va_dist, va_unit_dist)
 
 Update angle of attack at aerodynamic center for VSM method.
 
@@ -501,23 +534,23 @@ function update_effective_angle_of_attack!(alpha_corrected,
     core_radius_fraction,
     z_airf_dist,
     x_airf_dist,
+    va_vec_dist,
     va_dist,
-    va_norm_dist,
     va_unit_dist)
 
     # Its own buffer: `AIC` holds the control-point matrix the circulation was solved
     # against, so overwriting it here would leave post-solve readers on the LLT one.
-    calculate_AIC_matrices!(body_aero, LLT, core_radius_fraction, va_norm_dist,
+    calculate_AIC_matrices!(body_aero, LLT, core_radius_fraction, va_dist,
                             va_unit_dist, body_aero.AIC_aero_center)
 
-    induced_velocity = body_aero.cache[1][va_dist]
+    induced_velocity = body_aero.cache[1][va_vec_dist]
     for k in 1:3
         mul!(view(induced_velocity, :, k), view(body_aero.AIC_aero_center, :, :, k), gamma)
     end
 
     # In-place relative velocity calculation
-    relative_velocity = body_aero.cache[2][va_dist]
-    relative_velocity .= va_dist .+ induced_velocity
+    relative_velocity = body_aero.cache[2][va_vec_dist]
+    relative_velocity .= va_vec_dist .+ induced_velocity
 
     # Preallocate and compute dot products manually
     n = size(relative_velocity, 1)
@@ -745,8 +778,8 @@ end
 
 """
     calculate_results(body_aero::BodyAerodynamics, gamma_new, reference_point, density,
-                      core_radius_fraction, mu, alpha_dist, v_a_dist, chord_dist,
-                      x_airf_dist, z_airf_dist, va_dist, va_norm_dist, va_unit_dist,
+                      core_radius_fraction, mu, alpha_dist, v_rel_dist, chord_dist,
+                      x_airf_dist, z_airf_dist, va_vec_dist, va_dist, va_unit_dist,
                       panels::Vector{<:Panel}, is_only_f_and_gamma_output::Bool;
                       correct_aoa=false, flow_curvature=false,
                       is_with_viscous_drag_correction=false, v_span_dist=nothing)
@@ -769,12 +802,12 @@ function calculate_results(
     core_radius_fraction,
     mu,
     alpha_dist,
-    v_a_dist,
+    v_rel_dist,
     chord_dist,
     x_airf_dist,
     z_airf_dist,
+    va_vec_dist,
     va_dist,
-    va_norm_dist,
     va_unit_dist,
     panels::Vector{<:Panel},
     is_only_f_and_gamma_output::Bool;
@@ -811,20 +844,20 @@ function calculate_results(
             panel, alpha_dist[i])
         if flow_curvature
             cm_dist[i] += flow_curvature_cm(
-                body_aero.pitch_rate_dist[i], chord_dist[i], v_a_dist[i])
+                body_aero.pitch_rate_dist[i], chord_dist[i], v_rel_dist[i])
         end
         panel_width_dist[i] = panel.width
-        va_norm = va_norm_dist[i]
+        va = va_dist[i]
         x_norm = norm3(panel.x_airf)
         z_norm = norm3(panel.z_airf)
-        if va_norm == 0.0 || x_norm == 0.0 || z_norm == 0.0
+        if va == 0.0 || x_norm == 0.0 || z_norm == 0.0
             alpha_geometric[i] = NaN
         else
-            inv_va_norm = 1.0 / va_norm
+            inv_va = 1.0 / va
             v_tangential = -dot3(panel.x_airf, panel.va) *
-                           inv_va_norm / x_norm
+                           inv_va / x_norm
             v_normal = -dot3(panel.z_airf, panel.va) *
-                       inv_va_norm / z_norm
+                       inv_va / z_norm
             alpha_geometric[i] = atan(-v_normal, -v_tangential)
         end
     end
@@ -838,8 +871,8 @@ function calculate_results(
             core_radius_fraction,
             z_airf_dist,
             x_airf_dist,
+            va_vec_dist,
             va_dist,
-            va_norm_dist,
             va_unit_dist
         )
     else
@@ -853,40 +886,40 @@ function calculate_results(
 
     # Get wing properties and reference velocity
     spanwise_direction = body_aero.wings[1].spanwise_direction
-    va_ref_vector = MVec3(0.0, 0.0, 0.0)
+    va_ref_vec = MVec3(0.0, 0.0, 0.0)
     weighted_speed_sq = 0.0
     total_area = 0.0
     @inbounds for i in 1:n_panels
         area_i = chord_dist[i] * panel_width_dist[i]
         total_area += area_i
-        speed_i = va_norm_dist[i]
+        speed_i = va_dist[i]
         weighted_speed_sq += area_i * speed_i^2
-        va_ref_vector[1] += area_i * va_dist[i, 1]
-        va_ref_vector[2] += area_i * va_dist[i, 2]
-        va_ref_vector[3] += area_i * va_dist[i, 3]
+        va_ref_vec[1] += area_i * va_vec_dist[i, 1]
+        va_ref_vec[2] += area_i * va_vec_dist[i, 2]
+        va_ref_vec[3] += area_i * va_vec_dist[i, 3]
     end
     total_area > 0.0 || throw(ArgumentError(
         "Total panel area must be positive."))
     reference_speed = sqrt(weighted_speed_sq / total_area)
-    direction_norm = norm3(va_ref_vector)
+    direction_norm = norm3(va_ref_vec)
     if direction_norm <= 0.0
-        va_ref_vector .= (1.0, 0.0, 0.0)
+        va_ref_vec .= (1.0, 0.0, 0.0)
         direction_norm = 1.0
     end
     @inbounds for k in 1:3
-        va_ref_vector[k] = va_ref_vector[k] / direction_norm *
-                           reference_speed
+        va_ref_vec[k] = va_ref_vec[k] / direction_norm *
+                        reference_speed
     end
-    va_ref_mag = norm3(va_ref_vector)
-    va_ref_mag > 0.0 || throw(ArgumentError(
+    va_ref = norm3(va_ref_vec)
+    va_ref > 0.0 || throw(ArgumentError(
         "Reference freestream magnitude must be positive."))
     va_ref_unit = body_aero.work_vectors[1]
-    inv_va_ref = 1.0 / va_ref_mag
+    inv_va_ref = 1.0 / va_ref
     @inbounds for k in 1:3
-        va_ref_unit[k] = va_ref_vector[k] * inv_va_ref
+        va_ref_unit[k] = va_ref_vec[k] * inv_va_ref
     end
     dir_lift_ref = body_aero.work_vectors[2]
-    cross3!(dir_lift_ref, va_ref_vector, spanwise_direction)
+    cross3!(dir_lift_ref, va_ref_vec, spanwise_direction)
     dir_lift_ref_norm = norm3(dir_lift_ref)
     dir_lift_ref_norm > 0.0 || throw(ArgumentError(
         "Reference lift direction is undefined because " *
@@ -896,7 +929,7 @@ function calculate_results(
     end
     dir_side_ref = body_aero.work_vectors[3]
     cross3!(dir_side_ref, dir_lift_ref, va_ref_unit)
-    q_ref = 0.5 * density * va_ref_mag^2
+    q_ref = 0.5 * density * va_ref^2
 
     dir_lift_prescribed_va = body_aero.work_vectors[9]
     temp_vec = body_aero.work_vectors[10]
@@ -911,38 +944,38 @@ function calculate_results(
         dirs = panel_force_directions(axes, alpha_corrected[i], spanwise_unit)
         c_span = 0.0
         if is_with_viscous_drag_correction
-            viscous = spanwise_flow_drag(v_a_dist[i], v_span_dist[i], panel.chord,
+            viscous = spanwise_flow_drag(v_rel_dist[i], v_span_dist[i], panel.chord,
                 density, mu)
             cd_dist[i] += viscous.delta_cd
             c_span = viscous.c_span
         end
         loads = panel_loads(axes, dirs,
-            dynamic_pressure(density, density, v_a_dist[i]),
+            dynamic_pressure(density, density, v_rel_dist[i]),
             cl_dist[i], cd_dist[i], cm_dist[i]; c_span)
         force = loads.force
 
-        va_panel_mag = va_norm_dist[i]
-        va_panel_mag > 0.0 || throw(ArgumentError(
+        va_panel = va_dist[i]
+        va_panel > 0.0 || throw(ArgumentError(
             "Panel $i has non-positive apparent " *
             "velocity magnitude."))
-        q_panel = 0.5 * density * va_panel_mag^2
+        q_panel = 0.5 * density * va_panel^2
         cross3!(dir_lift_prescribed_va,
                 panel.va, spanwise_direction)
         normalize3!(dir_lift_prescribed_va)
 
         cross3!(temp_vec, dir_lift_prescribed_va, panel.va)
-        inv_vpm = 1.0 / va_panel_mag
+        inv_va_panel = 1.0 / va_panel
         @inbounds for k in 1:3
-            temp_vec[k] *= inv_vpm
+            temp_vec[k] *= inv_va_panel
         end
         lift_prescribed_va = dot(force, dir_lift_prescribed_va)
-        drag_prescribed_va = dot(force, panel.va) * inv_vpm
+        drag_prescribed_va = dot(force, panel.va) * inv_va_panel
         side_prescribed_va = dot(force, temp_vec)
 
         lift_wing_3D_sum += lift_prescribed_va *
             dot3(dir_lift_prescribed_va, dir_lift_ref)
         drag_wing_3D_sum += drag_prescribed_va *
-            (dot3(panel.va, va_ref_unit) * inv_vpm)
+            (dot3(panel.va, va_ref_unit) * inv_va_panel)
         side_wing_3D_sum += side_prescribed_va *
             dot3(temp_vec, dir_side_ref)
 
@@ -973,7 +1006,7 @@ function calculate_results(
 
     # Calculate Reynolds number
     c_ref = body_aero.c_ref
-    reynolds_number = density * va_ref_mag * c_ref / mu
+    reynolds_number = density * va_ref * c_ref / mu
 
     force_total = body_aero.work_vectors[9]
     moment_total = body_aero.work_vectors[10]
@@ -1035,7 +1068,7 @@ function calculate_results(
         "aspect_ratio_projected" => aspect_ratio_projected,
         "Rey" => reynolds_number,
         "q_ref" => q_ref,
-        "va_ref" => va_ref_vector,
+        "va_ref" => va_ref_vec,
         "center_of_pressure" => center_of_pressure,
         "panel_cp_locations" => panel_cp_locations
     )
@@ -1050,26 +1083,27 @@ end
 
 
 """
-    set_va!(body_aero::BodyAerodynamics, va::VelVector, omega=zeros(MVec3))
+    set_va!(body_aero::BodyAerodynamics, va_vec::VelVector, omega=zeros(MVec3))
 
 Set velocity array and update wake filaments.
 
 # Arguments
 - body_aero::BodyAerodynamics: The [`BodyAerodynamics`](@ref) struct to modify
-- `va::VelVector`: Velocity vector of the apparent wind speed           [m/s]
+- `va_vec::VelVector`: Velocity vector of the apparent wind speed       [m/s]
 - `omega::VelVector`: Turn rate vector around x y and z axis            [rad/s]
 
 `omega` is also projected onto each panel's spanwise axis into
 `pitch_rate_dist`, which the solver reads when `flow_curvature` is enabled.
 """
-function set_va!(body_aero::BodyAerodynamics{P, W, T}, va::AbstractVector, omega=zeros(MVector{3, T})) where {P, W, T}
+function set_va!(body_aero::BodyAerodynamics{P, W, T}, va_vec::AbstractVector,
+                 omega=zeros(MVector{3, T})) where {P, W, T}
     n_panels = length(body_aero.panels)
-    va_distribution = zeros(T, n_panels, 3)
+    va_vec_dist = zeros(T, n_panels, 3)
     body_aero.omega .= omega
     set_pitch_rate_dist!(body_aero, omega)
 
     if all(iszero, omega)
-        va_distribution .= reshape(va, 1, 3)
+        va_vec_dist .= reshape(va_vec, 1, 3)
     else
         idx = 1
         for wing in body_aero.wings
@@ -1077,8 +1111,8 @@ function set_va!(body_aero::BodyAerodynamics{P, W, T}, va::AbstractVector, omega
 
             # Calculate velocities for each panel in this wing slice
             for j in idx:panel_end
-                omega_va = -omega × body_aero.panels[j].control_point
-                va_distribution[j, :] .= omega_va .+ va
+                omega_va_vec = -omega × body_aero.panels[j].control_point
+                va_vec_dist[j, :] .= omega_va_vec .+ va_vec
             end
             idx = panel_end + 1
         end
@@ -1086,18 +1120,18 @@ function set_va!(body_aero::BodyAerodynamics{P, W, T}, va::AbstractVector, omega
 
     # Update panel velocities
     for (i, panel) in enumerate(body_aero.panels)
-        panel.va .= va_distribution[i,:]
+        panel.va .= va_vec_dist[i,:]
     end
 
     # Update wake elements
-    frozen_wake!(body_aero, va_distribution)
-    body_aero._va .= va
+    frozen_wake!(body_aero, va_vec_dist)
+    body_aero._va .= va_vec
     body_aero.has_distributed_va = false
     return nothing
 end
 
 """
-    set_va!(body_aero::BodyAerodynamics, va_distribution::AbstractMatrix;
+    set_va!(body_aero::BodyAerodynamics, va_vec_dist::AbstractMatrix;
             pitch_rate_dist=nothing)
 
 Set a per-panel inflow distribution. `pitch_rate_dist` gives each panel's rotation
@@ -1107,10 +1141,11 @@ rates differ per section and no single body rate describes them. It is reset to
 zero when omitted, because this method takes no `omega` and a stale one would
 silently feed the `flow_curvature` moment.
 """
-function set_va!(body_aero::BodyAerodynamics, va_distribution::AbstractMatrix;
+function set_va!(body_aero::BodyAerodynamics, va_vec_dist::AbstractMatrix;
                  pitch_rate_dist=nothing)
-    size(va_distribution, 1) != length(body_aero.panels) &&
-        throw(ArgumentError("Number of rows in va distribution should be equal to number of panels."))
+    size(va_vec_dist, 1) != length(body_aero.panels) &&
+        throw(ArgumentError(
+            "Number of rows in va_vec_dist should be equal to number of panels."))
     if isnothing(pitch_rate_dist)
         body_aero.pitch_rate_dist .= 0
     else
@@ -1120,12 +1155,12 @@ function set_va!(body_aero::BodyAerodynamics, va_distribution::AbstractMatrix;
     end
 
     for (i, panel) in enumerate(body_aero.panels)
-        panel.va .= va_distribution[i, :]
+        panel.va .= va_vec_dist[i, :]
     end
 
     # Update wake elements
-    frozen_wake!(body_aero, va_distribution)
-    body_aero._va .= [mean(va_distribution[:,i]) for i in 1:3]
+    frozen_wake!(body_aero, va_vec_dist)
+    body_aero._va .= [mean(va_vec_dist[:,i]) for i in 1:3]
     body_aero.has_distributed_va = true
     return nothing
 end
@@ -1162,11 +1197,11 @@ function set_va!(body_aero::BodyAerodynamics, settings::VSMSettings)
     β = deg2rad(settings.condition.beta)
     wind_speed = settings.condition.wind_speed
     
-    va = wind_speed * [
+    va_vec = wind_speed * [
         cos(α)*cos(β),  # X_b (forward)
         sin(β),         # Y_b (right)
         sin(α)*cos(β)   # Z_b (down)
     ]
     
-    set_va!(body_aero, va)
+    set_va!(body_aero, va_vec)
 end

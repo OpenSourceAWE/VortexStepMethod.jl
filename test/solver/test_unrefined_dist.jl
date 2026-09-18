@@ -24,8 +24,8 @@ using Test
             solver = Solver(body_aero, settings)
 
             # Set conditions and solve
-            va = [10.0, 0.0, 0.0]
-            set_va!(body_aero, va)
+            va_vec = [10.0, 0.0, 0.0]
+            set_va!(body_aero, va_vec)
             sol = solve!(solver, body_aero)
 
             # Test 1: Unrefined arrays exist and have correct size
@@ -98,8 +98,8 @@ using Test
             body_aero = BodyAerodynamics([wing])
             solver = Solver(body_aero, settings)
 
-            va = [10.0, 0.0, 0.0]
-            set_va!(body_aero, va)
+            va_vec = [10.0, 0.0, 0.0]
+            set_va!(body_aero, va_vec)
             sol = solve!(solver, body_aero)
 
             panels = body_aero.panels
@@ -171,8 +171,8 @@ using Test
                 body_aero = BodyAerodynamics([wing])
                 solver = Solver(body_aero, settings)
 
-                va = [10.0, 0.0, 0.0]
-                set_va!(body_aero, va)
+                va_vec = [10.0, 0.0, 0.0]
+                set_va!(body_aero, va_vec)
                 sol = solve!(solver, body_aero)
 
                 # Verify arrays have correct size
