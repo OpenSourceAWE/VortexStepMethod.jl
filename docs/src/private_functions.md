@@ -276,6 +276,7 @@ panel_contour
 panel_normal
 plate_hinge_local
 panel_plate_geometry
+panel_polar_curves
 PLATE_FACES
 Makie.plot!(ax, panel::VortexStepMethod.Panel)
 Makie.plot!(ax, body::VortexStepMethod.BodyAerodynamics)
