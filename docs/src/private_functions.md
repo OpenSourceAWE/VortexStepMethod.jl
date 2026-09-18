@@ -150,6 +150,7 @@ chord_residual!
 bernstein_basis
 class_function
 leading_edge_basis
+truncated_least_squares
 compute_optimal_x_points
 normalize_airfoil
 get_lower_upper
