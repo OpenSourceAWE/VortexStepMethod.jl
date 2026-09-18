@@ -3,7 +3,7 @@
 ### Introduction
 Reference frames are needed for following purposes:
 - for creating a CAD model of the wing (or the wings)
-- for defining the apparent wind speed vector $v_a$
+- for defining the apparent wind speed vector `va_vec`
 - for calculating the lift and drag and side force coefficients
 - for calculating the resulting forces and moments
 
@@ -30,6 +30,6 @@ The turn rates $\mathrm{omega} = [\mathrm{omega_x}, \mathrm{omega_y} ,\mathrm{om
 
 ## Input and output
 - when running a simulation, the turnrate of the kite must be provided on each time step
-- the apparent wind speed vector `v_a` is defined in the **KB** reference frame
+- the apparent wind speed vector `va_vec` is defined in the **KB** reference frame
 - the resulting forces are defined in the **KB** reference frame
 - the **CL**, **CD**, **CS** and the resulting moments and moment coefficients are defined in the **KB** reference frame

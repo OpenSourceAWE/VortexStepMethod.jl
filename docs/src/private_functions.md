@@ -52,6 +52,7 @@ effective_alpha
 panel_inflow
 dynamic_pressure
 flow_curvature_cm
+spanwise_flow_drag
 panel_force_directions
 panel_moment
 panel_couple_force
@@ -62,6 +63,7 @@ panel_loads
 ```@docs
 velocity_3D_bound_vortex!
 velocity_3D_trailing_vortex!
+velocity_3D_vortex_segment!
 velocity_3D_trailing_vortex_semiinfinite!
 calculate_velocity_induced_bound_2D!
 calculate_velocity_induced_single_ring_semiinfinite!
@@ -82,6 +84,7 @@ calculate_filaments_for_plotting
 ### Mesh refinement and billowing
 ```@docs
 unrefined_deform!
+unrefined_section_range
 deform!
 compute_refined_panel_mapping!
 compute_refined_section_interpolation!

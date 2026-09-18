@@ -96,6 +96,17 @@ end
         @test isapprox(panel.y_airf, [0.0, 1.0, 0.0])
     end
 
+    @testset "Filaments for plotting have a concrete element type" begin
+        section1 = Section([0.0, 0.0, 0.0], [1.0, 0.0, 0.0], INVISCID)
+        section2 = Section([0.0, 10.0, 0.0], [1.0, 10.0, 0.0], INVISCID)
+        panel = create_panel(section1, section2)
+        panel.va = [10.0, 0.0, 0.0]
+
+        filaments = VortexStepMethod.calculate_filaments_for_plotting(panel)
+        @test filaments isa Vector{Tuple{Vector{Float64}, Vector{Float64}, String}}
+        @test length(filaments) == length(panel.filaments)
+    end
+
     @testset "Velocity Calculations" begin
         section1 = Section([0.0, 0.0, 0.0], [1.0, 0.0, 0.0], INVISCID)
         section2 = Section([0.0, 10.0, 0.0], [1.0, 10.0, 0.0], INVISCID)

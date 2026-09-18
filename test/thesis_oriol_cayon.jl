@@ -22,10 +22,10 @@ CD : Global CD
 function output_results(Fmag, aero_coeffs, ringvec, Uinf, controlpoints, Atot)
     rho = 1.225
     alpha = aero_coeffs[:, 1]
-    F_rel = []
-    F_gl = []
-    Fmag_gl = []
-    SideF = []
+    F_rel = Vector{Vector{Float64}}[]
+    F_gl = Vector{Vector{Float64}}[]
+    Fmag_gl = Vector{Float64}[]
+    SideF = Float64[]
     Ltot = 0.0
     Dtot = 0.0
     SFtot = 0.0
@@ -124,12 +124,12 @@ ringvec : List of dictionaries containing the vectors that define each ring
 coord_L : coordinates of the aerodynamic centers of each wing panel
 """
 function create_geometry_general(coordinates, Uinf, N, ring_geo, model)
-    filaments = []
-    controlpoints = []
-    rings = []
-    wingpanels = []
-    ringvec = []
-    coord_L = []
+    filaments = Dict{String, Any}[]
+    controlpoints = Dict{String, Any}[]
+    rings = Vector{Dict{String, Any}}[]
+    wingpanels = Dict{String, Vector{Float64}}[]
+    ringvec = Dict{String, Vector{Float64}}[]
+    coord_L = Vector{Float64}[]
 
     # Go through all wing panels
     for i in 1:N-1
@@ -279,7 +279,7 @@ function create_geometry_general(coordinates, Uinf, N, ring_geo, model)
         end
 
         push!(rings, filaments)
-        filaments = []
+        filaments = Dict{String, Any}[]
     end
 
     coord_L = hcat(coord_L...)

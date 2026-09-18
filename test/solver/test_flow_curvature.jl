@@ -134,16 +134,16 @@ end
 
     @testset "distributed rates drive a deformation mode" begin
         n = length(body_aero.panels)
-        va_dist = repeat([V 0.0 0.0], n)
+        va_vec_dist = repeat([V 0.0 0.0], n)
 
-        set_va!(body_aero, va_dist)
+        set_va!(body_aero, va_vec_dist)
         @test all(iszero, body_aero.pitch_rate_dist)
         solve!(solver_on, body_aero)
         base = copy(solver_on.sol.cm_dist)
 
         # antisymmetric twist rate: no rigid-body omega can express this
         rates = [panel.aero_center[2] > 0 ? 1.0 : -1.0 for panel in body_aero.panels]
-        set_va!(body_aero, va_dist; pitch_rate_dist=rates)
+        set_va!(body_aero, va_vec_dist; pitch_rate_dist=rates)
         @test body_aero.pitch_rate_dist ≈ rates
         solve!(solver_on, body_aero)
 
@@ -156,7 +156,7 @@ end
         @test sign(solver_on.sol.cm_dist[1] - base[1]) ==
               -sign(solver_on.sol.cm_dist[n] - base[n])
 
-        @test_throws ArgumentError set_va!(body_aero, va_dist;
+        @test_throws ArgumentError set_va!(body_aero, va_vec_dist;
                                            pitch_rate_dist=rates[1:end-1])
     end
 end

@@ -117,7 +117,7 @@ If `use_observables=true`, creates observables for dynamic updates.
 """
 function Makie.plot!(ax, panel::VortexStepMethod.Panel; color=(:red, 0.2), R_b_w=nothing, T_b_w=nothing,
     use_observables=false, border_linewidth=1.5, transparency=true, kwargs...)
-    plots = []
+    plots = Makie.AbstractPlot[]
     points = panel_plate_geometry(panel; R_b_w, T_b_w)
 
     if use_observables
@@ -253,7 +253,7 @@ function Makie.plot!(ax, body::VortexStepMethod.BodyAerodynamics; color=(:red, 0
     use_observables=false, airfoils=false,
     airfoil_color=:deepskyblue, airfoil_opacity=0.2, rib_color=:black,
     border_linewidth=1.5, transparency=true, kwargs...)
-    plots = []
+    plots = Makie.AbstractPlot[]
 
     if airfoils
         vertices, faces, ribs = airfoil_skin_geometry(body; R_b_w, T_b_w)
@@ -316,9 +316,8 @@ function Makie.plot!(ax, body::VortexStepMethod.BodyAerodynamics; color=(:red, 0
     else
         # Static plotting (original behavior)
         for panel in body.panels
-            p = Makie.plot!(ax, panel; color, R_b_w, T_b_w, use_observables=false,
-                            border_linewidth, transparency, kwargs...)
-            push!(plots, p)
+            append!(plots, Makie.plot!(ax, panel; color, R_b_w, T_b_w,
+                use_observables=false, border_linewidth, transparency, kwargs...))
         end
     end
 
@@ -607,7 +606,7 @@ Create a 3D Makie plot of wing geometry including panels and filaments.
 function create_geometry_plot_makie(body_aero::BodyAerodynamics, title,
     view_elevation, view_azimuth; zoom=0.5)
     panels = body_aero.panels
-    va = getfield(body_aero, :_va)
+    va_vec = getfield(body_aero, :_va)
 
     # Create figure
     fig = Figure(size=(1400, 1400))
@@ -652,9 +651,9 @@ function create_geometry_plot_makie(body_aero::BodyAerodynamics, title,
 
     # Plot velocity vector
     max_chord = maximum(panel.chord for panel in panels)
-    va_mag = norm(va)
-    va_vector_begin = -2 * max_chord * va / va_mag
-    va_vector_end = va_vector_begin + 1.5 * va / va_mag
+    va_unit = va_vec / norm(va_vec)
+    va_vector_begin = -2 * max_chord * va_unit
+    va_vector_end = va_vector_begin + 1.5 * va_unit
     plot_line_segment_makie!(ax, [va_vector_begin, va_vector_end], :lightblue, "va")
 
     # Set equal axes
@@ -853,28 +852,6 @@ function VortexStepMethod.plot_distribution(y_coordinates_list, results_list, la
 end
 
 """
-    generate_polar_data(solver, body_aero::BodyAerodynamics, angle_range;
-                        angle_type="angle_of_attack", angle_of_attack=0.0,
-                        side_slip=0.0, v_a=10.0)
-
-Generate polar data for aerodynamic analysis over a range of angles.
-
-# Arguments
-- `solver`: Aerodynamic solver object
-- `body_aero`: Wing aerodynamics struct
-- `angle_range`: Range of angles to analyze
-
-# Keyword arguments
-- `angle_type`: Type of angle variation ("angle_of_attack" or "side_slip")
-- `angle_of_attack`: Initial angle of attack [°]
-- `side_slip`: Initial side slip angle [°]
-- `v_a`: Norm of apparent wind speed [m/s]
-
-# Returns
-- Tuple of polar data array and Reynolds number
-"""
-
-"""
     plot_polars(solver_list, body_aero_list, label_list;
                 literature_path_list=String[],
                 angle_range=range(0, 20, 2), angle_type="angle_of_attack",
@@ -931,13 +908,13 @@ function VortexStepMethod.plot_polars(
     main_title = replace(title, " " => "_")
 
     # Generate polar data
-    polar_data_list = []
-    cm_data_list = []
+    polar_data_list = Vector{Array{Float64}}[]
+    cm_data_list = NamedTuple{(:cmx, :cmy, :cmz), NTuple{3, Vector{Float64}}}[]
     labels_with_re = copy(label_list)
     for (i, (solver, body_aero)) in enumerate(zip(solver_list, body_aero_list))
         result = VortexStepMethod.generate_polar_data(
             solver, body_aero, angle_range;
-            angle_type, angle_of_attack, side_slip, v_a
+            angle_type, angle_of_attack, side_slip, va=v_a
         )
         push!(polar_data_list, result.polar_data)
         push!(cm_data_list, (cmx=result.cmx, cmy=result.cmy,
@@ -1242,7 +1219,7 @@ function VortexStepMethod.plot_combined_analysis(
     # Use first body_aero for geometry and polar data display
     first_body = body_aeros[1]
     panels = first_body.panels
-    va = getfield(first_body, :_va)
+    va_vec = getfield(first_body, :_va)
 
     # Compute spanwise results for each solver
     results_spanwise_list = copy(results_list)
@@ -1250,13 +1227,13 @@ function VortexStepMethod.plot_combined_analysis(
         α_span = deg2rad(angle_of_attack_for_spanwise_distribution)
         β_span = deg2rad(side_slip)
         for (i, (s, ba)) in enumerate(zip(solvers, body_aeros))
-            va_old = copy(getfield(ba, :_va))
+            va_vec_old = copy(getfield(ba, :_va))
             omega_old = copy(ba.omega)
             set_va!(ba, [cos(α_span) * cos(β_span), sin(β_span),
                 sin(α_span)] * v_a)
             results_spanwise_list[i] = solve(s, ba,
                 s.sol.gamma_distribution)
-            set_va!(ba, va_old, omega_old)
+            set_va!(ba, va_vec_old, omega_old)
         end
     end
 
@@ -1296,9 +1273,9 @@ function VortexStepMethod.plot_combined_analysis(
     end
 
     max_chord = maximum(panel.chord for panel in panels)
-    va_mag = norm(va)
-    va_vector_begin = -2 * max_chord * va / va_mag
-    va_vector_end = va_vector_begin + 1.5 * va / va_mag
+    va_unit = va_vec / norm(va_vec)
+    va_vector_begin = -2 * max_chord * va_unit
+    va_vector_end = va_vector_begin + 1.5 * va_unit
     plot_line_segment_makie!(ax_geo, [va_vector_begin, va_vector_end],
         :lightblue, "va")
 
@@ -1429,7 +1406,7 @@ function VortexStepMethod.plot_combined_analysis(
             zip(solvers, body_aeros, solver_labels))
         result = VortexStepMethod.generate_polar_data(
             s, ba, angle_range;
-            angle_type, angle_of_attack, side_slip, v_a)
+            angle_type, angle_of_attack, side_slip, va=v_a)
         pd = result.polar_data
         label_re = "$lbl Re = $(round(Int64,
                      result.rey * 1e-5))e5"

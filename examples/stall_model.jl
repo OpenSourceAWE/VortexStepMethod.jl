@@ -32,19 +32,15 @@ csv_file_path = joinpath(
 )
 
 df = CSV.read(csv_file_path, DataFrame)
-rib_list = []
-for row in eachrow(df)
-    LE = [row.LE_x, row.LE_y, row.LE_z]
-    TE = [row.TE_x, row.TE_y, row.TE_z]
-    push!(rib_list, (LE, TE, LEI_AIRFOIL_BREUKELS,
-                     lei_poly_coeffs(row.d_tube, row.camber)))
-end
 
 # Create wing geometry
 # n_unrefined_sections will be automatically set to the number of ribs (18 sections)
 CAD_wing = Wing(n_panels; spanwise_distribution)
-for rib in rib_list
-    add_section!(CAD_wing, rib[1], rib[2], rib[3], rib[4])
+for row in eachrow(df)
+    LE = [row.LE_x, row.LE_y, row.LE_z]
+    TE = [row.TE_x, row.TE_y, row.TE_z]
+    add_section!(CAD_wing, LE, TE, LEI_AIRFOIL_BREUKELS,
+                 lei_poly_coeffs(row.d_tube, row.camber))
 end
 refine!(CAD_wing)
 body_aero = BodyAerodynamics([CAD_wing])
@@ -60,17 +56,17 @@ VSM_with_stall_correction = Solver(body_aero;
 )
 
 # Setting velocity conditions
-v_a = 15.0
+va = 15.0
 aoa = 17.0
 side_slip = 0.0
 yaw_rate = 0.0
 aoa_rad = deg2rad(aoa)
-vel_app = [
+va_vec = [
     cos(aoa_rad) * cos(side_slip),
     sin(side_slip),
     sin(aoa_rad)
-] * v_a
-set_va!(body_aero, vel_app)
+] * va
+set_va!(body_aero, va_vec)
 
 # Plotting geometry
 PLOT && plot_geometry(
@@ -95,7 +91,7 @@ PLOT && plot_distribution(
     [CAD_y_coordinates, CAD_y_coordinates],
     [results, results_with_stall],
     ["VSM", "VSM with stall correction"];
-    title="CAD_spanwise_distributions_alpha_$(round(aoa, digits=1))_delta_$(round(side_slip, digits=1))_yaw_$(round(yaw_rate, digits=1))_v_a_$(round(v_a, digits=1))",
+    title="CAD_spanwise_distributions_alpha_$(round(aoa, digits=1))_delta_$(round(side_slip, digits=1))_yaw_$(round(yaw_rate, digits=1))_va_$(round(va, digits=1))",
     save_path=OUTPUT_DIR,
     is_save=false || SAVE_ALL,
     is_show=true,
@@ -131,7 +127,7 @@ PLOT && plot_polars(
     angle_type="angle_of_attack",
     angle_of_attack=aoa,
     side_slip=side_slip,
-    v_a=v_a,
+    v_a=va,
     title="tutorial_testing_stall_model_n_panels_$(n_panels)_distribution_$(spanwise_distribution)",
     save_path=OUTPUT_DIR,
     is_save=false || SAVE_ALL,

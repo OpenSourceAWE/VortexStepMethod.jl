@@ -12,8 +12,8 @@ Read vertices and faces from an OBJ file.
   - faces: Vector of triangle vertex indices
 """
 function read_faces(filename)
-    vertices = []
-    faces = []
+    vertices = Vector{Float64}[]
+    faces = Vector{Int64}[]
 
     open(filename) do file
         for line in eachline(file)

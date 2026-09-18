@@ -32,7 +32,7 @@ function create_body_aero()
     n_panels = 20          # Number of panels
     span = 20.0            # Wing span [m]
     chord = 1.0            # Chord length [m]
-    v_a = 20.0             # Magnitude of inflow velocity [m/s]
+    va = 20.0              # Magnitude of inflow velocity [m/s]
     alpha_deg = 30.0       # Angle of attack [degrees]
     alpha = deg2rad(alpha_deg)
 
@@ -49,8 +49,8 @@ function create_body_aero()
 
     refine!(wing)
     body_aero = BodyAerodynamics([wing])
-    vel_app = [cos(alpha), 0.0, sin(alpha)] .* v_a
-    set_va!(body_aero, vel_app)
+    va_vec = [cos(alpha), 0.0, sin(alpha)] .* va
+    set_va!(body_aero, va_vec)
     body_aero
 end
 
@@ -98,7 +98,7 @@ end
     @test fig isa Figure
 
     # Plot polar curves
-    v_a = 20.0
+    va = 20.0
     angle_range = range(0, 20, 20)
     fig = plot_polars(
         [llt_solver, vsm_solver],
@@ -106,7 +106,7 @@ end
         ["VSM", "LLT"],
         angle_range=angle_range,
         angle_type="angle_of_attack",
-        v_a=v_a,
+        v_a=va,
         title="Rectangular Wing Polars",
         data_type=".png",
         save_path=save_dir,
@@ -123,7 +123,7 @@ end
         ["VSM", "LLT"],
         angle_range=angle_range,
         angle_type="angle_of_attack",
-        v_a=v_a,
+        v_a=va,
         title="Polars CL vs CD",
         is_save=false,
         is_show=false,
@@ -137,7 +137,7 @@ end
         angle_range=angle_range,
         angle_type="angle_of_attack",
         angle_of_attack=30.0,
-        v_a=v_a,
+        v_a=va,
         title="Combined Analysis",
         is_save=false,
         is_show=false,
@@ -151,7 +151,7 @@ end
         angle_range=angle_range,
         angle_type="angle_of_attack",
         angle_of_attack=30.0,
-        v_a=v_a,
+        v_a=va,
         title="Combined CL vs CD",
         is_save=false,
         is_show=false,
@@ -182,8 +182,8 @@ end
 
     body_aero_distributed = create_body_aero()
     n_panels = length(body_aero_distributed.panels)
-    va_distribution = repeat([12.0 0.0 1.0], n_panels, 1)
-    set_va!(body_aero_distributed, va_distribution)
+    va_vec_dist = repeat([12.0 0.0 1.0], n_panels, 1)
+    set_va!(body_aero_distributed, va_vec_dist)
 
     @test body_aero_distributed.has_distributed_va
     fig = plot_geometry(
@@ -284,8 +284,8 @@ end
         write(io_no_cs, "aoa,cl,cd\n0.0,0.10,0.010\n5.0,0.20,0.020\n")
     end
     fig_lit_no_cs = plot_polars(
-        Any[],
-        Any[],
+        Solver[],
+        BodyAerodynamics[],
         ["Literature no CS"];
         literature_path_list=[lit_no_cs_path],
         is_save=false,
@@ -299,8 +299,8 @@ end
         write(io_bad, "alpha,cl\n0.0,0.10\n5.0,0.20\n")
     end
     @test_throws ArgumentError plot_polars(
-        Any[],
-        Any[],
+        Solver[],
+        BodyAerodynamics[],
         ["Literature bad"];
         literature_path_list=[lit_bad_path],
         is_save=false,
@@ -316,8 +316,8 @@ end
             "5.0,0.5,0.02,0.01,0.004,0.005,0.006\n")
     end
     fig_moments = plot_polars(
-        Any[],
-        Any[],
+        Solver[],
+        BodyAerodynamics[],
         ["Literature with moments"];
         literature_path_list=[cm_lit_path],
         show_moments=true,
@@ -334,8 +334,8 @@ end
             "0.0,0.1,0.01\n5.0,0.5,0.02\n")
     end
     fig_no_moments = plot_polars(
-        Any[],
-        Any[],
+        Solver[],
+        BodyAerodynamics[],
         ["Literature no moments"];
         literature_path_list=[no_cm_path],
         show_moments=false,
@@ -453,6 +453,7 @@ end
     ax = Axis3(fig[1, 1])
     plots = Makie.plot!(ax, body_aero; airfoils=true)
     @test !isempty(plots)
+    @test plots isa Vector{Makie.AbstractPlot}
 
     # Observable airfoil-skin plot registers the body for pose updates.
     fig_obs = Figure()
@@ -501,7 +502,9 @@ end
     # border_linewidth flows through the standard (non-airfoil) panel plot.
     fig_lw = Figure()
     ax_lw = Axis3(fig_lw[1, 1])
-    @test_nowarn Makie.plot!(ax_lw, plain_body; border_linewidth=3.0)
+    plots_lw = @test_nowarn Makie.plot!(ax_lw, plain_body; border_linewidth=3.0)
+    @test plots_lw isa Vector{Makie.AbstractPlot}
+    @test length(plots_lw) == 2 * length(plain_body.panels)
 end
 
 @testset "generated_slices reads the deflected .dat under its generated name" begin

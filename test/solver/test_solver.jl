@@ -25,8 +25,8 @@ end
             @test solver.density == 1.225
 
             # Test that the solver can solve
-            va = [10.0, 0.0, 0.0]
-            set_va!(body_aero, va)
+            va_vec = [10.0, 0.0, 0.0]
+            set_va!(body_aero, va_vec)
             sol = solve!(solver, body_aero)
             @test sol isa VSMSolution
 
@@ -81,16 +81,16 @@ end
         wing = Wing(settings)
         refine!(wing)
         body_aero = BodyAerodynamics([wing])
-        va = [10.0, 0.0, 5.0]   # 26.6 deg angle of attack, past stall
+        va_vec = [10.0, 0.0, 5.0]   # 26.6 deg angle of attack, past stall
         nonlin = Solver(body_aero; solver_type=NONLIN, aerodynamic_model_type=VSM,
             type_initial_gamma_distribution=ELLIPTIC)
         loop = Solver(body_aero; solver_type=LOOP, aerodynamic_model_type=VSM,
             type_initial_gamma_distribution=ELLIPTIC)
 
-        set_va!(body_aero, va)
+        set_va!(body_aero, va_vec)
         sol_nonlin = solve!(nonlin, body_aero)
         gamma_nonlin = copy(sol_nonlin.gamma_distribution)
-        set_va!(body_aero, va)
+        set_va!(body_aero, va_vec)
         sol_loop = solve!(loop, body_aero)
 
         @test sol_nonlin.solver_status == FEASIBLE
@@ -128,8 +128,9 @@ end
         solver = Solver(body_aero; solver_type=LOOP, aerodynamic_model_type=VSM,
             type_initial_gamma_distribution=ELLIPTIC)
 
-        for va in ([10.0, 0.0, 0.0], [10.0, 0.0, 5.0])   # 0 deg, and 26.6 deg past stall
-            set_va!(body_aero, va)
+        # 0 deg, and 26.6 deg past stall
+        for va_vec in ([10.0, 0.0, 0.0], [10.0, 0.0, 5.0])
+            set_va!(body_aero, va_vec)
             gamma = copy(solve!(solver, body_aero).gamma_distribution)
             @test solver.lr.converged
             residual = maximum(abs, unrelaxed_step(body_aero, gamma) .- gamma)
@@ -180,6 +181,25 @@ end
     @test all(small .== 0.0)
 end
 
+@testset "smooth_circulation! damps a rough interior, clears damp when smooth" begin
+    rough = [0.0, 1.0, 3.0, 1.0, 0.0]
+    damp = zeros(5)
+    @test VortexStepMethod.smooth_circulation!(damp, rough, 0.1, 0.5) === true
+    @test damp ≈ [0.0, 7/18, -7/9, 7/18, 0.0]
+    @test sum(rough .+ damp) ≈ sum(rough)
+
+    # `damp` still holds the rough correction from above.
+    smooth = [0.0, 1.0, 1.0, 1.0, 0.0]
+    @test VortexStepMethod.smooth_circulation!(damp, smooth, 0.1, 0.5) === false
+    @test all(iszero, damp)
+
+    no_interior_differences = [0.0, 2.0, 0.0]
+    damp_short = ones(3)
+    @test VortexStepMethod.smooth_circulation!(damp_short, no_interior_differences,
+        0.1, 0.5) === false
+    @test all(iszero, damp_short)
+end
+
 """
     flat_plate_wing(; n_panels=20, span=20.0, chord=1.0)
 
@@ -211,7 +231,7 @@ roughness(v) = sum(abs, @views v[1:end-2] .- 2 .* v[2:end-1] .+ v[3:end])
     VortexStepMethod.build_spanwise_laplacian!(laplacian, n)
     viscosity_matrix = zeros(n, n)
     lift_slope = zeros(n)
-    mu_array = zeros(n)
+    mu_dist = zeros(n)
     gamma_target = zeros(n)
     planform_area = sum(p.width * p.chord for p in panels)
 
@@ -223,7 +243,7 @@ roughness(v) = sum(abs, @views v[1:end-2] .- 2 .* v[2:end-1] .+ v[3:end])
     # the solve is skipped, and gamma is returned untouched.
     gamma_attached = spiky()
     fired_attached = VortexStepMethod.apply_artificial_viscosity!(gamma_attached,
-        panels, attached, laplacian, viscosity_matrix, lift_slope, mu_array,
+        panels, attached, laplacian, viscosity_matrix, lift_slope, mu_dist,
         gamma_target, planform_area, 0.035)
     @test !fired_attached
     @test gamma_attached == spiky()
@@ -232,7 +252,7 @@ roughness(v) = sum(abs, @views v[1:end-2] .- 2 .* v[2:end-1] .+ v[3:end])
     gamma_stalled = spiky()
     rough_before = roughness(gamma_stalled)
     fired_stalled = VortexStepMethod.apply_artificial_viscosity!(gamma_stalled,
-        panels, post_stall, laplacian, viscosity_matrix, lift_slope, mu_array,
+        panels, post_stall, laplacian, viscosity_matrix, lift_slope, mu_dist,
         gamma_target, planform_area, 0.035)
     @test fired_stalled
     @test roughness(gamma_stalled) < rough_before
@@ -240,10 +260,10 @@ roughness(v) = sum(abs, @views v[1:end-2] .- 2 .* v[2:end-1] .+ v[3:end])
     # The attached (hot) path must not allocate.
     gamma_alloc = spiky()
     VortexStepMethod.apply_artificial_viscosity!(gamma_alloc, panels, attached,
-        laplacian, viscosity_matrix, lift_slope, mu_array, gamma_target,
+        laplacian, viscosity_matrix, lift_slope, mu_dist, gamma_target,
         planform_area, 0.035)
     allocs = @allocated VortexStepMethod.apply_artificial_viscosity!(gamma_alloc,
-        panels, attached, laplacian, viscosity_matrix, lift_slope, mu_array,
+        panels, attached, laplacian, viscosity_matrix, lift_slope, mu_dist,
         gamma_target, planform_area, 0.035)
     @test allocs == 0
 end
