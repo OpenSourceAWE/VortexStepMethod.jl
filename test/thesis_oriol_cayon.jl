@@ -194,11 +194,11 @@ function create_geometry_general(coordinates, Uinf, N, ring_geo, model)
         )
         push!(filaments, bound)
 
-        x_airf = cross(VSMpoint - LLpoint, section["p2"] - section["p1"])
+        z_airf = bound["x2"] - bound["x1"]
+        x_airf = cross(VSMpoint - LLpoint, z_airf)
         x_airf = x_airf / norm(x_airf)
         y_airf = VSMpoint - LLpoint
         y_airf = y_airf / norm(y_airf)
-        z_airf = bound["x2"] - bound["x1"]
         z_airf = z_airf / norm(z_airf)
         airf_coord = hcat(x_airf, y_airf, z_airf)
 

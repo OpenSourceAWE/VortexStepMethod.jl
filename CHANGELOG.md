@@ -27,6 +27,11 @@
   panel's chordwise trailing segment were affected.
 - With `artificial_damping` on, an iteration whose circulation is already smooth no longer
   re-applies the previous iteration's damping correction.
+- `panel_axes` takes the panel normal from the quarter-chord step, so the frame
+  closes as `z_airf = x_airf × y_airf` and `z_airf` is square to the bound
+  vortex. `alpha` is measured against that normal, so `cl`, `cd` and `cm` were
+  wrong on panels whose two sections have differently-directed chords — twist,
+  sweep or dihedral, not taper alone.
 
 ## VortexStepMethod v5.1.1 2026-09-12
 
