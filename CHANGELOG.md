@@ -4,6 +4,10 @@
 
 ### Added
 
+- `set_va!(body_aero, va_vec, omega; reference_point)` turns the body about
+  `reference_point` [m] instead of the origin. The point is stored on
+  `BodyAerodynamics`, starts at the origin, and is kept by later `set_va!`, `reinit!`
+  and `linearize` calls until it is given again.
 - Spanwise-flow viscous drag correction (Gaunaa et al. 2024,
   doi:10.1088/1742-6596/2767/2/022068): each section gets a drag increment and a force
   along its span from the flow across it, in `solve!`, `solve` and `linearize`. Opt-in
@@ -20,6 +24,8 @@
 
 ### Fixed
 
+- `set_va!(body_aero, settings)` applies `condition.yaw_rate` as a turn rate about the
+  body z axis; it was read from the settings file and ignored.
 - The `VSMSolution` docstring gives `lift_dist`, `drag_dist` and `panel_moment_dist` in
   the per-unit-span units they hold, [N/m] and [Nm/m], instead of [N] and [Nm].
 - Inside its vortex core, `velocity_3D_trailing_vortex!` induces an azimuthal velocity
