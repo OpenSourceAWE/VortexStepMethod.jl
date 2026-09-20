@@ -6,7 +6,6 @@ using VortexStepMethod.AirfoilAero: write_aero_matrix
 using VortexStepMethod.ObjAdapter: create_interpolations, find_circle_center_and_radius,
     read_faces
 using LinearAlgebra
-using Interpolations
 
 @testset "Kite Geometry Tests" begin
     work_dir = mktempdir()
