@@ -431,9 +431,10 @@ end
     @test length(results_NEW["cd_distribution"]) == length(body_aero.panels)
 end
 
-@testset "set_va! with VSMSettings" begin
+@testset "set_va! with VSMSettings applies the yaw rate about body z" begin
     settings_file = create_temp_wing_settings("body_aerodynamics", "test_wing.yaml";
-                                              alpha=10.0, beta=5.0, wind_speed=15.0)
+                                              alpha=10.0, beta=5.0, wind_speed=15.0,
+                                              yaw_rate=30.0)
     try
         settings   = VSMSettings(settings_file)
         wing       = Wing(settings)
@@ -444,11 +445,13 @@ end
 
         α, β, wind_speed = deg2rad(10.0), deg2rad(5.0), 15.0
         expected_va_vec = wind_speed .* [cos(α)*cos(β), sin(β), sin(α)*cos(β)]
+        omega = [0.0, 0.0, deg2rad(30.0)]
 
         for p in body_aero.panels
-            @test p.va ≈ expected_va_vec atol=1e-10
+            @test p.va ≈ expected_va_vec .- omega × p.control_point atol=1e-10
         end
         @test body_aero._va ≈ expected_va_vec atol=1e-10
+        @test body_aero.omega ≈ omega
     finally
         isfile(settings_file) && rm(settings_file; force=true)
     end
@@ -502,6 +505,40 @@ end
         @test panel.va ≈ expected_va_vec atol=1e-12
     end
     @test body_aero.omega ≈ new_omega
+end
+
+"""
+    test_rigid_body_inflow(body_aero, va_vec, omega, reference_point)
+
+Test that every panel sees `va_vec` plus the inflow of a body turning at `omega` about
+`reference_point`.
+"""
+function test_rigid_body_inflow(body_aero, va_vec, omega, reference_point)
+    for panel in body_aero.panels
+        expected_va_vec = va_vec .- omega × (panel.control_point .- reference_point)
+        @test panel.va ≈ expected_va_vec atol=1e-12
+    end
+end
+
+@testset "set_va! rotates the body about reference_point" begin
+    body_aero = BodyAerodynamics([inviscid_wing([0.0, 1.0, 2.0]),
+                                  inviscid_wing([10.0, 11.0, 12.0])])
+    va_vec = [10.0, 0.0, 1.0]
+    omega = [0.1, 0.2, 1.0]
+    reference_point = [0.25, 6.0, -0.5]
+
+    set_va!(body_aero, va_vec, omega; reference_point)
+    @test body_aero.reference_point ≈ reference_point
+    test_rigid_body_inflow(body_aero, va_vec, omega, reference_point)
+
+    body_aero.omega = 2 .* omega
+    test_rigid_body_inflow(body_aero, va_vec, 2 .* omega, reference_point)
+
+    reinit!(body_aero; va=va_vec, omega)
+    test_rigid_body_inflow(body_aero, va_vec, omega, reference_point)
+
+    body_aero.reference_point = zeros(3)
+    test_rigid_body_inflow(body_aero, va_vec, omega, zeros(3))
 end
 
 """
