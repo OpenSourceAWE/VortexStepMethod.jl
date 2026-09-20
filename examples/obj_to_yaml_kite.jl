@@ -72,7 +72,8 @@ refine!(wing)
 body_aero = BodyAerodynamics([wing])
 VortexStepMethod.reinit!(body_aero)
 
-solver = Solver(body_aero; aerodynamic_model_type=VSM, rtol=1e-5, solver_type=LOOP)
+solver = Solver(wing.n_panels, wing.n_unrefined_sections;
+    aerodynamic_model_type=VSM, rtol=1e-5, solver_type=LOOP)
 set_va!(body_aero, [cos(deg2rad(8)) * va, 0.0, sin(deg2rad(8)) * va])
 results = VortexStepMethod.solve(solver, body_aero; log=true)
 

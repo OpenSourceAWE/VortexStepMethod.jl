@@ -23,7 +23,7 @@ yaml = obj_to_yaml(
 wing = Wing(yaml; n_panels=16)
 body_aero = BodyAerodynamics([wing])
 
-solver = Solver(body_aero;
+solver = Solver(wing.n_panels, wing.n_unrefined_sections;
     aerodynamic_model_type=VSM,
     is_with_artificial_damping=false,
     rtol=1e-7,

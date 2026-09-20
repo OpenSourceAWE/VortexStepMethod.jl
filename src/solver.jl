@@ -194,37 +194,82 @@ sol::VSMSolution = VSMSolution(): The result of calling [`solve!`](@ref)
     sol::VSMSolution{P, U, T} = VSMSolution{P, U, T}()
 end
 
-function Solver(body_aero::BodyAerodynamics{P, W, T}; reference_point=[0.0, 0.0, 0.0], kwargs...) where {P, W, T}
-    U = sum([wing.n_unrefined_sections for wing in body_aero.wings])
+"""
+    Solver(n_panels, n_unrefined_sections, T=Float64; reference_point=[0.0, 0.0, 0.0],
+           kwargs...)
+    Solver(settings::VSMSettings; kwargs...)
+
+Build a [`Solver`](@ref) for `n_panels` panels and `n_unrefined_sections` unrefined
+sections of element type `T`, with `kwargs` setting its fields. `settings` supplies the
+counts from the `n_panels` and `geometry_file` of its wings, and from its
+`solver_settings` the fields `kwargs` leaves unset. [`solve!`](@ref) throws a
+`DimensionMismatch` for a body of other counts.
+
+`Solver(body_aero; kwargs...)` and `Solver(body_aero, settings)` are deprecated.
+"""
+function Solver(n_panels::Integer, n_unrefined_sections::Integer, ::Type{T}=Float64;
+        reference_point=[0.0, 0.0, 0.0], kwargs...) where {T}
     reference_point_checked = check_reference_point(reference_point, T)
-    return Solver{P, U, T}(; reference_point=reference_point_checked, kwargs...)
+    return Solver{Int(n_panels), Int(n_unrefined_sections), T}(;
+        reference_point=reference_point_checked, kwargs...)
 end
 
-function Solver(body_aero, settings::VSMSettings)
-    ss = settings.solver_settings
-    solver_type = ss.solver_type == "NONLIN" ? NONLIN : LOOP
-    reference_point = hasproperty(ss, :reference_point) ? ss.reference_point : [0.0, 0.0, 0.0]
-    Solver(body_aero;
-        solver_type,
-        aerodynamic_model_type=ss.aerodynamic_model_type,
-        density=ss.density,
-        max_iterations=ss.max_iterations,
-        rtol=ss.rtol,
-        tol_reference_error=ss.tol_reference_error,
-        relaxation_factor=ss.relaxation_factor,
-        is_with_artificial_damping=ss.artificial_damping,
-        artificial_damping=(k2=ss.k2, k4=ss.k4),
-        is_with_artificial_viscosity=ss.is_with_artificial_viscosity,
-        artificial_viscosity_factor=ss.artificial_viscosity_factor,
-        type_initial_gamma_distribution=ss.type_initial_gamma_distribution,
-        use_gamma_prev=ss.use_gamma_prev,
-        core_radius_fraction=ss.core_radius_fraction,
-        mu=ss.mu,
-        is_only_f_and_gamma_output=ss.calc_only_f_and_gamma,
-        correct_aoa=ss.correct_aoa,
-        flow_curvature=ss.flow_curvature,
-        is_with_viscous_drag_correction=ss.is_with_viscous_drag_correction,
-        reference_point=reference_point,
+function Solver(settings::VSMSettings; kwargs...)
+    n_panels = sum(wing.n_panels for wing in settings.wings)
+    n_sections = sum(n_unrefined_sections, settings.wings)
+    return Solver(n_panels, n_sections; solver_kwargs(settings.solver_settings)...,
+        kwargs...)
+end
+
+function Solver(body_aero::BodyAerodynamics{P, W, T}; kwargs...) where {P, W, T}
+    Base.depwarn("`Solver(body_aero; kwargs...)` is deprecated, use " *
+        "`Solver(n_panels, n_unrefined_sections; kwargs...)` or " *
+        "`Solver(settings; kwargs...)`.", :Solver; force=true)
+    return Solver(P, n_unrefined_sections(body_aero), T; kwargs...)
+end
+
+function Solver(body_aero::BodyAerodynamics{P, W, T}, settings::VSMSettings
+        ) where {P, W, T}
+    Base.depwarn("`Solver(body_aero, settings)` is deprecated, use `Solver(settings)`.",
+        :Solver; force=true)
+    return Solver(P, n_unrefined_sections(body_aero), T;
+        solver_kwargs(settings.solver_settings)...)
+end
+
+"""
+    n_unrefined_sections(body_aero::BodyAerodynamics) -> Int
+
+Number of unrefined sections summed over the wings of `body_aero`.
+"""
+n_unrefined_sections(body_aero::BodyAerodynamics) =
+    sum(wing -> wing.n_unrefined_sections, body_aero.wings)
+
+"""
+    solver_kwargs(solver_settings::SolverSettings) -> NamedTuple
+
+The [`Solver`](@ref) fields that `solver_settings` sets, as keyword arguments.
+"""
+function solver_kwargs(solver_settings::SolverSettings)
+    return (
+        solver_type=solver_settings.solver_type == "NONLIN" ? NONLIN : LOOP,
+        aerodynamic_model_type=solver_settings.aerodynamic_model_type,
+        density=solver_settings.density,
+        max_iterations=solver_settings.max_iterations,
+        rtol=solver_settings.rtol,
+        tol_reference_error=solver_settings.tol_reference_error,
+        relaxation_factor=solver_settings.relaxation_factor,
+        is_with_artificial_damping=solver_settings.artificial_damping,
+        artificial_damping=(k2=solver_settings.k2, k4=solver_settings.k4),
+        is_with_artificial_viscosity=solver_settings.is_with_artificial_viscosity,
+        artificial_viscosity_factor=solver_settings.artificial_viscosity_factor,
+        type_initial_gamma_distribution=solver_settings.type_initial_gamma_distribution,
+        use_gamma_prev=solver_settings.use_gamma_prev,
+        core_radius_fraction=solver_settings.core_radius_fraction,
+        mu=solver_settings.mu,
+        is_only_f_and_gamma_output=solver_settings.calc_only_f_and_gamma,
+        correct_aoa=solver_settings.correct_aoa,
+        flow_curvature=solver_settings.flow_curvature,
+        is_with_viscous_drag_correction=solver_settings.is_with_viscous_drag_correction,
     )
 end
 
@@ -623,6 +668,21 @@ end
 end
 
 """
+    check_dimensions(solver::Solver, body_aero::BodyAerodynamics)
+
+Throw a `DimensionMismatch` unless `solver` was built for as many panels and unrefined
+sections as `body_aero` has.
+"""
+function check_dimensions(::Solver{P, U}, body_aero::BodyAerodynamics) where {P, U}
+    n_panels = length(body_aero.panels)
+    n_sections = n_unrefined_sections(body_aero)
+    n_panels == P && n_sections == U || throw(DimensionMismatch(
+        "Solver built for $P panels and $U unrefined sections is given a body_aero " *
+        "with $n_panels panels and $n_sections unrefined sections"))
+    return nothing
+end
+
+"""
     solve_base!(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=nothing;
                 log=false)
 
@@ -637,6 +697,7 @@ function solve_base!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics, gamma
                log=false) where {P, U, T}
     
     # check arguments
+    check_dimensions(solver, body_aero)
     isnothing(body_aero.panels[1].va) && throw(ArgumentError(
         "Inflow conditions are not set, use set_va!(body_aero, va_vec)"))
     
@@ -1218,7 +1279,7 @@ function make_dual_shadow(solver::Solver{P, U, Float64},
     body_aero_d = BodyAerodynamics(wings_d)
     set_va!(body_aero_d, MVector{3, TD}(body_aero._va), MVector{3, TD}(body_aero.omega);
             reference_point=body_aero.reference_point)
-    solver_d = Solver(body_aero_d;
+    solver_d = Solver(P, U, TD;
         solver_type = solver.solver_type,
         aerodynamic_model_type = solver.aerodynamic_model_type,
         density = TD(solver.density),

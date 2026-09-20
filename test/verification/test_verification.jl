@@ -56,8 +56,8 @@ settings of the Python verification cases.
 """
 function lift_drag_polar(wing, model, alphas; wind_speed, relaxation_factor)
     body_aero = BodyAerodynamics([wing])
-    solver = Solver(body_aero; aerodynamic_model_type=model, relaxation_factor,
-                    core_radius_fraction=1e-20)
+    solver = Solver(wing.n_panels, wing.n_unrefined_sections; aerodynamic_model_type=model,
+                    relaxation_factor, core_radius_fraction=1e-20)
     CL = zeros(length(alphas))
     CD = zeros(length(alphas))
     for (i, alpha) in enumerate(alphas)
