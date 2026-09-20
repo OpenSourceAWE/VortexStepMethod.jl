@@ -81,14 +81,18 @@ wing_cfd = Wing(settings_cfd)
 refine!(wing_cfd)
 body_cfd = BodyAerodynamics([wing_cfd])
 VortexStepMethod.reinit!(body_cfd)
-solver_cfd = Solver(body_cfd, settings_cfd)
+solver_cfd = Solver(settings_cfd)
 
 println("Creating wing with NeuralFoil polars...")
 wing_nf = Wing(nf_yaml; n_panels=50, spanwise_distribution=LINEAR)
 refine!(wing_nf)
 body_nf = BodyAerodynamics([wing_nf])
 VortexStepMethod.reinit!(body_nf)
-solver_nf = Solver(body_nf, settings_cfd)
+settings_nf = VSMSettings("TUDELFT_V3_KITE/vsm_settings.yaml")
+settings_nf.wings[1].geometry_file = nf_yaml
+settings_nf.solver_settings.relaxation_factor = RELAXATION
+settings_nf.solver_settings.artificial_damping = ARTIFICIAL_DAMPING
+solver_nf = Solver(settings_nf)
 
 # Compare CFD-polar and NeuralFoil-polar wings against published references
 # (Poland 2025 RANS CFD and wind tunnel). `plot_polars` sweeps each solver over the

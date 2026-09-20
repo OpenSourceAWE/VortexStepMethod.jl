@@ -84,8 +84,8 @@ julia> set_va!(body_aero, va_vec, [0, 0, 0.1])
 #### Step 5: Initialize solvers for both LLT and VSM methods
 
 ```julia
-julia> llt_solver = Solver(body_aero; aerodynamic_model_type=LLT)
-julia> vsm_solver = Solver(body_aero; aerodynamic_model_type=VSM)
+julia> llt_solver = Solver(wing.n_panels, wing.n_unrefined_sections; aerodynamic_model_type=LLT)
+julia> vsm_solver = Solver(wing.n_panels, wing.n_unrefined_sections; aerodynamic_model_type=VSM)
 ```
 
 #### Step 6: Solve using both methods

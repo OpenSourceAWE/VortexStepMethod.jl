@@ -72,8 +72,8 @@ using LinearAlgebra
     set_va!(body_aero, va_vec)
 
     # Initialize solvers for both LLT and VSM methods
-    solver = Solver(body_aero)
-    nonlin_solver = Solver(body_aero; solver_type=NONLIN)
+    solver = Solver(wing.n_panels, wing.n_unrefined_sections)
+    nonlin_solver = Solver(wing.n_panels, wing.n_unrefined_sections; solver_type=NONLIN)
 
     # Pre-allocate arrays
     gamma = rand(n_panels)
@@ -142,7 +142,7 @@ using LinearAlgebra
                 refine!(wing)
                 body_aero = BodyAerodynamics([wing])
                 
-                solver = Solver(body_aero;
+                solver = Solver(wing.n_panels, wing.n_unrefined_sections;
                     aerodynamic_model_type=model
                 )
                 solver.sol._va_dist .= va_vec_dist
