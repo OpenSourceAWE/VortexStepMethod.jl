@@ -80,10 +80,9 @@ if PLOT
     plot_geometry(body_aero, "Ram air kite (converted from .obj)"; is_show=true,
         view_elevation=15, view_azimuth=-120, use_tex=USE_TEX)
 
-    # Airfoils and per-section polars recovered from the converted geometry
+    # Airfoils and panel polars recovered from the converted geometry
     plot_airfoils(geometry_file; symmetric=true, is_show=true)
-    plot_section_polars(body_aero, :cl; is_show=true)
-    plot_section_polars(body_aero, :cd; is_show=true)
+    plot_section_polars(body_aero; panels=[1, 10], is_show=true)
 
     plot_polars([solver], [body_aero], ["VSM (NeuralFoil polars from .obj)"];
         angle_range=range(-5, 20, length=26), v_a=va,
