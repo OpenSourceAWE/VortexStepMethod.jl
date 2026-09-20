@@ -117,7 +117,7 @@ function deform_section(x, y, delta; crease_frac=0.9, thickness_frac=1.0,
 end
 
 """
-    side_of_line(a, b, p) -> Float64
+    side_of_line(a, b, p)
 
 Twice the signed area of the triangle `a`, `b`, `p`: positive with `p` left of the
 line from `a` to `b`, negative right of it, zero on it.
@@ -138,14 +138,15 @@ segments_cross(p, q, r, s) =
 """
     crossing_panels(x, y) -> Tuple{Int,Int} or nothing
 
-The first pair of non-neighbouring panels of the closed contour `(x, y)` that
-cross, or `nothing` when the contour is a simple closed curve.
+The first pair of non-neighbouring panels of the contour `(x, y)` that cross, or
+`nothing` when the contour is a simple closed curve. A contour that does not end on its
+first node is closed by a panel back to it, which carries the highest panel index.
 """
 function crossing_panels(x, y)
     nodes = collect(zip(x, y))
+    last(nodes) == first(nodes) || push!(nodes, first(nodes))
     last_panel = length(nodes) - 1
     for i in 1:last_panel, j in (i + 2):last_panel
-        i == 1 && j == last_panel && continue
         segments_cross(nodes[i], nodes[i+1], nodes[j], nodes[j+1]) && return (i, j)
     end
     return nothing
