@@ -180,6 +180,8 @@ Solver configuration, used within [`VSMSettings`](@ref).
     (default `false`)
 - `flow_curvature`: Add the thin-airfoil pitch-rate moment increment to each
     section (default `false`)
+- `is_with_viscous_drag_correction`: Add the spanwise-flow viscous drag and side
+    force to each section (default `false`)
 """
 @with_kw mutable struct SolverSettings
     n_panels::Int64 = 40
@@ -202,6 +204,7 @@ Solver configuration, used within [`VSMSettings`](@ref).
     calc_only_f_and_gamma::Bool=false       # whether to only output f and gamma
     correct_aoa::Bool=false                 # perform aoa correction
     flow_curvature::Bool=false              # thin-airfoil pitch-rate moment increment
+    is_with_viscous_drag_correction::Bool=false # spanwise-flow viscous force (Gaunaa 2024)
 end
 
 """

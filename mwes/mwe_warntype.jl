@@ -25,11 +25,11 @@ add_section!(wing, [0.0, span/2, 0.0], [chord, span/2, 0.0], INVISCID)
 add_section!(wing, [0.0, -span/2, 0.0], [chord, -span/2, 0.0], INVISCID)
 refine!(wing)
 body_aero = BodyAerodynamics([wing])
-vel_app = [cos(alpha), 0.0, sin(alpha)] .* 20.0
-set_va!(body_aero, vel_app)
+va_vec = [cos(alpha), 0.0, sin(alpha)] .* 20.0
+set_va!(body_aero, va_vec)
 solver = Solver(body_aero)
 
-va_norm_dist = ones(n_panels)
+va_dist = ones(n_panels)
 va_unit_dist = ones(n_panels, 3)
 
 # Prepare args for individual functions
@@ -73,7 +73,7 @@ printstyled("\n$sep\n calculate_velocity_induced_bound_2D!\n$sep\n"; color=:cyan
 
 printstyled("\n$sep\n calculate_AIC_matrices!\n$sep\n"; color=:cyan)
 @code_warntype calculate_AIC_matrices!(
-    body_aero, VSM, 0.001, va_norm_dist, va_unit_dist)
+    body_aero, VSM, 0.001, va_dist, va_unit_dist)
 
 printstyled("\n$sep\n gamma_loop!\n$sep\n"; color=:cyan)
 @code_warntype gamma_loop!(

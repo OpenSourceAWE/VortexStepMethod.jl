@@ -94,7 +94,7 @@ Three kinds of input data is needed:
   - kite wing: model of polars included, n sections to define
 
 - The airflow and turn rate:
-  - `v_app` vector and `omega` (turn rate) vector in Kite Body (KB) reference frame
+  - `va_vec` vector and `omega` (turn rate) vector in Kite Body (KB) reference frame
 
 - The configuration:
   - how many panels  
@@ -112,7 +112,7 @@ A whole run — the flight condition, each wing and the solver — is configured
 n_panels = 20          # Number of panels
 span = 20.0            # Wing span [m]
 chord = 1.0            # Chord length [m]
-v_a = 20.0             # Magnitude of inflow velocity [m/s]
+va = 20.0              # Magnitude of inflow velocity [m/s]
 density = 1.225        # Air density [kg/m³]
 alpha_deg = 30.0       # Angle of attack [degrees]
 alpha = deg2rad(alpha_deg)
@@ -137,8 +137,8 @@ refine!(wing)
 body_aero = BodyAerodynamics([wing])
 
 # Set inflow conditions
-vel_app = [cos(alpha), 0.0, sin(alpha)] .* v_a
-set_va!(body_aero, vel_app)
+va_vec = [cos(alpha), 0.0, sin(alpha)] .* va
+set_va!(body_aero, va_vec)
 ```
 
 It is possible to import the wing geometry using an `.obj` file as shown in the example `ram_air_kite.jl`. During the import the polars are calculated automatically, using NeuralFoil by default or XFoil as a viscous cross-check. This approach is valid for rigid wings and ram-air kites, but not for leading edge inflatable kites. See [From CAD mesh to aerodynamic model](@ref) for the full pipeline.
