@@ -32,7 +32,7 @@ end
 
     VortexStepMethod.unrefined_deform!(ram_wing, theta, delta; smooth=false)
     body_aero = BodyAerodynamics([ram_wing]; va=va_vec, omega)
-    solver = Solver(body_aero;
+    solver = Solver(ram_wing.n_panels, ram_wing.n_unrefined_sections;
         aerodynamic_model_type=VSM,
         is_with_artificial_damping=false,
         atol=1e-5,

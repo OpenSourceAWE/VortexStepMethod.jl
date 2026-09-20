@@ -11,7 +11,7 @@ settings = VSMSettings("my/vsm_settings.yaml"; data_prefix=false)  # as written
 
 wing = Wing(settings)
 body_aero = BodyAerodynamics([wing])
-solver = Solver(body_aero, settings)
+solver = Solver(settings)
 set_va!(body_aero, settings)
 ```
 

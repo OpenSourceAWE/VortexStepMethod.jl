@@ -78,8 +78,11 @@ end
     end
 
     # Initialize the solvers
-    vsm_solver = Solver(body_aero; aerodynamic_model_type=VSM)
-    llt_solver = Solver(body_aero; aerodynamic_model_type=LLT)
+    wing = only(body_aero.wings)
+    vsm_solver = Solver(wing.n_panels, wing.n_unrefined_sections;
+        aerodynamic_model_type=VSM)
+    llt_solver = Solver(wing.n_panels, wing.n_unrefined_sections;
+        aerodynamic_model_type=LLT)
 
     # Solve the VSM and LLT
     results_vsm = solve(vsm_solver, body_aero)

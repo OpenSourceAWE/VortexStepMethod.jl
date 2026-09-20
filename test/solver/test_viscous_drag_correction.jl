@@ -29,8 +29,8 @@ end
     refine!(wing)
     body_aero = BodyAerodynamics([wing])
 
-    solver_off = Solver(body_aero; use_gamma_prev=false)
-    solver_on = Solver(body_aero; use_gamma_prev=false,
+    solver_off = Solver(wing.n_panels, wing.n_unrefined_sections; use_gamma_prev=false)
+    solver_on = Solver(wing.n_panels, wing.n_unrefined_sections; use_gamma_prev=false,
                        is_with_viscous_drag_correction=true)
     va_vec_sideslip = V .* [cos(alpha) * cos(beta), sin(beta), sin(alpha) * cos(beta)]
     va_vec_straight = V .* [cos(alpha), 0.0, sin(alpha)]
@@ -96,7 +96,15 @@ end
     end
 
     @testset "defaults to off" begin
-        @test Solver(body_aero).is_with_viscous_drag_correction == false
+        @test solver_off.is_with_viscous_drag_correction == false
         @test VortexStepMethod.SolverSettings().is_with_viscous_drag_correction == false
+    end
+
+    @testset "solver settings switch it on" begin
+        solver_settings = VortexStepMethod.SolverSettings(
+            is_with_viscous_drag_correction=true)
+        kwargs = VortexStepMethod.solver_kwargs(solver_settings)
+        @test Solver(wing.n_panels, wing.n_unrefined_sections;
+                     kwargs...).is_with_viscous_drag_correction
     end
 end
