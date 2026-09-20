@@ -11,7 +11,7 @@ using LinearAlgebra
 
 PLOT = true
 USE_TEX = false
-v_a = 15.0
+va = 15.0
 RE = 1e6
 
 # Shared boundary-layer transition settings — both backends use the e^N model.
@@ -80,13 +80,15 @@ fig_audit = plot_slices_3d(joinpath("data", "ram_air_kite", "polars_xfoil");
                            delta=1.0, obj_path=obj_path)
 GLMakie.save("ram_air_slices_audit.png", fig_audit)
 body_xfoil = BodyAerodynamics([wing_xfoil])
-solver_xfoil = Solver(body_xfoil; aerodynamic_model_type=VSM, rtol=1e-5, solver_type=LOOP,
+solver_xfoil = Solver(wing_xfoil.n_panels, wing_xfoil.n_unrefined_sections;
+                      aerodynamic_model_type=VSM, rtol=1e-5, solver_type=LOOP,
                       relaxation_factor=RELAXATION, is_with_artificial_damping=ARTIFICIAL_DAMPING)
 
 println("Creating NeuralFoil wing...")
 wing_nf = matrix_wing(NF_SOLVER, "polars_neuralfoil")
 body_nf = BodyAerodynamics([wing_nf])
-solver_nf = Solver(body_nf; aerodynamic_model_type=VSM, rtol=1e-5, solver_type=LOOP,
+solver_nf = Solver(wing_nf.n_panels, wing_nf.n_unrefined_sections;
+                   aerodynamic_model_type=VSM, rtol=1e-5, solver_type=LOOP,
                    relaxation_factor=RELAXATION, is_with_artificial_damping=ARTIFICIAL_DAMPING)
 
 # Compare using plot_polars
@@ -97,7 +99,7 @@ if PLOT
         [body_xfoil, body_nf],
         ["XFoil", "NeuralFoil"];
         angle_range=range(-5, 25, length=31),
-        v_a=v_a,
+        v_a=va,
         title="Ram Air Kite: XFoil vs NeuralFoil",
         is_save=false,
         use_tex=USE_TEX

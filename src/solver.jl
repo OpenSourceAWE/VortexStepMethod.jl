@@ -14,9 +14,9 @@ Struct for storing the solution of the [`solve!`](@ref) function. Must contain a
 - cl_dist::Vector{Float64}: Lift coefficients of the panels [-]
 - cd_dist::Vector{Float64}: Drag coefficients of the panels [-]
 - cm_dist::Vector{Float64}: Pitching moment coefficients of the panels [-]
-- lift_dist::Vector{Float64}: Lift force of the panels [N]
-- drag_dist::Vector{Float64}: Drag force of the panels [N]
-- panel_moment_dist::Vector{Float64}: Pitching moment around the spanwise vector of the panels [Nm]
+- lift_dist::Vector{Float64}: Lift force per unit span of the panels [N/m]
+- drag_dist::Vector{Float64}: Drag force per unit span of the panels [N/m]
+- panel_moment_dist::Vector{Float64}: Pitching moment per unit span about y_airf [Nm/m]
 - `f_body_3D`::Matrix{Float64}: Matrix of the aerodynamic forces (x, y, z vectors) [N]
 - `m_body_3D`::Matrix{Float64}: Matrix of the aerodynamic moments [Nm]
 - `gamma_distribution`::Union{Nothing, Vector{Float64}}: Vector containing the panel circulations.
@@ -85,6 +85,7 @@ end
     gamma_new::MVector{P, T}         = zeros(MVector{P, T})
     alpha_dist::MVector{P, T}        = zeros(MVector{P, T})
     v_a_dist::MVector{P, T}          = zeros(MVector{P, T})
+    v_span_dist::MVector{P, T}       = zeros(MVector{P, T})
 end
 
 @with_kw struct BaseResult{P, T}
@@ -138,6 +139,8 @@ Main solver structure for the Vortex Step Method.See also: [`solve`](@ref)
 - `is_only_f_and_gamma_output`::Bool = false: Whether to only output f and gamma
 - `flow_curvature`::Bool = false: Add the thin-airfoil pitch-rate moment
     increment `-(π/4) q̂` to each section, see: [`flow_curvature_cm`](@ref)
+- `is_with_viscous_drag_correction`::Bool = false: Add the spanwise-flow viscous drag
+    and side force to each section, see: [`spanwise_flow_drag`](@ref)
 - `reference_point`::MVec3 = [0.0, 0.0, 0.0]: Moment reference point in body frame
 
 ## Solution
@@ -177,6 +180,7 @@ sol::VSMSolution = VSMSolution(): The result of calling [`solve!`](@ref)
     is_only_f_and_gamma_output::Bool = false
     correct_aoa::Bool = false
     flow_curvature::Bool = false
+    is_with_viscous_drag_correction::Bool = false
     reference_point::MVector{3, T} = zeros(MVector{3, T})
 
     # Intermediate results
@@ -190,36 +194,82 @@ sol::VSMSolution = VSMSolution(): The result of calling [`solve!`](@ref)
     sol::VSMSolution{P, U, T} = VSMSolution{P, U, T}()
 end
 
-function Solver(body_aero::BodyAerodynamics{P, W, T}; reference_point=[0.0, 0.0, 0.0], kwargs...) where {P, W, T}
-    U = sum([wing.n_unrefined_sections for wing in body_aero.wings])
+"""
+    Solver(n_panels, n_unrefined_sections, T=Float64; reference_point=[0.0, 0.0, 0.0],
+           kwargs...)
+    Solver(settings::VSMSettings; kwargs...)
+
+Build a [`Solver`](@ref) for `n_panels` panels and `n_unrefined_sections` unrefined
+sections of element type `T`, with `kwargs` setting its fields. `settings` supplies the
+counts from the `n_panels` and `geometry_file` of its wings, and from its
+`solver_settings` the fields `kwargs` leaves unset. [`solve!`](@ref) throws a
+`DimensionMismatch` for a body of other counts.
+
+`Solver(body_aero; kwargs...)` and `Solver(body_aero, settings)` are deprecated.
+"""
+function Solver(n_panels::Integer, n_unrefined_sections::Integer, ::Type{T}=Float64;
+        reference_point=[0.0, 0.0, 0.0], kwargs...) where {T}
     reference_point_checked = check_reference_point(reference_point, T)
-    return Solver{P, U, T}(; reference_point=reference_point_checked, kwargs...)
+    return Solver{Int(n_panels), Int(n_unrefined_sections), T}(;
+        reference_point=reference_point_checked, kwargs...)
 end
 
-function Solver(body_aero, settings::VSMSettings)
-    ss = settings.solver_settings
-    solver_type = ss.solver_type == "NONLIN" ? NONLIN : LOOP
-    reference_point = hasproperty(ss, :reference_point) ? ss.reference_point : [0.0, 0.0, 0.0]
-    Solver(body_aero;
-        solver_type,
-        aerodynamic_model_type=ss.aerodynamic_model_type,
-        density=ss.density,
-        max_iterations=ss.max_iterations,
-        rtol=ss.rtol,
-        tol_reference_error=ss.tol_reference_error,
-        relaxation_factor=ss.relaxation_factor,
-        is_with_artificial_damping=ss.artificial_damping,
-        artificial_damping=(k2=ss.k2, k4=ss.k4),
-        is_with_artificial_viscosity=ss.is_with_artificial_viscosity,
-        artificial_viscosity_factor=ss.artificial_viscosity_factor,
-        type_initial_gamma_distribution=ss.type_initial_gamma_distribution,
-        use_gamma_prev=ss.use_gamma_prev,
-        core_radius_fraction=ss.core_radius_fraction,
-        mu=ss.mu,
-        is_only_f_and_gamma_output=ss.calc_only_f_and_gamma,
-        correct_aoa=ss.correct_aoa,
-        flow_curvature=ss.flow_curvature,
-        reference_point=reference_point,
+function Solver(settings::VSMSettings; kwargs...)
+    n_panels = sum(wing.n_panels for wing in settings.wings)
+    n_sections = sum(n_unrefined_sections, settings.wings)
+    return Solver(n_panels, n_sections; solver_kwargs(settings.solver_settings)...,
+        kwargs...)
+end
+
+function Solver(body_aero::BodyAerodynamics{P, W, T}; kwargs...) where {P, W, T}
+    Base.depwarn("`Solver(body_aero; kwargs...)` is deprecated, use " *
+        "`Solver(n_panels, n_unrefined_sections; kwargs...)` or " *
+        "`Solver(settings; kwargs...)`.", :Solver; force=true)
+    return Solver(P, n_unrefined_sections(body_aero), T; kwargs...)
+end
+
+function Solver(body_aero::BodyAerodynamics{P, W, T}, settings::VSMSettings
+        ) where {P, W, T}
+    Base.depwarn("`Solver(body_aero, settings)` is deprecated, use `Solver(settings)`.",
+        :Solver; force=true)
+    return Solver(P, n_unrefined_sections(body_aero), T;
+        solver_kwargs(settings.solver_settings)...)
+end
+
+"""
+    n_unrefined_sections(body_aero::BodyAerodynamics) -> Int
+
+Number of unrefined sections summed over the wings of `body_aero`.
+"""
+n_unrefined_sections(body_aero::BodyAerodynamics) =
+    sum(wing -> wing.n_unrefined_sections, body_aero.wings)
+
+"""
+    solver_kwargs(solver_settings::SolverSettings) -> NamedTuple
+
+The [`Solver`](@ref) fields that `solver_settings` sets, as keyword arguments.
+"""
+function solver_kwargs(solver_settings::SolverSettings)
+    return (
+        solver_type=solver_settings.solver_type == "NONLIN" ? NONLIN : LOOP,
+        aerodynamic_model_type=solver_settings.aerodynamic_model_type,
+        density=solver_settings.density,
+        max_iterations=solver_settings.max_iterations,
+        rtol=solver_settings.rtol,
+        tol_reference_error=solver_settings.tol_reference_error,
+        relaxation_factor=solver_settings.relaxation_factor,
+        is_with_artificial_damping=solver_settings.artificial_damping,
+        artificial_damping=(k2=solver_settings.k2, k4=solver_settings.k4),
+        is_with_artificial_viscosity=solver_settings.is_with_artificial_viscosity,
+        artificial_viscosity_factor=solver_settings.artificial_viscosity_factor,
+        type_initial_gamma_distribution=solver_settings.type_initial_gamma_distribution,
+        use_gamma_prev=solver_settings.use_gamma_prev,
+        core_radius_fraction=solver_settings.core_radius_fraction,
+        mu=solver_settings.mu,
+        is_only_f_and_gamma_output=solver_settings.calc_only_f_and_gamma,
+        correct_aoa=solver_settings.correct_aoa,
+        flow_curvature=solver_settings.flow_curvature,
+        is_with_viscous_drag_correction=solver_settings.is_with_viscous_drag_correction,
     )
 end
 
@@ -311,7 +361,7 @@ function calc_forces!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics;
     alpha_dist = solver.lr.alpha_dist
     alpha_corrected = solver.sol.alpha_dist
     alpha_geometric_dist = solver.sol.alpha_geometric_dist
-    v_a_dist = solver.lr.v_a_dist
+    v_rel_dist = solver.lr.v_a_dist
     panels = body_aero.panels
    
     width_dist = solver.sol.width_dist
@@ -329,7 +379,7 @@ function calc_forces!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics;
         if solver.flow_curvature
             cm_dist[i] += flow_curvature_cm(
                 body_aero.pitch_rate_dist[i], solver.sol._chord_dist[i],
-                v_a_dist[i])
+                v_rel_dist[i])
         end
         width_dist[i] = panel.width
 
@@ -339,7 +389,7 @@ function calc_forces!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics;
             va1 = solver.sol._va_dist[i,1]
             va2 = solver.sol._va_dist[i,2]
             va3 = solver.sol._va_dist[i,3]
-            va_norm = sqrt(va1^2 + va2^2 + va3^2)
+            va = sqrt(va1^2 + va2^2 + va3^2)
             x1 = solver.sol._x_airf_dist[i,1]
             x2 = solver.sol._x_airf_dist[i,2]
             x3 = solver.sol._x_airf_dist[i,3]
@@ -348,10 +398,10 @@ function calc_forces!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics;
             z2 = solver.sol._z_airf_dist[i,2]
             z3 = solver.sol._z_airf_dist[i,3]
             z_norm = sqrt(z1^2 + z2^2 + z3^2)
-            if va_norm == 0 || x_norm == 0 || z_norm == 0
+            if va == 0 || x_norm == 0 || z_norm == 0
                 alpha_geometric_dist[i] = NaN
             else
-                inv_va = -1.0 / va_norm
+                inv_va = -1.0 / va
                 vu1 = va1 * inv_va
                 vu2 = va2 * inv_va
                 vu3 = va3 * inv_va
@@ -405,9 +455,16 @@ function calc_forces!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics;
 
         axes = panel_axes(panel)
         dirs = panel_force_directions(axes, alpha_corrected[i], spanwise_unit)
+        c_span = zero(T)
+        if solver.is_with_viscous_drag_correction
+            viscous = spanwise_flow_drag(v_rel_dist[i], solver.lr.v_span_dist[i],
+                panel.chord, density, solver.mu)
+            cd_dist[i] += viscous.delta_cd
+            c_span = viscous.c_span
+        end
         loads = panel_loads(axes, dirs,
-            dynamic_pressure(density, density, v_a_dist[i]),
-            cl_dist[i], cd_dist[i], cm_dist[i])
+            dynamic_pressure(density, density, v_rel_dist[i]),
+            cl_dist[i], cd_dist[i], cm_dist[i]; c_span)
         lift[i] = loads.lift
         drag[i] = loads.drag
         panel_moment_dist[i] = loads.moment
@@ -425,14 +482,14 @@ function calc_forces!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics;
     end
 
     # Python parity: normalize with area-weighted reference velocity for distributed inflow.
-    va_ref_vector = _compute_reference_velocity_from_distribution(
+    va_ref_vec = _compute_reference_velocity_from_distribution(
         solver.sol._va_dist,
         length(panels),
         panel_areas
     )
-    va_ref_mag = norm(va_ref_vector)
-    va_ref_mag > 0.0 || throw(ArgumentError("Reference freestream magnitude must be positive."))
-    q_ref = 0.5 * density * va_ref_mag^2
+    va_ref = norm(va_ref_vec)
+    va_ref > 0.0 || throw(ArgumentError("Reference freestream magnitude must be positive."))
+    q_ref = 0.5 * density * va_ref^2
     moment_coeff_dist .= moment_dist ./ (q_ref * projected_area * c_ref)
 
     # Only compute unrefined arrays if there are unrefined sections
@@ -469,13 +526,13 @@ function calc_forces!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics;
         fill!(unrefined_count_dist, 0)
 
         panel_idx = 1
-        unrefined_idx = 1
-        for wing in body_aero.wings
+        for (wing_idx, wing) in enumerate(body_aero.wings)
             if wing.n_unrefined_sections > 0
+                section_range = unrefined_section_range(body_aero, wing_idx)
                 for local_panel_idx in 1:wing.n_panels
                     panel = body_aero.panels[panel_idx]
                     original_section_idx = wing.refined_panel_mapping[local_panel_idx]
-                    target_unrefined_idx = unrefined_idx + original_section_idx - 1
+                    target_unrefined_idx = section_range[original_section_idx]
 
                     # Accumulate coefficients and moments
                     moment_unrefined_dist[target_unrefined_idx] += moment_dist[panel_idx]
@@ -499,8 +556,7 @@ function calc_forces!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics;
 
                 # Average coefficients and geometry. width and
                 # moment_coeff_unrefined_dist stay summed (extensive).
-                for i in 1:wing.n_unrefined_sections
-                    target_unrefined_idx = unrefined_idx + i - 1
+                for target_unrefined_idx in section_range
                     if unrefined_count_dist[target_unrefined_idx] > 0
                         count = unrefined_count_dist[target_unrefined_idx]
                         moment_unrefined_dist[target_unrefined_idx] /= count
@@ -517,7 +573,6 @@ function calc_forces!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics;
                         # sum of panel widths in the unrefined section
                     end
                 end
-                unrefined_idx += wing.n_unrefined_sections
             else
                 # Skip panels for wings with no unrefined sections
                 panel_idx += wing.n_panels
@@ -593,7 +648,9 @@ function solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=n
         body_aero.panels,
         solver.is_only_f_and_gamma_output;
         correct_aoa=solver.correct_aoa,
-        flow_curvature=solver.flow_curvature
+        flow_curvature=solver.flow_curvature,
+        is_with_viscous_drag_correction=solver.is_with_viscous_drag_correction,
+        v_span_dist=solver.lr.v_span_dist,
     )
     # Attach geometric AoA (already computed in calculate_results) to solver.sol
     if haskey(results, "alpha_geometric")
@@ -602,12 +659,27 @@ function solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=n
     return results
 end
 
-@inline @inbounds function calc_norm_array!(va_norm_dist, va_array)
-    for i in axes(va_array, 1)
-        va_norm_dist[i] = sqrt(
-            va_array[i,1]^2 + va_array[i,2]^2 +
-            va_array[i,3]^2)
+@inline @inbounds function calc_norm_dist!(va_dist, va_vec_dist)
+    for i in axes(va_vec_dist, 1)
+        va_dist[i] = sqrt(
+            va_vec_dist[i,1]^2 + va_vec_dist[i,2]^2 +
+            va_vec_dist[i,3]^2)
     end
+end
+
+"""
+    check_dimensions(solver::Solver, body_aero::BodyAerodynamics)
+
+Throw a `DimensionMismatch` unless `solver` was built for as many panels and unrefined
+sections as `body_aero` has.
+"""
+function check_dimensions(::Solver{P, U}, body_aero::BodyAerodynamics) where {P, U}
+    n_panels = length(body_aero.panels)
+    n_sections = n_unrefined_sections(body_aero)
+    n_panels == P && n_sections == U || throw(DimensionMismatch(
+        "Solver built for $P panels and $U unrefined sections is given a body_aero " *
+        "with $n_panels panels and $n_sections unrefined sections"))
+    return nothing
 end
 
 """
@@ -625,7 +697,9 @@ function solve_base!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics, gamma
                log=false) where {P, U, T}
     
     # check arguments
-    isnothing(body_aero.panels[1].va) && throw(ArgumentError("Inflow conditions are not set, use set_va!(body_aero, va)"))
+    check_dimensions(solver, body_aero)
+    isnothing(body_aero.panels[1].va) && throw(ArgumentError(
+        "Inflow conditions are not set, use set_va!(body_aero, va_vec)"))
     
     # Initialize variables
     panels = body_aero.panels
@@ -651,7 +725,7 @@ function solve_base!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics, gamma
     end
 
     # Calculate unit vectors
-    calc_norm_array!(solver.br.va_norm_dist, solver.sol._va_dist)
+    calc_norm_dist!(solver.br.va_norm_dist, solver.sol._va_dist)
     @inbounds for i in 1:n_panels
         inv_norm = 1.0 / solver.br.va_norm_dist[i]
         for k in 1:3
@@ -709,70 +783,74 @@ end
     velocity_view_x,
     velocity_view_y,
     velocity_view_z,
-    va_array,
+    va_vec_dist,
     induced_velocity_all,
-    relative_velocity_array,
-    y_airf_array,
+    relative_velocity_dist,
+    y_airf_dist,
     relative_velocity_crossz,
-    v_acrossz_array,
-    z_airf_array,
-    x_airf_array,
-    v_normal_array,
-    v_tangential_array,
-    va_magw_array,
+    v_acrossz_dist,
+    z_airf_dist,
+    x_airf_dist,
+    v_normal_dist,
+    v_tangential_dist,
+    va_magw_dist,
     cl_dist,
-    chord_array,
+    chord_dist,
 )
     mul!(velocity_view_x, AIC_x, gamma_in)
     mul!(velocity_view_y, AIC_y, gamma_in)
     mul!(velocity_view_z, AIC_z, gamma_in)
 
-    relative_velocity_array .= va_array .+ induced_velocity_all
+    relative_velocity_dist .= va_vec_dist .+ induced_velocity_all
     @inbounds for i in 1:n_panels
-        ax = relative_velocity_array[i,1]
-        ay = relative_velocity_array[i,2]
-        az = relative_velocity_array[i,3]
-        bx = y_airf_array[i,1]
-        by = y_airf_array[i,2]
-        bz = y_airf_array[i,3]
+        ax = relative_velocity_dist[i,1]
+        ay = relative_velocity_dist[i,2]
+        az = relative_velocity_dist[i,3]
+        bx = y_airf_dist[i,1]
+        by = y_airf_dist[i,2]
+        bz = y_airf_dist[i,3]
         relative_velocity_crossz[i,1] = ay*bz - az*by
         relative_velocity_crossz[i,2] = az*bx - ax*bz
         relative_velocity_crossz[i,3] = ax*by - ay*bx
-        ax = va_array[i,1]
-        ay = va_array[i,2]
-        az = va_array[i,3]
-        v_acrossz_array[i,1] = ay*bz - az*by
-        v_acrossz_array[i,2] = az*bx - ax*bz
-        v_acrossz_array[i,3] = ax*by - ay*bx
+        ax = va_vec_dist[i,1]
+        ay = va_vec_dist[i,2]
+        az = va_vec_dist[i,3]
+        v_acrossz_dist[i,1] = ay*bz - az*by
+        v_acrossz_dist[i,2] = az*bx - ax*bz
+        v_acrossz_dist[i,3] = ax*by - ay*bx
     end
 
     @inbounds for i in 1:n_panels
-        v_normal_array[i] =
-            z_airf_array[i,1]*relative_velocity_array[i,1] +
-            z_airf_array[i,2]*relative_velocity_array[i,2] +
-            z_airf_array[i,3]*relative_velocity_array[i,3]
-        v_tangential_array[i] =
-            x_airf_array[i,1]*relative_velocity_array[i,1] +
-            x_airf_array[i,2]*relative_velocity_array[i,2] +
-            x_airf_array[i,3]*relative_velocity_array[i,3]
+        v_normal_dist[i] =
+            z_airf_dist[i,1]*relative_velocity_dist[i,1] +
+            z_airf_dist[i,2]*relative_velocity_dist[i,2] +
+            z_airf_dist[i,3]*relative_velocity_dist[i,3]
+        v_tangential_dist[i] =
+            x_airf_dist[i,1]*relative_velocity_dist[i,1] +
+            x_airf_dist[i,2]*relative_velocity_dist[i,2] +
+            x_airf_dist[i,3]*relative_velocity_dist[i,3]
+        solver.lr.v_span_dist[i] =
+            y_airf_dist[i,1]*relative_velocity_dist[i,1] +
+            y_airf_dist[i,2]*relative_velocity_dist[i,2] +
+            y_airf_dist[i,3]*relative_velocity_dist[i,3]
     end
-    solver.lr.alpha_dist .= atan.(v_normal_array, v_tangential_array)
+    solver.lr.alpha_dist .= atan.(v_normal_dist, v_tangential_dist)
 
     @inbounds for i in 1:n_panels
         solver.lr.v_a_dist[i] = smooth_sqrt(
             relative_velocity_crossz[i,1]^2 +
             relative_velocity_crossz[i,2]^2 +
             relative_velocity_crossz[i,3]^2)
-        va_magw_array[i] = smooth_sqrt(
-            v_acrossz_array[i,1]^2 +
-            v_acrossz_array[i,2]^2 +
-            v_acrossz_array[i,3]^2)
+        va_magw_dist[i] = smooth_sqrt(
+            v_acrossz_dist[i,1]^2 +
+            v_acrossz_dist[i,2]^2 +
+            v_acrossz_dist[i,3]^2)
     end
 
     for (i, (panel, alpha)) in enumerate(zip(panels, solver.lr.alpha_dist))
         cl_dist[i] = calculate_cl(panel, alpha)
     end
-    gamma_out .= 0.5 .* solver.lr.v_a_dist.^2 ./ va_magw_array .* cl_dist .* chord_array
+    gamma_out .= 0.5 .* solver.lr.v_a_dist.^2 ./ va_magw_dist .* cl_dist .* chord_dist
     return nothing
 end
 
@@ -822,7 +900,7 @@ end
 
 """
     apply_artificial_viscosity!(gamma, panels, alpha_dist, laplacian, viscosity_matrix,
-                                lift_slope, mu_array, gamma_target, planform_area, factor)
+                                lift_slope, mu_dist, gamma_target, planform_area, factor)
 
 Apply one implicit Li/Gaunaa artificial-viscosity step to `gamma` in place and return
 `true` when it fired. The per-panel viscosity is
@@ -834,21 +912,21 @@ post-stall (`mu_i > 0`), `gamma` is replaced by the solution of
 remaining arguments are preallocated work buffers reused across iterations.
 """
 function apply_artificial_viscosity!(gamma, panels, alpha_dist, laplacian, viscosity_matrix,
-        lift_slope, mu_array, gamma_target, planform_area, factor)
+        lift_slope, mu_dist, gamma_target, planform_area, factor)
     n_panels = length(panels)
     local_lift_slope!(lift_slope, panels, alpha_dist)
     any_stalled = false
     @inbounds for i in 1:n_panels
         m = -factor * planform_area * lift_slope[i] / panels[i].width^2
-        mu_array[i] = max(zero(eltype(mu_array)), m)
-        mu_array[i] > 0 && (any_stalled = true)
+        mu_dist[i] = max(zero(eltype(mu_dist)), m)
+        mu_dist[i] > 0 && (any_stalled = true)
     end
     any_stalled || return false
     gamma_target .= gamma
     one_t, zero_t = one(eltype(viscosity_matrix)), zero(eltype(viscosity_matrix))
     @inbounds for col in 1:n_panels, row in 1:n_panels
         viscosity_matrix[row, col] =
-            (row == col ? one_t : zero_t) - mu_array[row] * laplacian[row, col]
+            (row == col ? one_t : zero_t) - mu_dist[row] * laplacian[row, col]
     end
     ldiv!(gamma, lu!(viscosity_matrix), gamma_target)
     return true
@@ -880,28 +958,28 @@ function gamma_loop!(
     relaxation_factor;
     log::Bool = true
 ) where {P, U, T}
-    va_array = solver.sol._va_dist
-    chord_array = solver.sol._chord_dist
-    x_airf_array = solver.sol._x_airf_dist
-    y_airf_array = solver.sol._y_airf_dist
-    z_airf_array = solver.sol._z_airf_dist
+    va_vec_dist = solver.sol._va_dist
+    chord_dist = solver.sol._chord_dist
+    x_airf_dist = solver.sol._x_airf_dist
+    y_airf_dist = solver.sol._y_airf_dist
+    z_airf_dist = solver.sol._z_airf_dist
     solver.lr.converged   = false
     n_panels    = length(body_aero.panels)
     solver.lr.alpha_dist .= body_aero.alpha_dist
     solver.lr.v_a_dist   .= body_aero.v_a_dist
     
-    va_magw_array            = solver.cache[1][solver.lr.v_a_dist]
+    va_magw_dist             = solver.cache[1][solver.lr.v_a_dist]
     gamma                    = solver.cache[2][solver.lr.gamma_new]
     abs_gamma_new            = solver.cache[3][solver.lr.gamma_new]
-    induced_velocity_all     = solver.cache[4][va_array]
-    relative_velocity_array  = solver.cache[5][va_array]
-    relative_velocity_crossz = solver.cache[6][va_array]
-    v_acrossz_array          = solver.cache[7][va_array]
-    cl_dist                 = solver.cache[8][solver.lr.gamma_new]
+    induced_velocity_all     = solver.cache[4][va_vec_dist]
+    relative_velocity_dist   = solver.cache[5][va_vec_dist]
+    relative_velocity_crossz = solver.cache[6][va_vec_dist]
+    v_acrossz_dist           = solver.cache[7][va_vec_dist]
+    cl_dist                  = solver.cache[8][solver.lr.gamma_new]
     damp                     = solver.cache[9][solver.lr.gamma_new]
     damp                    .= zero(T)
-    v_normal_array           = solver.cache[10][solver.lr.gamma_new]
-    v_tangential_array       = solver.cache[11][solver.lr.gamma_new]
+    v_normal_dist            = solver.cache[10][solver.lr.gamma_new]
+    v_tangential_dist        = solver.cache[11][solver.lr.gamma_new]
 
     AIC_x = @view body_aero.AIC[:, :, 1]
     AIC_y = @view body_aero.AIC[:, :, 2]
@@ -928,11 +1006,11 @@ function gamma_loop!(
             residual, gamma_iter, solver, panels, n_panels,
             AIC_x, AIC_y, AIC_z,
             velocity_view_x, velocity_view_y, velocity_view_z,
-            va_array, induced_velocity_all, relative_velocity_array,
-            y_airf_array, relative_velocity_crossz, v_acrossz_array,
-            z_airf_array, x_airf_array,
-            v_normal_array, v_tangential_array,
-            va_magw_array, cl_dist, chord_array,
+            va_vec_dist, induced_velocity_all, relative_velocity_dist,
+            y_airf_dist, relative_velocity_crossz, v_acrossz_dist,
+            z_airf_dist, x_airf_dist,
+            v_normal_dist, v_tangential_dist,
+            va_magw_dist, cl_dist, chord_dist,
         )
         @inbounds for i in 1:n_panels
             residual[i] -= gamma_iter[i]
@@ -950,11 +1028,11 @@ function gamma_loop!(
                     residual_perturbed, gamma_perturbed, solver, panels, n_panels,
                     AIC_x, AIC_y, AIC_z,
                     velocity_view_x, velocity_view_y, velocity_view_z,
-                    va_array, induced_velocity_all, relative_velocity_array,
-                    y_airf_array, relative_velocity_crossz, v_acrossz_array,
-                    z_airf_array, x_airf_array,
-                    v_normal_array, v_tangential_array,
-                    va_magw_array, cl_dist, chord_array,
+                    va_vec_dist, induced_velocity_all, relative_velocity_dist,
+                    y_airf_dist, relative_velocity_crossz, v_acrossz_dist,
+                    z_airf_dist, x_airf_dist,
+                    v_normal_dist, v_tangential_dist,
+                    va_magw_dist, cl_dist, chord_dist,
                 )
                 inv_step = 1.0 / step
                 for i in 1:n_panels
@@ -979,11 +1057,11 @@ function gamma_loop!(
                     residual_perturbed, gamma_perturbed, solver, panels, n_panels,
                     AIC_x, AIC_y, AIC_z,
                     velocity_view_x, velocity_view_y, velocity_view_z,
-                    va_array, induced_velocity_all, relative_velocity_array,
-                    y_airf_array, relative_velocity_crossz, v_acrossz_array,
-                    z_airf_array, x_airf_array,
-                    v_normal_array, v_tangential_array,
-                    va_magw_array, cl_dist, chord_array,
+                    va_vec_dist, induced_velocity_all, relative_velocity_dist,
+                    y_airf_dist, relative_velocity_crossz, v_acrossz_dist,
+                    z_airf_dist, x_airf_dist,
+                    v_normal_dist, v_tangential_dist,
+                    va_magw_dist, cl_dist, chord_dist,
                 )
                 @inbounds for i in 1:n_panels
                     residual_perturbed[i] -= gamma_perturbed[i]
@@ -1016,13 +1094,13 @@ function gamma_loop!(
         laplacian        = use_viscosity ? zeros(T, n_panels, n_panels) : zeros(T, 0, 0)
         viscosity_matrix = use_viscosity ? zeros(T, n_panels, n_panels) : zeros(T, 0, 0)
         lift_slope       = use_viscosity ? zeros(T, n_panels) : zeros(T, 0)
-        mu_array         = use_viscosity ? zeros(T, n_panels) : zeros(T, 0)
+        mu_dist          = use_viscosity ? zeros(T, n_panels) : zeros(T, 0)
         gamma_target     = use_viscosity ? zeros(T, n_panels) : zeros(T, 0)
         planform_area    = zero(T)
         if use_viscosity
             build_spanwise_laplacian!(laplacian, n_panels)
             @inbounds for i in 1:n_panels
-                planform_area += panels[i].width * chord_array[i]
+                planform_area += panels[i].width * chord_dist[i]
             end
         end
 
@@ -1040,25 +1118,25 @@ function gamma_loop!(
                 velocity_view_x,
                 velocity_view_y,
                 velocity_view_z,
-                va_array,
+                va_vec_dist,
                 induced_velocity_all,
-                relative_velocity_array,
-                y_airf_array,
+                relative_velocity_dist,
+                y_airf_dist,
                 relative_velocity_crossz,
-                v_acrossz_array,
-                z_airf_array,
-                x_airf_array,
-                v_normal_array,
-                v_tangential_array,
-                va_magw_array,
+                v_acrossz_dist,
+                z_airf_dist,
+                x_airf_dist,
+                v_normal_dist,
+                v_tangential_dist,
+                va_magw_dist,
                 cl_dist,
-                chord_array,
+                chord_dist,
             )
             # Gate the linear solve on any(mu > 0): fires exactly in post-stall.
             if use_viscosity
                 apply_artificial_viscosity!(
                     gamma_new, panels, solver.lr.alpha_dist, laplacian,
-                    viscosity_matrix, lift_slope, mu_array, gamma_target,
+                    viscosity_matrix, lift_slope, mu_dist, gamma_target,
                     planform_area, solver.artificial_viscosity_factor,
                 )
             end
@@ -1109,14 +1187,12 @@ function gamma_loop!(
 end
 
 """
-    smooth_circulation!(damp, circulation, 
-                      smoothness_factor::Float64, 
-                      damping_factor::Float64)
+    smooth_circulation!(damp, circulation, smoothness_factor, damping_factor) -> Bool
 
-Smooth circulation distribution if needed.
-
-Returns:
-- Tuple of smoothed circulation and boolean indicating if smoothing was applied
+Write into `damp` the correction that moves each interior value of `circulation` toward
+the mean of its neighbours by `damping_factor`, scaled to keep the total circulation.
+Smoothing applies only where an interior jump exceeds `smoothness_factor` times the
+interior mean; otherwise `damp` is zeroed. Returns whether smoothing was applied.
 """
 function smooth_circulation!(
     damp,
@@ -1124,37 +1200,20 @@ function smooth_circulation!(
     smoothness_factor::Float64,
     damping_factor::Float64
 )
-    # Calculate mean circulation excluding endpoints
-    circulation_mean = mean(circulation[2:end-1])
-    smoothness_threshold = smoothness_factor * circulation_mean
-
-    # Calculate differences between adjacent points
-    differences = diff(circulation[2:end-1])
-    @debug "circulation_mean: $circulation_mean, diff: $differences"
-
-    # Check smoothness
-    if isempty(differences)
-        return zeros(length(circulation)), false
+    interior = circulation[2:end-1]
+    differences = diff(interior)
+    if isempty(differences) ||
+            maximum(abs, differences) <= smoothness_factor * mean(interior)
+        damp .= 0.0
+        return false
     end
 
-    if maximum(abs.(differences)) <= smoothness_threshold
-        return zeros(length(circulation)), false
-    end
-
-    # Apply smoothing
     smoothed = copy(circulation)
     for i in 2:length(circulation)-1
-        left = circulation[i-1]
-        center = circulation[i]
-        right = circulation[i+1]
-        avg = (left + right) / 2
-        smoothed[i] = center + damping_factor * (avg - center)
+        neighbour_mean = (circulation[i-1] + circulation[i+1]) / 2
+        smoothed[i] += damping_factor * (neighbour_mean - circulation[i])
     end
-
-    # Preserve total circulation
-    total_original = sum(circulation)
-    total_smoothed = sum(smoothed)
-    smoothed .*= total_original / total_smoothed
+    smoothed .*= sum(circulation) / sum(smoothed)
 
     damp .= smoothed .- circulation
     return true
@@ -1177,8 +1236,10 @@ function _wing_with_eltype(wing::Wing{P, Float64}, ::Type{TD}) where {P, TD}
         wing.spanwise_distribution,
         PanelProperties{P, TD}(),
         MVector{3, TD}(wing.spanwise_direction),
-        Section{TD}[_section_with_eltype(s, TD) for s in wing.unrefined_sections],
-        Section{TD}[_section_with_eltype(s, TD) for s in wing.refined_sections],
+        Section{TD}[_section_with_eltype(section, TD)
+                    for section in wing.unrefined_sections],
+        Section{TD}[_section_with_eltype(section, TD)
+                    for section in wing.refined_sections],
         wing.remove_nan,
         wing.use_prior_polar,
         wing.billowing_percentage,
@@ -1186,7 +1247,8 @@ function _wing_with_eltype(wing::Wing{P, Float64}, ::Type{TD}) where {P, TD}
         copy(wing.refined_panel_mapping),
         copy(wing.refined_section_left_idx),
         Vector{TD}(wing.refined_section_weight),
-        Section{TD}[_section_with_eltype(s, TD) for s in wing.non_deformed_sections],
+        Section{TD}[_section_with_eltype(section, TD)
+                    for section in wing.non_deformed_sections],
         Vector{TD}(wing.theta_dist),
         Vector{TD}(wing.delta_dist),
         TD(wing.mass),
@@ -1213,14 +1275,11 @@ buffers are freshly allocated as `TD`-typed.
 function make_dual_shadow(solver::Solver{P, U, Float64},
                           body_aero::BodyAerodynamics{P, W, Float64},
                           ::Type{TD}) where {P, U, W, TD}
-    length(body_aero.wings) == 1 || throw(ArgumentError(
-        "make_dual_shadow currently supports body_aero with one wing"))
-    wing_d = _wing_with_eltype(body_aero.wings[1], TD)
-    body_aero_d = BodyAerodynamics([wing_d];
-        va = MVector{3, TD}(body_aero._va),
-        omega = MVector{3, TD}(body_aero.omega),
-    )
-    solver_d = Solver(body_aero_d;
+    wings_d = [_wing_with_eltype(wing, TD) for wing in body_aero.wings]
+    body_aero_d = BodyAerodynamics(wings_d)
+    set_va!(body_aero_d, MVector{3, TD}(body_aero._va), MVector{3, TD}(body_aero.omega);
+            reference_point=body_aero.reference_point)
+    solver_d = Solver(P, U, TD;
         solver_type = solver.solver_type,
         aerodynamic_model_type = solver.aerodynamic_model_type,
         density = TD(solver.density),
@@ -1240,6 +1299,7 @@ function make_dual_shadow(solver::Solver{P, U, Float64},
         is_only_f_and_gamma_output = solver.is_only_f_and_gamma_output,
         correct_aoa = solver.correct_aoa,
         flow_curvature = solver.flow_curvature,
+        is_with_viscous_drag_correction = solver.is_with_viscous_drag_correction,
         reference_point = MVector{3, TD}(solver.reference_point),
     )
     return body_aero_d, solver_d
@@ -1251,8 +1311,8 @@ end
               backend=AutoForwardDiff(), kwargs...)
 
 Jacobian of aerodynamic outputs w.r.t. control and kinematic inputs at `y`. Each `*_idxs`
-selects which entries of `y` map to twist angles (one per unrefined section), trailing-edge
-deflections (one per unrefined section), apparent wind `(vx, vy, vz)`, and angular rate
+selects which entries of `y` map to twist angles and trailing-edge deflections (one per
+unrefined section, over all wings in order), apparent wind `(vx, vy, vz)`, and angular rate
 `(ωx, ωy, ωz)` respectively.
 
 `backend` accepts any `DifferentiationInterface` backend; `AutoForwardDiff()` (the default)
@@ -1263,7 +1323,7 @@ Returns `(jac, results, converged)` where `results` is `(F, M, moment_unrefined_
 or the corresponding coefficients when `aero_coeffs=true` — and `converged` is `false` (with a
 warning) if any internal solve missed the solver's tolerances.
 """
-function linearize(solver::Solver, body_aero::BodyAerodynamics, y::Vector{T};
+function linearize(solver::Solver{<:Any, U}, body_aero::BodyAerodynamics, y::Vector{T};
         theta_idxs=1:4,
         delta_idxs=nothing,
         va_idxs=nothing,
@@ -1272,22 +1332,12 @@ function linearize(solver::Solver, body_aero::BodyAerodynamics, y::Vector{T};
         backend = AutoForwardDiff(),
         fd_absstep::Float64=1e-8,
         fd_relstep::Float64=1e-8,
-        kwargs...) where T
+        kwargs...) where {U, T}
 
-    !(length(body_aero.wings) == 1) && throw(ArgumentError("Linearization only works for a body_aero with one wing"))
-    wing = body_aero.wings[1]
-
-    # Validate that theta_idxs and delta_idxs match the number of unrefined sections
-    if !isnothing(theta_idxs) && wing.n_unrefined_sections > 0
-        length(theta_idxs) != wing.n_unrefined_sections && throw(ArgumentError(
-            "Length of theta_idxs ($(length(theta_idxs))) must match number of unrefined sections ($(wing.n_unrefined_sections))"))
-    end
-    if !isnothing(delta_idxs) && wing.n_unrefined_sections > 0
-        length(delta_idxs) != wing.n_unrefined_sections && throw(ArgumentError(
-            "Length of delta_idxs ($(length(delta_idxs))) must match number of unrefined sections ($(wing.n_unrefined_sections))"))
-    end
-    if wing.n_unrefined_sections == 0 && (!isnothing(theta_idxs) || !isnothing(delta_idxs))
-        throw(ArgumentError("Cannot use theta_idxs or delta_idxs when wing has no unrefined sections"))
+    for (name, idxs) in (("theta_idxs", theta_idxs), ("delta_idxs", delta_idxs))
+        isnothing(idxs) || length(idxs) == U || throw(ArgumentError(
+            "Length of $name ($(length(idxs))) must match number of unrefined sections " *
+            "($U)"))
     end
 
     n_failed = Ref(0)
@@ -1298,27 +1348,25 @@ function linearize(solver::Solver, body_aero::BodyAerodynamics, y::Vector{T};
         if TI === Float64
             body_aero_c = body_aero
             solver_c = solver
-            wing_c = wing
         else
             shadow = shadow_ref[]
             if shadow === nothing || eltype(shadow[1]._va) !== TI
                 shadow_ref[] = make_dual_shadow(solver, body_aero, TI)
             end
             body_aero_c, solver_c = shadow_ref[]
-            wing_c = body_aero_c.wings[1]
         end
 
         @views theta_angles = isnothing(theta_idxs) ? nothing : y_in[theta_idxs]
         @views delta_angles = isnothing(delta_idxs) ? nothing : y_in[delta_idxs]
 
         if !isnothing(theta_angles) || !isnothing(delta_angles)
-            VortexStepMethod.unrefined_deform!(wing_c, theta_angles, delta_angles; smooth=false)
-            VortexStepMethod.reinit!(body_aero_c; init_aero=false)
+            unrefined_deform!(body_aero_c, theta_angles, delta_angles)
+            reinit!(body_aero_c; init_aero=false)
         end
 
-        va = isnothing(va_idxs) ? MVector{3, TI}(body_aero_c._va) : y_in[va_idxs]
-        om = isnothing(omega_idxs) ? MVector{3, TI}(body_aero_c.omega) : y_in[omega_idxs]
-        set_va!(body_aero_c, va, om)
+        va_vec = isnothing(va_idxs) ? MVector{3, TI}(body_aero_c._va) : y_in[va_idxs]
+        omega = isnothing(omega_idxs) ? MVector{3, TI}(body_aero_c.omega) : y_in[omega_idxs]
+        set_va!(body_aero_c, va_vec, omega)
 
         solve!(solver_c, body_aero_c; kwargs...)
         solver_c.lr.converged || (n_failed[] += 1)
@@ -1334,13 +1382,13 @@ function linearize(solver::Solver, body_aero::BodyAerodynamics, y::Vector{T};
         return nothing
     end
 
-    n_results = 3 + 3 + length(solver.sol.moment_unrefined_dist)
+    n_results = 3 + 3 + U
     jac = zeros(n_results, length(y))
     results = zeros(n_results)
-    be = backend === nothing ?
+    ad_backend = backend === nothing ?
         AutoFiniteDiff(absstep=fd_absstep, relstep=fd_relstep) : backend
-    prep = prepare_jacobian(calc_results!, results, be, y)
-    jacobian!(calc_results!, results, jac, prep, be, y)
+    prep = prepare_jacobian(calc_results!, results, ad_backend, y)
+    jacobian!(calc_results!, results, jac, prep, ad_backend, y)
     calc_results!(results, y)
     converged = n_failed[] == 0
     if !converged

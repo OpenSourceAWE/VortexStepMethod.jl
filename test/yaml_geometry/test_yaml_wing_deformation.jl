@@ -59,14 +59,10 @@ using Test
         body_aero = BodyAerodynamics([wing])
 
         # Store original points for multiple panels
-        original_points = []
         test_indices = [1, length(body_aero.panels) ÷ 2, length(body_aero.panels)]
-        for i in test_indices
-            push!(original_points, (
-                LE=copy(body_aero.panels[i].LE_point_1),
-                TE=copy(body_aero.panels[i].TE_point_1)
-            ))
-        end
+        original_points = [(LE=copy(body_aero.panels[i].LE_point_1),
+                            TE=copy(body_aero.panels[i].TE_point_1))
+                           for i in test_indices]
 
         # Apply spanwise-varying deformation (panel-level)
         n = wing.n_panels

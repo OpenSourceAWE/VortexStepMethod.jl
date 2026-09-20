@@ -31,16 +31,16 @@ using Interpolations
         @test vertices[2] ≈ [1.0, 0.0, 0.0]
         @test vertices[3] ≈ [0.0, 1.0, 0.0]
         @test faces[1] == [1, 2, 3]
+        @test vertices isa Vector{Vector{Float64}}
+        @test faces isa Vector{Vector{Int64}}
     end
     
     @testset "Circle Fitting" begin
         # Create simple curved wing vertices
         r = 5.0
         z_center = 2.0
-        vertices = []
-        for θ in range(-π/4, π/4, length=100)
-            push!(vertices, [0.0, r*sin(θ), z_center + r*cos(θ)])
-        end
+        vertices = [[0.0, r*sin(θ), z_center + r*cos(θ)]
+                    for θ in range(-π/4, π/4, length=100)]
         
         z, radius, gamma_tip = find_circle_center_and_radius(vertices)
         
@@ -51,7 +51,7 @@ using Interpolations
     
     r = 5.0
     @testset "Interpolation Creation" begin
-        vertices = []
+        vertices = Vector{Float64}[]
         z_center = 2.0
         Δθ = π/2 / 1000
         for θ in range(-π/4, π/4-Δθ, 1000)

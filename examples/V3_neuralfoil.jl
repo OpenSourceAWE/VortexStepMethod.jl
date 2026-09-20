@@ -69,7 +69,7 @@ nf_yaml = obj_to_yaml(OBJ_PATH, gen_dir; n_sections=N_SLICES, Re=RE,
     rotation=ROTATION, wrap_method=WRAP, aero_solver=NF_SOLVER, verbose=true)
 
 # Flight conditions
-v_a = 10.0
+va = 10.0
 angle_range = range(-5, 25, length=31)
 
 # Load settings and create wing with CFD polars
@@ -81,14 +81,18 @@ wing_cfd = Wing(settings_cfd)
 refine!(wing_cfd)
 body_cfd = BodyAerodynamics([wing_cfd])
 VortexStepMethod.reinit!(body_cfd)
-solver_cfd = Solver(body_cfd, settings_cfd)
+solver_cfd = Solver(settings_cfd)
 
 println("Creating wing with NeuralFoil polars...")
 wing_nf = Wing(nf_yaml; n_panels=50, spanwise_distribution=LINEAR)
 refine!(wing_nf)
 body_nf = BodyAerodynamics([wing_nf])
 VortexStepMethod.reinit!(body_nf)
-solver_nf = Solver(body_nf, settings_cfd)
+settings_nf = VSMSettings("TUDELFT_V3_KITE/vsm_settings.yaml")
+settings_nf.wings[1].geometry_file = nf_yaml
+settings_nf.solver_settings.relaxation_factor = RELAXATION
+settings_nf.solver_settings.artificial_damping = ARTIFICIAL_DAMPING
+solver_nf = Solver(settings_nf)
 
 # Compare CFD-polar and NeuralFoil-polar wings against published references
 # (Poland 2025 RANS CFD and wind tunnel). `plot_polars` sweeps each solver over the
@@ -105,7 +109,7 @@ fig = plot_polars(
      "Wind tunnel (Poland 2025)"];
     literature_path_list=literature_paths,
     angle_range,
-    v_a,
+    v_a=va,
     title="TU Delft V3 Kite: CFD vs NeuralFoil (Re=$RE)",
     is_save=false,
 )
