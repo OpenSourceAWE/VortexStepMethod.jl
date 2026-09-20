@@ -4,7 +4,7 @@ using VortexStepMethod
 using VortexStepMethod: read_aero_matrix
 using VortexStepMethod.AirfoilAero: write_aero_matrix
 using VortexStepMethod.ObjAdapter: create_interpolations, find_circle_center_and_radius,
-    calculate_inertia_tensor, center_to_com!, read_faces, calc_inertia_y_rotation
+    read_faces
 using LinearAlgebra
 using Interpolations
 
@@ -31,30 +31,6 @@ using Interpolations
         @test vertices[2] ≈ [1.0, 0.0, 0.0]
         @test vertices[3] ≈ [0.0, 1.0, 0.0]
         @test faces[1] == [1, 2, 3]
-    end
-    
-    @testset "Center of Mass Calculation" begin
-        vertices = [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 0.0, 1.0]]
-        faces = [[1, 2, 3]]
-        
-        com = @test_deprecated center_to_com!(vertices, faces)
-        expected_com = [-1/3, 0.0, -1/3]
-        
-        @test isapprox(com, expected_com, rtol=1e-5)
-    end
-    
-    @testset "Inertia Tensor Calculation" begin
-        vertices = [[0.0, 0.0, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]
-        faces = [[1, 2, 3]]
-        mass = 1.0
-        com = [1/3, 1/3, 0.0]
-        
-        I = @test_deprecated calculate_inertia_tensor(vertices, faces, mass, com)
-        
-        # Test properties of inertia tensor
-        @test size(I) == (3,3)
-        @test isapprox(I, I', rtol=1e-10)  # Symmetric
-        @test all(diag(I) .≥ 0)  # Non-negative diagonal
     end
     
     @testset "Circle Fitting" begin
@@ -119,17 +95,6 @@ using Interpolations
         write_aero_matrix(cd_polar_path, cd_matrix, deg2rad.(alphas), deg2rad.(d_trailing_edge_angles), "C_d")
         write_aero_matrix(cm_polar_path, cm_matrix, deg2rad.(alphas), deg2rad.(d_trailing_edge_angles), "C_m")
         
-        # Create obj file
-        faces = [[i, i+1, i+2] for i in 1:3:length(vertices)-2]
-        open(test_obj_path, "w") do io
-            for v in vertices
-                println(io, "v $(v[1]) $(v[2]) $(v[3])")
-            end
-            for f in faces
-                println(io, "f $(f[1]) $(f[2]) $(f[3])")
-            end
-        end
-        
         # Test reading back the matrices
         cl_read, alphas_read, deltas_read = read_aero_matrix(cl_polar_path)
         # write_aero_matrix stores coefficients rounded to 4 decimals
@@ -143,20 +108,6 @@ using Interpolations
         # Test interpolation at middle point
         @test isapprox([le_interp[i](0.0) for i in 1:3], [0.0, 0.0, r+z_center], atol=0.03)
         @test isapprox([te_interp[i](0.0) for i in 1:3], [1.0, 0.0, r+z_center], atol=0.03)
-    end
-
-    @testset "Alignment to principal frame" begin
-        vertices, faces = read_faces(test_obj_path)
-        center_of_mass = center_to_com!(vertices, faces)
-        inertia_tensor_b = calculate_inertia_tensor(vertices, faces, 1.0, zeros(3))
-        inertia_tensor_p, R_b_p = @test_deprecated calc_inertia_y_rotation(inertia_tensor_b)
-        for v in vertices
-            v .= R_b_p * v
-        end
-        inertia_tensor_b2 = calculate_inertia_tensor(vertices, faces, 1.0, zeros(3))
-        inertia_tensor_p2, R_b_p2 = calc_inertia_y_rotation(inertia_tensor_b2)
-        @test inertia_tensor_p ≈ inertia_tensor_p2
-        @test R_b_p2 ≈ I(3)
     end
 
     @testset "Converted-wing construction and deformation" begin
