@@ -9,6 +9,8 @@
   rates p̂ = pb/2V, q̂ = q c_ref/2V, r̂ = rb/2V, turning about `solver.reference_point`,
   and `trim_angle` the angles of attack at which `CMy` changes sign, with the slope that
   says whether each trim is stable.
+- `Solver(settings)` and `Solver(n_panels, n_unrefined_sections)` build a solver without
+  a `BodyAerodynamics`; keyword arguments override the settings.
 - `set_va!(body_aero, va_vec, omega; reference_point)` turns the body about
   `reference_point` [m] instead of the origin. The point is stored on
   `BodyAerodynamics`, starts at the origin, and is kept by later `set_va!`, `reinit!`
@@ -29,13 +31,23 @@
 - The Makie `plot!` methods for a `Panel` or a `BodyAerodynamics` return a
   `Vector{Makie.AbstractPlot}` instead of a `Vector{Any}`; for a `BodyAerodynamics`
   drawn as flat panels it is one flat list rather than a list per panel.
+- `Solver(body_aero; kwargs...)` and `Solver(body_aero, settings)` are deprecated and warn
+  on use; build the solver with `Solver(settings)` or
+  `Solver(n_panels, n_unrefined_sections)` instead.
 
 ### Fixed
 
+- `solve!` and `solve` throw a `DimensionMismatch` naming both sizes for a `body_aero` whose
+  panel or unrefined-section count differs from the solver's, where they failed on a
+  broadcast partway through or silently left section results at zero.
 - `set_va!(body_aero, settings)` applies `condition.yaw_rate` as a turn rate about the
   body z axis; it was read from the settings file and ignored.
 - The `VSMSolution` docstring gives `lift_dist`, `drag_dist` and `panel_moment_dist` in
   the per-unit-span units they hold, [N/m] and [Nm/m], instead of [N] and [Nm].
+- `fit_kulfan_parameters` with `LeastSquaresFit` drops singular values below `1e-4`
+  times the largest and warns when it does, so a contour whose stations crowd into a
+  narrow band of the chord gets bounded weights instead of ones that resample it to 1e4
+  scale. Fits of well-spread stations are unchanged.
 - Inside its vortex core, `velocity_3D_trailing_vortex!` induces an azimuthal velocity
   instead of a radial one. Only points within the millimetre-scale Oseen core of a
   panel's chordwise trailing segment were affected.

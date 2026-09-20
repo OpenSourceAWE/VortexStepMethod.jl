@@ -42,7 +42,7 @@ wing = Wing(settings)
 refine!(wing)
 body_aero = BodyAerodynamics([wing])
 VortexStepMethod.reinit!(body_aero)
-solver = Solver(body_aero, settings)
+solver = Solver(settings)
 solver.reference_point .= REFERENCE_POINT
 
 if DEFORM
@@ -75,7 +75,7 @@ if NEURALFOIL
     refine!(wing_nf)
     body_nf = BodyAerodynamics([wing_nf])
     VortexStepMethod.reinit!(body_nf)
-    solver_nf = Solver(body_nf, settings_nf)
+    solver_nf = Solver(settings_nf)
     solver_nf.reference_point .= REFERENCE_POINT
 
     # Reading the generated directory instead of the OBJ shows the airfoils the polar

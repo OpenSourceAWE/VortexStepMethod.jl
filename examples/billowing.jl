@@ -30,15 +30,12 @@ literature_paths = [
         "windtunnel_alpha_sweep_beta_00_0_Poland_2025_Rey_5e5.csv"),
 ]
 
-# Load solver settings (coarse: 54 panels, matches 10-section geometry)
-settings_data = VortexStepMethod.YAML.load_file(
-    joinpath(v3_dir, "vsm_settings_coarse.yaml"))
-condition_cfg = settings_data["condition"]
-solver_cfg = settings_data["solver_settings"]
-wing_cfg = settings_data["wings"][1]
-n_panels = wing_cfg["n_panels"]
+# Coarse settings: 54 panels on the 10-section geometry
+settings = VSMSettings(joinpath(v3_dir, "vsm_settings_coarse.yaml"); data_prefix=false)
+settings.wings[1].geometry_file = joinpath(project_dir, settings.wings[1].geometry_file)
+n_panels = settings.wings[1].n_panels
 
-BILLOWING_PCT = get(wing_cfg, "billowing_percentage", 0.0)
+BILLOWING_PCT = settings.wings[1].billowing_percentage
 
 labels = [
     "VSM flat",
@@ -49,9 +46,7 @@ labels = [
     "WindTunnel Re=5e5",
 ]
 
-# Load coarse geometry (10 structural rib sections)
-geom_data = VortexStepMethod.YAML.load_file(
-    joinpath(v3_dir, "aero_geometry_coarse_discretisation.yaml"))
+geom_data = VortexStepMethod.YAML.load_file(settings.wings[1].geometry_file)
 section_headers = geom_data["wing_sections"]["headers"]
 section_rows = geom_data["wing_sections"]["data"]
 
@@ -84,43 +79,13 @@ body_aero_bill = BodyAerodynamics([wing_bill])
 VortexStepMethod.reinit!(body_aero_bill)
 
 # --- Build solvers ---
-function make_solver(body_aero)
-    Solver(body_aero;
-        solver_type=(solver_cfg["solver_type"] == "NONLIN" ?
-            NONLIN : LOOP),
-        aerodynamic_model_type=getproperty(
-            VortexStepMethod,
-            Symbol(solver_cfg["aerodynamic_model_type"])),
-        density=solver_cfg["density"],
-        max_iterations=solver_cfg["max_iterations"],
-        rtol=solver_cfg["rtol"],
-        tol_reference_error=solver_cfg["tol_reference_error"],
-        relaxation_factor=solver_cfg["relaxation_factor"],
-        is_with_artificial_damping=solver_cfg["artificial_damping"],
-        artificial_damping=(
-            k2=solver_cfg["k2"], k4=solver_cfg["k4"]),
-        type_initial_gamma_distribution=getproperty(
-            VortexStepMethod,
-            Symbol(solver_cfg["type_initial_gamma_distribution"])),
-        use_gamma_prev=get(solver_cfg, "use_gamma_prev",
-                           get(solver_cfg, "use_gamme_prev", true)),
-        core_radius_fraction=solver_cfg["core_radius_fraction"],
-        mu=solver_cfg["mu"],
-        is_only_f_and_gamma_output=get(
-            solver_cfg, "calc_only_f_and_gamma", false),
-        correct_aoa=get(solver_cfg, "correct_aoa", false),
-        reference_point=get(solver_cfg, "reference_point",
-                            [0.422646, 0.0, 9.3667]),
-    )
-end
-
-solver_flat = make_solver(body_aero_flat)
-solver_bill = make_solver(body_aero_bill)
+solver_flat = Solver(settings; reference_point=[0.422646, 0.0, 9.3667])
+solver_bill = Solver(settings; reference_point=[0.422646, 0.0, 9.3667])
 
 # --- Set flight conditions ---
-wind_speed = condition_cfg["wind_speed"]
+wind_speed = settings.condition.wind_speed
 angle_of_attack_deg = 10.0
-sideslip_deg = condition_cfg["beta"]
+sideslip_deg = settings.condition.beta
 
 α0 = deg2rad(angle_of_attack_deg)
 β0 = deg2rad(sideslip_deg)

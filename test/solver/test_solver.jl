@@ -18,11 +18,12 @@ end
             wing = Wing(settings)
             refine!(wing)
             body_aero = BodyAerodynamics([wing])
-            solver = Solver(body_aero, settings)
+            solver = Solver(settings)
 
             # Verify solver properties match settings
             @test solver.aerodynamic_model_type == VSM
             @test solver.density == 1.225
+            @test Solver(settings; density=1.0).density == 1.0
 
             # Test that the solver can solve
             va_vec = [10.0, 0.0, 0.0]
@@ -30,6 +31,37 @@ end
             sol = solve!(solver, body_aero)
             @test sol isa VSMSolution
 
+            @testset "body_aero constructors warn and match Solver(settings)" begin
+                with_settings = r"`Solver\(body_aero, settings\)` is deprecated"
+                solver_from_body = @test_logs((:warn, with_settings),
+                    Solver(body_aero, settings))
+                @test solver_from_body isa typeof(solver)
+                @test solver_from_body.density == solver.density
+                @test solve!(solver_from_body, body_aero).force ≈ sol.force
+
+                with_kwargs = r"`Solver\(body_aero; kwargs...\)` is deprecated"
+                solver_from_body = @test_logs((:warn, with_kwargs),
+                    Solver(body_aero; density=1.0))
+                @test solver_from_body isa typeof(solver)
+                @test solver_from_body.density == 1.0
+            end
+
+            @testset "Solver from panel and section counts" begin
+                n_sections = wing.n_unrefined_sections
+                solver_from_counts = Solver(wing.n_panels, n_sections)
+                @test solver_from_counts isa typeof(solver)
+                @test solve!(solver_from_counts, body_aero).force ≈ sol.force
+            end
+
+            @testset "solve refuses a body_aero sized for another solver" begin
+                n_sections = wing.n_unrefined_sections
+                for other in (Solver(wing.n_panels + 1, n_sections),
+                              Solver(wing.n_panels, n_sections + 1))
+                    @test_throws DimensionMismatch solve!(other, body_aero)
+                    @test_throws "Solver built for" solve!(other, body_aero)
+                    @test_throws DimensionMismatch solve(other, body_aero)
+                end
+            end
         finally
             # Cleanup
             rm(settings_file; force=true)
@@ -49,7 +81,7 @@ end
 
         body_aero = BodyAerodynamics([wing])
         solver = Solver(
-            body_aero;
+            wing.n_panels, wing.n_unrefined_sections;
             solver_type=NONLIN,
             aerodynamic_model_type=VSM,
             type_initial_gamma_distribution=ELLIPTIC,
@@ -82,10 +114,10 @@ end
         refine!(wing)
         body_aero = BodyAerodynamics([wing])
         va_vec = [10.0, 0.0, 5.0]   # 26.6 deg angle of attack, past stall
-        nonlin = Solver(body_aero; solver_type=NONLIN, aerodynamic_model_type=VSM,
-            type_initial_gamma_distribution=ELLIPTIC)
-        loop = Solver(body_aero; solver_type=LOOP, aerodynamic_model_type=VSM,
-            type_initial_gamma_distribution=ELLIPTIC)
+        nonlin = Solver(wing.n_panels, wing.n_unrefined_sections; solver_type=NONLIN,
+            aerodynamic_model_type=VSM, type_initial_gamma_distribution=ELLIPTIC)
+        loop = Solver(wing.n_panels, wing.n_unrefined_sections; solver_type=LOOP,
+            aerodynamic_model_type=VSM, type_initial_gamma_distribution=ELLIPTIC)
 
         set_va!(body_aero, va_vec)
         sol_nonlin = solve!(nonlin, body_aero)
@@ -109,8 +141,9 @@ One unrelaxed fixed-point step `F(gamma)` of the LOOP iteration, so that
 """
 function unrelaxed_step(body_aero, gamma)
     # An infinite rtol accepts the single step, so solve_base! skips its retry.
-    probe = Solver(body_aero; solver_type=LOOP, aerodynamic_model_type=VSM,
-        relaxation_factor=1.0, max_iterations=1, rtol=Inf)
+    wing = only(body_aero.wings)
+    probe = Solver(wing.n_panels, wing.n_unrefined_sections; solver_type=LOOP,
+        aerodynamic_model_type=VSM, relaxation_factor=1.0, max_iterations=1, rtol=Inf)
     VortexStepMethod.solve_base!(probe, body_aero, gamma)
     return copy(probe.lr.gamma_new)
 end
@@ -125,8 +158,8 @@ end
         wing = Wing(settings)
         refine!(wing)
         body_aero = BodyAerodynamics([wing])
-        solver = Solver(body_aero; solver_type=LOOP, aerodynamic_model_type=VSM,
-            type_initial_gamma_distribution=ELLIPTIC)
+        solver = Solver(wing.n_panels, wing.n_unrefined_sections; solver_type=LOOP,
+            aerodynamic_model_type=VSM, type_initial_gamma_distribution=ELLIPTIC)
 
         # 0 deg, and 26.6 deg past stall
         for va_vec in ([10.0, 0.0, 0.0], [10.0, 0.0, 5.0])
@@ -154,7 +187,7 @@ calc_forces_allocs(solver, body_aero) =
         wing = Wing(settings)
         refine!(wing)
         body_aero = BodyAerodynamics([wing])
-        solver = Solver(body_aero, settings)
+        solver = Solver(settings)
         set_va!(body_aero, [10.0, 0.0, 0.0])
         solve!(solver, body_aero)
 
@@ -270,10 +303,10 @@ end
 
 @testset "solve! artificial viscosity: attached no-op, post-stall finite" begin
     body_aero = BodyAerodynamics([poststall_wing])
-    solver_off = Solver(body_aero; solver_type=LOOP, aerodynamic_model_type=VSM,
-        is_with_artificial_viscosity=false)
-    solver_on = Solver(body_aero; solver_type=LOOP, aerodynamic_model_type=VSM,
-        is_with_artificial_viscosity=true)
+    solver_off = Solver(poststall_wing.n_panels, poststall_wing.n_unrefined_sections;
+        solver_type=LOOP, aerodynamic_model_type=VSM, is_with_artificial_viscosity=false)
+    solver_on = Solver(poststall_wing.n_panels, poststall_wing.n_unrefined_sections;
+        solver_type=LOOP, aerodynamic_model_type=VSM, is_with_artificial_viscosity=true)
 
     # Attached flow: viscosity never fires, so results are bit-identical.
     set_va!(body_aero, [10.0, 0.0, 0.0])
@@ -290,8 +323,8 @@ end
 
 @testset "solve! reports a solve that missed the tolerances" begin
     body_aero = BodyAerodynamics([poststall_wing])
-    solver = Solver(body_aero; solver_type=LOOP, aerodynamic_model_type=VSM,
-        max_iterations=1)
+    solver = Solver(poststall_wing.n_panels, poststall_wing.n_unrefined_sections;
+        solver_type=LOOP, aerodynamic_model_type=VSM, max_iterations=1)
     set_va!(body_aero, [10.0, 0.0, 0.0])
 
     sol = solve!(solver, body_aero)
@@ -302,7 +335,8 @@ end
     @test_throws "did not converge in 1 iterations" solve!(solver, body_aero;
         throw_on_fail=true)
 
-    converged = Solver(body_aero; solver_type=LOOP, aerodynamic_model_type=VSM)
+    converged = Solver(poststall_wing.n_panels, poststall_wing.n_unrefined_sections;
+        solver_type=LOOP, aerodynamic_model_type=VSM)
     @test solve!(converged, body_aero; throw_on_fail=true) isa VSMSolution
 end
 
