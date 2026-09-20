@@ -7,10 +7,19 @@
 - `stability_derivatives` gives the force and moment coefficients and their derivatives
   with respect to angle of attack and sideslip, and `trim_angle` the angles of attack at
   which `CMy` changes sign, with the slope that says whether each trim is stable.
+- `set_va!(body_aero, va_vec, omega; reference_point)` turns the body about
+  `reference_point` [m] instead of the origin. The point is stored on
+  `BodyAerodynamics`, starts at the origin, and is kept by later `set_va!`, `reinit!`
+  and `linearize` calls until it is given again.
 - Spanwise-flow viscous drag correction (Gaunaa et al. 2024,
   doi:10.1088/1742-6596/2767/2/022068): each section gets a drag increment and a force
   along its span from the flow across it, in `solve!`, `solve` and `linearize`. Opt-in
   via `is_with_viscous_drag_correction` (default `false`) on the solver settings.
+- `plot_section_polars(body_aero; panels, alphas, delta)` draws cl, cd and cm against α
+  per panel through `calculate_cl`/`calculate_cd`/`calculate_cm`, for every aero model
+  and at flap deflection `delta`, in one figure instead of one coefficient per call.
+- `linearize` takes a `BodyAerodynamics` with more than one wing; `theta_idxs` and
+  `delta_idxs` then run over the unrefined sections of all wings in order.
 
 ### Changed
 
@@ -21,11 +30,13 @@
 
 ### Fixed
 
+- `set_va!(body_aero, settings)` applies `condition.yaw_rate` as a turn rate about the
+  body z axis; it was read from the settings file and ignored.
 - The `VSMSolution` docstring gives `lift_dist`, `drag_dist` and `panel_moment_dist` in
   the per-unit-span units they hold, [N/m] and [Nm/m], instead of [N] and [Nm].
-
-### Fixed
-
+- Inside its vortex core, `velocity_3D_trailing_vortex!` induces an azimuthal velocity
+  instead of a radial one. Only points within the millimetre-scale Oseen core of a
+  panel's chordwise trailing segment were affected.
 - With `artificial_damping` on, an iteration whose circulation is already smooth no longer
   re-applies the previous iteration's damping correction.
 

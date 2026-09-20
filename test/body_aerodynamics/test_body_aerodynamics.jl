@@ -431,9 +431,10 @@ end
     @test length(results_NEW["cd_distribution"]) == length(body_aero.panels)
 end
 
-@testset "set_va! with VSMSettings" begin
+@testset "set_va! with VSMSettings applies the yaw rate about body z" begin
     settings_file = create_temp_wing_settings("body_aerodynamics", "test_wing.yaml";
-                                              alpha=10.0, beta=5.0, wind_speed=15.0)
+                                              alpha=10.0, beta=5.0, wind_speed=15.0,
+                                              yaw_rate=30.0)
     try
         settings   = VSMSettings(settings_file)
         wing       = Wing(settings)
@@ -444,11 +445,13 @@ end
 
         α, β, wind_speed = deg2rad(10.0), deg2rad(5.0), 15.0
         expected_va_vec = wind_speed .* [cos(α)*cos(β), sin(β), sin(α)*cos(β)]
+        omega = [0.0, 0.0, deg2rad(30.0)]
 
         for p in body_aero.panels
-            @test p.va ≈ expected_va_vec atol=1e-10
+            @test p.va ≈ expected_va_vec .- omega × p.control_point atol=1e-10
         end
         @test body_aero._va ≈ expected_va_vec atol=1e-10
+        @test body_aero.omega ≈ omega
     finally
         isfile(settings_file) && rm(settings_file; force=true)
     end
@@ -505,6 +508,40 @@ end
 end
 
 """
+    test_rigid_body_inflow(body_aero, va_vec, omega, reference_point)
+
+Test that every panel sees `va_vec` plus the inflow of a body turning at `omega` about
+`reference_point`.
+"""
+function test_rigid_body_inflow(body_aero, va_vec, omega, reference_point)
+    for panel in body_aero.panels
+        expected_va_vec = va_vec .- omega × (panel.control_point .- reference_point)
+        @test panel.va ≈ expected_va_vec atol=1e-12
+    end
+end
+
+@testset "set_va! rotates the body about reference_point" begin
+    body_aero = BodyAerodynamics([inviscid_wing([0.0, 1.0, 2.0]),
+                                  inviscid_wing([10.0, 11.0, 12.0])])
+    va_vec = [10.0, 0.0, 1.0]
+    omega = [0.1, 0.2, 1.0]
+    reference_point = [0.25, 6.0, -0.5]
+
+    set_va!(body_aero, va_vec, omega; reference_point)
+    @test body_aero.reference_point ≈ reference_point
+    test_rigid_body_inflow(body_aero, va_vec, omega, reference_point)
+
+    body_aero.omega = 2 .* omega
+    test_rigid_body_inflow(body_aero, va_vec, 2 .* omega, reference_point)
+
+    reinit!(body_aero; va=va_vec, omega)
+    test_rigid_body_inflow(body_aero, va_vec, omega, reference_point)
+
+    body_aero.reference_point = zeros(3)
+    test_rigid_body_inflow(body_aero, va_vec, omega, zeros(3))
+end
+
+"""
     solve_wings(wings)
 
 The `BodyAerodynamics` built from `wings` in a 10 m/s inflow and its `solve!` solution.
@@ -512,6 +549,32 @@ The `BodyAerodynamics` built from `wings` in a 10 m/s inflow and its `solve!` so
 function solve_wings(wings)
     body_aero = BodyAerodynamics(wings; va=[10.0, 0.0, 1.0])
     return body_aero, solve!(Solver(body_aero), body_aero)
+end
+
+"""
+    wing_pair(section_y, n_panels, offset)
+
+Two `inviscid_wing`s of `n_panels` panels, the second shifted by `-offset` [m] in y.
+"""
+function wing_pair(section_y, n_panels, offset)
+    return [inviscid_wing(section_y; n_panels),
+            inviscid_wing(section_y .- offset; n_panels)]
+end
+
+"""
+    linearize_body(body_aero; kwargs...)
+
+`linearize` of `body_aero` at zero twist and deflection over the twist and the deflection of
+every unrefined section, then the inflow and the angular rate.
+"""
+function linearize_body(body_aero; kwargs...)
+    n_sections = sum(wing -> wing.n_unrefined_sections, body_aero.wings)
+    solver = Solver(body_aero; use_gamma_prev=false, rtol=1e-10)
+    y0 = [zeros(2n_sections); body_aero.va; zeros(3)]
+    return VortexStepMethod.linearize(solver, body_aero, y0;
+        theta_idxs=1:n_sections, delta_idxs=n_sections+1:2n_sections,
+        va_idxs=2n_sections+1:2n_sections+3, omega_idxs=2n_sections+4:2n_sections+6,
+        kwargs...)
 end
 
 @testset "solve! on a two-wing body" begin
@@ -522,9 +585,7 @@ end
     @test single.solver_status == FEASIBLE
 
     @testset "wings far apart each act as the isolated wing" begin
-        wings = [inviscid_wing(section_y; n_panels),
-                 inviscid_wing(section_y .- 1e4; n_panels)]
-        body_aero, sol = solve_wings(wings)
+        body_aero, sol = solve_wings(wing_pair(section_y, n_panels, 1e4))
 
         @test length(body_aero.panels) == 2n_panels
         @test sol.solver_status == FEASIBLE
@@ -536,14 +597,57 @@ end
     end
 
     @testset "wings one chord apart induce on each other" begin
-        wings = [inviscid_wing(section_y; n_panels),
-                 inviscid_wing(section_y .- (span + 1.0); n_panels)]
-        _, sol = solve_wings(wings)
+        _, sol = solve_wings(wing_pair(section_y, n_panels, span + 1.0))
         gamma = sol.gamma_distribution
 
         @test sol.solver_status == FEASIBLE
         @test gamma ≈ reverse(gamma) rtol=1e-6
         @test gamma[n_panels] > 1.05single.gamma_distribution[n_panels]
         @test sol.force[3] > 2single.force[3]
+    end
+
+    n_wing_sections = length(section_y)
+    first_sections = 1:n_wing_sections
+    second_sections = n_wing_sections+1:2n_wing_sections
+    @testset "unrefined_deform! hands each wing its own run of angles" begin
+        body_aero = BodyAerodynamics(wing_pair(section_y, n_panels, span + 1.0))
+        isolated = wing_pair(section_y, n_panels, span + 1.0)
+        theta = deg2rad.(1.0:2n_wing_sections)
+        delta = -2theta
+        VortexStepMethod.unrefined_deform!(body_aero, theta, delta)
+
+        for (wing_idx, section_range) in enumerate((first_sections, second_sections))
+            wing = isolated[wing_idx]
+            VortexStepMethod.unrefined_deform!(wing, theta[section_range],
+                delta[section_range])
+            @test VortexStepMethod.unrefined_section_range(body_aero, wing_idx) ==
+                  section_range
+            @test body_aero.wings[wing_idx].theta_dist == wing.theta_dist
+            @test body_aero.wings[wing_idx].delta_dist == wing.delta_dist
+        end
+    end
+
+    @testset "linearize: theta of each wing moves that wing's sections" begin
+        body_aero, _ = solve_wings(wing_pair(section_y, n_panels, 1e4))
+        jac, _, converged = linearize_body(body_aero)
+        own_first = jac[6 .+ first_sections, first_sections]
+
+        @test converged
+        @test norm(own_first) > 0
+        @test jac[6 .+ second_sections, second_sections] ≈ own_first rtol=1e-9
+        @test norm(jac[6 .+ first_sections, second_sections]) < 1e-7norm(own_first)
+        @test norm(jac[6 .+ second_sections, first_sections]) < 1e-7norm(own_first)
+    end
+
+    @testset "linearize: AutoForwardDiff matches AutoFiniteDiff" begin
+        body_aero, _ = solve_wings(wing_pair(section_y, n_panels, span + 1.0))
+        jac_fwd, _, fwd_converged = linearize_body(body_aero)
+        jac_fd, _, fd_converged = linearize_body(body_aero; backend=nothing,
+            fd_absstep=1e-6, fd_relstep=1e-6)
+
+        @test fwd_converged
+        @test fd_converged
+        @test norm(jac_fwd[:, 1:2n_wing_sections]) > 0
+        @test jac_fwd ≈ jac_fd rtol=1e-4
     end
 end
