@@ -135,6 +135,7 @@ function create_temp_wing_settings(module_name, wing_file;
     alpha=10.0,
     beta=5.0,
     wind_speed=15.0,
+    yaw_rate=0.0,
 )
     wing_file_path = isabspath(wing_file) ? wing_file : test_data_path(module_name, wing_file)
     wing_file_path = replace(normpath(wing_file_path), '\\' => '/')
@@ -158,6 +159,7 @@ function create_temp_wing_settings(module_name, wing_file;
             "alpha" => alpha,
             "beta" => beta,
             "wind_speed" => wind_speed,
+            "yaw_rate" => yaw_rate,
         ),
     )
 

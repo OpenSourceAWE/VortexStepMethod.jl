@@ -14,7 +14,7 @@ vsm_settings = VSMSettings("pyramid_model/vsm_settings.yaml")
 wing = Wing(vsm_settings)
 refine!(wing)
 body_aero = BodyAerodynamics([wing])
-solver = Solver(body_aero, vsm_settings)
+solver = Solver(vsm_settings)
 
 # Set flight conditions from settings
 set_va!(body_aero, vsm_settings)
@@ -70,7 +70,7 @@ PLOT && plot_distribution(
     [body_y_coordinates],
     [results],
     ["VSM"];
-    title="pyramid_spanwise_distributions_alpha_$(round(angle_of_attack_deg, digits=1))_delta_$(round(sideslip_deg, digits=1))_yaw_$(round(yaw_rate, digits=1))_v_a_$(round(wind_speed, digits=1))",
+    title="pyramid_spanwise_distributions_alpha_$(round(angle_of_attack_deg, digits=1))_delta_$(round(sideslip_deg, digits=1))_yaw_$(round(yaw_rate, digits=1))_va_$(round(wind_speed, digits=1))",
     save_path=OUTPUT_DIR,
     is_save=false || SAVE_ALL,
     is_show=true,

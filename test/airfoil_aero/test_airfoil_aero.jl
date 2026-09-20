@@ -118,6 +118,14 @@ end
     @test size(cm) == (length(alpha_range), length(delta_range))
 end
 
+@testset "lei_poly_coeffs matches the Breukels regression, constant term first" begin
+    # Output of awegroup/Vortex-Step-Method's Breukels regression, reversed to ascending.
+    cl, cd, cm = lei_poly_coeffs(0.07, 0.095)
+    @test cl ≈ [0.15094825372, 0.18514483, -0.0006447182835, -0.0002730971205]
+    @test cd ≈ [0.04299816935, 0.0, 0.0003277967595]
+    @test cm ≈ [0.10077325005, 0.0, -0.00550797845]
+end
+
 @testset "SectionAero table round-trip and interpolation" begin
     alpha_range = deg2rad.([-5.0, 0.0, 5.0, 10.0])
     delta_range = deg2rad.([-3.0, 0.0, 3.0])

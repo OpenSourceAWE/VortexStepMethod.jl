@@ -7,13 +7,13 @@ function create_test_filament2()
     x1 = [0.0, 0.0, 0.0]
     direction = [1.0, 0.0, 0.0]
     filament_direction = 1
-    vel_mag = 1.0
+    va = 1.0
     filament = SemiInfiniteFilament{Float64}()
-    reinit!(filament, x1, direction, vel_mag, filament_direction)
+    reinit!(filament, x1, direction, va, filament_direction)
     return filament
 end
 
-function analytical_solution(control_point, gamma, x1, direction, filament_direction, vel_mag)
+function analytical_solution(control_point, gamma, x1, direction, filament_direction, va)
     gamma = -gamma  # Sign convention difference
     r1 = control_point - x1
     r1_cross_direction = cross(r1, direction)
@@ -21,7 +21,7 @@ function analytical_solution(control_point, gamma, x1, direction, filament_direc
     
     alpha0 = 1.25643
     nu = 1.48e-5
-    epsilon = sqrt(4 * alpha0 * nu * norm(r_perp) / vel_mag)
+    epsilon = sqrt(4 * alpha0 * nu * norm(r_perp) / va)
 
     if norm(r1_cross_direction) > epsilon
         K = (gamma / (4π * norm(r1_cross_direction)^2)) * 
@@ -162,16 +162,16 @@ end
 
     @testset "Constant azimuthal direction inside core" begin
         filament = create_test_filament2()
-        v_a = filament.vel_mag
+        va = filament.vel_mag
 
         d_inside = 1e-4
         v1 = zeros(3); v2 = zeros(3)
         velocity_3D_trailing_vortex_semiinfinite!(
             v1, filament, filament.direction,
-            [0.5, d_inside, 0.0], gamma, v_a, work_vectors)
+            [0.5, d_inside, 0.0], gamma, va, work_vectors)
         velocity_3D_trailing_vortex_semiinfinite!(
             v2, filament, filament.direction,
-            [0.5, 2 * d_inside, 0.0], gamma, v_a, work_vectors)
+            [0.5, 2 * d_inside, 0.0], gamma, va, work_vectors)
 
         @test isapprox(normalize(v2), normalize(v1); atol=1e-8)
     end

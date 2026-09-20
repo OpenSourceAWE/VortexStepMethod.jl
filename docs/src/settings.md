@@ -11,7 +11,7 @@ settings = VSMSettings("my/vsm_settings.yaml"; data_prefix=false)  # as written
 
 wing = Wing(settings)
 body_aero = BodyAerodynamics([wing])
-solver = Solver(body_aero, settings)
+solver = Solver(settings)
 set_va!(body_aero, settings)
 ```
 
@@ -32,7 +32,7 @@ condition:
   wind_speed: 10.0                # free-stream velocity magnitude [m/s]
   alpha: 5.0                      # angle of attack [°]
   beta: 0.0                       # sideslip angle [°]
-  yaw_rate: 0.0                   # yaw rate [°/s]
+  yaw_rate: 0.0                   # turn rate about the body z axis [°/s]
 
 wings:
   - name: main_wing               # label the wing carries into plots and output

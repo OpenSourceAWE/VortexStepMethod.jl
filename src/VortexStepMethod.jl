@@ -174,17 +174,22 @@ in sequence.
 function plot_combined_analysis end
 
 """
-    plot_section_polars(body_aero::BodyAerodynamics, coefficient=:cl; kwargs...)
+    plot_section_polars(body_aero::BodyAerodynamics; panels=eachindex(body_aero.panels),
+                        alphas=deg2rad.(-20:0.5:30), delta=nothing, kwargs...)
 
-Plot one polar coefficient (`:cl`, `:cd`, or `:cm`) against angle of attack for
-every section of a wing using stored `POLAR_VECTORS` data. Rendered through
-`MakieControlPlots`.
+Plot the lift, drag and moment coefficients against angle of attack for the chosen
+`panels`, one curve per panel, as each panel's [`calculate_cl`](@ref),
+[`calculate_cd`](@ref) and [`calculate_cm`](@ref) evaluate them for its aero model.
+Rendered through `MakieControlPlots`; returns its plot object.
 
 # Arguments
 - `body_aero`: the [`BodyAerodynamics`](@ref) to plot
-- `coefficient`: `:cl`, `:cd`, or `:cm` (default: `:cl`)
 
 # Keyword arguments
+- `panels`: index or indices into `body_aero.panels` (default: all panels)
+- `alphas`: angles of attack [rad] (default: `deg2rad.(-20:0.5:30)`)
+- `delta`: flap deflection [rad] a `POLAR_MATRICES` panel is evaluated at
+  (default: `nothing`, each panel's own `delta`)
 - `is_show`: whether to display (default: `true`)
 - `is_save`: whether to save (default: `false`)
 - `save_path`: directory to save the figure (default: `nothing`)
