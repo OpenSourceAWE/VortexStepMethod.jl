@@ -255,6 +255,9 @@ densify_contour
 create_interpolations
 find_circle_center_and_radius
 march_edges
+cut_station
+tip_station
+march_stations
 airfoils_from_yaml
 write_geometry_yaml
 resolve_aero_geometry

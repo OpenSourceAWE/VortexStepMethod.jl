@@ -270,6 +270,74 @@ function slice_mesh_at_plane(vertices, faces, point, normal; tol=1e-6)
 end
 
 """
+    cut_station(vertices, faces, point, tangent) -> (; le, te) or nothing
+
+Cut the mesh with the vertical spanwise plane through `point` whose normal is the
+spanwise component of `tangent`, and return the crossings with the least and greatest
+`x` as the leading and trailing edge; `nothing` where the plane misses the mesh.
+"""
+function cut_station(vertices, faces, point, tangent)
+    segments = slice_mesh_at_plane(vertices, faces, point,
+                                   normalize([0.0, tangent[2], 0.0]))
+    isempty(segments) && return nothing
+    crossings = Vector{Float64}[]
+    for (start_point, end_point) in segments
+        push!(crossings, start_point)
+        push!(crossings, end_point)
+    end
+    return (; le=argmin(pt -> pt[1], crossings), te=argmax(pt -> pt[1], crossings))
+end
+
+"""
+    tip_station(vertices, faces, prev_le, tangent, step) -> (; le, te, point) or nothing
+
+Bisect the step of length `step` from `prev_le` along `tangent` for the outermost cut
+that still yields an airfoil section whose leading edge stays within `step` of
+`prev_le` chordwise; `nothing` where no such cut exists.
+"""
+function tip_station(vertices, faces, prev_le, tangent, step)
+    lo, hi, tip = 0.0, step, nothing
+    for _ in 1:24
+        mid = (lo + hi) / 2
+        probe = prev_le .+ mid .* tangent
+        here = cut_station(vertices, faces, probe, tangent)
+        valid = here !== nothing &&
+                abs(here.le[1] - prev_le[1]) < step &&
+                build_section(vertices, faces, here.le, here.te, probe, tangent) !== nothing
+        valid ? (lo = mid; tip = (; here.le, here.te, point=probe)) : (hi = mid)
+    end
+    return tip
+end
+
+"""
+    march_stations(vertices, faces, start_le, step, direction) -> Vector{NamedTuple}
+
+March the leading edge from `start_le` in steps of arc length `step` towards `+y` for
+`direction = 1.0` or `-y` for `-1.0`, returning one `(; le, te, point)` per station,
+the tip station last. Stops when the leading edge stops advancing spanwise.
+"""
+function march_stations(vertices, faces, start_le, step, direction)
+    rows = NamedTuple[]
+    prev_le = start_le
+    tangent = [0.0, direction, 0.0]
+    for _ in 1:10_000
+        probe = prev_le .+ step .* tangent
+        found = cut_station(vertices, faces, probe, tangent)
+        if found === nothing
+            tip = tip_station(vertices, faces, prev_le, tangent, step)
+            tip === nothing || push!(rows, tip)
+            break
+        end
+        le_step = found.le .- prev_le
+        (norm(le_step) < 1e-9 || le_step[2] * direction <= 0.0) && break
+        push!(rows, (; found.le, found.te, point=probe))
+        tangent = normalize(le_step)
+        prev_le = found.le
+    end
+    return rows
+end
+
+"""
     march_edges(vertices, faces; step) -> (; le, te, point, tangent)
 
 March the leading edge outward from mid-span in both directions in steps of arc
@@ -287,60 +355,13 @@ function march_edges(vertices, faces; step)
     y_min, y_max = extrema(ys)
     y_mid = (y_min + y_max) / 2
 
-    # Vertical spanwise plane (z dropped): a tip curl mustn't tilt the cut horizontal.
-    cut(point, tangent) = begin
-        segments = slice_mesh_at_plane(vertices, faces, point,
-                                       normalize([0.0, tangent[2], 0.0]))
-        isempty(segments) && return nothing
-        crossings = Vector{Float64}[]
-        for (start_point, end_point) in segments
-            push!(crossings, start_point)
-            push!(crossings, end_point)
-        end
-        return (; le=argmin(pt -> pt[1], crossings), te=argmax(pt -> pt[1], crossings))
-    end
-
-    mid_cut = cut([0.0, y_mid, 0.0], [0.0, 1.0, 0.0])
+    mid_cut = cut_station(vertices, faces, [0.0, y_mid, 0.0], [0.0, 1.0, 0.0])
     mid_cut === nothing && error("Could not slice mid-span; check mesh / rotation.")
 
-    march(direction) = begin
-        rows = NamedTuple[]
-        prev_le = mid_cut.le
-        tangent = [0.0, direction, 0.0]
-        for _ in 1:10_000
-            probe = prev_le .+ step .* tangent
-            found = cut(probe, tangent)
-            if found === nothing
-                # Bisect the last step to land the tip station on the outermost cut
-                # that still yields a valid (non-degenerate) airfoil section.
-                lo, hi, tip = 0.0, step, nothing
-                for _ in 1:24
-                    mid = (lo + hi) / 2
-                    probe_mid = prev_le .+ mid .* tangent
-                    here = cut(probe_mid, tangent)
-                    # Reject a near-degenerate tip slice whose min-chord "LE" has jumped
-                    # chordwise (an artifact that would misplace the tip station).
-                    valid = here !== nothing &&
-                            abs(here.le[1] - prev_le[1]) < step &&
-                            build_section(vertices, faces, here.le, here.te,
-                                          probe_mid, tangent) !== nothing
-                    valid ? (lo = mid; tip = (; here.le, here.te, point=probe_mid)) :
-                            (hi = mid)
-                end
-                tip === nothing || push!(rows, tip)
-                break
-            end
-            le_step = found.le .- prev_le
-            (norm(le_step) < 1e-9 || le_step[2] * direction <= 0.0) && break
-            push!(rows, (; found.le, found.te, point=probe))
-            tangent = normalize(le_step)
-            prev_le = found.le
-        end
-        return rows
-    end
-
     center = (; mid_cut.le, mid_cut.te, point=[0.0, y_mid, 0.0])
-    rows = vcat(reverse(march(-1.0)), [center], march(1.0))
+    negative_y = march_stations(vertices, faces, mid_cut.le, step, -1.0)
+    positive_y = march_stations(vertices, faces, mid_cut.le, step, 1.0)
+    rows = vcat(reverse(negative_y), [center], positive_y)
     le = [r.le for r in rows]
     middle = clamp.(eachindex(le), 2, length(le) - 1)
     tangent = [normalize(le[j + 1] .- le[j - 1]) for j in middle]
