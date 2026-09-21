@@ -351,8 +351,9 @@ LE → TE lower), following [`ShrinkWrap`](@ref): the rolling ball
 by `clearance` ([`pivot_contour`](@ref)), and the resulting arcs are resampled to
 cosine panels in a curvature-weighted arclength measure. The first and last point
 coincide at the trailing edge (the TE cap is part of the contour). A closed loop
-(first and last cloud points coincident) is wrapped as the polygon through its points
-([`densify_contour`](@ref)) and keeps its true `clearance`, so `clearance=0` hugs the
+(first and last cloud points coincident) is wrapped as the polygon through its points,
+its edges split to at most `min(0.01, min_concave_radius/2)` chord
+([`densify_contour`](@ref)), and keeps its true `clearance`, so `clearance=0` hugs the
 input and leaves a sharp trailing edge sharp; an open single-membrane cloud is floored
 at `min_clearance`. Warns when the wrapped contour crosses itself. The output stays in
 the normalized frame of the input cloud (chord slightly longer than 1, nose apex near

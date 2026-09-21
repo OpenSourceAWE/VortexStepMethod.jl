@@ -1,4 +1,5 @@
 using Test
+using Logging
 using VortexStepMethod.AirfoilAero
 import VortexStepMethod
 using VortexStepMethod.AirfoilAero: KulfanParameters, LeastSquaresFit, ShrinkWrap,
@@ -276,8 +277,6 @@ end
 end
 
 @testset "re-wrapping a wrapped section keeps it a simple closed curve" begin
-    shoelace(x, y) = abs(sum(x[i] * y[mod1(i + 1, end)] - x[mod1(i + 1, end)] * y[i]
-                             for i in eachindex(x))) / 2
     obj = joinpath(pkgdir(VortexStepMethod), "data", "TUDELFT_V3_KITE", "V3_25.obj")
     vertices, faces = VortexStepMethod.ObjAdapter.read_faces(obj)
     canopy = VortexStepMethod.ObjAdapter.perpendicular_sections(vertices, faces, 18;
@@ -290,19 +289,25 @@ end
             @test isnothing(crossing_panels(def.x, def.y))
         end
     end
+end
 
-    # a clearance-padded wrap is re-wrapped at zero clearance, neither padded again
-    # nor collapsed by the ball falling between its long panels
+@testset "re-wrapping a clearance-padded wrap keeps its area" begin
+    shoelace(x, y) = abs(sum(x[i] * y[mod1(i + 1, end)] - x[mod1(i + 1, end)] * y[i]
+                             for i in eachindex(x))) / 2
     xw, yw = shrink_wrap(read_dat_coordinates(joinpath(@__DIR__, "data",
                                                        "test_airfoil.dat"))...,
                          ShrinkWrap())
     def = deform_section(xw, yw, 0.0; wrap_method=ShrinkWrap())
     @test isnothing(crossing_panels(def.x, def.y))
     @test shoelace(def.x, def.y) ≈ shoelace(xw, yw) rtol = 0.05
+end
 
-    @test_logs (:warn, r"cross") match_mode=:any shrink_wrap(canopy[2].x_airfoil,
-                                                             canopy[2].y_airfoil,
-                                                             ShrinkWrap())
+@testset "shrink_wrap warns when its contour crosses itself" begin
+    x = collect(range(0.0, 1.0, 400))
+    y = 0.02 .* sin.(20pi .* x) .+ 0.05 .* sin.(pi .* x)
+    @test_logs (:warn, r"cross") match_mode=:any shrink_wrap(x, y,
+                                                             ShrinkWrap(clearance=0.05))
+    @test_logs min_level=Logging.Warn shrink_wrap(x, y, ShrinkWrap(clearance=0.0))
 end
 
 @testset "generate_polar_from_coordinates POLAR_VECTORS sweep" begin

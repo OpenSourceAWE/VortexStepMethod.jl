@@ -107,8 +107,11 @@ function deform_section(x, y, delta; crease_frac=0.9, thickness_frac=1.0,
         lower, upper = get_lower_upper(xd, yd, crease_frac)
         turn_trailing_edge!(delta, xd, yd, lower, upper, crease_frac; thickness_frac=pivot)
     end
-    rewrap = ShrinkWrap(0.0, wrap_method.min_concave_radius, wrap_method.min_clearance,
-                        wrap_method.n_points, wrap_method.curvature_weight)
+    rewrap = ShrinkWrap(; clearance=0.0,
+                        min_concave_radius=wrap_method.min_concave_radius,
+                        min_clearance=wrap_method.min_clearance,
+                        n_points=wrap_method.n_points,
+                        curvature_weight=wrap_method.curvature_weight)
     xd, yd = shrink_wrap(xd, yd, rewrap)
     kulfan = fit_kulfan_parameters(xd, yd, LeastSquaresFit())
     return DeformedSection(kulfan, xd, yd)
