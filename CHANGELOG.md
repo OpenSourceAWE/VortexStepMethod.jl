@@ -4,6 +4,11 @@
 
 ### Added
 
+- `stability_derivatives` gives the force and moment coefficients and their derivatives
+  with respect to angle of attack and sideslip, and `trim_angle` the angles of attack at
+  which `CMy` changes sign, with the slope that says whether each trim is stable.
+- `apparent_wind(alpha, beta, wind_speed)` gives the body-frame inflow vector at an angle
+  of attack and sideslip, as `set_va!(body_aero, settings)` sets it.
 - `Solver(settings)` and `Solver(n_panels, n_unrefined_sections)` build a solver without
   a `BodyAerodynamics`; keyword arguments override the settings.
 - `set_va!(body_aero, va_vec, omega; reference_point)` turns the body about

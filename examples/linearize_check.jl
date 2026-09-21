@@ -35,11 +35,7 @@ va         = 15.0
 aoa_deg    = 10.0
 aoa_rad    = deg2rad(aoa_deg)
 side_slip  = 0.0
-va_vec_b_0 = [
-    cos(aoa_rad) * cos(side_slip),
-    sin(side_slip),
-    sin(aoa_rad),
-] * va
+va_vec_b_0 = apparent_wind(aoa_rad, side_slip, va)
 omega_b_0  = zeros(3)
 theta_0    = zeros(n_unrefined)
 

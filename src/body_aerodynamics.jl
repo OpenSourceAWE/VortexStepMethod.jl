@@ -1158,26 +1158,20 @@ function set_va!(body_aero::BodyAerodynamics, va_vec_dist::AbstractMatrix;
 end
 
 """
+    apparent_wind(alpha, beta, wind_speed)
+
+Apparent wind vector in the body frame [m/s] at angle of attack `alpha` [rad], sideslip
+`beta` [rad] and `wind_speed` [m/s].
+"""
+apparent_wind(alpha, beta, wind_speed) =
+    wind_speed .* [cos(alpha) * cos(beta), sin(beta), sin(alpha) * cos(beta)]
+
+"""
     set_va!(body_aero::BodyAerodynamics, settings::VSMSettings)
 
-Set velocity array from VSM settings configuration.
-
-This convenience method extracts flight conditions from VSMSettings and 
-constructs the velocity vector in the body reference frame based on:
-- Wind speed from settings.condition.wind_speed
-- Angle of attack from settings.condition.alpha (converted from degrees)
-- Sideslip angle from settings.condition.beta (converted from degrees)
-- Yaw rate from settings.condition.yaw_rate (converted from °/s), applied as `omega`
-  about Z_b and turning the body about `body_aero.reference_point`
-
-The velocity vector is constructed as:
-- X_b (forward): wind_speed * cos(α) * cos(β)  
-- Y_b (right): wind_speed * sin(β)
-- Z_b (down): wind_speed * sin(α) * cos(β)
-
-# Arguments
-- `body_aero::BodyAerodynamics`: The aerodynamic body to modify
-- `settings::VSMSettings`: Settings object containing flight conditions
+Set the uniform inflow of `body_aero` to the [`apparent_wind`](@ref) at the `alpha` and
+`beta` [°] and `wind_speed` [m/s] of `settings.condition`, turning the body about
+`body_aero.reference_point` at its `yaw_rate` [°/s] about Z_b.
 
 # Example
 ```julia
@@ -1187,16 +1181,8 @@ set_va!(body_aero, settings)
 ```
 """
 function set_va!(body_aero::BodyAerodynamics, settings::VSMSettings)
-    α = deg2rad(settings.condition.alpha)
-    β = deg2rad(settings.condition.beta)
-    wind_speed = settings.condition.wind_speed
-    
-    va_vec = wind_speed * [
-        cos(α)*cos(β),  # X_b (forward)
-        sin(β),         # Y_b (right)
-        sin(α)*cos(β)   # Z_b (down)
-    ]
-    omega = [0.0, 0.0, deg2rad(settings.condition.yaw_rate)]
-
-    set_va!(body_aero, va_vec, omega)
+    condition = settings.condition
+    va_vec = apparent_wind(deg2rad(condition.alpha), deg2rad(condition.beta),
+        condition.wind_speed)
+    set_va!(body_aero, va_vec, [0.0, 0.0, deg2rad(condition.yaw_rate)])
 end
