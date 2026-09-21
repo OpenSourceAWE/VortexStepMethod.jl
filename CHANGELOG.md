@@ -35,6 +35,11 @@
 
 ### Fixed
 
+- `get_lower_upper`, and with it the flap hinge in `deform_section`, takes the lower and
+  upper surface heights where the contour crosses `x = crease_frac`. It took the nearest
+  points below and above `y = 0`, which on a cambered section put the hinge near the
+  chord line or on the wrong surface. Polars with a flap deflection change slightly.
+  It throws an `ArgumentError` for a contour that crosses that line fewer than twice.
 - `solve!` and `solve` throw a `DimensionMismatch` naming both sizes for a `body_aero` whose
   panel or unrefined-section count differs from the solver's, where they failed on a
   broadcast partway through or silently left section results at zero.
