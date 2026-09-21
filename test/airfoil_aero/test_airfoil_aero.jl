@@ -286,7 +286,7 @@ end
     @test !occursin("delta", header)
 end
 
-@testset "a Cd deflection response smaller than 1e-4 survives the polar CSV round-trip" begin
+@testset "a Cd deflection response under 1e-4 survives the polar CSV round-trip" begin
     alpha_range = deg2rad.(-5:5:15)
     delta_range = deg2rad.(-3:3:3)
     cl = [0.1 * a + 0.03 * d for a in -5:5:15, d in -3:3:3]
