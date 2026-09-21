@@ -5,15 +5,14 @@ using Test
 
 relative_error(jac, reference) = maximum(abs.(jac .- reference)) / maximum(abs, reference)
 
-# Four-section arc whose POLAR_MATRICES tables are affine in (alpha, delta), so the
-# bilinear interpolation is exact and has no kinks at the grid knots.
-function affine_matrix_wing(n_panels)
+# Affine tables: bilinear interpolation is exact, so the grid knots are not kinks.
+function affine_matrix_wing()
     alphas = deg2rad.(-5:5:25)
     deltas = deg2rad.(-3:3:3)
     cl = [0.2 + 5.5alpha + 1.5delta for alpha in alphas, delta in deltas]
     cd = [0.03 + 0.2alpha + 0.05delta for alpha in alphas, delta in deltas]
     cm = [-0.05 - 0.1alpha - 0.3delta for alpha in alphas, delta in deltas]
-    wing = Wing(n_panels, spanwise_distribution=LINEAR)
+    wing = Wing(8, spanwise_distribution=LINEAR)
     radius = 3.0
     for phi in deg2rad.((50, 17, -17, -50))
         le = [0.0, radius * sin(phi), radius * (cos(phi) - 1)]
@@ -76,7 +75,7 @@ end
     end
 
     @testset "AutoForwardDiff matches AutoFiniteDiff (LOOP, POLAR_MATRICES)" begin
-        matrix_wing = affine_matrix_wing(8)
+        matrix_wing = affine_matrix_wing()
         matrix_body = BodyAerodynamics([matrix_wing])
         matrix_solver = Solver(matrix_wing.n_panels, matrix_wing.n_unrefined_sections;
             aerodynamic_model_type=VSM,
