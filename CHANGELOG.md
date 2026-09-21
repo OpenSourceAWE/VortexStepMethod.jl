@@ -56,12 +56,6 @@
   panel's chordwise trailing segment were affected.
 - With `artificial_damping` on, an iteration whose circulation is already smooth no longer
   re-applies the previous iteration's damping correction.
-- `analyze_sweep(::XFoilSolver, ...)` throws `ArgumentError` for a contour XFoil's
-  panel code cannot take, rather than handing it to the Fortran. A self-crossing
-  contour could reach a bare `STOP` there, ending the Julia process with exit code 0
-  and no exception; a contour with more nodes than XFoil's panel arrays hold was
-  refused by XFoil, which then solved every angle on whichever airfoil was loaded
-  before and returned it as this one.
 
 ## VortexStepMethod v5.1.1 2026-09-12
 

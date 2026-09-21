@@ -5,9 +5,7 @@ import VortexStepMethod
 using VortexStepMethod.AirfoilAero: KulfanParameters, LeastSquaresFit, ShrinkWrap,
                        shrink_wrap, fit_kulfan_parameters, kulfan_to_coordinates,
                        neuralfoil_aero, class_function, bernstein_basis,
-                       leading_edge_basis, normalize_airfoil, crossing_panels,
-                       validate_xfoil_contour, DeformedSection, XFoilSolver,
-                       analyze_sweep, Xfoil
+                       leading_edge_basis, normalize_airfoil, crossing_panels
 using VortexStepMethod: SectionAero, section_surface, read_section_aero
 using VortexStepMethod.AirfoilAero: write_section_aero
 
@@ -362,29 +360,16 @@ end
                        collect(extrema(fitted_y))) < 1e-4
 end
 
-@testset "a contour XFoil has no solution for is refused before XFoil sees it" begin
+@testset "crossing_panels finds the first pair of crossing panels" begin
     clean = KulfanParameters(fill(0.15, 8), fill(-0.15, 8), 0.0, 0.0)
     x, y = collect.(kulfan_to_coordinates(clean; n_points=60))
-    alphas = deg2rad.([0.0])
-    @test isnothing(validate_xfoil_contour(DeformedSection(clean, x, y)))
+    @test isnothing(crossing_panels(x, y))
 
     # the upper surface driven through the lower one over a stretch of the chord
     folded = copy(y)
     folded[20:40] .= -3 .* folded[20:40]
     @test !isnothing(crossing_panels(x, folded))
-    @test_throws ArgumentError analyze_sweep(XFoilSolver(),
-        DeformedSection(clean, x, folded), alphas, 1e6)
-
-    gapped = KulfanParameters(fill(0.15, 8), fill(-0.15, 8), 0.0, 0.02)
-    gapped_x, gapped_y = collect.(kulfan_to_coordinates(gapped; n_points=60))
-    @test (gapped_x[1], gapped_y[1]) != (gapped_x[end], gapped_y[end])
-    @test isnothing(validate_xfoil_contour(DeformedSection(gapped, gapped_x, gapped_y)))
 
     # a contour whose only crossing is the panel closing it back to node 1
     @test crossing_panels([0.0, 1.0, 1.0, 2.0], [0.0, 2.0, -2.0, 1.0]) == (2, 4)
-
-    crowded_x, crowded_y = collect.(kulfan_to_coordinates(clean; n_points=200))
-    @test length(crowded_x) > Xfoil.IQX - 5
-    @test_throws ArgumentError analyze_sweep(XFoilSolver(),
-        DeformedSection(clean, crowded_x, crowded_y), alphas, 1e6)
 end

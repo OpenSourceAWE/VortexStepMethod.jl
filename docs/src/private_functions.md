@@ -175,9 +175,8 @@ resample_arc
 smoothed_curvature
 ```
 
-### Section solver preconditions
+### Section contour checks
 ```@docs
-validate_xfoil_contour
 crossing_panels
 segments_cross
 side_of_line

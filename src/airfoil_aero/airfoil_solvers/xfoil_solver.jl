@@ -29,23 +29,6 @@ runs (`ncrit=9`, `max_iter=100`, incompressible) so the two backends are compara
 end
 
 """
-    validate_xfoil_contour(def::DeformedSection)
-
-Enforce what XFoil's panel code needs of `def`'s coordinates: no more nodes than its
-panel arrays hold, and no two panels crossing. Throws `ArgumentError` on a violation.
-"""
-function validate_xfoil_contour(def::DeformedSection)
-    max_nodes = Xfoil.IQX - 5
-    length(def.x) <= max_nodes || throw(ArgumentError(
-        "XFoil holds $max_nodes panel nodes; this contour has $(length(def.x))."))
-    crossing = crossing_panels(def.x, def.y)
-    isnothing(crossing) || throw(ArgumentError(
-        "XFoil needs a contour that does not cross itself; panels $(crossing[1]) " *
-        "and $(crossing[2]) of this one do."))
-    return nothing
-end
-
-"""
     analyze_sweep(solver::XFoilSolver, def, alpha_range, Re) -> Vector{SectionSolution}
 
 Set the deformed coordinates once (repaneling if `solver.repanel`), then solve
@@ -54,12 +37,8 @@ reinit at each side for convergence. Each converged angle reads the surface pres
 (`Xfoil.cpdump`) and the boundary layer (`Xfoil.bldump`, giving `cf` and the node
 coordinates) at the same panel nodes. Non-converged angles yield empty node arrays and
 `NaN` confidence.
-
-Throws `ArgumentError` for a contour XFoil's panel code cannot take, see
-[`validate_xfoil_contour`](@ref).
 """
 function analyze_sweep(solver::XFoilSolver, def::DeformedSection, alpha_range, Re)
-    validate_xfoil_contour(def)
     Xfoil.set_coordinates(def.x, def.y)
     solver.repanel && Xfoil.pane(npan=solver.npan)
     sols = Vector{SectionSolution}(undef, length(alpha_range))
