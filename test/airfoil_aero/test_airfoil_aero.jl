@@ -286,7 +286,7 @@ end
     @test !occursin("delta", header)
 end
 
-@testset "polar CSVs keep a Cd deflection response below 1e-4" begin
+@testset "a Cd deflection response smaller than 1e-4 survives the polar CSV round-trip" begin
     alpha_range = deg2rad.(-5:5:15)
     delta_range = deg2rad.(-3:3:3)
     cl = [0.1 * a + 0.03 * d for a in -5:5:15, d in -3:3:3]
@@ -307,6 +307,13 @@ end
             for i in eachindex(alpha_range)]
     vectors_csv = write_polar_csv(joinpath(work, "vectors.csv"), sols)
     (alphas, _, cd_vec, _), _ = load_polar_data(vectors_csv)
+    @test alphas == alpha_range
+    @test all(isapprox.(cd_vec, cd[:, 1]; rtol=5e-4))
+
+    result = AirfoilAero.NeuralFoilResult(collect(-5.0:5:15), cl[:, 1], cd[:, 1], cm[:, 1],
+                                          ones(5))
+    neuralfoil_csv = write_polar_csv(joinpath(work, "neuralfoil.csv"), result)
+    (alphas, _, cd_vec, _), _ = load_polar_data(neuralfoil_csv)
     @test alphas == alpha_range
     @test all(isapprox.(cd_vec, cd[:, 1]; rtol=5e-4))
 
