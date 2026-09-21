@@ -23,6 +23,13 @@ function trimmable_wing(cm; kwargs...)
            Solver(wing.n_panels, wing.n_unrefined_sections; kwargs...)
 end
 
+@testset "apparent_wind points along body x, tilts up with alpha, right with beta" begin
+    @test apparent_wind(0.0, 0.0, 10.0) == [10.0, 0.0, 0.0]
+    va_vec = apparent_wind(deg2rad(30), deg2rad(20), 10.0)
+    @test va_vec ≈ 10.0 .* [cosd(30) * cosd(20), sind(20), sind(30) * cosd(20)]
+    @test hypot(va_vec...) ≈ 10.0
+end
+
 @testset "stability_derivatives match central differences of solve!" begin
     body_aero, solver = trimmable_wing(0.05; reference_point=[0.25, 0.5, 0.1],
                                        use_gamma_prev=false)

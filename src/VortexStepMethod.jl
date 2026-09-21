@@ -35,7 +35,7 @@ export Solver, VSMSolution, linearize, solve, solve!, solve_base!, calc_forces!
 export stability_derivatives, trim_angle
 export SolveFailure
 export calculate_results
-export add_section!, set_va!, section_pitch_rate
+export add_section!, apparent_wind, set_va!, section_pitch_rate
 export calculate_projected_area, calculate_span
 export MVec3
 

@@ -89,7 +89,7 @@ sideslip_deg = settings.condition.beta
 
 α0 = deg2rad(angle_of_attack_deg)
 β0 = deg2rad(sideslip_deg)
-va_vec = wind_speed .* [cos(α0) * cos(β0), sin(β0), sin(α0) * cos(β0)]
+va_vec = apparent_wind(α0, β0, wind_speed)
 set_va!(body_aero_flat, va_vec)
 set_va!(body_aero_bill, va_vec)
 

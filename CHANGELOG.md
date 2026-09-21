@@ -9,6 +9,8 @@
   rates p̂ = pb/2V, q̂ = q c_ref/2V, r̂ = rb/2V, turning about `solver.reference_point`,
   and `trim_angle` the angles of attack at which `CMy` changes sign, with the slope that
   says whether each trim is stable.
+- `apparent_wind(alpha, beta, wind_speed)` gives the body-frame inflow vector at an angle
+  of attack and sideslip, as `set_va!(body_aero, settings)` sets it.
 - `Solver(settings)` and `Solver(n_panels, n_unrefined_sections)` build a solver without
   a `BodyAerodynamics`; keyword arguments override the settings.
 - `set_va!(body_aero, va_vec, omega; reference_point)` turns the body about
@@ -27,6 +29,9 @@
 
 ### Changed
 
+- BREAKING: `ObjAdapter.center_to_com!`, `calculate_inertia_tensor` and
+  `calc_inertia_y_rotation` are removed. Mesh mass properties are computed by
+  SymbolicAWEModels, which reads the mesh with `read_faces`.
 - Requires Julia 1.12 or 1.13; 1.10 and 1.11 keep resolving v5.1.1.
 - The Makie `plot!` methods for a `Panel` or a `BodyAerodynamics` return a
   `Vector{Makie.AbstractPlot}` instead of a `Vector{Any}`; for a `BodyAerodynamics`
