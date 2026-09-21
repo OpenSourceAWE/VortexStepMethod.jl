@@ -49,19 +49,19 @@ function wing_from_coordinates(coordinates, aero_model, aero_data=nothing;
 end
 
 """
-    lift_drag_polar(wing, model, alphas; wind_speed, relaxation_factor)
+    lift_drag_polar(wing, model, alphas; va, relaxation_factor)
 
 Wing `CL` and `CD` at each angle of attack in `alphas` [deg], solved with the
 settings of the Python verification cases.
 """
-function lift_drag_polar(wing, model, alphas; wind_speed, relaxation_factor)
+function lift_drag_polar(wing, model, alphas; va, relaxation_factor)
     body_aero = BodyAerodynamics([wing])
     solver = Solver(wing.n_panels, wing.n_unrefined_sections; aerodynamic_model_type=model,
                     relaxation_factor, core_radius_fraction=1e-20)
     CL = zeros(length(alphas))
     CD = zeros(length(alphas))
     for (i, alpha) in enumerate(alphas)
-        set_va!(body_aero, wind_speed .* [cosd(alpha), 0.0, sind(alpha)])
+        set_va!(body_aero, va .* [cosd(alpha), 0.0, sind(alpha)])
         results = solve(solver, body_aero)
         CL[i] = results["cl"]
         CD[i] = results["cd"]
@@ -90,9 +90,9 @@ max_error(actual, expected) = maximum(abs.(actual .- expected))
         alphas = [3.0, 9.0]
         coordinates = generate_coordinates_el_wing(max_chord, span, 40, "cos")
         wing = wing_from_coordinates(coordinates, INVISCID)
-        CL_llt, CD_llt = lift_drag_polar(wing, LLT, alphas; wind_speed=20.0,
+        CL_llt, CD_llt = lift_drag_polar(wing, LLT, alphas; va=20.0,
                                          relaxation_factor=0.05)
-        CL_vsm, CD_vsm = lift_drag_polar(wing, VSM, alphas; wind_speed=20.0,
+        CL_vsm, CD_vsm = lift_drag_polar(wing, VSM, alphas; va=20.0,
                                          relaxation_factor=0.05)
         CL_theory = 2π .* deg2rad.(alphas) ./ (1 + 2 / aspect_ratio)
         CD_theory = CL_theory .^ 2 ./ (π * aspect_ratio)
@@ -111,9 +111,9 @@ max_error(actual, expected) = maximum(abs.(actual .- expected))
                                                        "lin")
         polar = polar_vectors(read_columns("clarky_polar.csv")...)
         wing = wing_from_coordinates(coordinates, POLAR_VECTORS, polar)
-        CL_llt, CD_llt = lift_drag_polar(wing, LLT, alphas; wind_speed=20.0,
+        CL_llt, CD_llt = lift_drag_polar(wing, LLT, alphas; va=20.0,
                                          relaxation_factor=0.03)
-        CL_vsm, CD_vsm = lift_drag_polar(wing, VSM, alphas; wind_speed=20.0,
+        CL_vsm, CD_vsm = lift_drag_polar(wing, VSM, alphas; va=20.0,
                                          relaxation_factor=0.03)
         alpha_rans, CL_rans, CD_rans, _ = read_columns("curved_wing_rans.csv")
 
@@ -130,9 +130,9 @@ max_error(actual, expected) = maximum(abs.(actual .- expected))
             zeros(n_sections), zeros(n_sections), n_sections, "lin")
         polar = polar_vectors(read_columns("naca4415_cfd_polar.csv")...)
         wing = wing_from_coordinates(coordinates, POLAR_VECTORS, polar)
-        CL_llt, CD_llt = lift_drag_polar(wing, LLT, alphas; wind_speed=20.0,
+        CL_llt, CD_llt = lift_drag_polar(wing, LLT, alphas; va=20.0,
                                          relaxation_factor=0.03)
-        CL_vsm, CD_vsm = lift_drag_polar(wing, VSM, alphas; wind_speed=20.0,
+        CL_vsm, CD_vsm = lift_drag_polar(wing, VSM, alphas; va=20.0,
                                          relaxation_factor=0.03)
         alpha_cfd, CL_cfd = read_columns("rectangular_wing_ar12_cfd.csv")
 
@@ -172,7 +172,7 @@ max_error(actual, expected) = maximum(abs.(actual .- expected))
         alphas = [3.0, 6.0, 9.0]
         wing = wing_from_coordinates(coordinates, POLY, lei_poly_coeffs(0.1, 0.095);
                                      n_panels=36, spanwise_distribution=SPLIT_PROVIDED)
-        CL_vsm, CD_vsm = lift_drag_polar(wing, VSM, alphas; wind_speed=22.0,
+        CL_vsm, CD_vsm = lift_drag_polar(wing, VSM, alphas; va=22.0,
                                          relaxation_factor=0.03)
         alpha_cl, CL_rans = read_columns("v3_kite_rans_cl.csv")
         alpha_cd, CD_rans = read_columns("v3_kite_rans_cd.csv")
@@ -185,7 +185,7 @@ max_error(actual, expected) = maximum(abs.(actual .- expected))
     @testset "three horseshoe vortices match Biot-Savart" begin
         work_vectors = ntuple(_ -> zeros(3), 10)
         flow_direction = [1.0, 0.0, 0.0]
-        wind_speed = 1.0
+        va = 1.0
         trailing_length = 100.0
         evaluation_point = zeros(3)
         horseshoes = (
@@ -205,21 +205,21 @@ max_error(actual, expected) = maximum(abs.(actual .- expected))
             right_velocity = zeros(3)
             left_leg = SemiInfiniteFilament{Float64}()
             right_leg = SemiInfiniteFilament{Float64}()
-            reinit!(left_leg, left, flow_direction, wind_speed, 1)
-            reinit!(right_leg, right, flow_direction, wind_speed, -1)
+            reinit!(left_leg, left, flow_direction, va, 1)
+            reinit!(right_leg, right, flow_direction, va, -1)
             velocity_3D_trailing_vortex_semiinfinite!(left_velocity, left_leg,
-                flow_direction, evaluation_point, gamma, wind_speed, work_vectors)
+                flow_direction, evaluation_point, gamma, va, work_vectors)
             velocity_3D_trailing_vortex_semiinfinite!(right_velocity, right_leg,
-                flow_direction, evaluation_point, gamma, wind_speed, work_vectors)
+                flow_direction, evaluation_point, gamma, va, work_vectors)
             @test bound_velocity + left_velocity + right_velocity ≈ velocity atol=1e-4
 
             wake_offset = trailing_length * flow_direction
             velocity_3D_trailing_vortex!(left_velocity,
                 bound_filament(left, left + wake_offset), evaluation_point, gamma,
-                wind_speed, work_vectors)
+                va, work_vectors)
             velocity_3D_trailing_vortex!(right_velocity,
                 bound_filament(right + wake_offset, right), evaluation_point, gamma,
-                wind_speed, work_vectors)
+                va, work_vectors)
             @test bound_velocity + left_velocity + right_velocity ≈ velocity atol=1e-4
         end
     end

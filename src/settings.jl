@@ -9,7 +9,7 @@ function parse_enum(::Type{T}, s::String) where T <: Enum
 end
 
 @with_kw mutable struct ConditionSettings
-    wind_speed::Float64 = 10.0      # wind speed [m/s]
+    va::Float64 = 10.0              # apparent wind speed [m/s]
     alpha::Float64 = 5.0            # angle of attack [°]
     beta::Float64 = 0.0             # sideslip angle [°]
     yaw_rate::Float64 = 0.0         # yaw rate [°/s]
@@ -78,7 +78,7 @@ generated at different transition settings or off different networks.
     for a dataset generated without a flap sweep (default `nothing`).
 - `live_offsets`: Angles [deg] off the reference angle a live polar is sampled at
     (default `-12:3:12`).
-- `v_app`: Apparent wind [m/s] the polars' Reynolds number is taken at
+- `va`: apparent wind speed [m/s] the polars' Reynolds number is taken at
     (default `25.0`).
 - `chord_ref`: Reference (maximum panel) chord [m], which Reynolds is defined
     against (default `1.0`).
@@ -95,7 +95,7 @@ generated at different transition settings or off different networks.
     alpha_range::Vector{Float64} = [-180.0, 1.0, 180.0]
     delta_range::Union{Nothing, Vector{Float64}} = nothing
     live_offsets::Vector{Float64} = collect(-12.0:3.0:12.0)
-    v_app::Float64 = 25.0
+    va::Float64 = 25.0
     chord_ref::Float64 = 1.0
     table_format::Symbol = :arrow
 end

@@ -141,7 +141,7 @@ using Test
         # Multiple reinit calls should work without errors
         for _ in 1:3
             VortexStepMethod.reinit!(body_aero;
-                va=zeros(3),
+                va_vec=zeros(3),
                 omega=zeros(3),
                 init_aero=true,
                 

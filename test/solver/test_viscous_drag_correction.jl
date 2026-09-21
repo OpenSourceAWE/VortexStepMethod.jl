@@ -47,7 +47,7 @@ end
             delta_force = force_dist_at(solver_on, va_vec) .-
                           force_dist_at(solver_off, va_vec)
             for (i, panel) in enumerate(body_aero.panels)
-                v_normal = solver_on.lr.v_a_dist[i]
+                v_normal = solver_on.lr.v_rel_dist[i]
                 v_span = solver_on.lr.v_span_dist[i]
                 cos_beta = v_normal / hypot(v_normal, v_span)
                 f0 = 0.062 * (density * v_normal * panel.chord / mu)^(-1 / 7)
@@ -82,7 +82,7 @@ end
     @testset "linearize reports the corrected forces" begin
         y = [va_vec_sideslip; zeros(3)]
         results_for(solver) = VortexStepMethod.linearize(solver, body_aero, y;
-            theta_idxs=nothing, va_idxs=1:3, omega_idxs=4:6)[2]
+            theta_idxs=nothing, va_vec_idxs=1:3, omega_idxs=4:6)[2]
         results_on, results_off = results_for(solver_on), results_for(solver_off)
         @test results_on[1:3] ≈ vec(sum(force_dist_at(solver_on, va_vec_sideslip); dims=2))
         @test !(results_on[1:3] ≈ results_off[1:3])
