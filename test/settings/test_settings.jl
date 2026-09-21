@@ -103,6 +103,25 @@ end
     @test Set(Symbol.(keys(block["airfoil"]))) == Set(fieldnames(AirfoilSettings))
 end
 
+@testset "artificial damping keys load with a warning and set nothing" begin
+    yaml = """
+    solver_settings:
+      aerodynamic_model_type: VSM
+      type_initial_gamma_distribution: ZEROS
+      artificial_damping: true
+      k2: 0.1
+      k4: 0.0
+    """
+    path = tempname() * ".yaml"
+    write(path, yaml)
+    set = @test_logs (:warn, r"artificial_damping, k2, k4") VSMSettings(path;
+                                                                     data_prefix = false)
+    @test set.solver_settings isa SolverSettings
+    @test isempty(intersect(fieldnames(SolverSettings), (:artificial_damping, :k2, :k4)))
+    @test isempty(intersect(fieldnames(Solver),
+                            (:is_with_artificial_damping, :artificial_damping)))
+end
+
 @testset "an unnamed mesh block slices as an unconfigured call" begin
     vertices, faces = ObjAdapter.read_faces(joinpath(ram_air_dir,
                                                     "ram_air_kite_body.obj"))
