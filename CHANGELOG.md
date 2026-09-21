@@ -70,6 +70,9 @@
   `generate_aero_matrices` and `generate_polar_from_coordinates`), at zero clearance.
   `shrink_wrap` warns when the contour it returns crosses itself. A thin wrapped section
   came back with its surfaces crossing.
+- `shrink_wrap` cuts out the loops its `clearance` offset makes on a thin canopy, so a
+  V3 section wrapped at the default `MeshSettings` is a simple closed curve and no longer
+  warns; 6 of 18 crossed themselves.
 - `get_lower_upper`, and with it the flap hinge in `deform_section`, takes the lower and
   upper surface heights where the contour crosses `x = crease_frac`. It took the nearest
   points below and above `y = 0`, which on a cambered section put the hinge near the

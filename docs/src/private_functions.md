@@ -171,6 +171,7 @@ pivot_step
 push_arc!
 edge_normal
 pivot_contour
+cut_loops
 largest_linking_gap
 densify_contour
 enforce_min_spacing!

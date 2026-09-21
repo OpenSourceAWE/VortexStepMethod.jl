@@ -145,7 +145,8 @@ of the cloud from its leftmost point; the points it touches are the polygon's
 vertices in order, the ones inside a concavity narrower than the disk having been
 skipped and bridged straight. The offset rounds each convex vertex with an arc of
 radius `clearance` and chamfers each reflex one across the bisector, so it holds that
-distance from every contact.
+distance from every contact, and the loops the offset makes where contacts lie closer
+than `clearance` are cut out ([`cut_loops`](@ref)).
 """
 function pivot_contour(x, y, r, clearance)
     start = argmin(x)
@@ -182,7 +183,39 @@ function pivot_contour(x, y, r, clearance)
         end
         from = to
     end
-    return px, py
+    return cut_loops(px, py)
+end
+
+"""
+    cut_loops(px, py) -> (x, y)
+
+The closed polyline `(px, py)` walked from its first node with every loop it makes
+by crossing itself cut out, the crossing point taking the loop's place, so what comes
+back is a simple closed curve.
+"""
+function cut_loops(px, py)
+    n = length(px)
+    x, y = [px[1]], [py[1]]
+    for k in 2:n+1
+        closing = k > n
+        p = (px[mod1(k, n)], py[mod1(k, n)])
+        a = (x[end], y[end])
+        for j in (closing ? 2 : 1):length(x)-2
+            r, s = (x[j], y[j]), (x[j+1], y[j+1])
+            segments_cross(r, s, a, p) || continue
+            t = side_of_line(r, s, a) / (side_of_line(r, s, a) - side_of_line(r, s, p))
+            resize!(x, j)
+            resize!(y, j)
+            push!(x, a[1] + t * (p[1] - a[1]))
+            push!(y, a[2] + t * (p[2] - a[2]))
+            break
+        end
+        if !closing
+            push!(x, p[1])
+            push!(y, p[2])
+        end
+    end
+    return x, y
 end
 
 """

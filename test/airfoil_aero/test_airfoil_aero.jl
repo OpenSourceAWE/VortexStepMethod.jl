@@ -301,12 +301,31 @@ end
     @test shoelace(def.x, def.y) ≈ shoelace(xw, yw) rtol = 0.05
 end
 
-@testset "shrink_wrap warns when its contour crosses itself" begin
+@testset "shrink_wrap cuts the loops its clearance offset makes" begin
+    obj = joinpath(pkgdir(VortexStepMethod), "data", "TUDELFT_V3_KITE", "V3_25.obj")
+    vertices, faces = VortexStepMethod.ObjAdapter.read_faces(obj)
+    canopy = VortexStepMethod.ObjAdapter.perpendicular_sections(vertices, faces, 18;
+                                                                n_bins=100)
+    for section in canopy
+        xw, yw = @test_logs min_level=Logging.Warn shrink_wrap(section.x_airfoil,
+                                                               section.y_airfoil,
+                                                               ShrinkWrap())
+        @test isnothing(crossing_panels(xw, yw))
+    end
     x = collect(range(0.0, 1.0, 400))
     y = 0.02 .* sin.(20pi .* x) .+ 0.05 .* sin.(pi .* x)
-    @test_logs (:warn, r"cross") match_mode=:any shrink_wrap(x, y,
-                                                             ShrinkWrap(clearance=0.05))
-    @test_logs min_level=Logging.Warn shrink_wrap(x, y, ShrinkWrap(clearance=0.0))
+    @test_logs min_level=Logging.Warn shrink_wrap(x, y, ShrinkWrap(clearance=0.05))
+end
+
+@testset "shrink_wrap warns when its contour crosses itself" begin
+    x = collect(range(1.0, 0.0, 800))
+    camber = 0.05 .* sin.(pi .* x) .+ 0.02 .* sin.(20pi .* x)
+    loop(half) = (vcat(x, reverse(x)[2:end]),
+                  vcat(camber .+ half, reverse(camber .- half)[2:end]))
+    @test_logs (:warn, r"cross") match_mode=:any shrink_wrap(loop(1e-4)...,
+                                                             ShrinkWrap(clearance=0.0))
+    @test_logs min_level=Logging.Warn shrink_wrap(loop(1e-3)...,
+                                                  ShrinkWrap(clearance=0.0))
 end
 
 @testset "generate_polar_from_coordinates POLAR_VECTORS sweep" begin
