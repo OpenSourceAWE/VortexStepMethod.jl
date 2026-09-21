@@ -433,7 +433,7 @@ end
 
 @testset "set_va! with VSMSettings applies the yaw rate about body z" begin
     settings_file = create_temp_wing_settings("body_aerodynamics", "test_wing.yaml";
-                                              alpha=10.0, beta=5.0, wind_speed=15.0,
+                                              alpha=10.0, beta=5.0, va=15.0,
                                               yaw_rate=30.0)
     try
         settings   = VSMSettings(settings_file)
@@ -443,21 +443,21 @@ end
 
         set_va!(body_aero, settings)
 
-        α, β, wind_speed = deg2rad(10.0), deg2rad(5.0), 15.0
-        expected_va_vec = wind_speed .* [cos(α)*cos(β), sin(β), sin(α)*cos(β)]
+        α, β, va = deg2rad(10.0), deg2rad(5.0), 15.0
+        expected_va_vec = va .* [cos(α)*cos(β), sin(β), sin(α)*cos(β)]
         omega = [0.0, 0.0, deg2rad(30.0)]
 
         for p in body_aero.panels
-            @test p.va ≈ expected_va_vec .- omega × p.control_point atol=1e-10
+            @test p.va_vec ≈ expected_va_vec .- omega × p.control_point atol=1e-10
         end
-        @test body_aero._va ≈ expected_va_vec atol=1e-10
+        @test body_aero.va_vec ≈ expected_va_vec atol=1e-10
         @test body_aero.omega ≈ omega
     finally
         isfile(settings_file) && rm(settings_file; force=true)
     end
 end
 
-@testset "set_va! with distributed inflow blocks body_aero.va access" begin
+@testset "set_va! with distributed inflow blocks body_aero.va_vec access" begin
     body_aero = BodyAerodynamics([inviscid_wing([0.0, 1.0, 2.0])])
 
     va_vec_dist = [
@@ -468,7 +468,7 @@ end
 
     @test body_aero.has_distributed_va
     try
-        body_aero.va
+        body_aero.va_vec
         @test false
     catch err
         @test err isa ArgumentError
@@ -477,7 +477,14 @@ end
 
     set_va!(body_aero, [11.0, 0.0, 0.0])
     @test !body_aero.has_distributed_va
-    @test body_aero.va ≈ [11.0, 0.0, 0.0]
+    @test body_aero.va_vec ≈ [11.0, 0.0, 0.0]
+end
+
+@testset "body_aero.va and panel.va are removed" begin
+    body_aero = BodyAerodynamics([inviscid_wing([0.0, 1.0, 2.0])])
+    set_va!(body_aero, [10.0, 0.0, 0.0])
+    @test_throws FieldError body_aero.va
+    @test_throws FieldError body_aero.panels[1].va
 end
 
 @testset "set_va! with omega on multi-wing body" begin
@@ -490,19 +497,19 @@ end
 
     for panel in body_aero.panels
         expected_va_vec = va_vec .+ (-omega × panel.control_point)
-        @test panel.va ≈ expected_va_vec atol=1e-12
+        @test panel.va_vec ≈ expected_va_vec atol=1e-12
     end
     @test body_aero.omega ≈ omega
     @test !body_aero.has_distributed_va
-    @test body_aero.va ≈ va_vec
+    @test body_aero.va_vec ≈ va_vec
 
     new_omega = [0.0, 0.0, 2.0]
-    @test body_aero._va ≈ va_vec
+    @test body_aero.va_vec ≈ va_vec
     body_aero.omega = new_omega
 
     for panel in body_aero.panels
         expected_va_vec = va_vec .+ (-new_omega × panel.control_point)
-        @test panel.va ≈ expected_va_vec atol=1e-12
+        @test panel.va_vec ≈ expected_va_vec atol=1e-12
     end
     @test body_aero.omega ≈ new_omega
 end
@@ -516,7 +523,7 @@ Test that every panel sees `va_vec` plus the inflow of a body turning at `omega`
 function test_rigid_body_inflow(body_aero, va_vec, omega, reference_point)
     for panel in body_aero.panels
         expected_va_vec = va_vec .- omega × (panel.control_point .- reference_point)
-        @test panel.va ≈ expected_va_vec atol=1e-12
+        @test panel.va_vec ≈ expected_va_vec atol=1e-12
     end
 end
 
@@ -534,7 +541,7 @@ end
     body_aero.omega = 2 .* omega
     test_rigid_body_inflow(body_aero, va_vec, 2 .* omega, reference_point)
 
-    reinit!(body_aero; va=va_vec, omega)
+    reinit!(body_aero; va_vec, omega)
     test_rigid_body_inflow(body_aero, va_vec, omega, reference_point)
 
     body_aero.reference_point = zeros(3)
@@ -547,7 +554,7 @@ end
 The `BodyAerodynamics` built from `wings` in a 10 m/s inflow and its `solve!` solution.
 """
 function solve_wings(wings)
-    body_aero = BodyAerodynamics(wings; va=[10.0, 0.0, 1.0])
+    body_aero = BodyAerodynamics(wings; va_vec=[10.0, 0.0, 1.0])
     solver = Solver(sum(wing -> wing.n_panels, wings),
                     sum(wing -> wing.n_unrefined_sections, wings))
     return body_aero, solve!(solver, body_aero)
@@ -573,10 +580,10 @@ function linearize_body(body_aero; kwargs...)
     n_sections = sum(wing -> wing.n_unrefined_sections, body_aero.wings)
     solver = Solver(sum(wing -> wing.n_panels, body_aero.wings), n_sections;
                     use_gamma_prev=false, rtol=1e-10)
-    y0 = [zeros(2n_sections); body_aero.va; zeros(3)]
+    y0 = [zeros(2n_sections); body_aero.va_vec; zeros(3)]
     return VortexStepMethod.linearize(solver, body_aero, y0;
         theta_idxs=1:n_sections, delta_idxs=n_sections+1:2n_sections,
-        va_idxs=2n_sections+1:2n_sections+3, omega_idxs=2n_sections+4:2n_sections+6,
+        va_vec_idxs=2n_sections+1:2n_sections+3, omega_idxs=2n_sections+4:2n_sections+6,
         kwargs...)
 end
 
@@ -634,7 +641,7 @@ end
         wings = wing_pair(section_y, n_panels, span + 1.0)
         _, from_zeros = solve_wings(wings)
         gamma_zeros = copy(from_zeros.gamma_distribution)
-        body_aero = BodyAerodynamics(wings; va=[10.0, 0.0, 1.0])
+        body_aero = BodyAerodynamics(wings; va_vec=[10.0, 0.0, 1.0])
         solver = Solver(2n_panels, 2length(section_y);
                         type_initial_gamma_distribution=ELLIPTIC)
         sol = solve!(solver, body_aero)

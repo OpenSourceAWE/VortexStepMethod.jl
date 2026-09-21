@@ -166,14 +166,14 @@ Represents a semi-infinite vortex filament.
 # Fields
 - x1::MVec3=zeros(MVec3):           Starting point
 - direction::MVec3=zeros(MVec3):    Direction vector
-- `vel_mag`::Float64=zero(Float64): Velocity magnitude
+- `va`::Float64=zero(Float64): apparent wind speed [m/s]
 - `filament_direction`::Int64=0   : Direction indicator (-1 or 1)
 - initialized::Bool=false
 """
 @with_kw mutable struct SemiInfiniteFilament{T} <: Filament
     x1::MVector{3, T} = zeros(MVector{3, T})
     direction::MVector{3, T} = zeros(MVector{3, T})
-    vel_mag::T = zero(T)
+    va::T = zero(T)
     filament_direction::Int64 = zero(Int64)
     initialized::Bool = false
 end
@@ -182,7 +182,7 @@ function reinit!(filament::SemiInfiniteFilament{T}, x1::AbstractVector,
                  direction::AbstractVector, va::Real, filament_direction::Real) where T
     filament.x1 .= x1
     filament.direction .= direction
-    filament.vel_mag = va
+    filament.va = va
     filament.filament_direction = filament_direction
     filament.initialized = true
     return nothing

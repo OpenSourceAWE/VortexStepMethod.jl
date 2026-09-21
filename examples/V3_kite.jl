@@ -94,7 +94,7 @@ labels = [solver_labels;
      "WindTunnel Re=5e5"]] #with struts
 beta_labels = [solver_labels; ["Wind Tunnel Re=5e5 beta sweep alpha=7.4"]]
 
-wind_speed = settings.condition.wind_speed
+va = settings.condition.va
 angle_of_attack_deg = settings.condition.alpha
 sideslip_deg = settings.condition.beta
 yaw_rate = settings.condition.yaw_rate
@@ -111,7 +111,7 @@ PLOT && plot_polars(
     angle_type="angle_of_attack",
     angle_of_attack=angle_of_attack_deg,
     side_slip=sideslip_deg,
-    v_a=wind_speed,
+    va=va,
     title="$(wing.n_panels)_panels_$(wing.spanwise_distribution)_from_yaml_settings",
     save_path=OUTPUT_DIR,
     is_save=false || SAVE_ALL,
@@ -141,7 +141,7 @@ PLOT && plot_distribution(
     [body_y_coordinates],
     [results],
     ["VSM"];
-    title="CAD_spanwise_distributions_alpha_$(round(angle_of_attack_deg, digits=1))_delta_$(round(sideslip_deg, digits=1))_yaw_$(round(yaw_rate, digits=1))_va_$(round(wind_speed, digits=1))",
+    title="CAD_spanwise_distributions_alpha_$(round(angle_of_attack_deg, digits=1))_delta_$(round(sideslip_deg, digits=1))_yaw_$(round(yaw_rate, digits=1))_va_$(round(va, digits=1))",
     save_path=OUTPUT_DIR,
     is_save=false || SAVE_ALL,
     is_show=true,
@@ -158,7 +158,7 @@ PLOT && plot_polars(
     angle_type="side_slip",
     angle_of_attack=angle_of_attack_deg,
     side_slip=sideslip_deg,
-    v_a=wind_speed,
+    va=va,
     title="beta sweep",
     show_moments=true,
     save_path=OUTPUT_DIR,
