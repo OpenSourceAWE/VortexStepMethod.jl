@@ -35,39 +35,33 @@ end
     write_polar_csv(filepath, sols::Vector{SectionSolution})
 
 Write a solver sweep (from any [`AbstractAirfoilSolver`](@ref)) to a `POLAR_VECTORS`
-CSV (`alpha, Cd, Cs, Cl, Cm`; alpha in degrees). Non-converged angles (`NaN`) are
-skipped, so this works for both NeuralFoil and XFoil sweeps.
+table (`alpha, Cd, Cs, Cl, Cm`; alpha in degrees), CSV or Arrow as the suffix of
+`filepath` says. Non-converged angles (`NaN`) are skipped, so this works for both
+NeuralFoil and XFoil sweeps.
 """
 function write_polar_csv(filepath::String, sols::Vector{SectionSolution})
-    open(filepath, "w") do io
-        println(io, "alpha,Cd,Cs,Cl,Cm")
-        for s in sols
-            isnan(s.cl) && continue
-            row = (rad2deg(s.alpha), s.cd, 0.0, s.cl, s.cm)
-            println(io, csv_fields(row))
-        end
-    end
-    return filepath
+    converged = filter(sol -> !isnan(sol.cl), sols)
+    alpha, cd, cl, cm = ([getfield(sol, name) for sol in converged]
+                         for name in (:alpha, :cd, :cl, :cm))
+    return write_node_rows(filepath, alpha, nothing, [cd zero(cd) cl cm];
+                           columns=["Cd", "Cs", "Cl", "Cm"])
 end
 
 """
     write_polar_matrix_csv(filepath, alpha_range, delta_range, cl, cd, cm)
 
-Write an `(alpha × delta)` sweep to a long-format `POLAR_MATRICES` CSV with columns
-`alpha, delta, Cl, Cd, Cm` (both angles in degrees), one row per grid point. The
-`delta` column is what marks the file as a matrix polar to the loader. `alpha_range`
-and `delta_range` are in radians; `cl`/`cd`/`cm` are `length(alpha) × length(delta)`.
+Write an `(alpha × delta)` sweep to a long-format `POLAR_MATRICES` table with columns
+`alpha, delta, Cl, Cd, Cm` (both angles in degrees), one row per grid point, CSV or
+Arrow as the suffix of `filepath` says. The `delta` column is what marks the file as a
+matrix polar to the loader. `alpha_range` and `delta_range` are in radians;
+`cl`/`cd`/`cm` are `length(alpha) × length(delta)`.
 """
 function write_polar_matrix_csv(filepath::String, alpha_range, delta_range,
         cl::AbstractMatrix, cd::AbstractMatrix, cm::AbstractMatrix)
-    open(filepath, "w") do io
-        println(io, "alpha,delta,Cl,Cd,Cm")
-        for (j, d) in enumerate(delta_range), (i, a) in enumerate(alpha_range)
-            row = (rad2deg(a), rad2deg(d), cl[i, j], cd[i, j], cm[i, j])
-            println(io, csv_fields(row))
-        end
-    end
-    return filepath
+    alpha = repeat(collect(alpha_range), length(delta_range))
+    delta = repeat(collect(delta_range); inner=length(alpha_range))
+    return write_node_rows(filepath, alpha, delta, [vec(cl) vec(cd) vec(cm)];
+                           columns=["Cl", "Cd", "Cm"])
 end
 
 """

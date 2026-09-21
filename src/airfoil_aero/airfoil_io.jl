@@ -14,27 +14,16 @@ function write_dat(filepath::String, name::String, x::Vector, y::Vector)
 end
 
 """
-    csv_fields(values) -> String
-
-Join `values` into one comma-separated CSV line at 16 significant digits.
-"""
-csv_fields(values) = join((@sprintf("%.16g", v) for v in values), ",")
-
-"""
     write_polar_csv(filepath, result::NeuralFoilResult)
 
-Write a NeuralFoil result to a `POLAR_VECTORS` CSV (`alpha, Cd, Cs, Cl, Cm`).
+Write a NeuralFoil result to a `POLAR_VECTORS` table (`alpha, Cd, Cs, Cl, Cm`), CSV or
+Arrow as the suffix of `filepath` says (see [`write_node_rows`](@ref
+VortexStepMethod.write_node_rows)).
 """
 function write_polar_csv(filepath::String, result::NeuralFoilResult)
-    n = length(result.alpha)
-    open(filepath, "w") do io
-        println(io, "alpha,Cd,Cs,Cl,Cm")
-        for i in 1:n
-            row = (result.alpha[i], result.CD[i], 0.0, result.CL[i], result.CM[i])
-            println(io, csv_fields(row))
-        end
-    end
-    return filepath
+    values = [result.CD zero(result.CD) result.CL result.CM]
+    return write_node_rows(filepath, deg2rad.(result.alpha), nothing, values;
+                           columns=["Cd", "Cs", "Cl", "Cm"])
 end
 
 """

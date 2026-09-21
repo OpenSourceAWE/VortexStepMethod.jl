@@ -8,7 +8,7 @@ using NPZ
 using Xfoil
 using Printf: @sprintf
 using ..VortexStepMethod: SectionAero, interpolate_matrix_nans!, delta_suffix,
-                          write_node_rows, section_surface, set_polar!,
+                          write_node_rows, csv_fields, section_surface, set_polar!,
                           read_dat_coordinates, KulfanParameters, calculate_cl,
                           calculate_cd, calculate_cm
 

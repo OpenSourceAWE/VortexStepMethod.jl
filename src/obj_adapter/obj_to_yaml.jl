@@ -58,8 +58,9 @@ to use XFoil instead. Each section's polar is written as `POLAR_VECTORS`.
 `crease_frac` is the chordwise hinge location (0–1) about which each `delta_range`
 trailing-edge deflection pivots.
 
-With `force=false` (default) an existing geometry YAML is reused; `force=true`
-regenerates it (e.g. after changing `delta_range` or the mesh).
+With `force=false` (default) an existing geometry YAML is reused, its tables converted
+to `table_format` where they are in another ([`migrate_node_tables`](@ref));
+`force=true` regenerates it (e.g. after changing `delta_range` or the mesh).
 
 `geometry_path` names the YAML itself, `output_dir/geometry.yaml` by default. Point it
 elsewhere to keep the YAML out of the table directory — the emitted table references
@@ -83,16 +84,16 @@ reused. With `reuse_valid_airfoils=false` the degenerate fit is written as is.
 
 # Output
 Writes into `output_dir`, indexed by source-airfoil id `j` (degenerate sections
-share a neighbour's id):
+share a neighbour's id), each table as `table_format` `:csv` (default, readable) or
+`:arrow` (binary, an order of magnitude faster to load):
 - `airfoils/{j}.dat`     — shrink-wrapped airfoil coordinates (matches the polar)
 - `airfoils/{j}_raw.dat` — raw sliced section points (the wrap encloses these)
 - `airfoils/{j}_d{tag}.dat` — each trailing-edge-deflected shape (with a `delta_range`);
   `{tag}` is the deflection in degrees with `m` for minus and `p` for the decimal point
   (e.g. `_dm3.dat`, `_d2p5.dat`)
-- `polars/{j}.csv`    — NeuralFoil polar (alpha, Cd, Cs, Cl, Cm)
+- `polars/{j}.{table_format}` — NeuralFoil polar (alpha, Cd, Cs, Cl, Cm)
 - `pressure/{j}_cp.{table_format}`, `_cf.{table_format}` — per-node surface pressure and
-  skin friction; `table_format` is `:csv` (default, readable) or `:arrow` (binary, an
-  order of magnitude faster to load)
+  skin friction
 - `geometry.yaml`     — `wing_sections` + `wing_airfoils` referencing the above
 
 # Returns
@@ -103,11 +104,10 @@ function obj_to_yaml end
 """
     migrate_node_tables(yaml_path, output_dir, table_format; verbose=true)
 
-Rewrite a generated dataset's per-node `Cp`/`cf` tables in `table_format` and point
-`geometry.yaml` at them, when they are not in that format already. This is what lets
-an existing directory change format without re-running the airfoil solver that
-produced it — the polars are the slow part and they are untouched. The source tables
-are left in place.
+Rewrite a generated dataset's per-node `Cp`/`cf` tables and polars in `table_format`
+and point `geometry.yaml` at them, when they are not in that format already. This is
+what lets an existing directory change format without re-running the airfoil solver
+that produced it. The source tables are left in place.
 
 `output_dir` is what the YAML's relative table references resolve against, which is
 its own directory — the rule the geometry loader follows.
@@ -126,7 +126,7 @@ function migrate_node_tables(yaml_path::String, output_dir::String,
     for row in airfoils["data"]
         info = row[info_col]
         info isa AbstractDict || continue
-        for key in ("cp_file", "cf_file")
+        for key in ("cp_file", "cf_file", "csv_file_path")
             haskey(info, key) || continue
             relative = String(info[key])
             endswith(relative, ".$table_format") && continue
@@ -146,7 +146,7 @@ function migrate_node_tables(yaml_path::String, output_dir::String,
     write_geometry_yaml(yaml_path, data["wing_sections"]["data"],
                         [Any[row[id_col], row[type_col], row[info_col]]
                          for row in airfoils["data"]])
-    verbose && @info "Converted $converted node tables to :$table_format" yaml_path
+    verbose && @info "Converted $converted tables to :$table_format" yaml_path
     return yaml_path
 end
 

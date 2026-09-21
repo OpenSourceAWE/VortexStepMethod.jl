@@ -1,6 +1,7 @@
 using Test
 using VortexStepMethod.ObjAdapter
 using VortexStepMethod
+using VortexStepMethod: load_polar_data
 using VortexStepMethod.AirfoilAero: NeuralFoilSolver
 using LinearAlgebra
 import YAML
@@ -71,11 +72,13 @@ obj_path = normpath(joinpath(@__DIR__, "..", "..",
         arrow_yaml = obj_to_yaml(obj_path, outdir; n_sections=3, Re=5e5,
             verbose=false, table_format=:arrow)
         info = Dict(YAML.load_file(arrow_yaml)["wing_airfoils"]["data"][1][3])
-        @test endswith(info["cp_file"], ".arrow")
-        @test endswith(info["cf_file"], ".arrow")
-        @test isfile(joinpath(outdir, info["cp_file"]))
-        @test isfile(joinpath(outdir, info["cf_file"]))
-        @test isfile(joinpath(outdir, csv_info["cp_file"]))
+        for key in ("cp_file", "cf_file", "csv_file_path")
+            @test endswith(info[key], ".arrow")
+            @test isfile(joinpath(outdir, info[key]))
+            @test isfile(joinpath(outdir, csv_info[key]))
+        end
+        @test isequal(load_polar_data(joinpath(outdir, info["csv_file_path"])),
+                      load_polar_data(joinpath(outdir, csv_info["csv_file_path"])))
         @test Wing(arrow_yaml; n_panels=4) isa Wing
 
         # already in that format: nothing to convert, YAML untouched

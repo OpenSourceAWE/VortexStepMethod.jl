@@ -38,6 +38,19 @@ import YAML
     wing = Wing(yaml_path)
     @test wing isa Wing
 
+    reused = surfplan_to_aero_yaml(adapter_dir, output_dir; verbose=false,
+                                   table_format=:arrow)
+    info = Dict(YAML.load_file(reused)["wing_airfoils"]["data"][1][3])
+    @test all(endswith(info[key], ".arrow") for key in ("cp_file", "cf_file",
+                                                          "csv_file_path"))
+    @test Wing(reused) isa Wing
+
+    arrow_dir = mktempdir()
+    surfplan_to_aero_yaml(adapter_dir, arrow_dir;
+        aero_solver=NeuralFoilSolver(model_size="medium"),
+        alpha_range=-4:4:4, Re=5.0e5, verbose=false, table_format=:arrow)
+    @test isfile(joinpath(arrow_dir, "polars", "1.arrow"))
+
     # a missing dat_file_path is a hard error (the profiles are required)
     aero["wing_airfoils"]["data"][1][3] = Dict("dat_file_path" => "")
     YAML.write_file(joinpath(adapter_dir, "aero_geometry.yaml"), aero)

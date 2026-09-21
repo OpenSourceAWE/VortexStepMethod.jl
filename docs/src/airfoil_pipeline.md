@@ -99,18 +99,19 @@ For each unique airfoil id `j`, `obj_to_yaml` writes into `output_dir`:
   point), e.g. `_d5.dat` for 5°, `_dm3.dat` for −3°, `_d2p5.dat` for 2.5°
 - `polars/{j}.csv` — the generated polar (`POLAR_VECTORS` or `POLAR_MATRICES`)
 - `pressure/{j}_cp.csv`, `pressure/{j}_cf.csv` — surface pressure and skin friction per
-  contour node over the `alpha × delta` grid, what pressure integration reads.
-  `table_format=:arrow` writes these two as `.arrow` instead: binary, roughly an order of
-  magnitude faster to load and a third of the size. `read_section_aero` detects the format
-  from the suffix, so both are loadable and a directory can be migrated between them with
-  [`convert_node_table`](@ref VortexStepMethod.convert_node_table) — which `obj_to_yaml`
-  does itself when `table_format` differs from what the directory holds, without re-running
-  the solver
+  contour node over the `alpha × delta` grid, what pressure integration reads
 - `geometry.yaml` — `wing_sections` (leading/trailing-edge points) plus `wing_airfoils`
   (each section's `type` and the table paths above). `geometry_path` writes the YAML
   somewhere else, in which case the emitted table references carry the path from the YAML's
   directory to `output_dir` — the geometry loader resolves them against the YAML's own
   directory
+
+`table_format=:arrow` writes the polar and the two node tables as `.arrow` instead: binary, roughly an
+order of magnitude faster to load and a third of the size. The loaders detect the format
+from the suffix, so both are loadable and a directory can be migrated between them with
+[`convert_node_table`](@ref VortexStepMethod.convert_node_table) — which `obj_to_yaml` and
+`surfplan_to_aero_yaml` do themselves when `table_format` differs from what the directory
+holds, without re-running the solver.
 
 A tip that tapers to a point has no airfoil to slice, so the outermost stations stop at
 the last slice that still has a chord; `wingtip_distance` moves them a further arc length

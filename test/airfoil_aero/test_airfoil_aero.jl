@@ -321,6 +321,55 @@ end
     @test first(VortexStepMethod.read_aero_matrix(labelled_csv)) ≈ cd
 end
 
+@testset "an .arrow polar is an Arrow table that loads like its CSV twin" begin
+    alpha_range = deg2rad.(-5:5:15)
+    delta_range = deg2rad.(-3:3:3)
+    cl = [0.1 * a + 0.03 * d for a in -5:5:15, d in -3:3:3]
+    cd = [0.0093 + 2e-4 * a + 2e-5 * d for a in -5:5:15, d in -3:3:3]
+    cm = [0.06 - 0.01 * d for a in -5:5:15, d in -3:3:3]
+    sols = [SectionSolution(alpha_range[i], cl[i, 1], cd[i, 1], cm[i, 1], 1.0,
+                            Float64[], Float64[], Float64[], Float64[])
+            for i in eachindex(alpha_range)]
+    result = AirfoilAero.NeuralFoilResult(collect(-5.0:5:15), cl[:, 1], cd[:, 1],
+                                          cm[:, 1], ones(5))
+    writers = Dict(
+        "matrix" => path -> write_polar_matrix_csv(path, alpha_range, delta_range,
+                                                   cl, cd, cm),
+        "vectors" => path -> write_polar_csv(path, sols),
+        "neuralfoil" => path -> write_polar_csv(path, result))
+    work = mktempdir()
+    for (name, write_polar) in writers
+        csv = write_polar(joinpath(work, "$name.csv"))
+        arrow = write_polar(joinpath(work, "$name.arrow"))
+        table = VortexStepMethod.Arrow.Table(read(arrow))
+        @test VortexStepMethod.Arrow.getmetadata(table)["columns"] ==
+              (name == "vectors" || name == "neuralfoil" ? "Cd,Cs,Cl,Cm" : "Cl,Cd,Cm")
+        converted = VortexStepMethod.convert_node_table(csv,
+                                                        joinpath(work, "c_$name.arrow"))
+        csv_data, csv_model = load_polar_data(csv)
+        for (data, model) in (load_polar_data(arrow), load_polar_data(converted))
+            @test model == csv_model
+            @test data[1] == csv_data[1]
+            @test all(map(≈, data, csv_data))
+        end
+        _, _, _, columns = VortexStepMethod.read_node_table(converted)
+        @test columns == (name == "matrix" ? ["Cl", "Cd", "Cm"] : ["Cd", "Cs", "Cl", "Cm"])
+    end
+    (_, _, _, cd_back, _), model = load_polar_data(joinpath(work, "matrix.arrow"))
+    @test model == VortexStepMethod.POLAR_MATRICES
+    @test cd_back ≈ cd
+end
+
+@testset "an Arrow node table written before named columns still reads" begin
+    path = joinpath(mktempdir(), "legacy_cp.arrow")
+    VortexStepMethod.Arrow.write(path, (alpha=[-5.0, 5.0], delta=[0.0, 0.0],
+                                        values=[[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]))
+    alpha, delta, values, columns = VortexStepMethod.read_node_table(path)
+    @test alpha ≈ deg2rad.([-5.0, 5.0]) && delta == [0.0, 0.0]
+    @test values == [1.0 2.0 3.0; 4.0 5.0 6.0]
+    @test columns == ["n0", "n1", "n2"]
+end
+
 @testset "turn_trailing_edge! legacy crease cleanup" begin
     x, y = read_dat_coordinates(joinpath(@__DIR__, "data", "test_airfoil.dat"))
     crease_frac = 0.7

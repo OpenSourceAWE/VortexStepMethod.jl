@@ -123,11 +123,15 @@ same_knots
 polar_knots
 window_alpha
 assemble_polar_matrix
+load_polar_data
 load_matrix_polar_data
 read_aero_matrix
 read_dat_coordinates
 read_node_table
+read_arrow_columns
+read_csv_columns
 write_node_rows
+csv_fields
 convert_node_table
 delta_suffix
 interpolate_matrix_nans!
@@ -214,7 +218,6 @@ create_2d_polars
 lei_poly_coeffs
 resolve_airfoil
 write_dat
-csv_fields
 write_polar_csv
 write_polar_matrix_csv
 write_aero_matrix

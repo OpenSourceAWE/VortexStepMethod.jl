@@ -24,6 +24,10 @@
   and at flap deflection `delta`, in one figure instead of one coefficient per call.
 - `linearize` takes a `BodyAerodynamics` with more than one wing; `theta_idxs` and
   `delta_idxs` then run over the unrefined sections of all wings in order.
+- `table_format=:arrow` writes the polars as `.arrow` too, not only the per-node `Cp`/`cf`
+  tables: `write_polar_csv` and `write_polar_matrix_csv` write Arrow for an `.arrow` path
+  and `load_polar_data` reads it. `obj_to_yaml` and now also `surfplan_to_aero_yaml`
+  convert a reused dataset's polars along with its node tables. CSV polars load as before.
 
 ### Changed
 

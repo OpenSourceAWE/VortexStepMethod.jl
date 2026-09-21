@@ -28,140 +28,55 @@ span_order_key(section::WingSectionData) = section.LE_y
 end
 
 """
-    load_polar_data(csv_file_path::String) -> Tuple{Union{Nothing, Tuple{Vector{Float64}, Vector{Float64}, Vector{Float64}, Vector{Float64}}}, Symbol}
+    assemble_polar_matrix(alpha, delta, coefficients) -> (alphas, deltas, grids...)
 
-Load aerodynamic polar data from a CSV file using only `readlines`.
-
-The CSV file must contain a header row with columns for `alpha`, `cl`, `cd`, and `cm` (case-insensitive, order arbitrary). Each subsequent row should contain numeric values for these columns.
-
-# Arguments
-- `csv_file_path::String`: Path to the CSV file containing polar data.
-
-# Returns
-- A tuple `(aero_data, model_type)` where:
-    - `aero_data`: A tuple of vectors `(alpha, cl, cd, cm)` if the file is valid, or `nothing` if invalid or missing.
-        - `alpha`: Angle of attack in degrees (converted to radians internally).
-        - `cl`: Lift coefficient.
-        - `cd`: Drag coefficient.
-        - `cm`: Moment coefficient.
-    - `model_type`: `POLAR_VECTORS` if data is loaded, or `INVISCID` if not.
-
-# Behavior
-- If the file is missing, empty, or invalid, a warning is issued and `(nothing, INVISCID)` is returned.
-
-# Example
-```julia
-# Create a YAML-based wing from configuration file
-wing = Wing(
-    "path/to/wing_config.yaml";
-    n_panels=40,
-    n_groups=4
-)
-```
+Scatter long-format polar rows (radian `alpha`/`delta` per row, one coefficient per
+column of `coefficients`) onto the sorted unique `alphas × deltas` grid, one matrix per
+coefficient. Grid points without a row stay `NaN`.
 """
-function assemble_polar_matrix(dv::Dict{String,Vector{Float64}})
-    alphas = sort(unique(dv["alpha"]))
-    deltas = sort(unique(dv["delta"]))
+function assemble_polar_matrix(alpha, delta, coefficients::AbstractMatrix)
+    alphas = sort(unique(alpha))
+    deltas = sort(unique(delta))
     ai = Dict(a => i for (i, a) in enumerate(alphas))
     di = Dict(d => j for (j, d) in enumerate(deltas))
-    cl = fill(NaN, length(alphas), length(deltas))
-    cd = fill(NaN, length(alphas), length(deltas))
-    cm = fill(NaN, length(alphas), length(deltas))
-    for k in eachindex(dv["alpha"])
-        i, j = ai[dv["alpha"][k]], di[dv["delta"][k]]
-        cl[i, j], cd[i, j], cm[i, j] = dv["cl"][k], dv["cd"][k], dv["cm"][k]
+    grids = [fill(NaN, length(alphas), length(deltas)) for _ in axes(coefficients, 2)]
+    for k in eachindex(alpha), (c, grid) in enumerate(grids)
+        grid[ai[alpha[k]], di[delta[k]]] = coefficients[k, c]
     end
-    return (deg2rad.(alphas), deg2rad.(deltas), cl, cd, cm)
+    return (alphas, deltas, grids...)
 end
 
-function load_polar_data(csv_file_path::String)
-    # Return early for empty path
-    if isempty(csv_file_path)
-        @warn "Empty CSV file path provided"
+"""
+    load_polar_data(path::String) -> (aero_data, model)
+
+Load an airfoil polar table, CSV or Arrow as the suffix of `path` says (see
+[`read_node_table`](@ref)), with columns `alpha`, `cl`, `cd` and `cm` (case-insensitive,
+any order, alpha in degrees). A `delta` column makes it a long-format `POLAR_MATRICES`
+table, returned as `(alpha, delta, cl, cd, cm)` on its sorted grid; without one it is
+`POLAR_VECTORS` `(alpha, cl, cd, cm)`. Angles come back in radians. A missing, empty or
+malformed file warns and returns `(nothing, INVISCID)`.
+"""
+function load_polar_data(path::String)
+    if !isfile(path)
+        @warn "Polar file not found: \"$path\""
         return (nothing, INVISCID)
     end
-
-    # Check if file exists
-    if !isfile(csv_file_path)
-        @warn "CSV file not found: $csv_file_path"
-        return (nothing, INVISCID)
-    end
-
-    try
-        # Read all lines from the file
-        lines = readlines(csv_file_path)
-        
-        # Check if file is empty
-        if isempty(lines)
-            @warn "CSV file is empty: $csv_file_path"
-            return (nothing, INVISCID)
-        end
-
-        # Parse header - make case insensitive
-        header_line = strip(lines[1])
-        if isempty(header_line)
-            @warn "CSV file has empty header: $csv_file_path"
-            return (nothing, INVISCID)
-        end
-
-        # Split header and normalize to lowercase. A `delta` column marks the
-        # long-format `(alpha, delta)` polar, loaded as POLAR_MATRICES.
-        header_parts = map(strip ∘ lowercase, split(header_line, ','))
-        has_delta = "delta" in header_parts
-        wanted = has_delta ? ["alpha", "delta", "cl", "cd", "cm"] :
-                             ["alpha", "cl", "cd", "cm"]
-        col_indices = Dict{String, Int}()
-        for (i, col_name) in enumerate(header_parts)
-            col_name in wanted && (col_indices[col_name] = i)
-        end
-
-        missing_cols = setdiff(wanted, keys(col_indices))
-        if !isempty(missing_cols)
-            @warn "CSV file missing required columns: $(join(missing_cols, ", ")) in $csv_file_path"
-            return (nothing, INVISCID)
-        end
-
-        # Parse data rows
-        data_vectors = Dict(col => Float64[] for col in wanted)
-        for line_num in eachindex(lines)
-            line_num == firstindex(lines) && continue
-            line = strip(lines[line_num])
-            isempty(line) && continue  # Skip empty lines
-
-            parts = split(line, ',')
-            if length(parts) != length(header_parts)
-                @warn "Line $line_num has incorrect number of columns in $csv_file_path"
-                return (nothing, INVISCID)  # Strict: any malformed data rejects the file
-            end
-
-            try
-                for col in wanted
-                    push!(data_vectors[col], parse(Float64, strip(parts[col_indices[col]])))
-                end
-            catch e
-                @warn "Failed to parse line $line_num in $csv_file_path: $e"
-                return (nothing, INVISCID)  # Strict: any parsing error rejects the file
-            end
-        end
-
-        # Check if we got any valid data
-        if isempty(data_vectors["alpha"])
-            @warn "No valid data rows found in $csv_file_path"
-            return (nothing, INVISCID)
-        end
-
-        has_delta && return (assemble_polar_matrix(data_vectors), POLAR_MATRICES)
-
-        # Convert alpha from degrees to radians and create tuple
-        alpha_rad = deg2rad.(data_vectors["alpha"])
-        aero_data = (alpha_rad, data_vectors["cl"], data_vectors["cd"], data_vectors["cm"])
-
-        return (aero_data, POLAR_VECTORS)
-
+    alpha, delta, values, columns = try
+        read_node_table(path)
     catch e
-        @warn "Error reading CSV file $csv_file_path: $e"
+        @warn "Error reading polar file $path: $e"
         return (nothing, INVISCID)
     end
+    wanted = [findfirst(==(name), lowercase.(columns)) for name in ("cl", "cd", "cm")]
+    if any(isnothing, wanted) || isempty(alpha)
+        @warn "Polar file $path needs alpha, cl, cd and cm columns and a data row"
+        return (nothing, INVISCID)
+    end
+    coefficients = values[:, wanted]
+    delta === nothing ||
+        return (assemble_polar_matrix(alpha, delta, coefficients), POLAR_MATRICES)
+    return (alpha, coefficients[:, 1], coefficients[:, 2], coefficients[:, 3]),
+        POLAR_VECTORS
 end
 
 """

@@ -141,61 +141,106 @@ function read_dat_coordinates(path::AbstractString)
 end
 
 """
-    read_node_table(path) -> (alpha, delta, values)
+    csv_fields(values) -> String
 
-Read a per-node aero table into radian `alpha`/`delta` vectors (one entry per row) and a
-`nrow × n_node` value matrix. The file suffix picks the format: `.arrow` (columns
-`alpha`, `delta` in degrees and a per-row list column `values`), anything else CSV
-(header `alpha, delta, n0, n1, …`, angles in degrees).
+Join `values` into one comma-separated CSV line at 16 significant digits.
+"""
+csv_fields(values) = join((@sprintf("%.16g", v) for v in values), ",")
+
+"""
+    read_node_table(path) -> (alpha, delta, values, columns)
+
+Read an aero table into a radian `alpha` vector (one entry per row), a radian `delta`
+vector or `nothing` when the table has no `delta` column, the `nrow × ncol` matrix of
+the value columns and their names. The file suffix picks the format: `.arrow` (angle
+columns, a per-row list column `values`, the names in the `columns` metadata entry) or
+anything else CSV (a header line naming every column, found case-insensitively in any
+order). Angles are stored in degrees.
 """
 function read_node_table(path::AbstractString)
-    if endswith(String(path), ".arrow")
-        # bytes, not the mmap Arrow.Table(path) takes: Windows locks a mapped file
-        table = Arrow.Table(read(String(path)))
-        values = Matrix{Float64}(undef, length(table.alpha), length(first(table.values)))
-        for k in axes(values, 1)
-            @inbounds values[k, :] .= table.values[k]
-        end
-        return deg2rad.(table.alpha), deg2rad.(table.delta), values
-    end
-    lines = [l for l in readlines(String(path)) if !isempty(strip(l))]
-    n_row = length(lines) - 1
-    n_col = count(==(','), lines[1]) + 1
-    alpha = Vector{Float64}(undef, n_row)
-    delta = Vector{Float64}(undef, n_row)
-    values = Matrix{Float64}(undef, n_row, n_col - 2)
-    for k in 1:n_row
-        fields = split(lines[k + 1], ',')
-        alpha[k] = deg2rad(parse(Float64, fields[1]))
-        delta[k] = deg2rad(parse(Float64, fields[2]))
-        @inbounds for j in 3:n_col
-            values[k, j - 2] = parse(Float64, fields[j])
-        end
-    end
-    return alpha, delta, values
+    names, data = endswith(String(path), ".arrow") ? read_arrow_columns(path) :
+                                                     read_csv_columns(path)
+    lowercase_names = lowercase.(names)
+    alpha_col = findfirst(==("alpha"), lowercase_names)
+    alpha_col === nothing && error("Table $path has no alpha column")
+    delta_col = findfirst(==("delta"), lowercase_names)
+    value_cols = setdiff(eachindex(names), (alpha_col, delta_col))
+    delta = delta_col === nothing ? nothing : deg2rad.(data[:, delta_col])
+    return deg2rad.(data[:, alpha_col]), delta, data[:, value_cols], names[value_cols]
 end
 
 """
-    write_node_rows(path, alpha, delta, values) -> path
+    read_arrow_columns(path) -> (names, data)
 
-Write a per-node aero table from radian `alpha`/`delta` vectors (one entry per row)
-and a `nrow × n_node` value matrix. The file suffix picks the format, matching
-[`read_node_table`](@ref): `.arrow` for the binary form, anything else CSV. Angles
-are written in degrees either way.
+Read an Arrow aero table into its column names and one `Float64` matrix: the angle
+columns, then the list column `values` spread under the names its `columns` metadata
+entry holds, `n0, n1, …` where it has none.
 """
-function write_node_rows(path::AbstractString, alpha, delta, values)
+function read_arrow_columns(path::AbstractString)
+    # bytes, not the mmap Arrow.Table(path) takes: Windows locks a mapped file
+    table = Arrow.Table(read(String(path)))
+    angles = filter(!=(:values), Arrow.names(table))
+    n_value = length(first(table.values))
+    metadata = Arrow.getmetadata(table)
+    columns = metadata === nothing || !haskey(metadata, "columns") ?
+              ["n$(j - 1)" for j in 1:n_value] : split(metadata["columns"], ',')
+    data = Matrix{Float64}(undef, length(table.values), length(angles) + n_value)
+    for (j, angle) in enumerate(angles)
+        data[:, j] .= getproperty(table, angle)
+    end
+    for k in axes(data, 1)
+        @inbounds data[k, (length(angles) + 1):end] .= table.values[k]
+    end
+    return [String.(angles); String.(columns)], data
+end
+
+"""
+    read_csv_columns(path) -> (names, data)
+
+Read a CSV table with one header line into its column names and one `Float64` matrix.
+Throws on a row whose field count differs from the header's.
+"""
+function read_csv_columns(path::AbstractString)
+    lines = [strip(l) for l in readlines(String(path)) if !isempty(strip(l))]
+    isempty(lines) && error("Table $path is empty")
+    names = String.(strip.(split(lines[1], ',')))
+    data = Matrix{Float64}(undef, length(lines) - 1, length(names))
+    for k in axes(data, 1)
+        fields = split(lines[k + 1], ',')
+        length(fields) == length(names) ||
+            error("Row $k of $path has $(length(fields)) fields, header $(length(names))")
+        @inbounds for j in eachindex(fields)
+            data[k, j] = parse(Float64, fields[j])
+        end
+    end
+    return names, data
+end
+
+"""
+    write_node_rows(path, alpha, delta, values; columns) -> path
+
+Write an aero table from a radian `alpha` vector (one entry per row), a radian `delta`
+vector or `nothing` for a table without a `delta` column, and a `nrow × ncol` value
+matrix whose columns are named `columns` (default `n0, n1, …`). The file suffix picks
+the format, matching [`read_node_table`](@ref): `.arrow`, or anything else CSV at 16
+significant digits. Angles are written in degrees at 16 significant digits either way.
+"""
+function write_node_rows(path::AbstractString, alpha, delta, values;
+                         columns=["n$(j - 1)" for j in axes(values, 2)])
+    degrees(angle) = round.(rad2deg.(angle); sigdigits=16)
+    angles = delta === nothing ? (alpha=degrees(alpha),) :
+                                 (alpha=degrees(alpha), delta=degrees(delta))
     if endswith(String(path), ".arrow")
         Arrow.write(String(path),
-            (alpha=rad2deg.(alpha), delta=rad2deg.(delta),
-             values=[values[k, :] for k in axes(values, 1)]))
+            merge(angles, (values=[values[k, :] for k in axes(values, 1)],));
+            metadata=["columns" => join(columns, ",")])
         return path
     end
+    data = hcat(angles..., values)
     open(String(path), "w") do io
-        println(io, "alpha,delta," * join(("n$(j - 1)" for j in axes(values, 2)), ","))
-        for k in axes(values, 1)
-            row = [rad2deg(alpha[k]), rad2deg(delta[k])]
-            append!(row, @view values[k, :])
-            println(io, join(row, ","))
+        println(io, join((keys(angles)..., columns...), ","))
+        for k in axes(data, 1)
+            println(io, csv_fields(@view data[k, :]))
         end
     end
     return path
@@ -204,12 +249,14 @@ end
 """
     convert_node_table(src, dst) -> dst
 
-Rewrite a per-node aero table in the format `dst`'s suffix names. Use to move an
-existing dataset between CSV and Arrow without re-running the (slow) airfoil solver
-that produced it.
+Rewrite an aero table, a per-node `Cp`/`cf` table or a polar, in the format `dst`'s
+suffix names, keeping its column names. Use to move an existing dataset between CSV and
+Arrow without re-running the (slow) airfoil solver that produced it.
 """
-convert_node_table(src::AbstractString, dst::AbstractString) =
-    write_node_rows(dst, read_node_table(src)...)
+function convert_node_table(src::AbstractString, dst::AbstractString)
+    alpha, delta, values, columns = read_node_table(src)
+    return write_node_rows(dst, alpha, delta, values; columns)
+end
 
 """
     read_section_aero(dat_file, cp_file, cf_file) -> Union{Nothing, SectionAero}
