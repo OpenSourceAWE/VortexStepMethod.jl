@@ -72,7 +72,6 @@ relative_error(jac, reference) = maximum(abs.(jac .- reference)) / maximum(abs, 
         ram_body = BodyAerodynamics([ram_wing])
         ram_solver = Solver(ram_wing.n_panels, ram_wing.n_unrefined_sections;
             aerodynamic_model_type=VSM,
-            is_with_artificial_damping=false,
             rtol=1e-11,
             solver_type=LOOP,
             use_gamma_prev=false,
