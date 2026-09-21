@@ -263,11 +263,9 @@ Indices of the unrefined sections of wing `wing_idx` in a distribution that runs
 unrefined sections of all wings in order, such as `moment_unrefined_dist`.
 """
 function unrefined_section_range(body_aero::BodyAerodynamics, wing_idx)
-    offset = 0
-    for i in 1:wing_idx-1
-        offset += body_aero.wings[i].n_unrefined_sections
-    end
-    return offset .+ (1:body_aero.wings[wing_idx].n_unrefined_sections)
+    wings = body_aero.wings
+    offset = sum(wing.n_unrefined_sections for wing in view(wings, 1:wing_idx-1); init=0)
+    return offset .+ (1:wings[wing_idx].n_unrefined_sections)
 end
 
 """
@@ -276,11 +274,9 @@ end
 Indices of the panels of wing `wing_idx` in `body_aero.panels`.
 """
 function panel_range(body_aero::BodyAerodynamics, wing_idx)
-    offset = 0
-    for i in 1:wing_idx-1
-        offset += body_aero.wings[i].n_panels
-    end
-    return offset .+ (1:body_aero.wings[wing_idx].n_panels)
+    wings = body_aero.wings
+    offset = sum(wing.n_panels for wing in view(wings, 1:wing_idx-1); init=0)
+    return offset .+ (1:wings[wing_idx].n_panels)
 end
 
 """
