@@ -32,6 +32,12 @@
 
 ### Fixed
 
+- `deform_section` re-wraps a section with the rolling ball it was first wrapped with,
+  passed as `wrap_method` (also taken by `generate_airfoils`, `generate_airfoil_aero`,
+  `generate_aero_matrices` and `generate_polar_from_coordinates`), at zero clearance.
+  `shrink_wrap` rolls the ball on the polygon of a closed input rather than its nodes
+  and warns when the contour it returns crosses itself. A thin wrapped section came back
+  with its surfaces crossing.
 - `solve!` and `solve` throw a `DimensionMismatch` naming both sizes for a `body_aero` whose
   panel or unrefined-section count differs from the solver's, where they failed on a
   broadcast partway through or silently left section results at zero.

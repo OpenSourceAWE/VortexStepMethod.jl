@@ -39,8 +39,9 @@ end
 Sweep `solver` over the airfoil coordinates `(x, y)` and write the polar CSV. XFoil
 uses the coordinates directly; NeuralFoil fits [`LeastSquaresFit`](@ref) Kulfan
 parameters ([`deform_section`](@ref)). Wrap a raw or open single-membrane slice with
-[`shrink_wrap`](@ref) before calling this, and pass the same `wrap_method`. Pass a [`NeuralFoilSolver`](@ref) or
-[`XFoilSolver`](@ref) to pick the backend. With `delta_range === nothing` the sweep is
+[`shrink_wrap`](@ref) before calling this and pass that [`ShrinkWrap`](@ref) as
+`wrap_method`. Pass a [`NeuralFoilSolver`](@ref) or [`XFoilSolver`](@ref) to pick the
+backend. With `delta_range === nothing` the sweep is
 over `alpha_range` only and written as a `POLAR_VECTORS` CSV (returns the
 `Vector{SectionSolution}`); pass a `delta_range` of trailing-edge deflections to sweep
 `(alpha, delta)` and write a long-format `POLAR_MATRICES` CSV (returns the `(cl, cd,
