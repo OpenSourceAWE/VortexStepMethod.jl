@@ -271,6 +271,30 @@ function unrefined_section_range(body_aero::BodyAerodynamics, wing_idx)
 end
 
 """
+    prescribed_va_directions(va, spanwise)
+
+Lift and side unit vectors, `(; dir_lift, dir_side)`, of inflow `va` on a wing along
+`spanwise`: lift normal to both, side normal to lift and `va`.
+"""
+@inline function prescribed_va_directions(va, spanwise)
+    dir_lift = normalize(cross(va, spanwise))
+    return (; dir_lift, dir_side=cross(dir_lift, va) / norm(va))
+end
+
+"""
+    panel_range(body_aero::BodyAerodynamics, wing_idx)
+
+Indices of the panels of wing `wing_idx` in `body_aero.panels`.
+"""
+function panel_range(body_aero::BodyAerodynamics, wing_idx)
+    offset = 0
+    for i in 1:wing_idx-1
+        offset += body_aero.wings[i].n_panels
+    end
+    return offset .+ (1:body_aero.wings[wing_idx].n_panels)
+end
+
+"""
     unrefined_deform!(body_aero::BodyAerodynamics, theta_angles, delta_angles)
 
 Deform each wing of `body_aero` by its entries of `theta_angles` and `delta_angles` [rad],
@@ -888,8 +912,7 @@ function calculate_results(
     drag_wing_3D_sum = 0.0
     side_wing_3D_sum = 0.0
 
-    # Get wing properties and reference velocity
-    spanwise_direction = body_aero.wings[1].spanwise_direction
+    reference_spanwise = SVector{3}(body_aero.wings[1].spanwise_direction)
     va_ref_vec = MVec3(0.0, 0.0, 0.0)
     weighted_speed_sq = 0.0
     total_area = 0.0
@@ -922,77 +945,62 @@ function calculate_results(
     @inbounds for k in 1:3
         va_ref_unit[k] = va_ref_vec[k] * inv_va_ref
     end
-    dir_lift_ref = body_aero.work_vectors[2]
-    cross3!(dir_lift_ref, va_ref_vec, spanwise_direction)
-    dir_lift_ref_norm = norm3(dir_lift_ref)
-    dir_lift_ref_norm > 0.0 || throw(ArgumentError(
+    norm(cross(va_ref_vec, reference_spanwise)) > 0.0 || throw(ArgumentError(
         "Reference lift direction is undefined because " *
         "reference flow is parallel to spanwise direction."))
-    @inbounds for k in 1:3
-        dir_lift_ref[k] /= dir_lift_ref_norm
-    end
-    dir_side_ref = body_aero.work_vectors[3]
-    cross3!(dir_side_ref, dir_lift_ref, va_ref_unit)
+    reference_dirs = prescribed_va_directions(SVector{3}(va_ref_vec), reference_spanwise)
     q_ref = 0.5 * density * va_ref^2
 
-    dir_lift_prescribed_va = body_aero.work_vectors[9]
-    temp_vec = body_aero.work_vectors[10]
-    spanwise_unit = SVector{3}(spanwise_direction)
+    for (wing_idx, wing) in enumerate(body_aero.wings)
+        spanwise_unit = SVector{3}(wing.spanwise_direction)
+        for i in panel_range(body_aero, wing_idx)
+            panel = panels[i]
+            panel_area = panel.chord * panel.width
+            area_all_panels += panel_area
 
-    # Main calculation loop
-    for (i, panel) in enumerate(panels)
-        panel_area = panel.chord * panel.width
-        area_all_panels += panel_area
+            axes = panel_axes(panel)
+            dirs = panel_force_directions(axes, alpha_corrected[i], spanwise_unit)
+            c_span = 0.0
+            if is_with_viscous_drag_correction
+                viscous = spanwise_flow_drag(v_rel_dist[i], v_span_dist[i], panel.chord,
+                    density, mu)
+                cd_dist[i] += viscous.delta_cd
+                c_span = viscous.c_span
+            end
+            loads = panel_loads(axes, dirs,
+                dynamic_pressure(density, density, v_rel_dist[i]),
+                cl_dist[i], cd_dist[i], cm_dist[i]; c_span)
+            force = loads.force
 
-        axes = panel_axes(panel)
-        dirs = panel_force_directions(axes, alpha_corrected[i], spanwise_unit)
-        c_span = 0.0
-        if is_with_viscous_drag_correction
-            viscous = spanwise_flow_drag(v_rel_dist[i], v_span_dist[i], panel.chord,
-                density, mu)
-            cd_dist[i] += viscous.delta_cd
-            c_span = viscous.c_span
-        end
-        loads = panel_loads(axes, dirs,
-            dynamic_pressure(density, density, v_rel_dist[i]),
-            cl_dist[i], cd_dist[i], cm_dist[i]; c_span)
-        force = loads.force
+            va_panel = va_dist[i]
+            va_panel > 0.0 || throw(ArgumentError(
+                "Panel $i has non-positive apparent " *
+                "velocity magnitude."))
+            q_panel = 0.5 * density * va_panel^2
+            panel_va = SVector{3}(panel.va)
+            inv_va_panel = 1.0 / va_panel
+            drag_prescribed_va = dot(force, panel_va) * inv_va_panel
+            wing_dirs = prescribed_va_directions(panel_va, spanwise_unit)
+            body_dirs = prescribed_va_directions(panel_va, reference_spanwise)
 
-        va_panel = va_dist[i]
-        va_panel > 0.0 || throw(ArgumentError(
-            "Panel $i has non-positive apparent " *
-            "velocity magnitude."))
-        q_panel = 0.5 * density * va_panel^2
-        cross3!(dir_lift_prescribed_va,
-                panel.va, spanwise_direction)
-        normalize3!(dir_lift_prescribed_va)
+            lift_wing_3D_sum += dot(force, body_dirs.dir_lift) *
+                dot(body_dirs.dir_lift, reference_dirs.dir_lift)
+            drag_wing_3D_sum += drag_prescribed_va *
+                (dot3(panel.va, va_ref_unit) * inv_va_panel)
+            side_wing_3D_sum += dot(force, body_dirs.dir_side) *
+                dot(body_dirs.dir_side, reference_dirs.dir_side)
 
-        cross3!(temp_vec, dir_lift_prescribed_va, panel.va)
-        inv_va_panel = 1.0 / va_panel
-        @inbounds for k in 1:3
-            temp_vec[k] *= inv_va_panel
-        end
-        lift_prescribed_va = dot(force, dir_lift_prescribed_va)
-        drag_prescribed_va = dot(force, panel.va) * inv_va_panel
-        side_prescribed_va = dot(force, temp_vec)
+            inv_q_area = 1.0 / (q_panel * panel_area)
+            cl_prescribed_va[i] = dot(force, wing_dirs.dir_lift) * inv_q_area
+            cd_prescribed_va[i] = drag_prescribed_va * inv_q_area
+            cs_prescribed_va[i] = dot(force, wing_dirs.dir_side) * inv_q_area
 
-        lift_wing_3D_sum += lift_prescribed_va *
-            dot3(dir_lift_prescribed_va, dir_lift_ref)
-        drag_wing_3D_sum += drag_prescribed_va *
-            (dot3(panel.va, va_ref_unit) * inv_va_panel)
-        side_wing_3D_sum += side_prescribed_va *
-            dot3(temp_vec, dir_side_ref)
-
-        inv_q_area = 1.0 / (q_panel * panel_area)
-        cl_prescribed_va[i] = lift_prescribed_va * inv_q_area
-        cd_prescribed_va[i] = drag_prescribed_va * inv_q_area
-        cs_prescribed_va[i] = side_prescribed_va * inv_q_area
-
-        arm = SVector{3}(panel.aero_center) - SVector{3}(reference_point)
-        moment = loads.pitching_moment .* axes.y_airf .+ cross(arm, force)
-        @inbounds for k in 1:3
-            f_body_3D[k, i] = force[k]
-            m_body_3D[k, i] = moment[k]
+            arm = SVector{3}(panel.aero_center) - SVector{3}(reference_point)
+            moment = loads.pitching_moment .* axes.y_airf .+ cross(arm, force)
+            @inbounds for k in 1:3
+                f_body_3D[k, i] = force[k]
+                m_body_3D[k, i] = moment[k]
+            end
         end
     end
 
