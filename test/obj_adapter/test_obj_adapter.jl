@@ -28,6 +28,20 @@ obj_path = normpath(joinpath(@__DIR__, "..", "..",
         end
     end
 
+    @testset "every marched station cuts across the surface, closing tips included" begin
+        vertices, faces = read_faces(obj_path)
+        ys = [v[2] for v in vertices]
+        for n_bins in (60, 90)
+            march = ObjAdapter.march_edges(vertices, faces;
+                                           step=(maximum(ys) - minimum(ys)) / n_bins)
+            for i in eachindex(march.le)
+                section = ObjAdapter.build_section(vertices, faces, march.le[i],
+                    march.te[i], march.point[i], march.tangent[i])
+                @test maximum(section.y_airfoil) - minimum(section.y_airfoil) < 0.3
+            end
+        end
+    end
+
     @testset "station_indices spreads sections evenly in span past a raked tip" begin
         # Straight LE over |y| ≤ 1, then tip caps whose LE runs 40 mm aft per 3 mm span.
         cap = [(1.0 + 0.003k, 0.04k) for k in 1:20]

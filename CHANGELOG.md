@@ -66,6 +66,10 @@
 
 ### Fixed
 
+- `perpendicular_sections` and `obj_to_yaml` orient each cut by the leading edge through
+  the neighbouring stations, not by the step that reached the station, which near a
+  closing tip grazed the surface and returned an 80%-thick section. Every section moves
+  slightly; regenerate existing geometry to benefit.
 - `ELLIPTIC` initial circulation works on a body with more than one wing, where it threw
   an `ArgumentError`: each wing gets an ellipse over its own span, along its own
   `spanwise_direction` and centred on its own mid-span, also for a single wing off y = 0.

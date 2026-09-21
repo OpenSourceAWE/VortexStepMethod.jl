@@ -278,8 +278,9 @@ components of the running LE tangent dropped from the normal) so a tip that curl
 downward can't tilt the plane toward horizontal, where its min-chord "LE" pick would
 jump across the wing. Marching stops when the leading edge stops advancing spanwise.
 Cuts sample mesh *edges*, so the picks are robust to vertex density. Returns, ordered
-along the span, the LE/TE points and each cut's plane origin and tangent. Build the
-airfoil for a chosen station with `build_section`.
+along the span, the LE/TE points, each cut's plane origin, and the LE tangent: the
+central difference over the neighbouring stations, that of the next station in at
+either end. Build the airfoil for a chosen station with `build_section`.
 """
 function march_edges(vertices, faces; step)
     ys = [v[2] for v in vertices]
@@ -326,22 +327,24 @@ function march_edges(vertices, faces; step)
                     valid ? (lo = mid; tip = (; here.le, here.te, point=probe_mid)) :
                             (hi = mid)
                 end
-                tip === nothing || push!(rows, (; tip.le, tip.te, tip.point, tangent))
+                tip === nothing || push!(rows, tip)
                 break
             end
             le_step = found.le .- prev_le
             (norm(le_step) < 1e-9 || le_step[2] * direction <= 0.0) && break
-            push!(rows, (; found.le, found.te, point=probe, tangent))
+            push!(rows, (; found.le, found.te, point=probe))
             tangent = normalize(le_step)
             prev_le = found.le
         end
         return rows
     end
 
-    center = (; mid_cut.le, mid_cut.te, point=[0.0, y_mid, 0.0], tangent=[0.0, 1.0, 0.0])
+    center = (; mid_cut.le, mid_cut.te, point=[0.0, y_mid, 0.0])
     rows = vcat(reverse(march(-1.0)), [center], march(1.0))
-    return (; le=[r.le for r in rows], te=[r.te for r in rows],
-            point=[r.point for r in rows], tangent=[r.tangent for r in rows])
+    le = [r.le for r in rows]
+    neighbours = clamp.(eachindex(le), 2, length(le) - 1)
+    tangent = [normalize(le[j + 1] .- le[j - 1]) for j in neighbours]
+    return (; le, te=[r.te for r in rows], point=[r.point for r in rows], tangent)
 end
 
 """
