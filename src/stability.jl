@@ -2,25 +2,33 @@
     stability_derivatives(solver, body_aero, alpha, beta, va; kwargs...)
 
 Aerodynamic coefficients `[CFx, CFy, CFz, CMx, CMy, CMz]` of `body_aero` at angle of attack
-`alpha` [rad], sideslip `beta` [rad] and apparent wind speed `va` [m/s], and their
-derivatives with respect to `alpha` and `beta` [1/rad], at the rotation rate
-`body_aero.omega` and with moments about `solver.reference_point`. `kwargs` go to
-[`linearize`](@ref), which leaves `body_aero` at this inflow.
+`alpha` [rad], sideslip `beta` [rad], apparent wind speed `va` [m/s] and rotation rate
+`body_aero.omega` [rad/s], and their derivatives: `dalpha` and `dbeta` [1/rad], and `dp`,
+`dq`, `dr` with respect to p̂ = pb/2V, q̂ = q c_ref/2V and r̂ = rb/2V, where p, q, r are the
+rates about body x, y, z, b the wing span, c_ref `body_aero.c_ref` and V is `va`, not the
+area-weighted panel inflow speed the coefficients are normalised by. Moments are about,
+and the body turns about, `solver.reference_point`. `kwargs` go to [`linearize`](@ref).
+Leaves `body_aero` at this inflow with `body_aero.reference_point = solver.reference_point`.
 
-Returns `(coeffs, dalpha, dbeta, converged)`.
+Returns `(coeffs, dalpha, dbeta, dp, dq, dr, converged)`.
 """
 function stability_derivatives(solver::Solver, body_aero::BodyAerodynamics, alpha, beta,
         va; kwargs...)
     va_vec = apparent_wind(alpha, beta, va)
-    jac, results, converged = linearize(solver, body_aero, va_vec;
-        theta_idxs=nothing, va_vec_idxs=1:3, aero_coeffs=true, kwargs...)
+    set_va!(body_aero, va_vec, body_aero.omega; reference_point=solver.reference_point)
+    jac, results, converged = linearize(solver, body_aero, [va_vec; body_aero.omega];
+        theta_idxs=nothing, va_vec_idxs=1:3, omega_idxs=4:6, aero_coeffs=true, kwargs...)
     dva_dalpha = ForwardDiff.derivative(
         angle -> apparent_wind(angle, beta, va), alpha)
     dva_dbeta = ForwardDiff.derivative(
         angle -> apparent_wind(alpha, angle, va), beta)
     coeff_jac = jac[1:6, :]
-    return (coeffs=results[1:6], dalpha=coeff_jac * dva_dalpha,
-        dbeta=coeff_jac * dva_dbeta, converged)
+    span = body_aero.wings[1].span
+    return (coeffs=results[1:6], dalpha=coeff_jac[:, 1:3] * dva_dalpha,
+        dbeta=coeff_jac[:, 1:3] * dva_dbeta,
+        dp=coeff_jac[:, 4] * 2va / span,
+        dq=coeff_jac[:, 5] * 2va / body_aero.c_ref,
+        dr=coeff_jac[:, 6] * 2va / span, converged)
 end
 
 """
@@ -32,7 +40,8 @@ sign between neighbouring entries of `alpha_range`, bisected to `alpha_tol` [rad
 sideslip `beta` [rad] and apparent wind speed `va` [m/s]. Returns one
 `(alpha, dCMy_dalpha)` per trim, the slope [1/rad] from [`stability_derivatives`](@ref)
 with `backend`; a trim is statically stable where `dCMy_dalpha < 0`. Throws a
-[`SolveFailure`](@ref) if a solve misses the solver's tolerances.
+[`SolveFailure`](@ref) if a solve misses the solver's tolerances. Leaves
+`body_aero.reference_point = solver.reference_point`.
 """
 function trim_angle(solver::Solver, body_aero::BodyAerodynamics, beta, va;
         alpha_range=deg2rad.(-5:2:15), alpha_tol=1e-5, backend=AutoForwardDiff())
@@ -55,11 +64,13 @@ end
 
 Aerodynamic coefficients `[CFx, CFy, CFz, CMx, CMy, CMz]` of `body_aero` solved at angle of
 attack `alpha` [rad], sideslip `beta` [rad] and apparent wind speed `va` [m/s], at the
-rotation rate `body_aero.omega`. Throws a [`SolveFailure`](@ref) if the solve misses the
+rotation rate `body_aero.omega`, which it turns about and stores as
+`body_aero.reference_point`. Throws a [`SolveFailure`](@ref) if the solve misses the
 solver's tolerances.
 """
 function coeffs_at_angles(solver, body_aero, alpha, beta, va)
-    set_va!(body_aero, apparent_wind(alpha, beta, va), body_aero.omega)
+    set_va!(body_aero, apparent_wind(alpha, beta, va), body_aero.omega;
+        reference_point=solver.reference_point)
     sol = solve!(solver, body_aero; throw_on_fail=true)
     return [sol.force_coeffs; sol.moment_coeffs]
 end

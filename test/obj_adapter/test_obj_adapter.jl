@@ -29,6 +29,25 @@ obj_path = normpath(joinpath(@__DIR__, "..", "..",
         end
     end
 
+    @testset "station_indices spreads sections evenly in span past a raked tip" begin
+        # Straight LE over |y| ≤ 1, then tip caps whose LE runs 40 mm aft per 3 mm span.
+        cap = [(1.0 + 0.003k, 0.04k) for k in 1:20]
+        stations = vcat(reverse([(-y, x) for (y, x) in cap]),
+                        [(y, 0.0) for y in -1.0:0.05:1.0], cap)
+        march = (; le=[[x, y, 0.0] for (y, x) in stations],
+                 te=[[1.0, y, 0.0] for (y, _) in stations])
+        half_span = 1.06
+
+        y = [march.le[i][2] for i in ObjAdapter.station_indices(march, 9)]
+        @test all(isapprox.(diff(y), 2half_span / 8; atol=0.05))
+
+        wingtip_distance = 0.3
+        y = [march.le[i][2]
+             for i in ObjAdapter.station_indices(march, 9; wingtip_distance)]
+        @test y[1] ≈ -(half_span - wingtip_distance) atol=0.05
+        @test y[end] ≈ half_span - wingtip_distance atol=0.05
+    end
+
     @testset "obj_to_yaml (alpha,delta) matrices -> loadable Wing (NeuralFoil)" begin
         @test isfile(yaml)
         @test isfile(joinpath(out, "polars", "1.csv"))

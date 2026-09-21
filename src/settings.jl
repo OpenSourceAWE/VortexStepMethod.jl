@@ -38,7 +38,7 @@ slices as an unconfigured call.
     trace (default `60`).
 - `rotation`: Rows of the mesh-to-slicer rotation, which brings the mesh into the
     slicer's convention of x = chord, y = span, z = up (default the identity).
-- `wingtip_distance`: Arc length [m] the outermost sections stop short of each tip
+- `wingtip_distance`: Spanwise length [m] the outermost sections stop short of each tip
     (default `0.0`).
 - `clearance`: Shrink-wrap offset [chord fraction] the contour holds outside every
     cloud point, and the radius its convex corners are rounded at (default
@@ -159,9 +159,6 @@ Solver configuration, used within [`VSMSettings`](@ref).
     (default `0.001`)
 - `relaxation_factor`: Convergence relaxation factor
     (default `0.03`)
-- `artificial_damping`: Enable artificial damping
-    (default `false`)
-- `k2`, `k4`: Artificial damping parameters
 - `is_with_artificial_viscosity`: Enable Li/Gaunaa post-stall
     artificial viscosity (default `false`)
 - `artificial_viscosity_factor`: Viscosity scaling coefficient k
@@ -192,9 +189,6 @@ Solver configuration, used within [`VSMSettings`](@ref).
     rtol::Float64 = 1e-5                    # relative residual tolerance [-]
     tol_reference_error::Float64 = 0.001
     relaxation_factor::Float64 = 0.03       # relaxation factor for convergence
-    artificial_damping::Bool = false        # whether to apply artificial damping
-    k2::Float64 = 0.1                       # artificial damping parameter
-    k4::Float64 = 0.0                       # artificial damping parameter
     is_with_artificial_viscosity::Bool = false  # Li/Gaunaa post-stall artificial viscosity
     artificial_viscosity_factor::Float64 = 0.035 # viscosity scaling coefficient k
     type_initial_gamma_distribution::InitialGammaDistribution = ZEROS # see: [`InitialGammaDistribution`](@ref)
@@ -306,6 +300,13 @@ function VSMSettings(filename; data_prefix=true)
             solver_data_clean["use_gamma_prev"] = solver_data_clean["use_gamme_prev"]
         end
         haskey(solver_data_clean, "use_gamme_prev") && delete!(solver_data_clean, "use_gamme_prev")
+        removed = filter(key -> haskey(solver_data_clean, key),
+                         ["artificial_damping", "k2", "k4"])
+        if !isempty(removed)
+            @warn "solver_settings keys $(join(removed, ", ")) are ignored: " *
+                  "artificial damping was removed, see is_with_artificial_viscosity"
+            foreach(key -> delete!(solver_data_clean, key), removed)
+        end
         delete!(solver_data_clean, "aerodynamic_model_type")
         delete!(solver_data_clean, "type_initial_gamma_distribution")
         

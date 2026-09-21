@@ -63,28 +63,22 @@ end
 """
     get_lower_upper(x, y, crease_frac) -> (lower, upper)
 
-Find y-coordinates where upper/lower surfaces intersect the hinge line.
+Heights of the lower and upper surfaces of the contour `(x, y)` at the chord station
+`x = crease_frac`: the lowest and highest crossing of that vertical line with the
+segments between consecutive points, not including the one from the last point back
+to the first. Throws an `ArgumentError` when the contour crosses it fewer than twice.
 """
 function get_lower_upper(x, y, crease_frac)
-    lower_trailing_edge = 0.0
-    upper_trailing_edge = 0.0
-    min_lower_distance = Inf
-    min_upper_distance = Inf
-    for (xi, yi) in zip(x, y)
-        if yi < 0
-            lower_distance = abs(xi - crease_frac)
-            if lower_distance < min_lower_distance
-                min_lower_distance = lower_distance
-                lower_trailing_edge = yi
-            end
-        else
-            upper_distance = abs(xi - crease_frac)
-            if upper_distance < min_upper_distance
-                min_upper_distance = upper_distance
-                upper_trailing_edge = yi
-            end
-        end
+    lower, upper = Inf, -Inf
+    n_crossings = 0
+    for i in firstindex(x):lastindex(x)-1
+        min(x[i], x[i+1]) <= crease_frac < max(x[i], x[i+1]) || continue
+        t = (crease_frac - x[i]) / (x[i+1] - x[i])
+        y_crossing = y[i] + t * (y[i+1] - y[i])
+        lower, upper = min(lower, y_crossing), max(upper, y_crossing)
+        n_crossings += 1
     end
-    return lower_trailing_edge, upper_trailing_edge
+    n_crossings >= 2 || throw(ArgumentError("the contour crosses x = $crease_frac " *
+        "$n_crossings times; a closed one crosses it at least twice"))
+    return lower, upper
 end
-

@@ -120,10 +120,6 @@ Main solver structure for the Vortex Step Method.See also: [`solve`](@ref)
 - `tol_reference_error`::Float64 = 0.001
 - `relaxation_factor`::Float64 = 0.03: Relaxation factor for convergence 
 
-## Damping settings
-- `is_with_artificial_damping`::Bool = false: Whether to apply artificial damping
-- `artificial_damping`::NamedTuple{(:k2, :k4), Tuple{Float64, Float64}} = (k2=0.1, k4=0.0): Artificial damping parameters
-
 ## Artificial viscosity settings
 - `is_with_artificial_viscosity`::Bool = false: Enable the Li/Gaunaa spanwise artificial
     viscosity (TORQUE 2026) for post-stall stabilization in the LOOP solver
@@ -164,10 +160,6 @@ sol::VSMSolution = VSMSolution(): The result of calling [`solve!`](@ref)
     nonlin_gamma_perturbed::MVector{P, T} = zeros(MVector{P, T})
     nonlin_ipiv::Vector{LinearAlgebra.BlasInt} = zeros(LinearAlgebra.BlasInt, P)
 
-    # Damping settings
-    is_with_artificial_damping::Bool = false
-    artificial_damping::NamedTuple{(:k2, :k4), Tuple{Float64, Float64}} =(k2=0.1, k4=0.0)
-
     # Li/Gaunaa spanwise artificial viscosity (TORQUE 2026) settings
     is_with_artificial_viscosity::Bool = false
     artificial_viscosity_factor::T = T(0.035)
@@ -186,7 +178,7 @@ sol::VSMSolution = VSMSolution(): The result of calling [`solve!`](@ref)
     # Intermediate results
     lr::LoopResult{P, T} = LoopResult{P, T}()
     br::BaseResult{P, T} = BaseResult{P, T}()
-    cache::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}} = [LazyBufferCache() for _ in 1:11]
+    cache::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}} = [LazyBufferCache() for _ in 1:10]
     cache_base::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}}  = [LazyBufferCache()]
     cache_lin::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}} = [LazyBufferCache() for _ in 1:4]
 
@@ -258,8 +250,6 @@ function solver_kwargs(solver_settings::SolverSettings)
         rtol=solver_settings.rtol,
         tol_reference_error=solver_settings.tol_reference_error,
         relaxation_factor=solver_settings.relaxation_factor,
-        is_with_artificial_damping=solver_settings.artificial_damping,
-        artificial_damping=(k2=solver_settings.k2, k4=solver_settings.k4),
         is_with_artificial_viscosity=solver_settings.is_with_artificial_viscosity,
         artificial_viscosity_factor=solver_settings.artificial_viscosity_factor,
         type_initial_gamma_distribution=solver_settings.type_initial_gamma_distribution,
@@ -976,10 +966,8 @@ function gamma_loop!(
     relative_velocity_crossz = solver.cache[6][va_vec_dist]
     v_acrossz_dist           = solver.cache[7][va_vec_dist]
     cl_dist                  = solver.cache[8][solver.lr.gamma_new]
-    damp                     = solver.cache[9][solver.lr.gamma_new]
-    damp                    .= zero(T)
-    v_normal_dist            = solver.cache[10][solver.lr.gamma_new]
-    v_tangential_dist        = solver.cache[11][solver.lr.gamma_new]
+    v_normal_dist            = solver.cache[9][solver.lr.gamma_new]
+    v_tangential_dist        = solver.cache[10][solver.lr.gamma_new]
 
     AIC_x = @view body_aero.AIC[:, :, 1]
     AIC_y = @view body_aero.AIC[:, :, 2]
@@ -1104,7 +1092,7 @@ function gamma_loop!(
             end
         end
 
-        function f_loop!(gamma_new, gamma, damp)
+        function f_loop!(gamma_new, gamma)
             gamma .= gamma_new
             update_gamma_candidate!(
                 gamma_new,
@@ -1141,24 +1129,14 @@ function gamma_loop!(
                 )
             end
 
-            # Update gamma with relaxation and damping
-            @. gamma_new = (1 - relaxation_factor) * gamma +
-                    relaxation_factor * gamma_new + damp
-
-            # Apply damping if needed
-            if solver.is_with_artificial_damping
-                smooth_circulation!(damp, gamma, 0.1, 0.5)
-                @debug "damp: $damp"
-            else
-                damp .= 0.0
-            end
+            @. gamma_new = (1 - relaxation_factor) * gamma + relaxation_factor * gamma_new
             return nothing
         end
         iters = 0
         for i in 1:solver.max_iterations
             iters += 1
 
-            f_loop!(solver.lr.gamma_new, gamma, damp)
+            f_loop!(solver.lr.gamma_new, gamma)
 
             # Check convergence
             abs_gamma_new .= abs.(solver.lr.gamma_new)
@@ -1184,39 +1162,6 @@ function gamma_loop!(
         end
         return nothing
     end
-end
-
-"""
-    smooth_circulation!(damp, circulation, smoothness_factor, damping_factor) -> Bool
-
-Write into `damp` the correction that moves each interior value of `circulation` toward
-the mean of its neighbours by `damping_factor`, scaled to keep the total circulation.
-Smoothing applies only where an interior jump exceeds `smoothness_factor` times the
-interior mean; otherwise `damp` is zeroed. Returns whether smoothing was applied.
-"""
-function smooth_circulation!(
-    damp,
-    circulation,
-    smoothness_factor::Float64,
-    damping_factor::Float64
-)
-    interior = circulation[2:end-1]
-    differences = diff(interior)
-    if isempty(differences) ||
-            maximum(abs, differences) <= smoothness_factor * mean(interior)
-        damp .= 0.0
-        return false
-    end
-
-    smoothed = copy(circulation)
-    for i in 2:length(circulation)-1
-        neighbour_mean = (circulation[i-1] + circulation[i+1]) / 2
-        smoothed[i] += damping_factor * (neighbour_mean - circulation[i])
-    end
-    smoothed .*= sum(circulation) / sum(smoothed)
-
-    damp .= smoothed .- circulation
-    return true
 end
 
 function _section_with_eltype(section::Section, ::Type{TD}) where TD
@@ -1288,8 +1233,6 @@ function make_dual_shadow(solver::Solver{P, U, Float64},
         tol_reference_error = TD(solver.tol_reference_error),
         relaxation_factor = TD(solver.relaxation_factor),
         atol = TD(solver.atol),
-        is_with_artificial_damping = solver.is_with_artificial_damping,
-        artificial_damping = solver.artificial_damping,
         is_with_artificial_viscosity = solver.is_with_artificial_viscosity,
         artificial_viscosity_factor = TD(solver.artificial_viscosity_factor),
         type_initial_gamma_distribution = solver.type_initial_gamma_distribution,
