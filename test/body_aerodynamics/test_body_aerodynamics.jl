@@ -535,7 +535,7 @@ end
     body_aero.omega = 2 .* omega
     test_rigid_body_inflow(body_aero, va_vec, 2 .* omega, reference_point)
 
-    reinit!(body_aero; va_vec=va_vec, omega)
+    reinit!(body_aero; va_vec, omega)
     test_rigid_body_inflow(body_aero, va_vec, omega, reference_point)
 
     body_aero.reference_point = zeros(3)

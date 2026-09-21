@@ -84,7 +84,7 @@ end
     converged::Bool                  = false
     gamma_new::MVector{P, T}         = zeros(MVector{P, T})
     alpha_dist::MVector{P, T}        = zeros(MVector{P, T})
-    v_rel_dist::MVector{P, T}          = zeros(MVector{P, T})
+    v_rel_dist::MVector{P, T}        = zeros(MVector{P, T})
     v_span_dist::MVector{P, T}       = zeros(MVector{P, T})
 end
 
@@ -966,7 +966,7 @@ function gamma_loop!(
     solver.lr.converged   = false
     n_panels    = length(body_aero.panels)
     solver.lr.alpha_dist .= body_aero.alpha_dist
-    solver.lr.v_rel_dist   .= body_aero.v_rel_dist
+    solver.lr.v_rel_dist .= body_aero.v_rel_dist
     
     va_magw_dist             = solver.cache[1][solver.lr.v_rel_dist]
     gamma                    = solver.cache[2][solver.lr.gamma_new]

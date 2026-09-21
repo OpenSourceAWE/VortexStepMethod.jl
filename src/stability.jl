@@ -4,8 +4,8 @@
 Aerodynamic coefficients `[CFx, CFy, CFz, CMx, CMy, CMz]` of `body_aero` at angle of attack
 `alpha` [rad], sideslip `beta` [rad] and apparent wind speed `va` [m/s], and their
 derivatives with respect to `alpha` and `beta` [1/rad], at the rotation rate
-`body_aero.omega` and with moments about `solver.reference_point`. `kwargs` go to [`linearize`](@ref), which leaves
-`body_aero` at this inflow.
+`body_aero.omega` and with moments about `solver.reference_point`. `kwargs` go to
+[`linearize`](@ref), which leaves `body_aero` at this inflow.
 
 Returns `(coeffs, dalpha, dbeta, converged)`.
 """
@@ -31,8 +31,8 @@ Angles of attack [rad] at which `CMy` of `body_aero` about `solver.reference_poi
 sign between neighbouring entries of `alpha_range`, bisected to `alpha_tol` [rad], at
 sideslip `beta` [rad] and apparent wind speed `va` [m/s]. Returns one
 `(alpha, dCMy_dalpha)` per trim, the slope [1/rad] from [`stability_derivatives`](@ref)
-with `backend`; a trim is statically stable where `dCMy_dalpha < 0`. Throws a [`SolveFailure`](@ref) if a solve misses the
-solver's tolerances.
+with `backend`; a trim is statically stable where `dCMy_dalpha < 0`. Throws a
+[`SolveFailure`](@ref) if a solve misses the solver's tolerances.
 """
 function trim_angle(solver::Solver, body_aero::BodyAerodynamics, beta, va;
         alpha_range=deg2rad.(-5:2:15), alpha_tol=1e-5, backend=AutoForwardDiff())
@@ -55,8 +55,8 @@ end
 
 Aerodynamic coefficients `[CFx, CFy, CFz, CMx, CMy, CMz]` of `body_aero` solved at angle of
 attack `alpha` [rad], sideslip `beta` [rad] and apparent wind speed `va` [m/s], at the
-rotation rate `body_aero.omega`. Throws a [`SolveFailure`](@ref) if the solve misses the solver's
-tolerances.
+rotation rate `body_aero.omega`. Throws a [`SolveFailure`](@ref) if the solve misses the
+solver's tolerances.
 """
 function coeffs_at_angles(solver, body_aero, alpha, beta, va)
     set_va!(body_aero, apparent_wind(alpha, beta, va), body_aero.omega)
