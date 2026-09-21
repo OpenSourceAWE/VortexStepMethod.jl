@@ -169,6 +169,7 @@ push_arc!
 edge_normal
 pivot_contour
 largest_linking_gap
+densify_contour
 enforce_min_spacing!
 resample_arc
 smoothed_curvature
@@ -255,7 +256,6 @@ build_section
 contour_to_airfoil
 plane_contour_to_airfoil
 reorder_airfoil_selig
-densify_contour
 create_interpolations
 find_circle_center_and_radius
 march_edges

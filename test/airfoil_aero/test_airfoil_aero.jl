@@ -275,6 +275,36 @@ end
     end
 end
 
+@testset "re-wrapping a wrapped section keeps it a simple closed curve" begin
+    shoelace(x, y) = abs(sum(x[i] * y[mod1(i + 1, end)] - x[mod1(i + 1, end)] * y[i]
+                             for i in eachindex(x))) / 2
+    obj = joinpath(pkgdir(VortexStepMethod), "data", "TUDELFT_V3_KITE", "V3_25.obj")
+    vertices, faces = VortexStepMethod.ObjAdapter.read_faces(obj)
+    canopy = VortexStepMethod.ObjAdapter.perpendicular_sections(vertices, faces, 18;
+                                                                n_bins=100)
+    for radius in (0.02, 0.2)
+        wrap = ShrinkWrap(clearance=0.0, min_concave_radius=radius)
+        for section in canopy, delta in deg2rad.((0.0, 5.0))
+            xw, yw = shrink_wrap(section.x_airfoil, section.y_airfoil, wrap)
+            def = deform_section(xw, yw, delta; wrap_method=wrap)
+            @test isnothing(crossing_panels(def.x, def.y))
+        end
+    end
+
+    # a clearance-padded wrap is re-wrapped at zero clearance, neither padded again
+    # nor collapsed by the ball falling between its long panels
+    xw, yw = shrink_wrap(read_dat_coordinates(joinpath(@__DIR__, "data",
+                                                       "test_airfoil.dat"))...,
+                         ShrinkWrap())
+    def = deform_section(xw, yw, 0.0; wrap_method=ShrinkWrap())
+    @test isnothing(crossing_panels(def.x, def.y))
+    @test shoelace(def.x, def.y) ≈ shoelace(xw, yw) rtol = 0.05
+
+    @test_logs (:warn, r"cross") match_mode=:any shrink_wrap(canopy[2].x_airfoil,
+                                                             canopy[2].y_airfoil,
+                                                             ShrinkWrap())
+end
+
 @testset "generate_polar_from_coordinates POLAR_VECTORS sweep" begin
     x, y = read_dat_coordinates(joinpath(@__DIR__, "data", "test_airfoil.dat"))
     csv = joinpath(mktempdir(), "polar.csv")

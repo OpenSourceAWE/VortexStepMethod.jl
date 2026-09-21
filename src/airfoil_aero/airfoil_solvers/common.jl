@@ -85,8 +85,7 @@ end
 
 """
     deform_section(x, y, delta; crease_frac=0.9, thickness_frac=1.0,
-                   flip_thickness_neg=true,
-                   wrap_method=ShrinkWrap(clearance=0.0))
+                   flip_thickness_neg=true, wrap_method=ShrinkWrap())
         -> DeformedSection
 
 Deform the airfoil coordinates `(x, y)` by trailing-edge deflection `delta` (radians)
@@ -96,22 +95,21 @@ into clean cosine panels and fit [`LeastSquaresFit`](@ref) Kulfan parameters to 
 XFoil consumes the coordinates directly, NeuralFoil the Kulfan parameters.
 
 `flip_thickness_neg` folds a soft membrane about its lower surface for negative `delta`.
-The re-wrap uses zero clearance (it hugs the deflected shape at `min_clearance`);
-the rolling-ball wrap bridges the crease with a `min_concave_radius` fillet instead
-of the overlapping panels that XFoil's own repaneling can hit there. The wrap runs
-for every `delta` including `0`, so all deflections share the same node count
-(`2·n_points - 1`).
+`wrap_method` is the wrap `(x, y)` came from: the re-wrap rolls the same ball at zero
+clearance, bridging the crease with a `min_concave_radius` fillet. It runs for every
+`delta` including `0`, so all deflections share the same node count (`2·n_points - 1`).
 """
 function deform_section(x, y, delta; crease_frac=0.9, thickness_frac=1.0,
-                        flip_thickness_neg=true,
-                        wrap_method::ShrinkWrap=ShrinkWrap(clearance=0.0))
+                        flip_thickness_neg=true, wrap_method::ShrinkWrap=ShrinkWrap())
     xd, yd = collect(float.(x)), collect(float.(y))
     if !iszero(delta)
         pivot = flip_thickness_neg && delta < 0 ? 1 - thickness_frac : thickness_frac
         lower, upper = get_lower_upper(xd, yd, crease_frac)
         turn_trailing_edge!(delta, xd, yd, lower, upper, crease_frac; thickness_frac=pivot)
     end
-    xd, yd = shrink_wrap(xd, yd, wrap_method)
+    rewrap = ShrinkWrap(0.0, wrap_method.min_concave_radius, wrap_method.min_clearance,
+                        wrap_method.n_points, wrap_method.curvature_weight)
+    xd, yd = shrink_wrap(xd, yd, rewrap)
     kulfan = fit_kulfan_parameters(xd, yd, LeastSquaresFit())
     return DeformedSection(kulfan, xd, yd)
 end

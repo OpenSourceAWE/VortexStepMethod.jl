@@ -21,7 +21,8 @@ end
 
 """
     generate_aero_matrices(solver, x, y; alpha_range, delta_range, Re,
-                           crease_frac=0.75, remove_nan=true, on_deform=nothing)
+                           crease_frac=0.75, remove_nan=true, on_deform=nothing,
+                           wrap_method=ShrinkWrap())
         -> (cl, cd, cm)
 
 Build `(alpha × delta)` coefficient matrices for a base airfoil given as coordinates
@@ -30,18 +31,19 @@ deflected shape is then swept over `alpha_range` (radians) with `solver` — any
 [`AbstractAirfoilSolver`](@ref), so this works identically for XFoil and NeuralFoil.
 `Re` is the Reynolds number. With `remove_nan` the (non-converged) `NaN` entries are
 interpolated away. `on_deform(delta, x, y)`, if given, is called with each deflected
-shape's coordinates (e.g. to write a per-deflection `.dat`).
+shape's coordinates (e.g. to write a per-deflection `.dat`). `wrap_method` is the
+[`ShrinkWrap`](@ref) `(x, y)` was wrapped with.
 """
 function generate_aero_matrices(solver::AbstractAirfoilSolver, x, y;
         alpha_range, delta_range, Re, crease_frac=0.75, remove_nan=true,
-        on_deform=nothing)
+        on_deform=nothing, wrap_method::ShrinkWrap=ShrinkWrap())
     na, nd = length(alpha_range), length(delta_range)
     cl = fill(NaN, na, nd)
     cd = fill(NaN, na, nd)
     cm = fill(NaN, na, nd)
     alphas = collect(Float64, alpha_range)
     for (j, delta) in enumerate(delta_range)
-        def = deform_section(x, y, delta; crease_frac)
+        def = deform_section(x, y, delta; crease_frac, wrap_method)
         on_deform === nothing || on_deform(delta, def.x, def.y)
         sols = analyze_sweep(solver, def, alphas, Re)
         for (i, s) in enumerate(sols)
