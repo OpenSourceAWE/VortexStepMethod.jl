@@ -34,7 +34,6 @@ end
     body_aero = BodyAerodynamics([ram_wing]; va_vec, omega)
     solver = Solver(ram_wing.n_panels, ram_wing.n_unrefined_sections;
         aerodynamic_model_type=VSM,
-        is_with_artificial_damping=false,
         atol=1e-5,
         rtol=1e-5,
         solver_type=NONLIN,

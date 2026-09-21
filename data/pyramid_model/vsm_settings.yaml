@@ -65,9 +65,6 @@ solver_settings:
     relaxation_factor: 0.01          # [0.001-0.1] Under-relaxation for stability
     
     # --- Numerical Stability ---
-    artificial_damping: false        # Enable artificial damping for unstable cases
-    k2: 0.0                          # 2nd-order damping coefficient
-    k4: 0.0                          # 4th-order damping coefficient
     core_radius_fraction: 0.05      # Vortex core radius (fraction of filament length)
     
     # --- Initial Conditions ---

@@ -25,7 +25,6 @@ body_aero = BodyAerodynamics([wing])
 
 solver = Solver(wing.n_panels, wing.n_unrefined_sections;
     aerodynamic_model_type=VSM,
-    is_with_artificial_damping=false,
     rtol=1e-7,
     solver_type=LOOP,
     use_gamma_prev=false,
