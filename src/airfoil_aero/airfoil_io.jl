@@ -33,15 +33,16 @@ end
 
 Sweep `solver` over the airfoil coordinates `(x, y)` and write the polar table, CSV or
 Arrow as the suffix of `output_path` says. XFoil uses the coordinates directly;
-NeuralFoil fits [`LeastSquaresFit`](@ref) Kulfan parameters ([`deform_section`](@ref)). Wrap a raw or open single-membrane slice with
-[`shrink_wrap`](@ref) before calling this. Pass a [`NeuralFoilSolver`](@ref) or
-[`XFoilSolver`](@ref) to pick the backend. With `delta_range === nothing` the sweep is
-over `alpha_range` only and written as a `POLAR_VECTORS` table (returns the
-`Vector{SectionSolution}`); pass a `delta_range` of trailing-edge deflections to sweep
-`(alpha, delta)` and write a long-format `POLAR_MATRICES` table (returns the `(cl, cd,
-cm)` matrices). Both angle ranges are in degrees. `crease_frac` is the chordwise hinge
-location (0–1) about which each `delta_range` deflection pivots. With `dat_prefix` set,
-each deflected shape is also written to `{dat_prefix}_{delta_suffix(δ)}.dat`.
+NeuralFoil fits [`LeastSquaresFit`](@ref) Kulfan parameters ([`deform_section`](@ref)).
+Wrap a raw or open single-membrane slice with [`shrink_wrap`](@ref) before calling this.
+Pass a [`NeuralFoilSolver`](@ref) or [`XFoilSolver`](@ref) to pick the backend. With
+`delta_range === nothing` the sweep is over `alpha_range` only and written as a
+`POLAR_VECTORS` table (returns the `Vector{SectionSolution}`); pass a `delta_range` of
+trailing-edge deflections to sweep `(alpha, delta)` and write a long-format
+`POLAR_MATRICES` table (returns the `(cl, cd, cm)` matrices). Both angle ranges are in
+degrees. `crease_frac` is the chordwise hinge location (0–1) about which each
+`delta_range` deflection pivots. With `dat_prefix` set, each deflected shape is also
+written to `{dat_prefix}_{delta_suffix(δ)}.dat`.
 """
 function generate_polar_from_coordinates(x::Vector, y::Vector, output_path::String;
                                          Re::Real, alpha_range=-180:1:180,
