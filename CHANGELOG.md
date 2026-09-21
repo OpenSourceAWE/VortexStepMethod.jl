@@ -62,6 +62,11 @@
 
 ### Fixed
 
+- `get_lower_upper`, and with it the flap hinge in `deform_section`, takes the lower and
+  upper surface heights where the contour crosses `x = crease_frac`. It took the nearest
+  points below and above `y = 0`, which on a cambered section put the hinge near the
+  chord line or on the wrong surface. Polars with a flap deflection change slightly.
+  It throws an `ArgumentError` for a contour that crosses that line fewer than twice.
 - `write_polar_csv` for `SectionSolution`s, `write_polar_matrix_csv` and `write_aero_matrix`
   write coefficients at 16 significant digits instead of 4 decimals, so a `POLAR_MATRICES`
   table carries the drag response to a small flap deflection. Regenerate existing tables
