@@ -5,8 +5,10 @@
 ### Added
 
 - `stability_derivatives` gives the force and moment coefficients and their derivatives
-  with respect to angle of attack and sideslip, and `trim_angle` the angles of attack at
-  which `CMy` changes sign, with the slope that says whether each trim is stable.
+  with respect to angle of attack, sideslip and the nondimensional roll, pitch and yaw
+  rates p̂ = pb/2V, q̂ = q c_ref/2V, r̂ = rb/2V, turning about `solver.reference_point`,
+  and `trim_angle` the angles of attack at which `CMy` changes sign, with the slope that
+  says whether each trim is stable.
 - `apparent_wind(alpha, beta, va)` gives the body-frame inflow vector at an angle
   of attack and sideslip, as `set_va!(body_aero, settings)` sets it.
 - `Solver(settings)` and `Solver(n_panels, n_unrefined_sections)` build a solver without
