@@ -941,10 +941,10 @@ function calculate_results(
     @inbounds for k in 1:3
         va_ref_unit[k] = va_ref_vec[k] * inv_va_ref
     end
-    norm(cross(va_ref_vec, reference_spanwise)) > 0.0 || throw(ArgumentError(
+    reference_dirs = prescribed_va_directions(SVector{3}(va_ref_vec), reference_spanwise)
+    all(isfinite, reference_dirs.dir_lift) || throw(ArgumentError(
         "Reference lift direction is undefined because " *
         "reference flow is parallel to spanwise direction."))
-    reference_dirs = prescribed_va_directions(SVector{3}(va_ref_vec), reference_spanwise)
     q_ref = 0.5 * density * va_ref^2
 
     for (wing_idx, wing) in enumerate(body_aero.wings)
@@ -982,7 +982,7 @@ function calculate_results(
             lift_wing_3D_sum += dot(force, body_dirs.dir_lift) *
                 dot(body_dirs.dir_lift, reference_dirs.dir_lift)
             drag_wing_3D_sum += drag_prescribed_va *
-                (dot3(panel.va, va_ref_unit) * inv_va_panel)
+                (dot(panel_va, va_ref_unit) * inv_va_panel)
             side_wing_3D_sum += dot(force, body_dirs.dir_side) *
                 dot(body_dirs.dir_side, reference_dirs.dir_side)
 
