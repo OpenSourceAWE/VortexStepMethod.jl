@@ -58,6 +58,10 @@
 - `ELLIPTIC` initial circulation works on a body with more than one wing, where it threw
   an `ArgumentError`: each wing gets an ellipse over its own span, along its own
   `spanwise_direction` and centred on its own mid-span, also for a single wing off y = 0.
+- `write_polar_csv` for `SectionSolution`s, `write_polar_matrix_csv` and `write_aero_matrix`
+  write coefficients at 16 significant digits instead of 4 decimals, so a `POLAR_MATRICES`
+  table carries the drag response to a small flap deflection. Regenerate existing tables
+  to benefit.
 - `solve!` and `solve` throw a `DimensionMismatch` naming both sizes for a `body_aero` whose
   panel or unrefined-section count differs from the solver's, where they failed on a
   broadcast partway through or silently left section results at zero.
