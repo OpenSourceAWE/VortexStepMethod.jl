@@ -229,16 +229,6 @@ end
         end
     end
 
-    @testset "LINEAR panels are equal in span on a wing swept past a kink" begin
-        wing = Wing(4; spanwise_distribution=LINEAR)
-        add_section!(wing, [1.0, 2.0, 0.0], [2.0, 2.0, 0.0], INVISCID)
-        add_section!(wing, [0.0, 1.0, 0.0], [1.0, 1.0, 0.0], INVISCID)
-        add_section!(wing, [0.0, 0.0, 0.0], [1.0, 0.0, 0.0], INVISCID)
-        refine!(wing)
-        y = [section.LE_point[2] for section in wing.refined_sections]
-        @test y ≈ [2.0, 1.5, 1.0, 0.5, 0.0]
-    end
-
     @testset "Single panel" begin
         n_panels = 1
         span = 20.0

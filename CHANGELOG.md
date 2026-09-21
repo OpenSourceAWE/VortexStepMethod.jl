@@ -29,13 +29,11 @@
 - `Solver(body_aero; kwargs...)` and `Solver(body_aero, settings)` are deprecated and warn
   on use; build the solver with `Solver(settings)` or
   `Solver(n_panels, n_unrefined_sections)` instead.
-- BREAKING: spanwise position is measured along the quarter-chord line without its
-  chordwise component, in both places that spread sections over the span.
-  `obj_to_yaml` and `perpendicular_sections` used leading-edge arc length, and
-  `wingtip_distance` is now that spanwise length; `LINEAR` and `COSINE` refinement used
-  the full 3D quarter-chord length. A tip whose leading edge runs aft no longer gathers
-  sections into its last centimetres, and a swept wing gets panels of equal span. The
-  same mesh, wing and settings give different section and panel positions, so a tuned
+- BREAKING: `obj_to_yaml` and `perpendicular_sections` spread the sections evenly over
+  the span, measured along the quarter-chord line without its chordwise component,
+  instead of over leading-edge arc length, and `wingtip_distance` is that spanwise
+  length. A tip whose leading edge runs aft no longer gathers sections into its last
+  centimetres. The same mesh and settings give different section positions, so a tuned
   `wingtip_distance` and any geometry generated from one have to be redone.
   `march_edges` no longer returns `arclen`.
 

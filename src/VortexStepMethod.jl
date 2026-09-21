@@ -286,8 +286,8 @@ const LEI_AIRFOIL_BREUKELS = POLY
 Enumeration of the implemented panel distributions.
 
 # Elements
-- LINEAR               # Even spacing over the span, see [`refine!`](@ref)
-- COSINE               # Cosine spacing over the span
+- LINEAR               # Linear distribution
+- COSINE               # Cosine distribution
 - `SPLIT_PROVIDED`     # Split provided sections
 - `UNCHANGED`          # 1:1 copy of unrefined to refined sections (no interpolation)
 - `BILLOWING`          # Split provided + sinusoidal TE billowing between ribs

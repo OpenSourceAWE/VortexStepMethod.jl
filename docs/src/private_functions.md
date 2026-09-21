@@ -91,8 +91,6 @@ unrefined_section_range
 deform!
 compute_refined_panel_mapping!
 compute_refined_section_interpolation!
-spanwise_step
-span_position
 copy_sections
 copy_sections_to_refined!
 _apply_refined_section_thetas!
