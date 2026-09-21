@@ -6,7 +6,8 @@ using VortexStepMethod.AirfoilAero: KulfanParameters, LeastSquaresFit, ShrinkWra
                        neuralfoil_aero, class_function, bernstein_basis,
                        leading_edge_basis, normalize_airfoil
 using VortexStepMethod: SectionAero, section_surface, read_section_aero
-using VortexStepMethod.AirfoilAero: write_section_aero
+using VortexStepMethod.AirfoilAero: write_section_aero, write_aero_matrix
+using VortexStepMethod: load_polar_data
 
 seg_dist(px, py, ax, ay, bx, by) = begin
     vx, vy = bx - ax, by - ay
@@ -283,6 +284,34 @@ end
     header = lowercase(readline(csv))
     @test occursin("alpha", header)
     @test !occursin("delta", header)
+end
+
+@testset "polar CSVs keep a Cd deflection response below 1e-4" begin
+    alpha_range = deg2rad.(-5:5:15)
+    delta_range = deg2rad.(-3:3:3)
+    cl = [0.1 * a + 0.03 * d for a in -5:5:15, d in -3:3:3]
+    cd = [0.0093 + 2e-4 * a + 2e-5 * d for a in -5:5:15, d in -3:3:3]
+    cm = [0.06 - 0.01 * d for a in -5:5:15, d in -3:3:3]
+    work = mktempdir()
+
+    matrix_csv = write_polar_matrix_csv(joinpath(work, "matrix.csv"), alpha_range,
+                                        delta_range, cl, cd, cm)
+    (alphas, deltas, cl_back, cd_back, cm_back), model = load_polar_data(matrix_csv)
+    @test model == VortexStepMethod.POLAR_MATRICES
+    @test alphas == alpha_range && deltas == delta_range
+    @test cl_back ≈ cl && cd_back ≈ cd && cm_back ≈ cm
+
+    sols = [SectionSolution(alpha_range[i], cl[i, 1], cd[i, 1], cm[i, 1], 1.0,
+                            Float64[], Float64[], Float64[], Float64[])
+            for i in eachindex(alpha_range)]
+    vectors_csv = write_polar_csv(joinpath(work, "vectors.csv"), sols)
+    (alphas, _, cd_vec, _), _ = load_polar_data(vectors_csv)
+    @test alphas == alpha_range
+    @test cd_vec ≈ cd[:, 1]
+
+    labelled_csv = write_aero_matrix(joinpath(work, "cd.csv"), cd, collect(alpha_range),
+                                     collect(delta_range), "C_d")
+    @test first(VortexStepMethod.read_aero_matrix(labelled_csv)) ≈ cd
 end
 
 @testset "turn_trailing_edge! legacy crease cleanup" begin
