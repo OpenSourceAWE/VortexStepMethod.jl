@@ -38,19 +38,17 @@
 - BREAKING: `ObjAdapter.center_to_com!`, `calculate_inertia_tensor` and
   `calc_inertia_y_rotation` are removed. Mesh mass properties are computed by
   SymbolicAWEModels, which reads the mesh with `read_faces`.
-- BREAKING: the apparent wind is `va` for the speed [m/s], `va_vec` for the 3-vector and
-  `va_dist` / `va_vec_dist` per panel, and the old names error:
-  - `body_aero.va` becomes `body_aero.va_vec`, and `va=` becomes `va_vec=` in
-    `BodyAerodynamics(...)` and `reinit!`.
-  - `Panel.va` becomes `Panel.va_vec`, and `SemiInfiniteFilament.vel_mag` becomes `va`.
-  - On `VSMSolution`, `_va_dist` becomes `va_vec_dist` and `va_unrefined_dist` becomes
-    `va_vec_unrefined_dist`.
-  - `v_a_dist` on `BodyAerodynamics` and `solver.lr` becomes `v_rel_dist`, and
-    `solver.br.va_norm_dist` becomes `va_dist`.
-  - The `linearize` keyword `va_idxs` becomes `va_vec_idxs`, the `calculate_results` key
-    `"va_ref"` becomes `"va_ref_vec"`, and the `plot_polars` / `plot_combined_analysis`
-    keyword `v_a` becomes `va`.
-  - The settings keys `condition.wind_speed` and `airfoil.v_app` become `va`.
+- BREAKING: the apparent wind follows one naming rule. `va` is its speed [m/s], a `_vec`
+  suffix makes it the 3-vector [m/s] in the body frame, and a `_dist` suffix gives one
+  value per panel, so `va_vec_dist` is a 3-vector per panel. `v_rel` is the local flow a
+  panel sees, induced velocity included. Public names that break:
+  `body_aero.va` and the `va=` keyword of `BodyAerodynamics` and `reinit!` (now
+  `va_vec`), `VSMSolution._va_dist` and `va_unrefined_dist` (now `va_vec_dist` and
+  `va_vec_unrefined_dist`), `BodyAerodynamics.v_a_dist` (now `v_rel_dist`), the
+  `linearize` keyword `va_idxs` (now `va_vec_idxs`), the `calculate_results` key
+  `"va_ref"` (now `"va_ref_vec"`), the `v_a` keyword of `plot_polars` and
+  `plot_combined_analysis` (now `va`), and the settings keys `condition.wind_speed` and
+  `airfoil.v_app` (now `va`). The old names raise an error.
 - Requires Julia 1.12 or 1.13; 1.10 and 1.11 keep resolving v5.1.1.
 - The Makie `plot!` methods for a `Panel` or a `BodyAerodynamics` return a
   `Vector{Makie.AbstractPlot}` instead of a `Vector{Any}`; for a `BodyAerodynamics`
