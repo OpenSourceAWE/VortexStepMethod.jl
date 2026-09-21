@@ -38,7 +38,6 @@ calculate_stall_angle_list
 wing_span_flip
 calculate_circulation_distribution_elliptical_wing
 _compute_reference_velocity_from_distribution
-smooth_circulation!
 smooth_distribution!
 make_dual_shadow
 ```

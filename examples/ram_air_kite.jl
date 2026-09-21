@@ -32,8 +32,8 @@ NF_SOLVER = NeuralFoilSolver(model_size=NF_MODEL_SIZE, n_crit=N_CRIT,
                              xtr_upper=XTR_UPPER, xtr_lower=XTR_LOWER)
 
 # VSM solver stability settings.
-RELAXATION         = 0.03   # iteration relaxation factor
-ARTIFICIAL_DAMPING = false  # smooth-circulation stabiliser for difficult cases
+RELAXATION           = 0.03   # iteration relaxation factor
+ARTIFICIAL_VISCOSITY = false  # post-stall stabiliser for difficult cases
 
 # Convert-then-load: the .obj mesh is sliced per section, each section fitted and swept
 # over (alpha, delta) with the chosen solver, written as long-format POLAR_MATRICES.
@@ -82,14 +82,16 @@ GLMakie.save("ram_air_slices_audit.png", fig_audit)
 body_xfoil = BodyAerodynamics([wing_xfoil])
 solver_xfoil = Solver(wing_xfoil.n_panels, wing_xfoil.n_unrefined_sections;
                       aerodynamic_model_type=VSM, rtol=1e-5, solver_type=LOOP,
-                      relaxation_factor=RELAXATION, is_with_artificial_damping=ARTIFICIAL_DAMPING)
+                      relaxation_factor=RELAXATION,
+                      is_with_artificial_viscosity=ARTIFICIAL_VISCOSITY)
 
 println("Creating NeuralFoil wing...")
 wing_nf = matrix_wing(NF_SOLVER, "polars_neuralfoil")
 body_nf = BodyAerodynamics([wing_nf])
 solver_nf = Solver(wing_nf.n_panels, wing_nf.n_unrefined_sections;
                    aerodynamic_model_type=VSM, rtol=1e-5, solver_type=LOOP,
-                   relaxation_factor=RELAXATION, is_with_artificial_damping=ARTIFICIAL_DAMPING)
+                   relaxation_factor=RELAXATION,
+                   is_with_artificial_viscosity=ARTIFICIAL_VISCOSITY)
 
 # Compare using plot_polars
 if PLOT
