@@ -6,7 +6,8 @@ using VortexStepMethod.AirfoilAero: KulfanParameters, LeastSquaresFit, ShrinkWra
                        neuralfoil_aero, class_function, bernstein_basis,
                        leading_edge_basis, normalize_airfoil
 using VortexStepMethod: SectionAero, section_surface, read_section_aero
-using VortexStepMethod.AirfoilAero: write_section_aero
+using VortexStepMethod.AirfoilAero: write_section_aero, write_aero_matrix
+using VortexStepMethod: load_polar_data
 
 seg_dist(px, py, ax, ay, bx, by) = begin
     vx, vy = bx - ax, by - ay
@@ -41,6 +42,23 @@ end
         @test maximum(abs.(params.lower_weights .- ref_lower)) < 1e-9
         @test abs(params.leading_edge_weight - 0.9180525576877088) < 1e-9
         @test params.TE_thickness ≈ 0.0 atol = 1e-12
+    end
+
+    @testset "Fit to stations crowded into a narrow band stays airfoil-sized" begin
+        spread = (1 .- cos.(range(0, pi, 121))) ./ 2
+        crowded = vcat(0.0, range(0.30, 0.31, 118), 1.0)
+        surface(weights, xs) = class_function(xs) .* (bernstein_basis(xs, 7) * weights)
+        y_upper = surface(fill(0.2, 8), crowded) .+ 0.005 .* sin.(40pi .* crowded)
+        y_lower = surface(fill(-0.1, 8), spread)
+        x = vcat(reverse(crowded), spread[2:end])
+        y = vcat(reverse(y_upper), y_lower[2:end])
+        crowded_fit = @test_logs (:warn, r"dropped \d+ of \d+ singular values") (
+            fit_kulfan_parameters(x, y))
+        _, y_fit = kulfan_to_coordinates(crowded_fit)
+        @test maximum(abs, y_fit) < 2 * maximum(abs, y)
+
+        y_spread = vcat(reverse(surface(fill(0.2, 8), spread)), y_lower[2:end])
+        @test_logs fit_kulfan_parameters(vcat(reverse(spread), spread[2:end]), y_spread)
     end
 
     @testset "Shrink-wrap encloses points with clearance" begin
@@ -268,6 +286,41 @@ end
     @test !occursin("delta", header)
 end
 
+@testset "a Cd deflection response under 1e-4 survives the polar CSV round-trip" begin
+    alpha_range = deg2rad.(-5:5:15)
+    delta_range = deg2rad.(-3:3:3)
+    cl = [0.1 * a + 0.03 * d for a in -5:5:15, d in -3:3:3]
+    cd = [0.0093 + 2e-4 * a + 2e-5 * d for a in -5:5:15, d in -3:3:3]
+    cm = [0.06 - 0.01 * d for a in -5:5:15, d in -3:3:3]
+    work = mktempdir()
+
+    matrix_csv = write_polar_matrix_csv(joinpath(work, "matrix.csv"), alpha_range,
+                                        delta_range, cl, cd, cm)
+    (alphas, deltas, cl_back, cd_back, cm_back), model = load_polar_data(matrix_csv)
+    @test model == VortexStepMethod.POLAR_MATRICES
+    @test alphas == alpha_range && deltas == delta_range
+    @test cl_back ≈ cl && cd_back ≈ cd && cm_back ≈ cm
+
+    sols = [SectionSolution(alpha_range[i], cl[i, 1], cd[i, 1], cm[i, 1], 1.0,
+                            Float64[], Float64[], Float64[], Float64[])
+            for i in eachindex(alpha_range)]
+    vectors_csv = write_polar_csv(joinpath(work, "vectors.csv"), sols)
+    (alphas, _, cd_vec, _), _ = load_polar_data(vectors_csv)
+    @test alphas == alpha_range
+    @test cd_vec ≈ cd[:, 1]
+
+    result = AirfoilAero.NeuralFoilResult(collect(-5.0:5:15), cl[:, 1], cd[:, 1], cm[:, 1],
+                                          ones(5))
+    neuralfoil_csv = write_polar_csv(joinpath(work, "neuralfoil.csv"), result)
+    (alphas, _, cd_vec, _), _ = load_polar_data(neuralfoil_csv)
+    @test alphas == alpha_range
+    @test cd_vec ≈ cd[:, 1]
+
+    labelled_csv = write_aero_matrix(joinpath(work, "cd.csv"), cd, collect(alpha_range),
+                                     collect(delta_range), "C_d")
+    @test first(VortexStepMethod.read_aero_matrix(labelled_csv)) ≈ cd
+end
+
 @testset "turn_trailing_edge! legacy crease cleanup" begin
     x, y = read_dat_coordinates(joinpath(@__DIR__, "data", "test_airfoil.dat"))
     crease_frac = 0.7
@@ -281,6 +334,21 @@ end
         @test length(xd) <= n0
         @test all(isfinite, xd) && all(isfinite, yd)
     end
+end
+
+@testset "get_lower_upper takes both surfaces at the crease chord station" begin
+    camber(x) = 0.1 * sin(pi * x)
+    thickness(x) = 0.1 * sqrt(x) * (1 - x)
+    x_upper = range(1.0, 0.0, 400)
+    x_lower = range(0.0, 1.0, 400)[2:end]
+    x = [x_upper; x_lower]
+    y = [camber.(x_upper) .+ thickness.(x_upper); camber.(x_lower) .- thickness.(x_lower)]
+    crease_frac = 0.9
+    lower, upper = get_lower_upper(x, y, crease_frac)
+    @test camber(crease_frac) - thickness(crease_frac) > 0
+    @test lower ≈ camber(crease_frac) - thickness(crease_frac) atol = 1e-5
+    @test upper ≈ camber(crease_frac) + thickness(crease_frac) atol = 1e-5
+    @test_throws ArgumentError get_lower_upper(x_upper, camber.(x_upper), crease_frac)
 end
 
 @testset "load_neuralfoil_model missing weights errors" begin

@@ -100,7 +100,7 @@ end
         section1 = Section([0.0, 0.0, 0.0], [1.0, 0.0, 0.0], INVISCID)
         section2 = Section([0.0, 10.0, 0.0], [1.0, 10.0, 0.0], INVISCID)
         panel = create_panel(section1, section2)
-        panel.va = [10.0, 0.0, 0.0]
+        panel.va_vec = [10.0, 0.0, 0.0]
 
         filaments = VortexStepMethod.calculate_filaments_for_plotting(panel)
         @test filaments isa Vector{Tuple{Vector{Float64}, Vector{Float64}, String}}
@@ -113,14 +113,14 @@ end
         panel = create_panel(section1, section2)
 
         # Test relative velocity calculations
-        panel.va = [10.0, 0.0, 0.0]
+        panel.va_vec = [10.0, 0.0, 0.0]
         induced_velocity = [1.0, 1.0, 1.0]
         alpha, rel_vel = calculate_relative_alpha_and_relative_velocity(panel, induced_velocity)
         
         # Verify calculations
         norm_airf = panel.z_airf
         tan_airf = panel.x_airf
-        relative_velocity = panel.va .+ induced_velocity
+        relative_velocity = panel.va_vec .+ induced_velocity
         vn = dot(norm_airf, relative_velocity)
         vtan = dot(tan_airf, relative_velocity)
         expected_alpha = atan(vn / vtan)

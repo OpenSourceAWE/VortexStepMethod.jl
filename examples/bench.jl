@@ -37,12 +37,12 @@ refine!(wing)
 body_aero = BodyAerodynamics([wing])
 
 # Set inflow conditions
-va_vec = [cos(alpha), 0.0, sin(alpha)] .* va
+va_vec = apparent_wind(alpha, 0.0, va)
 set_va!(body_aero, va_vec)
 
 # Step 4: Initialize solvers for both LLT and VSM methods
-llt_solver = Solver(body_aero; aerodynamic_model_type=LLT)
-vsm_solver = Solver(body_aero; aerodynamic_model_type=VSM)
+llt_solver = Solver(wing.n_panels, wing.n_unrefined_sections; aerodynamic_model_type=LLT)
+vsm_solver = Solver(wing.n_panels, wing.n_unrefined_sections; aerodynamic_model_type=VSM)
 
 # Step 5: Solve using both methods
 results_vsm = solve(vsm_solver, body_aero, nothing)
@@ -66,9 +66,8 @@ body_aero = BodyAerodynamics([wing])
 
 # Create solvers
 vsm_solver = Solver(
-    body_aero;
+    wing.n_panels, wing.n_unrefined_sections;
     aerodynamic_model_type=VSM,
-    is_with_artificial_damping=false,
     solver_type=LOOP,
 )
 
@@ -76,13 +75,8 @@ vsm_solver = Solver(
 va = 15.0
 aoa = 15.0
 side_slip = 0.0
-yaw_rate = 0.0
 aoa_rad = deg2rad(aoa)
-va_vec = [
-    cos(aoa_rad) * cos(side_slip),
-    sin(side_slip),
-    sin(aoa_rad)
-] * va
+va_vec = apparent_wind(aoa_rad, side_slip, va)
 set_va!(body_aero, va_vec)
 
 # Solving

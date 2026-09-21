@@ -41,12 +41,12 @@ refine!(wing)
 body_aero = BodyAerodynamics([wing])
 
 # Set inflow conditions
-va_vec = [cos(alpha), 0.0, sin(alpha)] .* va
+va_vec = apparent_wind(alpha, 0.0, va)
 set_va!(body_aero, va_vec, [0, 0, 0.1])
 
 # Step 4: Initialize solvers for both LLT and VSM methods
-llt_solver = Solver(body_aero; aerodynamic_model_type=LLT)
-vsm_solver = Solver(body_aero; aerodynamic_model_type=VSM)
+llt_solver = Solver(wing.n_panels, wing.n_unrefined_sections; aerodynamic_model_type=LLT)
+vsm_solver = Solver(wing.n_panels, wing.n_unrefined_sections; aerodynamic_model_type=VSM)
 
 # Step 5: Solve using both methods
 results_llt = solve(llt_solver, body_aero)
@@ -94,7 +94,7 @@ PLOT && plot_polars(
     ["LLT", "VSM"];
     angle_range,
     angle_type="angle_of_attack",
-    v_a=va,
+    va=va,
     title="Rectangular Wing Polars",
     save_path=OUTPUT_DIR,
     is_save=false || SAVE_ALL,

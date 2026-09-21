@@ -12,6 +12,9 @@ settings_range
 
 ### Solver, forces and circulation
 ```@docs
+n_unrefined_sections
+solver_kwargs
+check_dimensions
 calculate_AIC_matrices!
 gamma_loop!
 build_spanwise_laplacian!
@@ -25,6 +28,9 @@ calculate_cd
 calculate_cm
 calculate_cd_cm
 set_pitch_rate_dist!
+coeffs_at_angles
+nose_down
+bisect_sign_change
 calculate_relative_alpha_and_velocity
 calculate_relative_alpha_and_relative_velocity
 update_effective_angle_of_attack!
@@ -32,7 +38,6 @@ calculate_stall_angle_list
 wing_span_flip
 calculate_circulation_distribution_elliptical_wing
 _compute_reference_velocity_from_distribution
-smooth_circulation!
 smooth_distribution!
 make_dual_shadow
 ```
@@ -150,6 +155,7 @@ chord_residual!
 bernstein_basis
 class_function
 leading_edge_basis
+truncated_least_squares
 compute_optimal_x_points
 normalize_airfoil
 get_lower_upper
@@ -207,6 +213,7 @@ create_2d_polars
 lei_poly_coeffs
 resolve_airfoil
 write_dat
+csv_fields
 write_polar_csv
 write_polar_matrix_csv
 write_aero_matrix
@@ -247,8 +254,6 @@ densify_contour
 create_interpolations
 find_circle_center_and_radius
 march_edges
-calculate_inertia_tensor
-center_to_com!
 airfoils_from_yaml
 write_geometry_yaml
 resolve_aero_geometry
@@ -276,6 +281,7 @@ panel_contour
 panel_normal
 plate_hinge_local
 panel_plate_geometry
+panel_polar_curves
 PLATE_FACES
 Makie.plot!(ax, panel::VortexStepMethod.Panel)
 Makie.plot!(ax, body::VortexStepMethod.BodyAerodynamics)

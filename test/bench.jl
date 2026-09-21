@@ -72,8 +72,8 @@ using LinearAlgebra
     set_va!(body_aero, va_vec)
 
     # Initialize solvers for both LLT and VSM methods
-    solver = Solver(body_aero)
-    nonlin_solver = Solver(body_aero; solver_type=NONLIN)
+    solver = Solver(wing.n_panels, wing.n_unrefined_sections)
+    nonlin_solver = Solver(wing.n_panels, wing.n_unrefined_sections; solver_type=NONLIN)
 
     # Pre-allocate arrays
     gamma = rand(n_panels)
@@ -114,7 +114,7 @@ using LinearAlgebra
         
         # Fill arrays with data
         for (i, panel) in enumerate(body_aero.panels)
-            va_vec_dist[i, :] .= panel.va
+            va_vec_dist[i, :] .= panel.va_vec
             chord_dist[i] = panel.chord
             x_airf_dist[i, :] .= panel.x_airf
             y_airf_dist[i, :] .= panel.y_airf
@@ -142,10 +142,10 @@ using LinearAlgebra
                 refine!(wing)
                 body_aero = BodyAerodynamics([wing])
                 
-                solver = Solver(body_aero;
+                solver = Solver(wing.n_panels, wing.n_unrefined_sections;
                     aerodynamic_model_type=model
                 )
-                solver.sol._va_dist .= va_vec_dist
+                solver.sol.va_vec_dist .= va_vec_dist
                 solver.sol._chord_dist .= chord_dist
                 solver.sol._x_airf_dist .= x_airf_dist
                 solver.sol._y_airf_dist .= y_airf_dist
@@ -184,9 +184,10 @@ using LinearAlgebra
             x_airf_dist[i, :] .= panel.x_airf
             y_airf_dist[i, :] .= panel.y_airf
             z_airf_dist[i, :] .= panel.z_airf
-            va_vec_dist[i, :] .= panel.va
-            va_dist[i] = norm(panel.va)
-            va_unit_dist[i, :] .= va_dist[i] > 0.0 ? panel.va ./ va_dist[i] : [1.0, 0.0, 0.0]
+            va_vec_dist[i, :] .= panel.va_vec
+            va_dist[i] = norm(panel.va_vec)
+            va_unit_dist[i, :] .=
+                va_dist[i] > 0.0 ? panel.va_vec ./ va_dist[i] : [1.0, 0.0, 0.0]
             v_rel_dist[i] = va_dist[i]
         end
         results = @MVector zeros(3)

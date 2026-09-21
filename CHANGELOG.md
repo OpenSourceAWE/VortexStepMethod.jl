@@ -4,29 +4,93 @@
 
 ### Added
 
+- `stability_derivatives` gives the force and moment coefficients and their derivatives
+  with respect to angle of attack, sideslip and the nondimensional roll, pitch and yaw
+  rates p̂ = pb/2V, q̂ = q c_ref/2V, r̂ = rb/2V, turning about `solver.reference_point`,
+  and `trim_angle` the angles of attack at which `CMy` changes sign, with the slope that
+  says whether each trim is stable.
+- `apparent_wind(alpha, beta, va)` gives the body-frame inflow vector at an angle
+  of attack and sideslip, as `set_va!(body_aero, settings)` sets it.
+- `Solver(settings)` and `Solver(n_panels, n_unrefined_sections)` build a solver without
+  a `BodyAerodynamics`; keyword arguments override the settings.
+- `set_va!(body_aero, va_vec, omega; reference_point)` turns the body about
+  `reference_point` [m] instead of the origin. The point is stored on
+  `BodyAerodynamics`, starts at the origin, and is kept by later `set_va!`, `reinit!`
+  and `linearize` calls until it is given again.
 - Spanwise-flow viscous drag correction (Gaunaa et al. 2024,
   doi:10.1088/1742-6596/2767/2/022068): each section gets a drag increment and a force
   along its span from the flow across it, in `solve!`, `solve` and `linearize`. Opt-in
   via `is_with_viscous_drag_correction` (default `false`) on the solver settings.
+- `plot_section_polars(body_aero; panels, alphas, delta)` draws cl, cd and cm against α
+  per panel through `calculate_cl`/`calculate_cd`/`calculate_cm`, for every aero model
+  and at flap deflection `delta`, in one figure instead of one coefficient per call.
 - `linearize` takes a `BodyAerodynamics` with more than one wing; `theta_idxs` and
   `delta_idxs` then run over the unrefined sections of all wings in order.
 
 ### Changed
 
+- BREAKING: artificial damping is removed: the `is_with_artificial_damping` and
+  `artificial_damping` keyword arguments of `Solver`, and the `artificial_damping`, `k2`
+  and `k4` solver settings. `k2` and `k4` had no effect; `artificial_damping: true`
+  smoothed the circulation with fixed factors, so a solve that had it on now gives
+  different results. A settings file that still sets these keys loads with a warning. The post-stall stabiliser is
+  `is_with_artificial_viscosity`.
+- BREAKING: `ObjAdapter.center_to_com!`, `calculate_inertia_tensor` and
+  `calc_inertia_y_rotation` are removed. Mesh mass properties are computed by
+  SymbolicAWEModels, which reads the mesh with `read_faces`.
+- BREAKING: the apparent wind is `va` for the speed [m/s], `va_vec` for the 3-vector and
+  `va_dist` / `va_vec_dist` per panel, and the old names error:
+  - `body_aero.va` becomes `body_aero.va_vec`, and `va=` becomes `va_vec=` in
+    `BodyAerodynamics(...)` and `reinit!`.
+  - `Panel.va` becomes `Panel.va_vec`, and `SemiInfiniteFilament.vel_mag` becomes `va`.
+  - On `VSMSolution`, `_va_dist` becomes `va_vec_dist` and `va_unrefined_dist` becomes
+    `va_vec_unrefined_dist`.
+  - `v_a_dist` on `BodyAerodynamics` and `solver.lr` becomes `v_rel_dist`, and
+    `solver.br.va_norm_dist` becomes `va_dist`.
+  - The `linearize` keyword `va_idxs` becomes `va_vec_idxs`, the `calculate_results` key
+    `"va_ref"` becomes `"va_ref_vec"`, and the `plot_polars` / `plot_combined_analysis`
+    keyword `v_a` becomes `va`.
+  - The settings keys `condition.wind_speed` and `airfoil.v_app` become `va`.
 - Requires Julia 1.12 or 1.13; 1.10 and 1.11 keep resolving v5.1.1.
 - The Makie `plot!` methods for a `Panel` or a `BodyAerodynamics` return a
   `Vector{Makie.AbstractPlot}` instead of a `Vector{Any}`; for a `BodyAerodynamics`
   drawn as flat panels it is one flat list rather than a list per panel.
+- `Solver(body_aero; kwargs...)` and `Solver(body_aero, settings)` are deprecated and warn
+  on use; build the solver with `Solver(settings)` or
+  `Solver(n_panels, n_unrefined_sections)` instead.
+- BREAKING: `obj_to_yaml` and `perpendicular_sections` spread the sections evenly over
+  the span, measured along the quarter-chord line without its chordwise component,
+  instead of over leading-edge arc length, and `wingtip_distance` is that spanwise
+  length. A tip whose leading edge runs aft no longer gathers sections into its last
+  centimetres. The same mesh and settings give different section positions, so a tuned
+  `wingtip_distance` and any geometry generated from one have to be redone.
+  `march_edges` no longer returns `arclen`.
 
 ### Fixed
 
+- `get_lower_upper`, and with it the flap hinge in `deform_section`, takes the lower and
+  upper surface heights where the contour crosses `x = crease_frac`. It took the nearest
+  points below and above `y = 0`, which on a cambered section put the hinge near the
+  chord line or on the wrong surface. Polars with a flap deflection change slightly.
+  It throws an `ArgumentError` for a contour that crosses that line fewer than twice.
+- `write_polar_csv` for `SectionSolution`s, `write_polar_matrix_csv` and `write_aero_matrix`
+  write coefficients at 16 significant digits instead of 4 decimals, so a `POLAR_MATRICES`
+  table carries the drag response to a small flap deflection. Regenerate existing tables
+  to benefit.
+- `solve!` and `solve` throw a `DimensionMismatch` naming both sizes for a `body_aero` whose
+  panel or unrefined-section count differs from the solver's, where they failed on a
+  broadcast partway through or silently left section results at zero.
+- `set_va!(body_aero, settings)` applies `condition.yaw_rate` as a turn rate about the
+  body z axis; it was read from the settings file and ignored.
 - The `VSMSolution` docstring gives `lift_dist`, `drag_dist` and `panel_moment_dist` in
   the per-unit-span units they hold, [N/m] and [Nm/m], instead of [N] and [Nm].
+- `fit_kulfan_parameters` with `LeastSquaresFit` drops singular values below `1e-4`
+  times the largest and warns when it does, so a contour whose stations crowd into a
+  narrow band of the chord gets bounded weights instead of ones that resample it to 1e4
+  scale. Fits of well-spread stations are unchanged.
 - Inside its vortex core, `velocity_3D_trailing_vortex!` induces an azimuthal velocity
   instead of a radial one. Only points within the millimetre-scale Oseen core of a
   panel's chordwise trailing segment were affected.
-- With `artificial_damping` on, an iteration whose circulation is already smooth no longer
-  re-applies the previous iteration's damping correction.
 - `panel_axes` takes the panel normal from the quarter-chord step, so the frame
   closes as `z_airf = x_airf × y_airf` and `z_airf` is square to the bound
   vortex. `alpha` is measured against that normal, so `cl`, `cd` and `cm` were

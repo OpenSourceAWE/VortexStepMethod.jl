@@ -21,20 +21,25 @@ relative_error(jac, reference) = maximum(abs.(jac .- reference)) / maximum(abs, 
     omega = [0.0, 0.0, 0.0]
     y0 = [va_vec; omega]
 
-    @testset "AutoForwardDiff matches AutoFiniteDiff (LOOP, INVISCID)" begin
-        solver = Solver(body_aero;
+    turns = ((omega, zeros(3)), ([0.0, 0.0, 0.2], [0.5, 4.0, 0.0]))
+    @testset "ForwardDiff matches FiniteDiff about $reference_point (LOOP, INVISCID)" for
+            (omega_op, reference_point) in turns
+        pivot_body = BodyAerodynamics([wing])
+        set_va!(pivot_body, va_vec, omega_op; reference_point)
+        y_op = [va_vec; omega_op]
+        solver = Solver(wing.n_panels, wing.n_unrefined_sections;
             use_gamma_prev=false,
             type_initial_gamma_distribution=ELLIPTIC)
 
         jac_fwd, _, fwd_converged = VortexStepMethod.linearize(
-            solver, body_aero, y0;
-            theta_idxs=nothing, va_idxs=1:3, omega_idxs=4:6,
+            solver, pivot_body, y_op;
+            theta_idxs=nothing, va_vec_idxs=1:3, omega_idxs=4:6,
             aero_coeffs=true, backend=AutoForwardDiff())
         @test fwd_converged
 
         jac_fd, _, fd_converged = VortexStepMethod.linearize(
-            solver, body_aero, y0;
-            theta_idxs=nothing, va_idxs=1:3, omega_idxs=4:6,
+            solver, pivot_body, y_op;
+            theta_idxs=nothing, va_vec_idxs=1:3, omega_idxs=4:6,
             aero_coeffs=true,
             backend=AutoFiniteDiff(absstep=1e-5, relstep=1e-5))
         @test fd_converged
@@ -44,10 +49,10 @@ relative_error(jac, reference) = maximum(abs.(jac .- reference)) / maximum(abs, 
     end
 
     @testset "NONLIN+ForwardDiff is rejected" begin
-        solver_nl = Solver(body_aero; solver_type=NONLIN)
+        solver_nl = Solver(wing.n_panels, wing.n_unrefined_sections; solver_type=NONLIN)
         @test_throws ErrorException VortexStepMethod.linearize(
             solver_nl, body_aero, y0;
-            theta_idxs=nothing, va_idxs=1:3, omega_idxs=4:6,
+            theta_idxs=nothing, va_vec_idxs=1:3, omega_idxs=4:6,
             aero_coeffs=true, backend=AutoForwardDiff())
     end
 
@@ -65,9 +70,8 @@ relative_error(jac, reference) = maximum(abs.(jac .- reference)) / maximum(abs, 
             delta_range=deg2rad.(-3:3:3),
         )
         ram_body = BodyAerodynamics([ram_wing])
-        ram_solver = Solver(ram_body;
+        ram_solver = Solver(ram_wing.n_panels, ram_wing.n_unrefined_sections;
             aerodynamic_model_type=VSM,
-            is_with_artificial_damping=false,
             rtol=1e-11,
             solver_type=LOOP,
             use_gamma_prev=false,
@@ -81,13 +85,13 @@ relative_error(jac, reference) = maximum(abs.(jac .- reference)) / maximum(abs, 
 
         jac_fwd, _, conv_fwd = VortexStepMethod.linearize(
             ram_solver, ram_body, y_op;
-            theta_idxs=1:4, va_idxs=5:7, omega_idxs=8:10,
+            theta_idxs=1:4, va_vec_idxs=5:7, omega_idxs=8:10,
             aero_coeffs=true, backend=AutoForwardDiff())
         @test conv_fwd
 
         jac_fd, _, conv_fd = VortexStepMethod.linearize(
             ram_solver, ram_body, y_op;
-            theta_idxs=1:4, va_idxs=5:7, omega_idxs=8:10,
+            theta_idxs=1:4, va_vec_idxs=5:7, omega_idxs=8:10,
             aero_coeffs=true, backend=nothing)
         @test conv_fd
 

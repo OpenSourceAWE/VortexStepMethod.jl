@@ -1,7 +1,8 @@
 module VortexStepMethodMakieExt
 using MakieControlPlots.Makie, VortexStepMethod, LinearAlgebra, Statistics, DelimitedFiles
 import MakieControlPlots
-import VortexStepMethod: calculate_filaments_for_plotting
+import VortexStepMethod: calculate_filaments_for_plotting, calculate_cl, calculate_cd,
+    calculate_cm
 import VortexStepMethod: ObjAdapter, AirfoilAero
 
 export plot_geometry, plot_distribution, plot_polars, save_plot, show_plot,
@@ -606,7 +607,7 @@ Create a 3D Makie plot of wing geometry including panels and filaments.
 function create_geometry_plot_makie(body_aero::BodyAerodynamics, title,
     view_elevation, view_azimuth; zoom=0.5)
     panels = body_aero.panels
-    va_vec = getfield(body_aero, :_va)
+    va_vec = getfield(body_aero, :va_vec)
 
     # Create figure
     fig = Figure(size=(1400, 1400))
@@ -855,7 +856,7 @@ end
     plot_polars(solver_list, body_aero_list, label_list;
                 literature_path_list=String[],
                 angle_range=range(0, 20, 2), angle_type="angle_of_attack",
-                angle_of_attack=0.0, side_slip=0.0, v_a=10.0,
+                angle_of_attack=0.0, side_slip=0.0, va=10.0,
                 title="polar", data_type=nothing, save_path=nothing,
                 is_save=true, is_show=true, use_tex=false)
 
@@ -872,7 +873,7 @@ Makie implementation of [`plot_polars`](@ref).
 - `angle_type`: "angle_of_attack" or "side_slip" (default: angle_of_attack)
 - `angle_of_attack`: AoA [°] (default: 0.0)
 - `side_slip`: Side slip angle [°] (default: 0.0)
-- `v_a`: Wind speed [m/s] (default: 10.0)
+- `va`: apparent wind speed [m/s] (default: 10.0)
 - `title`: Plot title
 - `data_type`: File extension (default: `nothing`; delegated to `save_plot` backend-aware default)
 - `save_path`: Path to save (default: nothing)
@@ -890,7 +891,7 @@ function VortexStepMethod.plot_polars(
     angle_type="angle_of_attack",
     angle_of_attack=0.0,
     side_slip=0.0,
-    v_a=10.0,
+    va=10.0,
     title="polar",
     data_type=nothing,
     save_path=nothing,
@@ -914,7 +915,7 @@ function VortexStepMethod.plot_polars(
     for (i, (solver, body_aero)) in enumerate(zip(solver_list, body_aero_list))
         result = VortexStepMethod.generate_polar_data(
             solver, body_aero, angle_range;
-            angle_type, angle_of_attack, side_slip, va=v_a
+            angle_type, angle_of_attack, side_slip, va
         )
         push!(polar_data_list, result.polar_data)
         push!(cm_data_list, (cmx=result.cmx, cmy=result.cmy,
@@ -1115,7 +1116,7 @@ end
                           solver_label="VSM",
                           angle_range=range(0,20,length=20),
                           angle_type="angle_of_attack",
-                          angle_of_attack=0.0, side_slip=0.0, v_a=10.0,
+                          angle_of_attack=0.0, side_slip=0.0, va=10.0,
                           title="Combined Analysis",
                           view_elevation=15, view_azimuth=-120,
                           is_show=true, use_tex=false,
@@ -1138,7 +1139,7 @@ Makie implementation of [`plot_combined_analysis`](@ref).
 - `angle_type`: "angle_of_attack" or "side_slip" (default: "angle_of_attack")
 - `angle_of_attack`: AoA in degrees (default: 0.0)
 - `side_slip`: Side slip in degrees (default: 0.0)
-- `v_a`: Wind speed in m/s (default: 10.0)
+- `va`: apparent wind speed [m/s] (default: 10.0)
 - `title`: Overall figure title (default: "Combined Analysis")
 - `view_elevation`: Geometry view elevation in degrees (default: 15)
 - `view_azimuth`: Geometry view azimuth in degrees (default: -120)
@@ -1161,7 +1162,7 @@ function VortexStepMethod.plot_combined_analysis(
     angle_type="angle_of_attack",
     angle_of_attack=0.0,
     side_slip=0.0,
-    v_a=10.0,
+    va=10.0,
     title="Combined Analysis",
     view_elevation=15,
     view_azimuth=-120,
@@ -1219,7 +1220,7 @@ function VortexStepMethod.plot_combined_analysis(
     # Use first body_aero for geometry and polar data display
     first_body = body_aeros[1]
     panels = first_body.panels
-    va_vec = getfield(first_body, :_va)
+    va_vec = getfield(first_body, :va_vec)
 
     # Compute spanwise results for each solver
     results_spanwise_list = copy(results_list)
@@ -1227,10 +1228,10 @@ function VortexStepMethod.plot_combined_analysis(
         α_span = deg2rad(angle_of_attack_for_spanwise_distribution)
         β_span = deg2rad(side_slip)
         for (i, (s, ba)) in enumerate(zip(solvers, body_aeros))
-            va_vec_old = copy(getfield(ba, :_va))
+            va_vec_old = copy(getfield(ba, :va_vec))
             omega_old = copy(ba.omega)
             set_va!(ba, [cos(α_span) * cos(β_span), sin(β_span),
-                sin(α_span)] * v_a)
+                sin(α_span)] * va)
             results_spanwise_list[i] = solve(s, ba,
                 s.sol.gamma_distribution)
             set_va!(ba, va_vec_old, omega_old)
@@ -1324,13 +1325,12 @@ function VortexStepMethod.plot_combined_analysis(
             xlabel="α [°]",
             ylabel="Cm")
 
-        cl_vals = [first_body.panels[1].cl_interp(a) for a in alphas]
-        cd_vals = [first_body.panels[1].cd_interp(a) for a in alphas]
-        cm_vals = [first_body.panels[1].cm_interp(a) for a in alphas]
+        panel = first_body.panels[1]
+        cl, cd, cm = panel_polar_curves([panel], alphas, panel.delta)
 
-        lines!(ax_cl_curve, alphas_deg, cl_vals; color=:blue, linewidth=2)
-        lines!(ax_cd_curve, alphas_deg, cd_vals; color=:red, linewidth=2)
-        lines!(ax_cm_curve, alphas_deg, cm_vals; color=:green, linewidth=2)
+        lines!(ax_cl_curve, alphas_deg, only(cl); color=:blue, linewidth=2)
+        lines!(ax_cd_curve, alphas_deg, only(cd); color=:red, linewidth=2)
+        lines!(ax_cm_curve, alphas_deg, only(cm); color=:green, linewidth=2)
     end
 
     # [2,1] Spanwise Distributions (3×3 grid)
@@ -1406,7 +1406,7 @@ function VortexStepMethod.plot_combined_analysis(
             zip(solvers, body_aeros, solver_labels))
         result = VortexStepMethod.generate_polar_data(
             s, ba, angle_range;
-            angle_type, angle_of_attack, side_slip, va=v_a)
+            angle_type, angle_of_attack, side_slip, va)
         pd = result.polar_data
         label_re = "$lbl Re = $(round(Int64,
                      result.rey * 1e-5))e5"
@@ -1477,48 +1477,43 @@ function VortexStepMethod.plot_combined_analysis(
 end
 
 """
-    plot_section_polars(body_aero, coefficient=:cl; is_show=true,
-                        is_save=false, save_path=nothing, data_type=".png")
+    panel_polar_curves(panels, alphas, deltas) -> (cl, cd, cm)
+
+Lift, drag and moment coefficients of each of `panels` over `alphas` [rad], each panel
+at its flap deflection in `deltas` [rad] (or one shared deflection), as one vector per
+panel per coefficient.
+"""
+function panel_polar_curves(panels, alphas, deltas)
+    cl = collect.(eachrow(calculate_cl.(panels, alphas', deltas)))
+    cd = collect.(eachrow(calculate_cd.(panels, alphas', deltas)))
+    cm = collect.(eachrow(calculate_cm.(panels, alphas', deltas)))
+    return cl, cd, cm
+end
+
+"""
+    plot_section_polars(body_aero; kwargs...)
 
 Implementation of [`plot_section_polars`](@ref); rendered through `MakieControlPlots`.
 """
-function VortexStepMethod.plot_section_polars(body_aero::BodyAerodynamics,
-    coefficient::Symbol=:cl; is_show::Bool=true, is_save::Bool=false,
-    save_path=nothing, data_type::String=".png")
+function VortexStepMethod.plot_section_polars(body_aero::BodyAerodynamics;
+    panels=eachindex(body_aero.panels), alphas=deg2rad.(-20:0.5:30), delta=nothing,
+    is_show::Bool=true, is_save::Bool=false, save_path=nothing,
+    data_type::String=".png")
 
-    coefficient in (:cl, :cd, :cm) ||
-        throw(ArgumentError("coefficient must be :cl, :cd, or :cm, got :$coefficient"))
-    idx = coefficient === :cl ? 2 : coefficient === :cd ? 3 : 4
-    label = uppercasefirst(string(coefficient))
+    panel_indices = vcat(panels)
+    chosen_panels = body_aero.panels[panel_indices]
+    deltas = something.(delta, getproperty.(chosen_panels, :delta))
+    cl, cd, cm = panel_polar_curves(chosen_panels, alphas, deltas)
+    labels = ["panel $i ($(panel.aero_model))"
+              for (i, panel) in zip(panel_indices, chosen_panels)]
 
-    alphas_deg = nothing
-    series = Vector{Float64}[]
-    labels = String[]
-    for wing in body_aero.wings
-        for (s, section) in enumerate(wing.unrefined_sections)
-            section.aero_model == POLAR_VECTORS || continue
-            aero = section.aero_data
-            aero === nothing && continue
-            section_alphas = rad2deg.(aero[1])
-            if isnothing(alphas_deg)
-                alphas_deg = collect(section_alphas)
-            elseif length(section_alphas) != length(alphas_deg)
-                @warn "section $s has a different α grid; plotting against the first section's α"
-            end
-            push!(series, Float64.(aero[idx]))
-            push!(labels, "section $s")
-        end
-    end
-    isempty(series) && error("No POLAR_VECTORS sections found in body")
-
-    plt = MakieControlPlots.plot(alphas_deg, series;
-        xlabel="α [deg]", ylabel=label, title="$label per section",
-        labels=labels, disp=(is_show || is_save))
+    plt = MakieControlPlots.plotx(rad2deg.(alphas), cl, cd, cm;
+        xlabel="α [deg]", ylabels=["cl", "cd", "cm"], title="Section polars",
+        labels=[labels], disp=(is_show || is_save))
 
     if is_save && !isnothing(save_path)
         isdir(save_path) || mkpath(save_path)
-        MakieControlPlots.savefig(
-            joinpath(save_path, "section_polars_$(coefficient)$(data_type)"))
+        MakieControlPlots.savefig(joinpath(save_path, "section_polars$(data_type)"))
     end
     return plt
 end

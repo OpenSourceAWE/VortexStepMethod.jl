@@ -37,8 +37,8 @@ XF_SOLVER = XFoilSolver(npan=XF_NPAN, max_iter=XF_MAX_ITER, ncrit=N_CRIT,
                         xtrip=(XTR_UPPER, XTR_LOWER), mach=XF_MACH)
 
 # VSM solver stability settings.
-RELAXATION         = 0.03   # iteration relaxation factor
-ARTIFICIAL_DAMPING = false   # smooth-circulation stabiliser for difficult cases
+RELAXATION           = 0.03   # iteration relaxation factor
+ARTIFICIAL_VISCOSITY = false  # post-stall stabiliser for difficult cases
 
 # V3_25.obj is already in slicer convention (x=chord, y=span, z=up).
 ROTATION = I
@@ -76,19 +76,23 @@ angle_range = range(-5, 25, length=31)
 println("\nCreating wing with CFD polars...")
 settings_cfd = VSMSettings("TUDELFT_V3_KITE/vsm_settings.yaml")
 settings_cfd.solver_settings.relaxation_factor = RELAXATION
-settings_cfd.solver_settings.artificial_damping = ARTIFICIAL_DAMPING
+settings_cfd.solver_settings.is_with_artificial_viscosity = ARTIFICIAL_VISCOSITY
 wing_cfd = Wing(settings_cfd)
 refine!(wing_cfd)
 body_cfd = BodyAerodynamics([wing_cfd])
 VortexStepMethod.reinit!(body_cfd)
-solver_cfd = Solver(body_cfd, settings_cfd)
+solver_cfd = Solver(settings_cfd)
 
 println("Creating wing with NeuralFoil polars...")
 wing_nf = Wing(nf_yaml; n_panels=50, spanwise_distribution=LINEAR)
 refine!(wing_nf)
 body_nf = BodyAerodynamics([wing_nf])
 VortexStepMethod.reinit!(body_nf)
-solver_nf = Solver(body_nf, settings_cfd)
+settings_nf = VSMSettings("TUDELFT_V3_KITE/vsm_settings.yaml")
+settings_nf.wings[1].geometry_file = nf_yaml
+settings_nf.solver_settings.relaxation_factor = RELAXATION
+settings_nf.solver_settings.is_with_artificial_viscosity = ARTIFICIAL_VISCOSITY
+solver_nf = Solver(settings_nf)
 
 # Compare CFD-polar and NeuralFoil-polar wings against published references
 # (Poland 2025 RANS CFD and wind tunnel). `plot_polars` sweeps each solver over the
@@ -105,7 +109,7 @@ fig = plot_polars(
      "Wind tunnel (Poland 2025)"];
     literature_path_list=literature_paths,
     angle_range,
-    v_a=va,
+    va=va,
     title="TU Delft V3 Kite: CFD vs NeuralFoil (Re=$RE)",
     is_save=false,
 )

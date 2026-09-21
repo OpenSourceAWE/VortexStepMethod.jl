@@ -46,13 +46,13 @@ refine!(CAD_wing)
 body_aero = BodyAerodynamics([CAD_wing])
 
 # Create solvers
-vsm_solver = Solver(body_aero;
+vsm_solver = Solver(CAD_wing.n_panels, CAD_wing.n_unrefined_sections;
     aerodynamic_model_type=VSM,
-    is_with_artificial_damping=false
+    is_with_artificial_viscosity=false
 )
-VSM_with_stall_correction = Solver(body_aero;
+VSM_with_stall_correction = Solver(CAD_wing.n_panels, CAD_wing.n_unrefined_sections;
     aerodynamic_model_type=VSM,
-    is_with_artificial_damping=true
+    is_with_artificial_viscosity=true
 )
 
 # Setting velocity conditions
@@ -61,11 +61,7 @@ aoa = 17.0
 side_slip = 0.0
 yaw_rate = 0.0
 aoa_rad = deg2rad(aoa)
-va_vec = [
-    cos(aoa_rad) * cos(side_slip),
-    sin(side_slip),
-    sin(aoa_rad)
-] * va
+va_vec = apparent_wind(aoa_rad, side_slip, va)
 set_va!(body_aero, va_vec)
 
 # Plotting geometry
@@ -127,7 +123,7 @@ PLOT && plot_polars(
     angle_type="angle_of_attack",
     angle_of_attack=aoa,
     side_slip=side_slip,
-    v_a=va,
+    va=va,
     title="tutorial_testing_stall_model_n_panels_$(n_panels)_distribution_$(spanwise_distribution)",
     save_path=OUTPUT_DIR,
     is_save=false || SAVE_ALL,

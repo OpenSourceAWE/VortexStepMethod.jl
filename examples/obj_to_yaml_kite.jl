@@ -72,21 +72,21 @@ refine!(wing)
 body_aero = BodyAerodynamics([wing])
 VortexStepMethod.reinit!(body_aero)
 
-solver = Solver(body_aero; aerodynamic_model_type=VSM, rtol=1e-5, solver_type=LOOP)
-set_va!(body_aero, [cos(deg2rad(8)) * va, 0.0, sin(deg2rad(8)) * va])
+solver = Solver(wing.n_panels, wing.n_unrefined_sections;
+    aerodynamic_model_type=VSM, rtol=1e-5, solver_type=LOOP)
+set_va!(body_aero, apparent_wind(deg2rad(8), 0.0, va))
 results = VortexStepMethod.solve(solver, body_aero; log=true)
 
 if PLOT
     plot_geometry(body_aero, "Ram air kite (converted from .obj)"; is_show=true,
         view_elevation=15, view_azimuth=-120, use_tex=USE_TEX)
 
-    # Airfoils and per-section polars recovered from the converted geometry
+    # Airfoils and panel polars recovered from the converted geometry
     plot_airfoils(geometry_file; symmetric=true, is_show=true)
-    plot_section_polars(body_aero, :cl; is_show=true)
-    plot_section_polars(body_aero, :cd; is_show=true)
+    plot_section_polars(body_aero; panels=[1, 10], is_show=true)
 
     plot_polars([solver], [body_aero], ["VSM (NeuralFoil polars from .obj)"];
-        angle_range=range(-5, 20, length=26), v_a=va,
+        angle_range=range(-5, 20, length=26), va=va,
         title="Ram air kite: obj_to_yaml route", is_save=false, use_tex=USE_TEX)
 end
 

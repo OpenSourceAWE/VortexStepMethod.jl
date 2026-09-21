@@ -9,7 +9,8 @@ using Test
         n_unrefined_sections = 5  # 5 unrefined sections
 
         # Create a test wing settings file
-        settings_file = create_temp_wing_settings("solver", "solver_test_wing.yaml"; alpha=5.0, beta=0.0, wind_speed=10.0)
+        settings_file = create_temp_wing_settings("solver", "solver_test_wing.yaml";
+            alpha=5.0, beta=0.0, va=10.0)
 
         try
             # Modify settings to use specific panel configuration
@@ -21,7 +22,7 @@ using Test
             wing = Wing(settings)
             refine!(wing)
             body_aero = BodyAerodynamics([wing])
-            solver = Solver(body_aero, settings)
+            solver = Solver(settings)
 
             # Set conditions and solve
             va_vec = [10.0, 0.0, 0.0]
@@ -86,7 +87,7 @@ using Test
         #   sum(coeff_panel * width_panel * chord_panel) for all panels in section
         settings_file = create_temp_wing_settings(
             "solver", "solver_test_wing.yaml";
-            alpha=5.0, beta=0.0, wind_speed=10.0)
+            alpha=5.0, beta=0.0, va=10.0)
 
         try
             settings = VSMSettings(settings_file)
@@ -96,7 +97,7 @@ using Test
             wing = Wing(settings)
             refine!(wing)
             body_aero = BodyAerodynamics([wing])
-            solver = Solver(body_aero, settings)
+            solver = Solver(settings)
 
             va_vec = [10.0, 0.0, 0.0]
             set_va!(body_aero, va_vec)
@@ -159,7 +160,8 @@ using Test
         ]
 
         for (n_panels, n_unrefined_expected) in test_cases
-            settings_file = create_temp_wing_settings("solver", "solver_test_wing.yaml"; alpha=5.0, beta=0.0, wind_speed=10.0)
+            settings_file = create_temp_wing_settings("solver", "solver_test_wing.yaml";
+                alpha=5.0, beta=0.0, va=10.0)
 
             try
                 settings = VSMSettings(settings_file)
@@ -169,7 +171,7 @@ using Test
                 wing = Wing(settings)
                 refine!(wing)
                 body_aero = BodyAerodynamics([wing])
-                solver = Solver(body_aero, settings)
+                solver = Solver(settings)
 
                 va_vec = [10.0, 0.0, 0.0]
                 set_va!(body_aero, va_vec)

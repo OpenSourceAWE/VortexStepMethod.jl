@@ -32,9 +32,10 @@ export slice_args, preview_args
 export ObjWing, Section, Wing, refine!, reinit!
 export BodyAerodynamics
 export Solver, VSMSolution, linearize, solve, solve!, solve_base!, calc_forces!
+export stability_derivatives, trim_angle
 export SolveFailure
 export calculate_results
-export add_section!, set_va!, section_pitch_rate
+export add_section!, apparent_wind, set_va!, section_pitch_rate
 export calculate_projected_area, calculate_span
 export MVec3
 
@@ -114,7 +115,7 @@ Plot polar data comparing different solvers and configurations.
 - `angle_type`: `"angle_of_attack"` or `"side_slip"` (default: `"angle_of_attack"`)
 - `angle_of_attack`: AoA for the polar sweep (default: `0.0`) [°]
 - `side_slip`: side slip angle (default: `0.0`) [°]
-- `v_a`: apparent wind speed magnitude (default: `10.0`) [m/s]
+- `va`: apparent wind speed (default: `10.0`) [m/s]
 - `title`: plot title (default: `"polar"`)
 - `data_type`: file extension for saving (default: `".png"`)
 - `save_path`: path to save plots (default: `nothing`)
@@ -159,7 +160,7 @@ in sequence.
 - `angle_type`: `"angle_of_attack"` or `"side_slip"` (default: `"angle_of_attack"`)
 - `angle_of_attack`: AoA in degrees (default: `0.0`)
 - `side_slip`: side slip angle in degrees (default: `0.0`)
-- `v_a`: wind speed in m/s (default: `10.0`)
+- `va`: apparent wind speed (default: `10.0`) [m/s]
 - `title`: overall figure title (default: `"Combined Analysis"`)
 - `view_elevation`: geometry view elevation in degrees (default: `15`)
 - `view_azimuth`: geometry view azimuth in degrees (default: `-120`)
@@ -174,17 +175,22 @@ in sequence.
 function plot_combined_analysis end
 
 """
-    plot_section_polars(body_aero::BodyAerodynamics, coefficient=:cl; kwargs...)
+    plot_section_polars(body_aero::BodyAerodynamics; panels=eachindex(body_aero.panels),
+                        alphas=deg2rad.(-20:0.5:30), delta=nothing, kwargs...)
 
-Plot one polar coefficient (`:cl`, `:cd`, or `:cm`) against angle of attack for
-every section of a wing using stored `POLAR_VECTORS` data. Rendered through
-`MakieControlPlots`.
+Plot the lift, drag and moment coefficients against angle of attack for the chosen
+`panels`, one curve per panel, as each panel's [`calculate_cl`](@ref),
+[`calculate_cd`](@ref) and [`calculate_cm`](@ref) evaluate them for its aero model.
+Rendered through `MakieControlPlots`; returns its plot object.
 
 # Arguments
 - `body_aero`: the [`BodyAerodynamics`](@ref) to plot
-- `coefficient`: `:cl`, `:cd`, or `:cm` (default: `:cl`)
 
 # Keyword arguments
+- `panels`: index or indices into `body_aero.panels` (default: all panels)
+- `alphas`: angles of attack [rad] (default: `deg2rad.(-20:0.5:30)`)
+- `delta`: flap deflection [rad] a `POLAR_MATRICES` panel is evaluated at
+  (default: `nothing`, each panel's own `delta`)
 - `is_show`: whether to display (default: `true`)
 - `is_save`: whether to save (default: `false`)
 - `save_path`: directory to save the figure (default: `nothing`)
@@ -432,6 +438,7 @@ include("panel.jl")
 include("body_aerodynamics.jl")
 include("wake.jl")
 include("solver.jl")
+include("stability.jl")
 
 include("plotting_helpers.jl")
 

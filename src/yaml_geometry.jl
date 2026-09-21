@@ -428,6 +428,18 @@ function Wing(settings::VSMSettings; sort_sections::Bool=true)
 end
 
 """
+    n_unrefined_sections(wing_settings::WingSettings) -> Int
+
+Number of unrefined sections the [`Wing`](@ref) built from `wing_settings` carries: the
+rows of its `geometry_file`'s `wing_sections`.
+"""
+function n_unrefined_sections(wing_settings::WingSettings)
+    isempty(wing_settings.geometry_file) && throw(ArgumentError(
+        "wing \"$(wing_settings.name)\" has no geometry_file to count its sections from"))
+    return length(YAML.load_file(wing_settings.geometry_file)["wing_sections"]["data"])
+end
+
+"""
     ObjWing(obj_path[, dat_path]; n_panels, Re, alpha_range, delta_range,
             n_sections, spanwise_direction, aero_solver, remake, output_dir,
             crease_frac, verbose) → Wing

@@ -36,7 +36,7 @@
 
 # Define the flight state for the aerodynamic analysis
 condition:
-  wind_speed: 10.0 # [m/s] Free stream velocity magnitude
+  va: 10.0 # [m/s] apparent wind speed
   alpha: 0.0 # [°] Angle of attack (pitch angle relative to flow)
   beta: 0.0 # [°] Sideslip angle (yaw angle relative to flow)
   yaw_rate: 0.0 # [°/s] Yaw rate (for dynamic analysis, 0 for static)
@@ -44,7 +44,7 @@ condition:
 # Define wing geometry files and discretization parameters
 wings:
   - name: V3_Kite # Wing identifier for output labeling
-    geometry_file: data/TUDELFT_V3_KITE/aero_geometry.yaml
+    geometry_file: data/TUDELFT_V3_KITE/aero_geometry_coarse_discretisation.yaml
     n_panels: 54 # Total number of panels along wingspan
     spanwise_panel_distribution: SPLIT_PROVIDED # Panel spacing algorithm
     spanwise_direction: [0.0, 1.0, 0.0] # Unit vector defining wingspan direction
@@ -70,9 +70,6 @@ solver_settings:
   relaxation_factor: 0.01 # [0.001-0.1] Under-relaxation for stability
 
   # --- Numerical Stability ---
-  artificial_damping: false # Enable artificial damping for unstable cases
-  k2: 0.1 # 2nd-order damping coefficient
-  k4: 0.0 # 4th-order damping coefficient
   core_radius_fraction: 1e-20 # Vortex core radius (fraction of filament length)
 
   # --- Initial Conditions ---
