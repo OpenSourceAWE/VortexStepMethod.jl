@@ -68,6 +68,9 @@
 
 ### Fixed
 
+- `ELLIPTIC` initial circulation works on a body with more than one wing, where it threw
+  an `ArgumentError`: each wing gets an ellipse over its own span, along its own
+  `spanwise_direction` and centred on its own mid-span, also for a single wing off y = 0.
 - `get_lower_upper`, and with it the flap hinge in `deform_section`, takes the lower and
   upper surface heights where the contour crosses `x = crease_frac`. It took the nearest
   points below and above `y = 0`, which on a cambered section put the hinge near the

@@ -616,6 +616,40 @@ end
         @test sol.force[3] > 2single.force[3]
     end
 
+    @testset "ELLIPTIC starts each wing on its own ellipse" begin
+        control_y = [panel.control_point[2] for panel in single_aero.panels]
+        ellipse = sqrt.(1 .- (2control_y ./ span) .^ 2)
+        fin = Wing(n_panels; spanwise_direction=[0.0, 0.0, 1.0])
+        for z in section_y .+ 5.0
+            add_section!(fin, [0.0, 0.0, z], [1.0, 0.0, z], INVISCID)
+        end
+        refine!(fin)
+        body_aero = BodyAerodynamics([wing_pair(section_y, n_panels, span + 1.0); fin])
+        gamma = zeros(3n_panels)
+        VortexStepMethod.calculate_circulation_distribution_elliptical_wing(gamma,
+            body_aero)
+
+        @test gamma ≈ repeat(ellipse, 3)
+
+        lone_wing_gamma = zeros(n_panels)
+        VortexStepMethod.calculate_circulation_distribution_elliptical_wing(
+            lone_wing_gamma, BodyAerodynamics([inviscid_wing(section_y .+ 5.0; n_panels)]))
+        @test lone_wing_gamma ≈ ellipse
+    end
+
+    @testset "ELLIPTIC and ZEROS converge to the same gamma" begin
+        wings = wing_pair(section_y, n_panels, span + 1.0)
+        _, from_zeros = solve_wings(wings)
+        gamma_zeros = copy(from_zeros.gamma_distribution)
+        body_aero = BodyAerodynamics(wings; va_vec=[10.0, 0.0, 1.0])
+        solver = Solver(2n_panels, 2length(section_y);
+                        type_initial_gamma_distribution=ELLIPTIC)
+        sol = solve!(solver, body_aero)
+
+        @test sol.solver_status == FEASIBLE
+        @test sol.gamma_distribution ≈ gamma_zeros rtol=1e-4
+    end
+
     n_wing_sections = length(section_y)
     first_sections = 1:n_wing_sections
     second_sections = n_wing_sections+1:2n_wing_sections

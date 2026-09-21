@@ -1685,24 +1685,25 @@ function refine_mesh_with_billowing!(wing; reuse_aero_data::Bool=false)
 end
 
 """
+    spanwise_extent(wing::AbstractWing)
+
+Lowest and highest projection of the unrefined sections' LE and TE points on `wing`'s
+`spanwise_direction`, as `(lo, hi)` [m].
+"""
+function spanwise_extent(wing::AbstractWing)
+    axis = normalize(wing.spanwise_direction)
+    return extrema(dot(point, axis) for section in wing.unrefined_sections
+                   for point in (section.LE_point, section.TE_point))
+end
+
+"""
     calculate_span(wing::AbstractWing)
 
-Calculate wing span along spanwise direction.
-
-Returns:
-    Float64: Wing span
+Wing span along `spanwise_direction` [m].
 """
 function calculate_span(wing::AbstractWing)
-    # Normalize spanwise direction
-    vector_axis = wing.spanwise_direction ./ norm(wing.spanwise_direction)
-    
-    # Get all points
-    all_points = reduce(vcat, [[section.LE_point, section.TE_point] 
-                              for section in wing.unrefined_sections])
-    
-    # Project points and calculate span
-    projections = [dot(point, vector_axis) for point in all_points]
-    return maximum(projections) - minimum(projections)
+    lo, hi = spanwise_extent(wing)
+    return hi - lo
 end
 
 # Project point onto plane
