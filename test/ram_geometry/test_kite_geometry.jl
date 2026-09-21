@@ -96,7 +96,7 @@ using LinearAlgebra
         
         # Test reading back the matrices
         cl_read, alphas_read, deltas_read = read_aero_matrix(cl_polar_path)
-        @test all(isapprox.(cl_read[1:end-1,:], cl_matrix[1:end-1,:]; rtol=5e-4))
+        @test cl_read[1:end-1,:] ≈ cl_matrix[1:end-1,:]
         @test isnan(cl_read[end,end])
         @test alphas_read ≈ deg2rad.(alphas)
         @test deltas_read ≈ deg2rad.(d_trailing_edge_angles)

@@ -13,7 +13,7 @@ function write_aero_matrix(filepath::AbstractString, matrix::Matrix{Float64},
         println(io, string(label, "/delta,", deltas_str))
         for i in eachindex(alpha_range)
             alpha_label = "α=$(round(rad2deg(alpha_range[i]), digits=1))°"
-            println(io, alpha_label, ",", csv_fields((), matrix[i, :]))
+            println(io, alpha_label, ",", csv_fields(matrix[i, :]))
         end
     end
     return filepath

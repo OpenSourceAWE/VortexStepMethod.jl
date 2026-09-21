@@ -299,8 +299,7 @@ end
     (alphas, deltas, cl_back, cd_back, cm_back), model = load_polar_data(matrix_csv)
     @test model == VortexStepMethod.POLAR_MATRICES
     @test alphas == alpha_range && deltas == delta_range
-    @test all(isapprox.(cl_back, cl; rtol=5e-4)) && all(isapprox.(cm_back, cm; rtol=5e-4))
-    @test all(isapprox.(cd_back, cd; rtol=5e-4))
+    @test cl_back ≈ cl && cd_back ≈ cd && cm_back ≈ cm
 
     sols = [SectionSolution(alpha_range[i], cl[i, 1], cd[i, 1], cm[i, 1], 1.0,
                             Float64[], Float64[], Float64[], Float64[])
@@ -308,19 +307,18 @@ end
     vectors_csv = write_polar_csv(joinpath(work, "vectors.csv"), sols)
     (alphas, _, cd_vec, _), _ = load_polar_data(vectors_csv)
     @test alphas == alpha_range
-    @test all(isapprox.(cd_vec, cd[:, 1]; rtol=5e-4))
+    @test cd_vec ≈ cd[:, 1]
 
     result = AirfoilAero.NeuralFoilResult(collect(-5.0:5:15), cl[:, 1], cd[:, 1], cm[:, 1],
                                           ones(5))
     neuralfoil_csv = write_polar_csv(joinpath(work, "neuralfoil.csv"), result)
     (alphas, _, cd_vec, _), _ = load_polar_data(neuralfoil_csv)
     @test alphas == alpha_range
-    @test all(isapprox.(cd_vec, cd[:, 1]; rtol=5e-4))
+    @test cd_vec ≈ cd[:, 1]
 
     labelled_csv = write_aero_matrix(joinpath(work, "cd.csv"), cd, collect(alpha_range),
                                      collect(delta_range), "C_d")
-    @test all(isapprox.(first(VortexStepMethod.read_aero_matrix(labelled_csv)), cd;
-                        rtol=5e-4))
+    @test first(VortexStepMethod.read_aero_matrix(labelled_csv)) ≈ cd
 end
 
 @testset "turn_trailing_edge! legacy crease cleanup" begin
