@@ -27,7 +27,6 @@ Main structure for calculating aerodynamic properties of bodies. Use the constru
                         influence coefficients, used only for the corrected angle of attack
 - `projected_area::Float64` = 1.0: The area projected onto the xy-plane of the kite body reference frame [m²]
 - `c_ref::Float64` = 1.0: Reference chord length (max panel chord) [m]
-- `y::MVector{P, Float64}` = MVector{P,Float64}(zeros(P))
 - `cache::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}}` = [LazyBufferCache() for _ in 1:15]
 """
 @with_kw mutable struct BodyAerodynamics{P, W<:AbstractWing, T, PN<:Panel{T}}
@@ -49,7 +48,6 @@ Main structure for calculating aerodynamic properties of bodies. Use the constru
     AIC_aero_center::Array{T, 3} = zeros(T, P, P, 3)
     projected_area::T = one(T)
     c_ref::T = one(T)
-    y::MVector{P, T} = zeros(MVector{P, T})
     cache::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}} = [LazyBufferCache() for _ in 1:15]
 end
 
@@ -496,30 +494,26 @@ Returns: nothing
 end
 
 """
-    calculate_circulation_distribution_elliptical_wing(body_aero::BodyAerodynamics, gamma_0=1.0)
+    calculate_circulation_distribution_elliptical_wing(gamma_i, body_aero::BodyAerodynamics,
+                                                       gamma_0=1.0)
 
-Calculate circulation distribution for an elliptical wing.
-
-Returns: nothing
+Write into `gamma_i` an elliptic circulation of peak `gamma_0` over each wing, its control
+points measured along that wing's `spanwise_direction` from the wing's mid-span.
 """
-function calculate_circulation_distribution_elliptical_wing(gamma_i, body_aero::BodyAerodynamics, gamma_0=1.0)
-    length(body_aero.wings) == 1 || throw(ArgumentError("Multiple wings not yet implemented"))
-    
-    wing_span = body_aero.wings[1].span
-    @debug "Wing span: $wing_span"
-    
-    # Calculate y-coordinates of control points
-    y = body_aero.y
-    for (i, panel) in pairs(body_aero.panels) 
-        y[i] = panel.control_point[2] 
+function calculate_circulation_distribution_elliptical_wing(gamma_i,
+        body_aero::BodyAerodynamics, gamma_0=1.0)
+    panel_offset = 0
+    for wing in body_aero.wings
+        lo, hi = spanwise_extent(wing)
+        axis = normalize(wing.spanwise_direction)
+        for i in panel_offset .+ (1:wing.n_panels)
+            span_position = dot(body_aero.panels[i].control_point, axis) - (lo + hi) / 2
+            # Clamped: a control point can lie outside the span of the unrefined sections
+            gamma_i[i] = gamma_0 * sqrt(max(0.0, 1 - (2span_position / (hi - lo))^2))
+        end
+        panel_offset += wing.n_panels
     end
-    
-    # Calculate elliptical distribution (clamp to avoid sqrt of negative
-    # when control points lie outside the nominal span envelope)
-    gamma_i .= gamma_0 * sqrt.(max.(0.0, 1 .- (2 .* y ./ wing_span).^2))
-    
-    @debug "Calculated circulation distribution: $gamma_i"
-    nothing
+    return nothing
 end
 
 """
