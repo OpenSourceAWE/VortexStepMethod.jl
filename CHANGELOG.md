@@ -25,6 +25,9 @@
 
 ### Changed
 
+- BREAKING: `ObjAdapter.center_to_com!`, `calculate_inertia_tensor` and
+  `calc_inertia_y_rotation` are removed. Mesh mass properties are computed by
+  SymbolicAWEModels, which reads the mesh with `read_faces`.
 - Requires Julia 1.12 or 1.13; 1.10 and 1.11 keep resolving v5.1.1.
 - The Makie `plot!` methods for a `Panel` or a `BodyAerodynamics` return a
   `Vector{Makie.AbstractPlot}` instead of a `Vector{Any}`; for a `BodyAerodynamics`
