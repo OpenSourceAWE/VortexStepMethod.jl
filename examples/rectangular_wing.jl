@@ -94,7 +94,7 @@ PLOT && plot_polars(
     ["LLT", "VSM"];
     angle_range,
     angle_type="angle_of_attack",
-    v_a=va,
+    va=va,
     title="Rectangular Wing Polars",
     save_path=OUTPUT_DIR,
     is_save=false || SAVE_ALL,

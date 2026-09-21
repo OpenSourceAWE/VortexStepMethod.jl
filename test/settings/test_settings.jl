@@ -40,7 +40,7 @@ end
           n_crit: 4.0
           alpha_range: [-15, 3, 90]
           delta_range: [-40, 10, 40]
-          v_app: 25.0
+          va: 25.0
           chord_ref: 6.0
           table_format: csv
     solver_settings:

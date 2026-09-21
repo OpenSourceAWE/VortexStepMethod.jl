@@ -123,7 +123,7 @@ PLOT && plot_polars(
     angle_type="angle_of_attack",
     angle_of_attack=aoa,
     side_slip=side_slip,
-    v_a=va,
+    va=va,
     title="tutorial_testing_stall_model_n_panels_$(n_panels)_distribution_$(spanwise_distribution)",
     save_path=OUTPUT_DIR,
     is_save=false || SAVE_ALL,

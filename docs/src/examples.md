@@ -118,7 +118,7 @@ julia> plot_combined_analysis(
            solver_label=["LLT", "VSM"],
            angle_range=angle_range,
            angle_type="angle_of_attack",
-           v_a=va,
+           va=va,
            title="Rectangular Wing",
            is_show=true,
        )

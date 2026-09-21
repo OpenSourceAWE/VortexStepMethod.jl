@@ -1,4 +1,4 @@
-# Replace va_dist = norm.(eachrow(solver.sol._va_dist)) with a for loop
+# Replace va_dist = norm.(eachrow(solver.sol.va_vec_dist)) with a for loop
 
 # Testcase that shows that the new function is equivalent to the old, allocating line of code.
 using Test

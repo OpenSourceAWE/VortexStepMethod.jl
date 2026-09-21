@@ -39,7 +39,7 @@ Struct for storing the solution of the [`solve!`](@ref) function. Must contain a
     _x_airf_dist::Matrix{T} = zeros(T, P, 3)
     _y_airf_dist::Matrix{T} = zeros(T, P, 3)
     _z_airf_dist::Matrix{T} = zeros(T, P, 3)
-    _va_dist::Matrix{T} = zeros(T, P, 3)
+    va_vec_dist::Matrix{T} = zeros(T, P, 3)
     _chord_dist::Vector{T} = zeros(T, P)
     ### end of private vectors
     width_dist::Vector{T} = zeros(T, P)
@@ -72,7 +72,7 @@ Struct for storing the solution of the [`solve!`](@ref) function. Must contain a
     x_airf_unrefined_dist::Vector{MVector{3, T}} = [zeros(MVector{3, T}) for _ in 1:U]
     y_airf_unrefined_dist::Vector{MVector{3, T}} = [zeros(MVector{3, T}) for _ in 1:U]
     z_airf_unrefined_dist::Vector{MVector{3, T}} = [zeros(MVector{3, T}) for _ in 1:U]
-    va_unrefined_dist::Vector{MVector{3, T}} = [zeros(MVector{3, T}) for _ in 1:U]
+    va_vec_unrefined_dist::Vector{MVector{3, T}} = [zeros(MVector{3, T}) for _ in 1:U]
     chord_unrefined_dist::MVector{U, T} = zeros(MVector{U, T})
     width_unrefined_dist::MVector{U, T} = zeros(MVector{U, T})
     unrefined_count_dist::Vector{Int} = zeros(Int, U)
@@ -84,12 +84,12 @@ end
     converged::Bool                  = false
     gamma_new::MVector{P, T}         = zeros(MVector{P, T})
     alpha_dist::MVector{P, T}        = zeros(MVector{P, T})
-    v_a_dist::MVector{P, T}          = zeros(MVector{P, T})
+    v_rel_dist::MVector{P, T}        = zeros(MVector{P, T})
     v_span_dist::MVector{P, T}       = zeros(MVector{P, T})
 end
 
 @with_kw struct BaseResult{P, T}
-    va_norm_dist::MVector{P, T} = zeros(MVector{P, T})
+    va_dist::MVector{P, T} = zeros(MVector{P, T})
     va_unit_dist::Matrix{T} = zeros(T, P, 3)
 end
 
@@ -361,7 +361,7 @@ function calc_forces!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics;
     alpha_dist = solver.lr.alpha_dist
     alpha_corrected = solver.sol.alpha_dist
     alpha_geometric_dist = solver.sol.alpha_geometric_dist
-    v_rel_dist = solver.lr.v_a_dist
+    v_rel_dist = solver.lr.v_rel_dist
     panels = body_aero.panels
    
     width_dist = solver.sol.width_dist
@@ -386,9 +386,9 @@ function calc_forces!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics;
         # Geometric AoA using panel-local axes and prescribed
         # freestream — scalar ops to avoid allocations
         begin
-            va1 = solver.sol._va_dist[i,1]
-            va2 = solver.sol._va_dist[i,2]
-            va3 = solver.sol._va_dist[i,3]
+            va1 = solver.sol.va_vec_dist[i,1]
+            va2 = solver.sol.va_vec_dist[i,2]
+            va3 = solver.sol.va_vec_dist[i,3]
             va = sqrt(va1^2 + va2^2 + va3^2)
             x1 = solver.sol._x_airf_dist[i,1]
             x2 = solver.sol._x_airf_dist[i,2]
@@ -427,8 +427,8 @@ function calc_forces!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics;
             solver.core_radius_fraction,
             solver.sol._z_airf_dist,
             solver.sol._x_airf_dist,
-            solver.sol._va_dist,
-            solver.br.va_norm_dist,
+            solver.sol.va_vec_dist,
+            solver.br.va_dist,
             solver.br.va_unit_dist
         )
     else
@@ -483,7 +483,7 @@ function calc_forces!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics;
 
     # Python parity: normalize with area-weighted reference velocity for distributed inflow.
     va_ref_vec = _compute_reference_velocity_from_distribution(
-        solver.sol._va_dist,
+        solver.sol.va_vec_dist,
         length(panels),
         panel_areas
     )
@@ -503,7 +503,7 @@ function calc_forces!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics;
         x_airf_unrefined_dist = solver.sol.x_airf_unrefined_dist
         y_airf_unrefined_dist = solver.sol.y_airf_unrefined_dist
         z_airf_unrefined_dist = solver.sol.z_airf_unrefined_dist
-        va_unrefined_dist = solver.sol.va_unrefined_dist
+        va_vec_unrefined_dist = solver.sol.va_vec_unrefined_dist
         chord_unrefined_dist = solver.sol.chord_unrefined_dist
         width_unrefined_dist = solver.sol.width_unrefined_dist
         unrefined_count_dist = solver.sol.unrefined_count_dist
@@ -519,7 +519,7 @@ function calc_forces!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics;
             x_airf_unrefined_dist[i] .= 0.0
             y_airf_unrefined_dist[i] .= 0.0
             z_airf_unrefined_dist[i] .= 0.0
-            va_unrefined_dist[i] .= 0.0
+            va_vec_unrefined_dist[i] .= 0.0
         end
         chord_unrefined_dist .= 0.0
         width_unrefined_dist .= 0.0
@@ -546,7 +546,7 @@ function calc_forces!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics;
                     x_airf_unrefined_dist[target_unrefined_idx] .+= panel.x_airf
                     y_airf_unrefined_dist[target_unrefined_idx] .+= panel.y_airf
                     z_airf_unrefined_dist[target_unrefined_idx] .+= panel.z_airf
-                    va_unrefined_dist[target_unrefined_idx] .+= panel.va
+                    va_vec_unrefined_dist[target_unrefined_idx] .+= panel.va_vec
                     chord_unrefined_dist[target_unrefined_idx] += panel.chord
                     width_unrefined_dist[target_unrefined_idx] += panel.width
 
@@ -567,7 +567,7 @@ function calc_forces!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics;
                         x_airf_unrefined_dist[target_unrefined_idx] ./= count
                         y_airf_unrefined_dist[target_unrefined_idx] ./= count
                         z_airf_unrefined_dist[target_unrefined_idx] ./= count
-                        va_unrefined_dist[target_unrefined_idx] ./= count
+                        va_vec_unrefined_dist[target_unrefined_idx] ./= count
                         chord_unrefined_dist[target_unrefined_idx] /= count
                         # width_unrefined_dist is NOT averaged - it is the
                         # sum of panel widths in the unrefined section
@@ -638,12 +638,12 @@ function solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=n
         solver.core_radius_fraction,
         solver.mu,
         solver.lr.alpha_dist,
-        solver.lr.v_a_dist,
+        solver.lr.v_rel_dist,
         solver.sol._chord_dist,
         solver.sol._x_airf_dist,
         solver.sol._z_airf_dist,
-        solver.sol._va_dist,
-        solver.br.va_norm_dist,
+        solver.sol.va_vec_dist,
+        solver.br.va_dist,
         solver.br.va_unit_dist,
         body_aero.panels,
         solver.is_only_f_and_gamma_output;
@@ -698,7 +698,7 @@ function solve_base!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics, gamma
     
     # check arguments
     check_dimensions(solver, body_aero)
-    isnothing(body_aero.panels[1].va) && throw(ArgumentError(
+    isnothing(body_aero.panels[1].va_vec) && throw(ArgumentError(
         "Inflow conditions are not set, use set_va!(body_aero, va_vec)"))
     
     # Initialize variables
@@ -710,7 +710,7 @@ function solve_base!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics, gamma
     solver.sol._x_airf_dist .= 0
     solver.sol._y_airf_dist .= 0
     solver.sol._z_airf_dist .= 0
-    solver.sol._va_dist .= 0
+    solver.sol.va_vec_dist .= 0
     solver.sol._chord_dist .= 0
 
     # Fill arrays from panels
@@ -719,24 +719,24 @@ function solve_base!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics, gamma
             solver.sol._x_airf_dist[i, k] = panel.x_airf[k]
             solver.sol._y_airf_dist[i, k] = panel.y_airf[k]
             solver.sol._z_airf_dist[i, k] = panel.z_airf[k]
-            solver.sol._va_dist[i, k] = panel.va[k]
+            solver.sol.va_vec_dist[i, k] = panel.va_vec[k]
         end
         solver.sol._chord_dist[i] = panel.chord
     end
 
     # Calculate unit vectors
-    calc_norm_dist!(solver.br.va_norm_dist, solver.sol._va_dist)
+    calc_norm_dist!(solver.br.va_dist, solver.sol.va_vec_dist)
     @inbounds for i in 1:n_panels
-        inv_norm = 1.0 / solver.br.va_norm_dist[i]
+        inv_norm = 1.0 / solver.br.va_dist[i]
         for k in 1:3
             solver.br.va_unit_dist[i, k] =
-                solver.sol._va_dist[i, k] * inv_norm
+                solver.sol.va_vec_dist[i, k] * inv_norm
         end
     end
 
     # Calculate AIC matrices
-    calculate_AIC_matrices!(body_aero, solver.aerodynamic_model_type, solver.core_radius_fraction, solver.br.va_norm_dist,
-                            solver.br.va_unit_dist)
+    calculate_AIC_matrices!(body_aero, solver.aerodynamic_model_type,
+        solver.core_radius_fraction, solver.br.va_dist, solver.br.va_unit_dist)
 
     # Initialize gamma distribution
     gamma_initial = solver.cache_base[1][solver.sol._chord_dist]
@@ -837,7 +837,7 @@ end
     solver.lr.alpha_dist .= atan.(v_normal_dist, v_tangential_dist)
 
     @inbounds for i in 1:n_panels
-        solver.lr.v_a_dist[i] = smooth_sqrt(
+        solver.lr.v_rel_dist[i] = smooth_sqrt(
             relative_velocity_crossz[i,1]^2 +
             relative_velocity_crossz[i,2]^2 +
             relative_velocity_crossz[i,3]^2)
@@ -850,7 +850,7 @@ end
     for (i, (panel, alpha)) in enumerate(zip(panels, solver.lr.alpha_dist))
         cl_dist[i] = calculate_cl(panel, alpha)
     end
-    gamma_out .= 0.5 .* solver.lr.v_a_dist.^2 ./ va_magw_dist .* cl_dist .* chord_dist
+    gamma_out .= 0.5 .* solver.lr.v_rel_dist.^2 ./ va_magw_dist .* cl_dist .* chord_dist
     return nothing
 end
 
@@ -958,7 +958,7 @@ function gamma_loop!(
     relaxation_factor;
     log::Bool = true
 ) where {P, U, T}
-    va_vec_dist = solver.sol._va_dist
+    va_vec_dist = solver.sol.va_vec_dist
     chord_dist = solver.sol._chord_dist
     x_airf_dist = solver.sol._x_airf_dist
     y_airf_dist = solver.sol._y_airf_dist
@@ -966,9 +966,9 @@ function gamma_loop!(
     solver.lr.converged   = false
     n_panels    = length(body_aero.panels)
     solver.lr.alpha_dist .= body_aero.alpha_dist
-    solver.lr.v_a_dist   .= body_aero.v_a_dist
+    solver.lr.v_rel_dist .= body_aero.v_rel_dist
     
-    va_magw_dist             = solver.cache[1][solver.lr.v_a_dist]
+    va_magw_dist             = solver.cache[1][solver.lr.v_rel_dist]
     gamma                    = solver.cache[2][solver.lr.gamma_new]
     abs_gamma_new            = solver.cache[3][solver.lr.gamma_new]
     induced_velocity_all     = solver.cache[4][va_vec_dist]
@@ -1277,8 +1277,8 @@ function make_dual_shadow(solver::Solver{P, U, Float64},
                           ::Type{TD}) where {P, U, W, TD}
     wings_d = [_wing_with_eltype(wing, TD) for wing in body_aero.wings]
     body_aero_d = BodyAerodynamics(wings_d)
-    set_va!(body_aero_d, MVector{3, TD}(body_aero._va), MVector{3, TD}(body_aero.omega);
-            reference_point=body_aero.reference_point)
+    set_va!(body_aero_d, MVector{3, TD}(getfield(body_aero, :va_vec)),
+            MVector{3, TD}(body_aero.omega); reference_point=body_aero.reference_point)
     solver_d = Solver(P, U, TD;
         solver_type = solver.solver_type,
         aerodynamic_model_type = solver.aerodynamic_model_type,
@@ -1307,7 +1307,7 @@ end
 
 """
     linearize(solver, body_aero, y; theta_idxs=1:4, delta_idxs=nothing,
-              va_idxs=nothing, omega_idxs=nothing, aero_coeffs=false,
+              va_vec_idxs=nothing, omega_idxs=nothing, aero_coeffs=false,
               backend=AutoForwardDiff(), kwargs...)
 
 Jacobian of aerodynamic outputs w.r.t. control and kinematic inputs at `y`. Each `*_idxs`
@@ -1326,7 +1326,7 @@ warning) if any internal solve missed the solver's tolerances.
 function linearize(solver::Solver{<:Any, U}, body_aero::BodyAerodynamics, y::Vector{T};
         theta_idxs=1:4,
         delta_idxs=nothing,
-        va_idxs=nothing,
+        va_vec_idxs=nothing,
         omega_idxs=nothing,
         aero_coeffs=false,
         backend = AutoForwardDiff(),
@@ -1350,7 +1350,7 @@ function linearize(solver::Solver{<:Any, U}, body_aero::BodyAerodynamics, y::Vec
             solver_c = solver
         else
             shadow = shadow_ref[]
-            if shadow === nothing || eltype(shadow[1]._va) !== TI
+            if shadow === nothing || eltype(getfield(shadow[1], :va_vec)) !== TI
                 shadow_ref[] = make_dual_shadow(solver, body_aero, TI)
             end
             body_aero_c, solver_c = shadow_ref[]
@@ -1364,7 +1364,8 @@ function linearize(solver::Solver{<:Any, U}, body_aero::BodyAerodynamics, y::Vec
             reinit!(body_aero_c; init_aero=false)
         end
 
-        va_vec = isnothing(va_idxs) ? MVector{3, TI}(body_aero_c._va) : y_in[va_idxs]
+        va_vec = isnothing(va_vec_idxs) ? MVector{3, TI}(getfield(body_aero_c, :va_vec)) :
+            y_in[va_vec_idxs]
         omega = isnothing(omega_idxs) ? MVector{3, TI}(body_aero_c.omega) : y_in[omega_idxs]
         set_va!(body_aero_c, va_vec, omega)
 

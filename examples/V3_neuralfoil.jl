@@ -109,7 +109,7 @@ fig = plot_polars(
      "Wind tunnel (Poland 2025)"];
     literature_path_list=literature_paths,
     angle_range,
-    v_a=va,
+    va=va,
     title="TU Delft V3 Kite: CFD vs NeuralFoil (Re=$RE)",
     is_save=false,
 )
