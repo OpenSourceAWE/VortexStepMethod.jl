@@ -29,7 +29,7 @@ values shown are those defaults, and the docstrings linked below carry the rest.
 
 ```yaml
 condition:
-  va: 10.0                # apparent wind speed [m/s]
+  va: 10.0                        # apparent wind speed [m/s]
   alpha: 5.0                      # angle of attack [°]
   beta: 0.0                       # sideslip angle [°]
   yaw_rate: 0.0                   # turn rate about the body z axis [°/s]
@@ -67,7 +67,7 @@ wings:
       delta_range: [-40, 10, 40]  # flap-deflection sweep [°]; null for no flap sweep
       # angles off the reference angle a live polar is re-solved at [°]
       live_offsets: [-12, -9, -6, -3, 0, 3, 6, 9, 12]
-      va: 25.0                 # apparent wind the Reynolds number is taken at [m/s]
+      va: 25.0                    # apparent wind the Reynolds number is taken at [m/s]
       chord_ref: 1.0              # reference (maximum panel) chord [m]
       table_format: arrow         # per-node table format: csv or arrow
 

@@ -480,6 +480,13 @@ end
     @test body_aero.va_vec ≈ [11.0, 0.0, 0.0]
 end
 
+@testset "body_aero.va and panel.va are removed" begin
+    body_aero = BodyAerodynamics([inviscid_wing([0.0, 1.0, 2.0])])
+    set_va!(body_aero, [10.0, 0.0, 0.0])
+    @test_throws FieldError body_aero.va
+    @test_throws FieldError body_aero.panels[1].va
+end
+
 @testset "set_va! with omega on multi-wing body" begin
     body_aero = BodyAerodynamics([inviscid_wing([0.0, 1.0, 2.0]),
                                   inviscid_wing([10.0, 11.0, 12.0])])
@@ -495,7 +502,6 @@ end
     @test body_aero.omega ≈ omega
     @test !body_aero.has_distributed_va
     @test body_aero.va_vec ≈ va_vec
-    @test_throws FieldError body_aero.va
 
     new_omega = [0.0, 0.0, 2.0]
     @test body_aero.va_vec ≈ va_vec

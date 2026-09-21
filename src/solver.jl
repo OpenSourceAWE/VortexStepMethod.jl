@@ -1350,7 +1350,7 @@ function linearize(solver::Solver{<:Any, U}, body_aero::BodyAerodynamics, y::Vec
             solver_c = solver
         else
             shadow = shadow_ref[]
-            if shadow === nothing || eltype(shadow[1].va_vec) !== TI
+            if shadow === nothing || eltype(getfield(shadow[1], :va_vec)) !== TI
                 shadow_ref[] = make_dual_shadow(solver, body_aero, TI)
             end
             body_aero_c, solver_c = shadow_ref[]

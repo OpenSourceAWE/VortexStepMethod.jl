@@ -39,10 +39,10 @@ va_vec_b_0 = apparent_wind(aoa_rad, side_slip, va)
 omega_b_0  = zeros(3)
 theta_0    = zeros(n_unrefined)
 
-theta_idxs = 1:n_unrefined
-va_vec_idxs    = (n_unrefined + 1):(n_unrefined + 3)
-omega_idxs = (n_unrefined + 4):(n_unrefined + 6)
-y0         = [theta_0; va_vec_b_0; omega_b_0]
+theta_idxs  = 1:n_unrefined
+va_vec_idxs = (n_unrefined + 1):(n_unrefined + 3)
+omega_idxs  = (n_unrefined + 4):(n_unrefined + 6)
+y0          = [theta_0; va_vec_b_0; omega_b_0]
 
 @info "Computing FiniteDiff Jacobian …"
 t_fd = @elapsed begin
