@@ -32,8 +32,6 @@
 - BREAKING: `ObjAdapter.center_to_com!`, `calculate_inertia_tensor` and
   `calc_inertia_y_rotation` are removed. Mesh mass properties are computed by
   SymbolicAWEModels, which reads the mesh with `read_faces`.
-- BREAKING: the `BodyAerodynamics` field `y` is removed; it was scratch space for the
-  `ELLIPTIC` initial circulation and nothing else read it.
 - BREAKING: the apparent wind is `va` for the speed [m/s], `va_vec` for the 3-vector and
   `va_dist` / `va_vec_dist` per panel, and the old names error:
   - `body_aero.va` becomes `body_aero.va_vec`, and `va=` becomes `va_vec=` in
