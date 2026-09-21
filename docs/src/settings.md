@@ -53,7 +53,7 @@ wings:
       n_bins: 60                  # leading-edge stations marched across the span
       # rows of the mesh-to-slicer rotation, whose x = chord, y = span, z = up
       rotation: [[0, 0, -1], [-1, 0, 0], [0, 1, 0]]
-      wingtip_distance: 0.0       # arc length the outermost sections stop short [m]
+      wingtip_distance: 0.0       # span the outermost sections stop short [m]
       clearance: 0.006            # shrink-wrap offset outside the cloud [chord fraction]
       min_concave_radius: 0.02    # shrink-wrap rolling-ball radius [chord fraction]
 
