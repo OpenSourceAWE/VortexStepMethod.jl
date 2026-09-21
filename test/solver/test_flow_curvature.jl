@@ -150,7 +150,7 @@ end
         for i in 1:n
             @test solver_on.sol.cm_dist[i] - base[i] ≈
                   flow_curvature_cm(rates[i], solver_on.sol._chord_dist[i],
-                                    solver_on.lr.v_a_dist[i])
+                                    solver_on.lr.v_rel_dist[i])
         end
         # the two half-wings must be driven in opposite senses
         @test sign(solver_on.sol.cm_dist[1] - base[1]) ==
