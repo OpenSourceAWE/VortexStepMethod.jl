@@ -279,8 +279,8 @@ downward can't tilt the plane toward horizontal, where its min-chord "LE" pick w
 jump across the wing. Marching stops when the leading edge stops advancing spanwise.
 Cuts sample mesh *edges*, so the picks are robust to vertex density. Returns, ordered
 along the span, the LE/TE points, each cut's plane origin, and the LE tangent: the
-central difference over the neighbouring stations, that of the next station in at
-either end. Build the airfoil for a chosen station with `build_section`.
+central difference over the neighbouring stations, where the end stations reuse their
+inner neighbour's. Build the airfoil for a chosen station with `build_section`.
 """
 function march_edges(vertices, faces; step)
     ys = [v[2] for v in vertices]
@@ -342,8 +342,8 @@ function march_edges(vertices, faces; step)
     center = (; mid_cut.le, mid_cut.te, point=[0.0, y_mid, 0.0])
     rows = vcat(reverse(march(-1.0)), [center], march(1.0))
     le = [r.le for r in rows]
-    neighbours = clamp.(eachindex(le), 2, length(le) - 1)
-    tangent = [normalize(le[j + 1] .- le[j - 1]) for j in neighbours]
+    middle = clamp.(eachindex(le), 2, length(le) - 1)
+    tangent = [normalize(le[j + 1] .- le[j - 1]) for j in middle]
     return (; le, te=[r.te for r in rows], point=[r.point for r in rows], tangent)
 end
 

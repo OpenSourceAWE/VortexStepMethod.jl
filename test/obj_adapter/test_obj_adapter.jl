@@ -37,7 +37,9 @@ obj_path = normpath(joinpath(@__DIR__, "..", "..",
             for i in eachindex(march.le)
                 section = ObjAdapter.build_section(vertices, faces, march.le[i],
                     march.te[i], march.point[i], march.tangent[i])
-                @test maximum(section.y_airfoil) - minimum(section.y_airfoil) < 0.3
+                depth = section === nothing ? Inf :
+                        maximum(section.y_airfoil) - minimum(section.y_airfoil)
+                @test depth < 0.3
             end
         end
     end
