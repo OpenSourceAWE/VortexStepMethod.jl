@@ -452,21 +452,16 @@ end
     station_indices(march, n; wingtip_distance=0.0, min_chord_frac=0.01) -> Vector{Int}
 
 Indices of the [`march_edges`](@ref) stations nearest `n` targets spread evenly over
-the spanwise length of the quarter-chord line: its arc length with the chordwise `x`
-component dropped. Stations whose chord has closed to less than `min_chord_frac` of
-the longest one are left out of that range first, so a wing tapering to a point puts
-its outermost sections on the last stations that still have an airfoil to slice. The
-remaining first and last targets sit a further `wingtip_distance` [m] inboard.
+their [`spanwise_arc_length`](@ref VortexStepMethod.spanwise_arc_length). Stations
+whose chord has closed to less than `min_chord_frac` of the longest one are left out
+of that range first, so a wing tapering to a point puts its outermost sections on the
+last stations that still have an airfoil to slice. The remaining first and last targets
+sit a further `wingtip_distance` [m] inboard.
 """
 function station_indices(march, n; wingtip_distance=0.0, min_chord_frac=0.01)
     chords = [norm(te .- le) for (le, te) in zip(march.le, march.te)]
     usable = findall(≥(min_chord_frac * maximum(chords)), chords)
-    quarter_chord = [le .+ 0.25 .* (te .- le) for (le, te) in zip(march.le, march.te)]
-    span = zeros(length(quarter_chord))
-    for i in 2:length(span)
-        step = quarter_chord[i] .- quarter_chord[i-1]
-        span[i] = span[i-1] + hypot(step[2], step[3])
-    end
+    span = VortexStepMethod.spanwise_arc_length(march.le, march.te)
     inner, outer = span[first(usable)], span[last(usable)]
     d = clamp(wingtip_distance, 0.0, (outer - inner) / 2)
     n == 1 && return [argmin(abs.(span .- (inner + outer) / 2))]
