@@ -41,8 +41,10 @@ NeuralFoil and XFoil sweeps.
 """
 function write_polar_csv(filepath::String, sols::Vector{SectionSolution})
     converged = filter(sol -> !isnan(sol.cl), sols)
-    alpha, cd, cl, cm = ([getfield(sol, name) for sol in converged]
-                         for name in (:alpha, :cd, :cl, :cm))
+    alpha = [sol.alpha for sol in converged]
+    cd = [sol.cd for sol in converged]
+    cl = [sol.cl for sol in converged]
+    cm = [sol.cm for sol in converged]
     return write_node_rows(filepath, alpha, nothing, [cd zero(cd) cl cm];
                            columns=["Cd", "Cs", "Cl", "Cm"])
 end

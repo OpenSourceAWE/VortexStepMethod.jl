@@ -166,7 +166,7 @@ function read_node_table(path::AbstractString)
     delta_col = findfirst(==("delta"), lowercase_names)
     value_cols = setdiff(eachindex(names), (alpha_col, delta_col))
     delta = delta_col === nothing ? nothing : deg2rad.(data[:, delta_col])
-    return deg2rad.(data[:, alpha_col]), delta, data[:, value_cols], names[value_cols]
+    return deg2rad.(data[:, alpha_col]), delta, view(data, :, value_cols), names[value_cols]
 end
 
 """
@@ -236,11 +236,11 @@ function write_node_rows(path::AbstractString, alpha, delta, values;
             metadata=["columns" => join(columns, ",")])
         return path
     end
-    data = hcat(angles..., values)
     open(String(path), "w") do io
         println(io, join((keys(angles)..., columns...), ","))
-        for k in axes(data, 1)
-            println(io, csv_fields(@view data[k, :]))
+        for k in axes(values, 1)
+            println(io, csv_fields(angle[k] for angle in angles), ",",
+                    csv_fields(@view values[k, :]))
         end
     end
     return path

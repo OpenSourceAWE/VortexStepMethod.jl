@@ -97,9 +97,10 @@ For each unique airfoil id `j`, `obj_to_yaml` writes into `output_dir`:
 - `airfoils/{j}_d{tag}.dat` — each deflected shape, when a `delta_range` is given. The
   `{tag}` encodes the deflection in degrees (`m` for a minus sign, `p` for the decimal
   point), e.g. `_d5.dat` for 5°, `_dm3.dat` for −3°, `_d2p5.dat` for 2.5°
-- `polars/{j}.csv` — the generated polar (`POLAR_VECTORS` or `POLAR_MATRICES`)
-- `pressure/{j}_cp.csv`, `pressure/{j}_cf.csv` — surface pressure and skin friction per
-  contour node over the `alpha × delta` grid, what pressure integration reads
+- `polars/{j}.{table_format}` — the generated polar (`POLAR_VECTORS` or `POLAR_MATRICES`)
+- `pressure/{j}_cp.{table_format}`, `pressure/{j}_cf.{table_format}` — surface pressure
+  and skin friction per contour node over the `alpha × delta` grid, what pressure
+  integration reads
 - `geometry.yaml` — `wing_sections` (leading/trailing-edge points) plus `wing_airfoils`
   (each section's `type` and the table paths above). `geometry_path` writes the YAML
   somewhere else, in which case the emitted table references carry the path from the YAML's

@@ -333,17 +333,17 @@ end
     result = AirfoilAero.NeuralFoilResult(collect(-5.0:5:15), cl[:, 1], cd[:, 1],
                                           cm[:, 1], ones(5))
     writers = Dict(
-        "matrix" => path -> write_polar_matrix_csv(path, alpha_range, delta_range,
-                                                   cl, cd, cm),
-        "vectors" => path -> write_polar_csv(path, sols),
-        "neuralfoil" => path -> write_polar_csv(path, result))
+        "matrix" => (path -> write_polar_matrix_csv(path, alpha_range, delta_range,
+                                                    cl, cd, cm), ["Cl", "Cd", "Cm"]),
+        "vectors" => (path -> write_polar_csv(path, sols), ["Cd", "Cs", "Cl", "Cm"]),
+        "neuralfoil" => (path -> write_polar_csv(path, result), ["Cd", "Cs", "Cl", "Cm"]))
     work = mktempdir()
-    for (name, write_polar) in writers
+    for (name, (write_polar, expected_columns)) in writers
         csv = write_polar(joinpath(work, "$name.csv"))
         arrow = write_polar(joinpath(work, "$name.arrow"))
         table = VortexStepMethod.Arrow.Table(read(arrow))
         @test VortexStepMethod.Arrow.getmetadata(table)["columns"] ==
-              (name == "vectors" || name == "neuralfoil" ? "Cd,Cs,Cl,Cm" : "Cl,Cd,Cm")
+              join(expected_columns, ",")
         converted = VortexStepMethod.convert_node_table(csv,
                                                         joinpath(work, "c_$name.arrow"))
         csv_data, csv_model = load_polar_data(csv)
@@ -353,7 +353,7 @@ end
             @test all(map(≈, data, csv_data))
         end
         _, _, _, columns = VortexStepMethod.read_node_table(converted)
-        @test columns == (name == "matrix" ? ["Cl", "Cd", "Cm"] : ["Cd", "Cs", "Cl", "Cm"])
+        @test columns == expected_columns
     end
     (_, _, _, cd_back, _), model = load_polar_data(joinpath(work, "matrix.arrow"))
     @test model == VortexStepMethod.POLAR_MATRICES
