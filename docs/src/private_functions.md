@@ -179,6 +179,7 @@ smoothed_curvature
 ```@docs
 crossing_panels
 segments_cross
+extents_overlap
 side_of_line
 ```
 

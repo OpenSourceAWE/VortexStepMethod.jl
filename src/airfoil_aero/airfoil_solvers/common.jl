@@ -130,11 +130,20 @@ side_of_line(a, b, p) = (b[1] - a[1]) * (p[2] - a[2]) - (b[2] - a[2]) * (p[1] - 
 
 Whether the segments `p`-`q` and `r`-`s` cross properly, each strictly separating
 the other's endpoints. Touching at an endpoint or lying along each other does not
-count.
+count, nor do segments whose coordinate extents do not overlap.
 """
 segments_cross(p, q, r, s) =
+    extents_overlap(p[1], q[1], r[1], s[1]) && extents_overlap(p[2], q[2], r[2], s[2]) &&
     side_of_line(p, q, r) * side_of_line(p, q, s) < 0 &&
     side_of_line(r, s, p) * side_of_line(r, s, q) < 0
+
+"""
+    extents_overlap(a1, a2, b1, b2) -> Bool
+
+Whether the intervals spanned by `a1`, `a2` and by `b1`, `b2` overlap.
+"""
+extents_overlap(a1, a2, b1, b2) =
+    max(min(a1, a2), min(b1, b2)) <= min(max(a1, a2), max(b1, b2))
 
 """
     crossing_panels(x, y) -> Tuple{Int,Int} or nothing

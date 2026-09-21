@@ -372,4 +372,11 @@ end
 
     # a contour whose only crossing is the panel closing it back to node 1
     @test crossing_panels([0.0, 1.0, 1.0, 2.0], [0.0, 2.0, -2.0, 1.0]) == (2, 4)
+
+    # disjoint panels along one straight edge, whose side tests round to either sign
+    edge_x = [0.0008647734705084547, 0.000648580102881341, 0.00043238673525422734,
+              0.00021619336762711367, 0.0]
+    edge_y = [0.0044110473582233455, 0.003308285518667509, 0.0022055236791116727,
+              0.0011027618395558364, 0.0]
+    @test isnothing(crossing_panels([edge_x; 0.001], [edge_y; -0.002]))
 end
