@@ -50,11 +50,11 @@ function generate_airfoils(airfoils, output_dir::String;
             clvals = collect(sol.cl for sol in sols[1])
             all(isnan, clvals) && error("solver produced no converged points")
             if isnothing(delta_range)
-                write_polar_csv(joinpath(output_dir, polar_rel), sols[1])
+                write_polar(joinpath(output_dir, polar_rel), sols[1])
             else
                 coeff(f) = [f(sols[jd][ia]) for ia in eachindex(alphas),
                             jd in eachindex(deltas)]
-                write_polar_matrix_csv(joinpath(output_dir, polar_rel), alphas, deltas,
+                write_polar_matrix(joinpath(output_dir, polar_rel), alphas, deltas,
                     coeff(s -> s.cl), coeff(s -> s.cd), coeff(s -> s.cm))
             end
             paths = write_section_aero(joinpath(output_dir, "airfoils", "$j"), aero;
@@ -64,7 +64,7 @@ function generate_airfoils(airfoils, output_dir::String;
                       af.x_raw, af.y_raw)
             push!(airfoil_rows, Any[j, "polar_vectors",
                 Dict("dat_file" => dat_rel, "raw_dat_file" => raw_rel,
-                     "csv_file_path" => polar_rel, "cp_file" => cp_rel,
+                     "polar_file_path" => polar_rel, "cp_file" => cp_rel,
                      "cf_file" => cf_rel)])
             push!(ok, j)
             finite_cl = [v for v in clvals if !isnan(v)]

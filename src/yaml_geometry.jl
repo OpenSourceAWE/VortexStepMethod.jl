@@ -1,6 +1,6 @@
 # Data structures for YAML wing geometry
 @with_kw struct WingAirfoilInfo
-    csv_file_path::String
+    polar_file_path::String
     dat_file::String = ""
     cp_file::String = ""
     cf_file::String = ""
@@ -184,23 +184,23 @@ function Wing(
             airfoil_id = airfoil_dict["airfoil_id"],
             type = airfoil_dict["type"],
             info_dict = WingAirfoilInfo(
-                csv_file_path = get(airfoil_dict["info_dict"], "csv_file_path", ""),
-                dat_file = get(airfoil_dict["info_dict"], "dat_file", ""),
-                cp_file = get(airfoil_dict["info_dict"], "cp_file", ""),
-                cf_file = get(airfoil_dict["info_dict"], "cf_file", ""),
-                cl_file_path = get(airfoil_dict["info_dict"], "cl_file_path", ""),
-                cd_file_path = get(airfoil_dict["info_dict"], "cd_file_path", ""),
-                cm_file_path = get(airfoil_dict["info_dict"], "cm_file_path", ""))
+                polar_file_path = get(info, "polar_file_path",
+                                      get(info, "csv_file_path", "")),
+                dat_file = get(info, "dat_file", ""),
+                cp_file = get(info, "cp_file", ""),
+                cf_file = get(info, "cf_file", ""),
+                cl_file_path = get(info, "cl_file_path", ""),
+                cd_file_path = get(info, "cd_file_path", ""),
+                cm_file_path = get(info, "cm_file_path", ""))
         ))
     end
 
-    # Create CSV file mapping from airfoils
-    airfoil_csv_map = Dict{Int64, String}()
+    airfoil_polar_map = Dict{Int64, String}()
     airfoil_surface_map = Dict{Int64, NTuple{3, String}}()
     airfoil_matrix_map = Dict{Int64, NTuple{3, String}}()
     for airfoil in airfoils
-        if !isempty(airfoil.info_dict.csv_file_path)
-            airfoil_csv_map[airfoil.airfoil_id] = airfoil.info_dict.csv_file_path
+        if !isempty(airfoil.info_dict.polar_file_path)
+            airfoil_polar_map[airfoil.airfoil_id] = airfoil.info_dict.polar_file_path
         end
         if !isempty(airfoil.info_dict.cp_file) && !isempty(airfoil.info_dict.cf_file)
             airfoil_surface_map[airfoil.airfoil_id] = (airfoil.info_dict.dat_file,
@@ -245,8 +245,8 @@ function Wing(
                 "type \"$airfoil_type\"; resolve it with AirfoilAero " *
                 "(resolve_aero_geometry) into polars/poly before loading."))
         else
-            csv_file_path = resolve(get(airfoil_csv_map, section.airfoil_id, ""))
-            aero_data, aero_model = load_polar_data(csv_file_path)
+            polar_path = resolve(get(airfoil_polar_map, section.airfoil_id, ""))
+            aero_data, aero_model = load_polar_data(polar_path)
         end
 
         surface = get(airfoil_surface_map, section.airfoil_id, nothing)

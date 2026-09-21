@@ -218,8 +218,8 @@ create_2d_polars
 lei_poly_coeffs
 resolve_airfoil
 write_dat
-write_polar_csv
-write_polar_matrix_csv
+write_polar
+write_polar_matrix
 write_aero_matrix
 write_node_table
 flat_plate_cf

@@ -21,7 +21,7 @@ The conversion runs four stages per spanwise station:
     └── XFoil:       coordinates  →  panel code  (± repanel)
     │  4. write
     ▼
- airfoils/*.dat + polars/*.csv + pressure/* + geometry.yaml → Wing(geometry.yaml)
+ airfoils/*.dat + polars/* + pressure/* + geometry.yaml → Wing(geometry.yaml)
 ```
 
 ## 1. Slice
@@ -97,7 +97,8 @@ For each unique airfoil id `j`, `obj_to_yaml` writes into `output_dir`:
 - `airfoils/{j}_d{tag}.dat` — each deflected shape, when a `delta_range` is given. The
   `{tag}` encodes the deflection in degrees (`m` for a minus sign, `p` for the decimal
   point), e.g. `_d5.dat` for 5°, `_dm3.dat` for −3°, `_d2p5.dat` for 2.5°
-- `polars/{j}.{table_format}` — the generated polar (`POLAR_VECTORS` or `POLAR_MATRICES`)
+- `polars/{j}.{table_format}` — the generated polar (`POLAR_VECTORS` or `POLAR_MATRICES`),
+  referenced from the YAML as `polar_file_path`
 - `pressure/{j}_cp.{table_format}`, `pressure/{j}_cf.{table_format}` — surface pressure
   and skin friction per contour node over the `alpha × delta` grid, what pressure
   integration reads

@@ -32,14 +32,14 @@ struct SectionSolution
 end
 
 """
-    write_polar_csv(filepath, sols::Vector{SectionSolution})
+    write_polar(filepath, sols::Vector{SectionSolution})
 
 Write a solver sweep (from any [`AbstractAirfoilSolver`](@ref)) to a `POLAR_VECTORS`
 table (`alpha, Cd, Cs, Cl, Cm`; alpha in degrees), CSV or Arrow as the suffix of
 `filepath` says. Non-converged angles (`NaN`) are skipped, so this works for both
 NeuralFoil and XFoil sweeps.
 """
-function write_polar_csv(filepath::String, sols::Vector{SectionSolution})
+function write_polar(filepath::String, sols::Vector{SectionSolution})
     converged = filter(sol -> !isnan(sol.cl), sols)
     alpha = [sol.alpha for sol in converged]
     cd = [sol.cd for sol in converged]
@@ -50,7 +50,7 @@ function write_polar_csv(filepath::String, sols::Vector{SectionSolution})
 end
 
 """
-    write_polar_matrix_csv(filepath, alpha_range, delta_range, cl, cd, cm)
+    write_polar_matrix(filepath, alpha_range, delta_range, cl, cd, cm)
 
 Write an `(alpha × delta)` sweep to a long-format `POLAR_MATRICES` table with columns
 `alpha, delta, Cl, Cd, Cm` (both angles in degrees), one row per grid point, CSV or
@@ -58,7 +58,7 @@ Arrow as the suffix of `filepath` says. The `delta` column is what marks the fil
 matrix polar to the loader. `alpha_range` and `delta_range` are in radians;
 `cl`/`cd`/`cm` are `length(alpha) × length(delta)`.
 """
-function write_polar_matrix_csv(filepath::String, alpha_range, delta_range,
+function write_polar_matrix(filepath::String, alpha_range, delta_range,
         cl::AbstractMatrix, cd::AbstractMatrix, cm::AbstractMatrix)
     alpha = repeat(collect(alpha_range), length(delta_range))
     delta = repeat(collect(delta_range); inner=length(alpha_range))

@@ -140,7 +140,7 @@ wing_airfoils:
   #           Average wind tunnel: 9   (standard "e^9 method")
   #           Dirty wind tunnel:   4–8
   #   - polars:
-  #       csv_file_path: Path to polar CSV file (columns: alpha [rad], cl, cd, cm)
+  #       polar_file_path: Path to polar CSV file (columns: alpha [rad], cl, cd, cm)
   #   - measure_regression:
   #       t, eta, kappa, delta, lambda, phi: Regression parameters
   #   - inviscid:
@@ -150,22 +150,22 @@ wing_airfoils:
   reynolds: !!float 1e6 # Reynolds number
   headers: [airfoil_id, type, info_dict]
   data:
-    - [1, polars, { csv_file_path: '2D_polars_drag_adjusted/1.csv' }]
-    - [2, polars, { csv_file_path: '2D_polars_drag_adjusted/2.csv' }]
-    - [3, polars, { csv_file_path: '2D_polars_drag_adjusted/3.csv' }]
-    - [4, polars, { csv_file_path: '2D_polars_drag_adjusted/4.csv' }]
-    - [5, polars, { csv_file_path: '2D_polars_drag_adjusted/5.csv' }]
-    - [6, polars, { csv_file_path: '2D_polars_drag_adjusted/6.csv' }]
-    - [7, polars, { csv_file_path: '2D_polars_drag_adjusted/7.csv' }]
-    - [8, polars, { csv_file_path: '2D_polars_drag_adjusted/8.csv' }]
-    - [9, polars, { csv_file_path: '2D_polars_drag_adjusted/9.csv' }]
-    - [10, polars, { csv_file_path: '2D_polars_drag_adjusted/10.csv' }]
-    - [11, polars, { csv_file_path: '2D_polars_drag_adjusted/11.csv' }]
-    - [12, polars, { csv_file_path: '2D_polars_drag_adjusted/12.csv' }]
-    - [13, polars, { csv_file_path: '2D_polars_drag_adjusted/13.csv' }]
-    - [14, polars, { csv_file_path: '2D_polars_drag_adjusted/14.csv' }]
-    - [15, polars, { csv_file_path: '2D_polars_drag_adjusted/15.csv' }]
-    - [16, polars, { csv_file_path: '2D_polars_drag_adjusted/16.csv' }]
-    - [17, polars, { csv_file_path: '2D_polars_drag_adjusted/17.csv' }]
-    - [18, polars, { csv_file_path: '2D_polars_drag_adjusted/18.csv' }]
-    - [19, polars, { csv_file_path: '2D_polars_drag_adjusted/19.csv' }]
+    - [1, polars, { polar_file_path: '2D_polars_drag_adjusted/1.csv' }]
+    - [2, polars, { polar_file_path: '2D_polars_drag_adjusted/2.csv' }]
+    - [3, polars, { polar_file_path: '2D_polars_drag_adjusted/3.csv' }]
+    - [4, polars, { polar_file_path: '2D_polars_drag_adjusted/4.csv' }]
+    - [5, polars, { polar_file_path: '2D_polars_drag_adjusted/5.csv' }]
+    - [6, polars, { polar_file_path: '2D_polars_drag_adjusted/6.csv' }]
+    - [7, polars, { polar_file_path: '2D_polars_drag_adjusted/7.csv' }]
+    - [8, polars, { polar_file_path: '2D_polars_drag_adjusted/8.csv' }]
+    - [9, polars, { polar_file_path: '2D_polars_drag_adjusted/9.csv' }]
+    - [10, polars, { polar_file_path: '2D_polars_drag_adjusted/10.csv' }]
+    - [11, polars, { polar_file_path: '2D_polars_drag_adjusted/11.csv' }]
+    - [12, polars, { polar_file_path: '2D_polars_drag_adjusted/12.csv' }]
+    - [13, polars, { polar_file_path: '2D_polars_drag_adjusted/13.csv' }]
+    - [14, polars, { polar_file_path: '2D_polars_drag_adjusted/14.csv' }]
+    - [15, polars, { polar_file_path: '2D_polars_drag_adjusted/15.csv' }]
+    - [16, polars, { polar_file_path: '2D_polars_drag_adjusted/16.csv' }]
+    - [17, polars, { polar_file_path: '2D_polars_drag_adjusted/17.csv' }]
+    - [18, polars, { polar_file_path: '2D_polars_drag_adjusted/18.csv' }]
+    - [19, polars, { polar_file_path: '2D_polars_drag_adjusted/19.csv' }]

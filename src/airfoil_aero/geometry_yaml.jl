@@ -4,7 +4,7 @@
 Write a geometry YAML via [`write_yaml`](@ref), one line per section/airfoil row.
 `section_rows` are `[airfoil_id, LE_x, LE_y, LE_z, TE_x, TE_y, TE_z]`; `airfoil_rows`
 are `[airfoil_id, type, info_dict]` where `info_dict` holds `dat_file`,
-`csv_file_path`, and optionally `raw_dat_file`, `cp_file`, `cf_file`.
+`polar_file_path`, and optionally `raw_dat_file`, `cp_file`, `cf_file`.
 """
 function write_geometry_yaml(path::String, section_rows, airfoil_rows)
     data = Dict(

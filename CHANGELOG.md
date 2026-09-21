@@ -25,14 +25,19 @@
 - `linearize` takes a `BodyAerodynamics` with more than one wing; `theta_idxs` and
   `delta_idxs` then run over the unrefined sections of all wings in order.
 - `table_format=:arrow` writes the polars as `.arrow`, like the per-node `Cp`/`cf`
-  tables: `write_polar_csv` and `write_polar_matrix_csv` write Arrow for an `.arrow` path
-  and `load_polar_data` reads it. `obj_to_yaml` and `surfplan_to_aero_yaml` convert a
-  reused dataset's polars and node tables to `table_format`. A CSV polar loads as before
+  tables: `write_polar` and `write_polar_matrix` write Arrow for an `.arrow` path and
+  `load_polar_data` reads it. `resolve_aero_geometry` takes `table_format` too, for the
+  polars it generates. `obj_to_yaml` and `surfplan_to_aero_yaml` convert a reused
+  dataset's polars and node tables to `table_format`. A CSV polar loads as before
   when every column is numeric; one with a non-numeric column warns and loads as
   `INVISCID`.
 
 ### Changed
 
+- BREAKING: `write_polar_csv` is `write_polar` and `write_polar_matrix_csv` is
+  `write_polar_matrix`. The geometry YAML names the polar `polar_file_path`; the old
+  key `csv_file_path` is still read, and `obj_to_yaml` rewrites it when it migrates a
+  dataset.
 - BREAKING: `ObjAdapter.center_to_com!`, `calculate_inertia_tensor` and
   `calc_inertia_y_rotation` are removed. Mesh mass properties are computed by
   SymbolicAWEModels, which reads the mesh with `read_faces`.
@@ -59,7 +64,7 @@
 
 ### Fixed
 
-- `write_polar_csv` for `SectionSolution`s, `write_polar_matrix_csv` and `write_aero_matrix`
+- `write_polar` for `SectionSolution`s, `write_polar_matrix` and `write_aero_matrix`
   write coefficients at 16 significant digits instead of 4 decimals, so a `POLAR_MATRICES`
   table carries the drag response to a small flap deflection. Regenerate existing tables
   to benefit.

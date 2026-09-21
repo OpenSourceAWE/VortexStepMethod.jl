@@ -42,7 +42,7 @@ import YAML
                                    table_format=:arrow)
     info = Dict(YAML.load_file(reused)["wing_airfoils"]["data"][1][3])
     @test all(endswith(info[key], ".arrow") for key in ("cp_file", "cf_file",
-                                                          "csv_file_path"))
+                                                          "polar_file_path"))
     @test Wing(reused) isa Wing
 
     arrow_dir = mktempdir()

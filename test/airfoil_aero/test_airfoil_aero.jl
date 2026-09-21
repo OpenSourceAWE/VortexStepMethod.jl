@@ -294,7 +294,7 @@ end
     cm = [0.06 - 0.01 * d for a in -5:5:15, d in -3:3:3]
     work = mktempdir()
 
-    matrix_csv = write_polar_matrix_csv(joinpath(work, "matrix.csv"), alpha_range,
+    matrix_csv = write_polar_matrix(joinpath(work, "matrix.csv"), alpha_range,
                                         delta_range, cl, cd, cm)
     (alphas, deltas, cl_back, cd_back, cm_back), model = load_polar_data(matrix_csv)
     @test model == VortexStepMethod.POLAR_MATRICES
@@ -304,14 +304,14 @@ end
     sols = [SectionSolution(alpha_range[i], cl[i, 1], cd[i, 1], cm[i, 1], 1.0,
                             Float64[], Float64[], Float64[], Float64[])
             for i in eachindex(alpha_range)]
-    vectors_csv = write_polar_csv(joinpath(work, "vectors.csv"), sols)
+    vectors_csv = write_polar(joinpath(work, "vectors.csv"), sols)
     (alphas, _, cd_vec, _), _ = load_polar_data(vectors_csv)
     @test alphas == alpha_range
     @test cd_vec ≈ cd[:, 1]
 
     result = AirfoilAero.NeuralFoilResult(collect(-5.0:5:15), cl[:, 1], cd[:, 1], cm[:, 1],
                                           ones(5))
-    neuralfoil_csv = write_polar_csv(joinpath(work, "neuralfoil.csv"), result)
+    neuralfoil_csv = write_polar(joinpath(work, "neuralfoil.csv"), result)
     (alphas, _, cd_vec, _), _ = load_polar_data(neuralfoil_csv)
     @test alphas == alpha_range
     @test cd_vec ≈ cd[:, 1]
@@ -333,14 +333,14 @@ end
     result = AirfoilAero.NeuralFoilResult(collect(-5.0:5:15), cl[:, 1], cd[:, 1],
                                           cm[:, 1], ones(5))
     writers = Dict(
-        "matrix" => (path -> write_polar_matrix_csv(path, alpha_range, delta_range,
+        "matrix" => (path -> write_polar_matrix(path, alpha_range, delta_range,
                                                     cl, cd, cm), ["Cl", "Cd", "Cm"]),
-        "vectors" => (path -> write_polar_csv(path, sols), ["Cd", "Cs", "Cl", "Cm"]),
-        "neuralfoil" => (path -> write_polar_csv(path, result), ["Cd", "Cs", "Cl", "Cm"]))
+        "vectors" => (path -> write_polar(path, sols), ["Cd", "Cs", "Cl", "Cm"]),
+        "neuralfoil" => (path -> write_polar(path, result), ["Cd", "Cs", "Cl", "Cm"]))
     work = mktempdir()
-    for (name, (write_polar, expected_columns)) in writers
-        csv = write_polar(joinpath(work, "$name.csv"))
-        arrow = write_polar(joinpath(work, "$name.arrow"))
+    for (name, (write_table, expected_columns)) in writers
+        csv = write_table(joinpath(work, "$name.csv"))
+        arrow = write_table(joinpath(work, "$name.arrow"))
         table = VortexStepMethod.Arrow.Table(read(arrow))
         @test VortexStepMethod.Arrow.getmetadata(table)["columns"] ==
               join(expected_columns, ",")
