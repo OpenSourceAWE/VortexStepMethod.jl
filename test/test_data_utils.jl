@@ -117,7 +117,8 @@ Useful for tests that need to modify settings while using standard wing geometri
 
 # Example
 ```julia
-settings_file = create_temp_wing_settings("body_aerodynamics", "test_wing.yaml"; alpha=15.0, va=25.0)
+settings_file = create_temp_wing_settings("body_aerodynamics", "test_wing.yaml";
+    alpha=15.0, va=25.0)
 # Use settings_file...
 rm(settings_file)
 ```

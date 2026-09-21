@@ -735,8 +735,8 @@ function solve_base!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics, gamma
     end
 
     # Calculate AIC matrices
-    calculate_AIC_matrices!(body_aero, solver.aerodynamic_model_type, solver.core_radius_fraction, solver.br.va_dist,
-                            solver.br.va_unit_dist)
+    calculate_AIC_matrices!(body_aero, solver.aerodynamic_model_type,
+        solver.core_radius_fraction, solver.br.va_dist, solver.br.va_unit_dist)
 
     # Initialize gamma distribution
     gamma_initial = solver.cache_base[1][solver.sol._chord_dist]
@@ -1277,8 +1277,8 @@ function make_dual_shadow(solver::Solver{P, U, Float64},
                           ::Type{TD}) where {P, U, W, TD}
     wings_d = [_wing_with_eltype(wing, TD) for wing in body_aero.wings]
     body_aero_d = BodyAerodynamics(wings_d)
-    set_va!(body_aero_d, MVector{3, TD}(getfield(body_aero, :va_vec)), MVector{3, TD}(body_aero.omega);
-            reference_point=body_aero.reference_point)
+    set_va!(body_aero_d, MVector{3, TD}(getfield(body_aero, :va_vec)),
+            MVector{3, TD}(body_aero.omega); reference_point=body_aero.reference_point)
     solver_d = Solver(P, U, TD;
         solver_type = solver.solver_type,
         aerodynamic_model_type = solver.aerodynamic_model_type,

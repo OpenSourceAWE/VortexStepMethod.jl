@@ -10,7 +10,8 @@ end
 @testset "Solver Constructor Tests" begin
     @testset "Solver Constructor with VSMSettings" begin
         # Use module-specific test data files
-        settings_file = create_temp_wing_settings("solver", "solver_test_wing.yaml"; alpha=5.0, beta=0.0, va=10.0)
+        settings_file = create_temp_wing_settings("solver", "solver_test_wing.yaml";
+            alpha=5.0, beta=0.0, va=10.0)
 
         try
             # Test Solver constructor with VSMSettings

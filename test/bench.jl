@@ -186,7 +186,8 @@ using LinearAlgebra
             z_airf_dist[i, :] .= panel.z_airf
             va_vec_dist[i, :] .= panel.va_vec
             va_dist[i] = norm(panel.va_vec)
-            va_unit_dist[i, :] .= va_dist[i] > 0.0 ? panel.va_vec ./ va_dist[i] : [1.0, 0.0, 0.0]
+            va_unit_dist[i, :] .=
+                va_dist[i] > 0.0 ? panel.va_vec ./ va_dist[i] : [1.0, 0.0, 0.0]
             v_rel_dist[i] = va_dist[i]
         end
         results = @MVector zeros(3)

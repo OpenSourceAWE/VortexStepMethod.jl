@@ -1109,7 +1109,8 @@ function set_va!(body_aero::BodyAerodynamics{P, W, T}, va_vec::AbstractVector,
 
     va_vec_dist = zeros(T, P, 3)
     for (i, panel) in enumerate(body_aero.panels)
-        panel.va_vec .= va_vec .- omega × (panel.control_point .- body_aero.reference_point)
+        panel.va_vec .= va_vec .-
+            omega × (panel.control_point .- body_aero.reference_point)
         va_vec_dist[i, :] .= panel.va_vec
     end
 
@@ -1168,8 +1169,8 @@ apparent_wind(alpha, beta, va) =
     set_va!(body_aero::BodyAerodynamics, settings::VSMSettings)
 
 Set the uniform inflow of `body_aero` to the [`apparent_wind`](@ref) at the `alpha` and
-`beta` [°] and apparent wind speed `va` [m/s] of `settings.condition`, turning the body about
-`body_aero.reference_point` at its `yaw_rate` [°/s] about Z_b.
+`beta` [°] and apparent wind speed `va` [m/s] of `settings.condition`, turning the body
+about `body_aero.reference_point` at its `yaw_rate` [°/s] about Z_b.
 
 # Example
 ```julia

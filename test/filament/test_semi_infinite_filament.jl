@@ -106,9 +106,12 @@ end
         v2 = zeros(3)
         v4 = zeros(3)
         
-        velocity_3D_trailing_vortex_semiinfinite!(v1, filament, filament.direction, control_point, 1.0, filament.va, work_vectors)
-        velocity_3D_trailing_vortex_semiinfinite!(v2, filament, filament.direction, control_point, 2.0, filament.va, work_vectors)
-        velocity_3D_trailing_vortex_semiinfinite!(v4, filament, filament.direction, control_point, 4.0, filament.va, work_vectors)
+        velocity_3D_trailing_vortex_semiinfinite!(v1, filament, filament.direction,
+            control_point, 1.0, filament.va, work_vectors)
+        velocity_3D_trailing_vortex_semiinfinite!(v2, filament, filament.direction,
+            control_point, 2.0, filament.va, work_vectors)
+        velocity_3D_trailing_vortex_semiinfinite!(v4, filament, filament.direction,
+            control_point, 4.0, filament.va, work_vectors)
         
         @test isapprox(v4, 2 * v2)
         @test isapprox(v4, 4 * v1)
