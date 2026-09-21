@@ -35,6 +35,11 @@
 
 ### Fixed
 
+- On a body whose wings span different directions, such as a wing and a vertical fin,
+  `solve!`, `solve` and `linearize` take each panel's lift, drag and side directions
+  from its own wing's `spanwise_direction`, not the first wing's. `solve` computes
+  `wing_span` and `aspect_ratio_projected` from the extent of all wings along the
+  first wing's span, through the new `calculate_span(wings, spanwise_direction)`.
 - `solve!` and `solve` throw a `DimensionMismatch` naming both sizes for a `body_aero` whose
   panel or unrefined-section count differs from the solver's, where they failed on a
   broadcast partway through or silently left section results at zero.

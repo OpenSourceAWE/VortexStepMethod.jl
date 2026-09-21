@@ -51,9 +51,24 @@ end
             solver = Solver(length(body_aero.panels), 2length(body_aero.wings))
             solve(solver, body_aero)
         end
-        @test pair["F_distribution"][:, rotated] ≈ rotation * solo["F_distribution"] rtol = 1e-5
+        rotated_forces = pair["F_distribution"][:, rotated]
+        @test rotated_forces ≈ rotation * solo["F_distribution"] rtol = 1e-5
         for key in ("cl_distribution", "cd_distribution", "cs_distribution")
             @test pair[key][rotated] ≈ solo[key] rtol = 1e-5 atol = 1e-8
         end
+        # along x the inflow makes z the body's lift and y its side direction
+        @test pair["lift"] ≈ pair["Fz"] rtol = 1e-10
+        @test pair["side"] ≈ pair["Fy"] rtol = 1e-10
+        @test pair["drag"] ≈ pair["Fx"] rtol = 1e-10
     end
+end
+
+@testset "the projected aspect ratio spans every wing" begin
+    body_aero = BodyAerodynamics([rectangular_wing(I(3), zeros(3)),
+        rectangular_wing(I(3), [0.0, 6.0, 0.0])])
+    set_va!(body_aero, [20.0, 0.0, 0.0])
+    solver = Solver(length(body_aero.panels), 4)
+    results = solve(solver, body_aero)
+    @test results["wing_span"] ≈ 12.0
+    @test results["aspect_ratio_projected"] ≈ 12.0^2 / 18.0
 end

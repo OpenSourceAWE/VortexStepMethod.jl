@@ -1686,24 +1686,19 @@ end
 
 """
     calculate_span(wing::AbstractWing)
+    calculate_span(wings, spanwise_direction)
 
-Calculate wing span along spanwise direction.
-
-Returns:
-    Float64: Wing span
+Extent [m] of the unrefined sections of `wing` along its spanwise direction, or of all
+`wings` together along `spanwise_direction`.
 """
-function calculate_span(wing::AbstractWing)
-    # Normalize spanwise direction
-    vector_axis = wing.spanwise_direction ./ norm(wing.spanwise_direction)
-    
-    # Get all points
-    all_points = reduce(vcat, [[section.LE_point, section.TE_point] 
-                              for section in wing.unrefined_sections])
-    
-    # Project points and calculate span
-    projections = [dot(point, vector_axis) for point in all_points]
+function calculate_span(wings, spanwise_direction)
+    axis = spanwise_direction ./ norm(spanwise_direction)
+    projections = [dot(point, axis) for wing in wings
+                   for section in wing.unrefined_sections
+                   for point in (section.LE_point, section.TE_point)]
     return maximum(projections) - minimum(projections)
 end
+calculate_span(wing::AbstractWing) = calculate_span((wing,), wing.spanwise_direction)
 
 # Project point onto plane
 @inline function project_onto_plane!(point_proj, point, normal)

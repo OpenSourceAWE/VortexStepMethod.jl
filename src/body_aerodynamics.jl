@@ -271,17 +271,6 @@ function unrefined_section_range(body_aero::BodyAerodynamics, wing_idx)
 end
 
 """
-    prescribed_va_directions(va, spanwise)
-
-Lift and side unit vectors, `(; dir_lift, dir_side)`, of inflow `va` on a wing along
-`spanwise`: lift normal to both, side normal to lift and `va`.
-"""
-@inline function prescribed_va_directions(va, spanwise)
-    dir_lift = normalize(cross(va, spanwise))
-    return (; dir_lift, dir_side=cross(dir_lift, va) / norm(va))
-end
-
-"""
     panel_range(body_aero::BodyAerodynamics, wing_idx)
 
 Indices of the panels of wing `wing_idx` in `body_aero.panels`.
@@ -805,6 +794,17 @@ function set_pitch_rate_dist!(body_aero::BodyAerodynamics, omega)
 end
 
 """
+    prescribed_va_directions(va, spanwise)
+
+Lift and side unit vectors, `(; dir_lift, dir_side)`, of inflow `va` on a wing along
+`spanwise`: lift normal to both, side normal to lift and `va`.
+"""
+@inline function prescribed_va_directions(va, spanwise)
+    dir_lift = normalize(cross(va, spanwise))
+    return (; dir_lift, dir_side=cross(dir_lift, va) / norm(va))
+end
+
+"""
     calculate_results(body_aero::BodyAerodynamics, gamma_new, reference_point, density,
                       core_radius_fraction, mu, alpha_dist, v_rel_dist, chord_dist,
                       x_airf_dist, z_airf_dist, va_vec_dist, va_dist, va_unit_dist,
@@ -1013,7 +1013,7 @@ function calculate_results(
 
     # Calculate wing geometry properties
     projected_area = body_aero.projected_area
-    wing_span = body_aero.wings[1].span
+    wing_span = calculate_span(body_aero.wings, reference_spanwise)
     aspect_ratio_projected = wing_span^2 / projected_area
 
     # Calculate Reynolds number
