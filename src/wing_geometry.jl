@@ -869,7 +869,7 @@ body_aero = BodyAerodynamics([wing])   # Create aerodynamics
 ```
 
 # Distribution Methods
-- `LINEAR`: Even spacing over the [`spanwise_arc_length`](@ref) of the sections
+- `LINEAR`: Even spacing over the summed [`spanwise_step`](@ref)s of the sections
 - `COSINE`: Cosine spacing over that length (more panels near tips)
 - `SPLIT_PROVIDED`: Split each unrefined section into sub-panels
 - `UNCHANGED`: 1:1 copy when n_unrefined_sections == n_panels+1
@@ -1072,35 +1072,38 @@ function compute_refined_panel_mapping!(wing::AbstractWing)
 end
 
 """
-    spanwise_arc_length(sections) -> Vector{Float64}
-    spanwise_arc_length(le_points, te_points) -> Vector{Float64}
+    spanwise_step(section_a, section_b)
+    spanwise_step(le_a, te_a, le_b, te_b)
 
-Cumulative length [m] of the quarter-chord line through the sections, or through the
-given leading and trailing edges, with the chordwise `x` component of each step dropped.
+Length [m] of the quarter-chord step from one section to the next, given as
+[`Section`](@ref)s or as leading and trailing edge points, without its chordwise `x`
+component.
 """
-function spanwise_arc_length(le_points, te_points)
-    arc = zeros(length(le_points))
-    for i in 2:length(arc)
-        step = 0.75 .* (le_points[i] .- le_points[i-1]) .+
-               0.25 .* (te_points[i] .- te_points[i-1])
-        arc[i] = arc[i-1] + hypot(step[2], step[3])
-    end
-    return arc
+function spanwise_step(le_a, te_a, le_b, te_b)
+    dy = 0.75 * (le_b[2] - le_a[2]) + 0.25 * (te_b[2] - te_a[2])
+    dz = 0.75 * (le_b[3] - le_a[3]) + 0.25 * (te_b[3] - te_a[3])
+    return hypot(dy, dz)
 end
 
-spanwise_arc_length(sections::AbstractVector{<:Section}) = spanwise_arc_length(
-    [section.LE_point for section in sections], [section.TE_point for section in sections])
+spanwise_step(section_a::Section, section_b::Section) = spanwise_step(
+    section_a.LE_point, section_a.TE_point, section_b.LE_point, section_b.TE_point)
 
 """
-    span_position(arc, target) -> (index, fraction)
+    span_position(sections, target) -> (index, fraction)
 
-Segment of the cumulative lengths `arc` that reaches `target` first, and the fraction
-of that segment's length at which `target` lies (0 on a segment of zero length).
+Segment between `sections[index]` and `sections[index + 1]` that first reaches `target`
+[m] of summed [`spanwise_step`](@ref)s, and the fraction of that segment's step at
+which `target` lies (0 on a segment of zero length).
 """
-function span_position(arc, target)
-    index = clamp(searchsortedfirst(arc, target) - 1, 1, length(arc) - 1)
-    segment = arc[index + 1] - arc[index]
-    return index, segment > 1e-30 ? (target - arc[index]) / segment : 0.0
+function span_position(sections, target)
+    reached = 0.0
+    for index in 1:(length(sections) - 1)
+        segment = spanwise_step(sections[index], sections[index + 1])
+        if reached + segment >= target || index == length(sections) - 1
+            return index, segment > 1e-30 ? (target - reached) / segment : 0.0
+        end
+        reached += segment
+    end
 end
 
 """
@@ -1113,7 +1116,7 @@ sections. For refined section i, the interpolated value is:
     out[i] = weight[i] * unrefined[left_idx[i]] +
              (1 - weight[i]) * unrefined[left_idx[i] + 1]
 
-Positions are the [`spanwise_arc_length`](@ref) of the unrefined and refined sections.
+Positions are summed [`spanwise_step`](@ref)s along the unrefined and refined sections.
 The first refined section is pinned to `left_idx == 1`, `weight == 1` (returns
 `unrefined[1]` exactly) and the last refined section to `left_idx == n_unref - 1`,
 `weight == 0` (returns `unrefined[end]` exactly).
@@ -1144,10 +1147,11 @@ function compute_refined_section_interpolation!(wing::AbstractWing{T};
         return nothing
     end
 
-    s_unref = spanwise_arc_length(wing.unrefined_sections)
-    s_ref = spanwise_arc_length(view(wing.refined_sections, 1:n_sections))
+    reached = 0.0
     for i in 1:n_sections
-        left, t = span_position(s_unref, s_ref[i])
+        i > 1 && (reached += spanwise_step(wing.refined_sections[i - 1],
+                                           wing.refined_sections[i]))
+        left, t = span_position(wing.unrefined_sections, reached)
         wing.refined_section_left_idx[i] = Int16(left)
         wing.refined_section_weight[i] = T(1.0 - clamp(t, 0.0, 1.0))
     end
@@ -1303,8 +1307,8 @@ end
     refine_mesh_for_linear_cosine_distribution!(wing, idx, dist,
         n_sections, sections; endpoints, reuse_aero_data)
 
-Refine wing mesh using linear or cosine spacing over the [`spanwise_arc_length`](@ref)
-of `sections`.
+Refine wing mesh using linear or cosine spacing over the summed
+[`spanwise_step`](@ref)s of `sections`.
 """
 function refine_mesh_for_linear_cosine_distribution!(
     wing::AbstractWing,
@@ -1318,16 +1322,16 @@ function refine_mesh_for_linear_cosine_distribution!(
     @inline _le(s, j) = @inbounds s.LE_point[j]
     @inline _te(s, j) = @inbounds s.TE_point[j]
 
-    span = spanwise_arc_length(sections)
+    span = sum(k -> spanwise_step(sections[k], sections[k + 1]), 1:(length(sections) - 1))
     new_le = MVec3(0.0, 0.0, 0.0)
     new_te = MVec3(0.0, 0.0, 0.0)
     dir = MVec3(0.0, 0.0, 0.0)
 
     for i in 1:n_sections
         target = if spanwise_distribution == LINEAR
-            span[end] * (i - 1) / (n_sections - 1)
+            span * (i - 1) / (n_sections - 1)
         elseif spanwise_distribution == COSINE
-            span[end] * (1 - cos(π * (i - 1) /
+            span * (1 - cos(π * (i - 1) /
                 (n_sections - 1))) / 2
         else
             throw(ArgumentError(
@@ -1335,7 +1339,7 @@ function refine_mesh_for_linear_cosine_distribution!(
                 "$spanwise_distribution"))
         end
 
-        si, t = span_position(span, target)
+        si, t = span_position(sections, target)
         s_l = sections[si]; s_r = sections[si + 1]
         wl = 1 - t; wr = t
 
