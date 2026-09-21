@@ -623,6 +623,11 @@ end
             body_aero)
 
         @test gamma ≈ repeat(ellipse, 3)
+
+        lone_wing_gamma = zeros(n_panels)
+        VortexStepMethod.calculate_circulation_distribution_elliptical_wing(
+            lone_wing_gamma, BodyAerodynamics([inviscid_wing(section_y .+ 5.0; n_panels)]))
+        @test lone_wing_gamma ≈ ellipse
     end
 
     @testset "ELLIPTIC and ZEROS converge to the same gamma" begin
