@@ -56,29 +56,24 @@ end
     reference_point = [0.25, 0.5, 0.1]
     body_aero, solver = trimmable_wing(0.05; reference_point, use_gamma_prev=false)
     alpha, beta, va, step = deg2rad(4.0), deg2rad(3.0), 20.0, 1e-4
-    va_vec = apparent_wind(alpha, beta, va)
     omega = [0.1, -0.05, 0.08]
-    set_va!(body_aero, va_vec, omega)
+    body_aero.omega = omega
 
     derivatives = stability_derivatives(solver, body_aero, alpha, beta, va)
     @test derivatives.converged
     @test body_aero.reference_point == reference_point
 
-    function coeffs_at_rate(rate)
-        set_va!(body_aero, va_vec, rate; reference_point)
-        sol = solve!(solver, body_aero)
-        return [sol.force_coeffs; sol.moment_coeffs]
-    end
     rate_scales = 2va ./ [body_aero.wings[1].span, body_aero.c_ref, body_aero.wings[1].span]
-    rate_derivatives = map(1:3) do axis
+    for (axis, derivative) in enumerate((derivatives.dp, derivatives.dq, derivatives.dr))
         rate_step = step .* (1:3 .== axis)
-        (coeffs_at_rate(omega + rate_step) - coeffs_at_rate(omega - rate_step)) /
-            2step * rate_scales[axis]
+        body_aero.omega = omega + rate_step
+        coeffs_plus = coeffs_at_angles(solver, body_aero, alpha, beta, va)
+        body_aero.omega = omega - rate_step
+        coeffs_minus = coeffs_at_angles(solver, body_aero, alpha, beta, va)
+        central_difference = (coeffs_plus - coeffs_minus) / 2step * rate_scales[axis]
+        @test !iszero(central_difference)
+        @test derivative ≈ central_difference rtol = 1e-4 atol = 1e-6
     end
-    @test all(!iszero, rate_derivatives)
-    @test derivatives.dp ≈ rate_derivatives[1] rtol = 1e-4 atol = 1e-6
-    @test derivatives.dq ≈ rate_derivatives[2] rtol = 1e-4 atol = 1e-6
-    @test derivatives.dr ≈ rate_derivatives[3] rtol = 1e-4 atol = 1e-6
 end
 
 @testset "trim_angle finds where CMy changes sign" begin
