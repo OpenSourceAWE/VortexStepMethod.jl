@@ -9,7 +9,7 @@ Represents a panel in a vortex step method simulation. All points and vectors ar
 - `TE_point_2`::MVec3=zeros(MVec3): Second trailing edge point
 - `LE_point_2`::MVec3=zeros(MVec3): Second leading edge point
 - `chord`::Float64=0: Panel chord length
-- `va`::MVec3=zeros(MVec3): Panel velocity
+- `va_vec`::MVec3=zeros(MVec3): apparent wind vector at the panel [m/s]
 - `corner_points`::MMatrix{3, 4, Float64}=zeros(MMatrix{3, 4, Float64}: Panel corner points
 - `aero_model`::AeroModel=INVISCID: Aerodynamic model type [`AeroModel`](@ref)
 - `aero_center::Vector{Float64}`: Panel aerodynamic center
@@ -47,7 +47,7 @@ Represents a panel in a vortex step method simulation. All points and vectors ar
     TE_point_2::MVector{3, T} = zeros(MVector{3, T})
     LE_point_2::MVector{3, T} = zeros(MVector{3, T})
     chord::T = zero(T)
-    va::MVector{3, T} = zeros(MVector{3, T})
+    va_vec::MVector{3, T} = zeros(MVector{3, T})
     corner_points::MMatrix{3, 4, T, 12} = zeros(MMatrix{3, 4, T, 12})
     aero_model::AeroModel = INVISCID
     cl_coeffs::Vector{Float64} = zeros(Float64, 3)
@@ -474,7 +474,7 @@ function calculate_relative_alpha_and_relative_velocity(
     panel::Panel{T},
     induced_velocity::AbstractVector{T}
 ) where T
-    flow = panel_inflow(panel_axes(panel), panel.va, panel.va, induced_velocity)
+    flow = panel_inflow(panel_axes(panel), panel.va_vec, panel.va_vec, induced_velocity)
     return flow.alpha, flow.v_eff
 end
 
@@ -484,7 +484,7 @@ end
 Calculate relative angle of attack and relative velocity of the panel.
 """
 function calculate_relative_alpha_and_velocity(panel::Panel, induced_velocity)
-    flow = panel_inflow(panel_axes(panel), panel.va, panel.va, induced_velocity)
+    flow = panel_inflow(panel_axes(panel), panel.va_vec, panel.va_vec, induced_velocity)
     return flow.alpha, flow.v_eff
 end
 
@@ -611,7 +611,7 @@ function calculate_filaments_for_plotting(panel::Panel)
             color = i == 1 ? "magenta" : "green"  # bound vs trailing
         else
             # For semi-infinite filaments
-            x2 = x1 + 2 * panel.chord * (panel.va / norm(panel.va))
+            x2 = x1 + 2 * panel.chord * (panel.va_vec / norm(panel.va_vec))
             color = "orange"
             
             if filament.filament_direction == -1

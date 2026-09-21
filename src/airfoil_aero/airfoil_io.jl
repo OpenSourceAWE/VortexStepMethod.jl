@@ -14,6 +14,13 @@ function write_dat(filepath::String, name::String, x::Vector, y::Vector)
 end
 
 """
+    csv_fields(values) -> String
+
+Join `values` into one comma-separated CSV line at 16 significant digits.
+"""
+csv_fields(values) = join((@sprintf("%.16g", v) for v in values), ",")
+
+"""
     write_polar_csv(filepath, result::NeuralFoilResult)
 
 Write a NeuralFoil result to a `POLAR_VECTORS` CSV (`alpha, Cd, Cs, Cl, Cm`).
@@ -24,7 +31,7 @@ function write_polar_csv(filepath::String, result::NeuralFoilResult)
         println(io, "alpha,Cd,Cs,Cl,Cm")
         for i in 1:n
             row = (result.alpha[i], result.CD[i], 0.0, result.CL[i], result.CM[i])
-            println(io, join((@sprintf("%.16g", v) for v in row), ","))
+            println(io, csv_fields(row))
         end
     end
     return filepath

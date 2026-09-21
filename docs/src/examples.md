@@ -77,7 +77,7 @@ multiple wings.
 ###### Set inflow conditions
 
 ```julia
-julia> va_vec = [cos(alpha), 0.0, sin(alpha)] .* va
+julia> va_vec = apparent_wind(alpha, 0.0, va)
 julia> set_va!(body_aero, va_vec, [0, 0, 0.1])
 ```
 
@@ -118,7 +118,7 @@ julia> plot_combined_analysis(
            solver_label=["LLT", "VSM"],
            angle_range=angle_range,
            angle_type="angle_of_attack",
-           v_a=va,
+           va=va,
            title="Rectangular Wing",
            is_show=true,
        )

@@ -61,11 +61,7 @@ aoa = 17.0
 side_slip = 0.0
 yaw_rate = 0.0
 aoa_rad = deg2rad(aoa)
-va_vec = [
-    cos(aoa_rad) * cos(side_slip),
-    sin(side_slip),
-    sin(aoa_rad)
-] * va
+va_vec = apparent_wind(aoa_rad, side_slip, va)
 set_va!(body_aero, va_vec)
 
 # Plotting geometry
@@ -127,7 +123,7 @@ PLOT && plot_polars(
     angle_type="angle_of_attack",
     angle_of_attack=aoa,
     side_slip=side_slip,
-    v_a=va,
+    va=va,
     title="tutorial_testing_stall_model_n_panels_$(n_panels)_distribution_$(spanwise_distribution)",
     save_path=OUTPUT_DIR,
     is_save=false || SAVE_ALL,

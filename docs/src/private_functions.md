@@ -28,6 +28,9 @@ calculate_cd
 calculate_cm
 calculate_cd_cm
 set_pitch_rate_dist!
+coeffs_at_angles
+nose_down
+bisect_sign_change
 calculate_relative_alpha_and_velocity
 calculate_relative_alpha_and_relative_velocity
 update_effective_angle_of_attack!
@@ -220,6 +223,7 @@ create_2d_polars
 lei_poly_coeffs
 resolve_airfoil
 write_dat
+csv_fields
 write_polar_csv
 write_polar_matrix_csv
 write_aero_matrix

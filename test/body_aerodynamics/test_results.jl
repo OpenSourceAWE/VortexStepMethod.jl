@@ -31,7 +31,7 @@ end
     fd_step = 1e-3
 
     VortexStepMethod.unrefined_deform!(ram_wing, theta, delta; smooth=false)
-    body_aero = BodyAerodynamics([ram_wing]; va=va_vec, omega)
+    body_aero = BodyAerodynamics([ram_wing]; va_vec, omega)
     solver = Solver(ram_wing.n_panels, ram_wing.n_unrefined_sections;
         aerodynamic_model_type=VSM,
         is_with_artificial_damping=false,
@@ -43,7 +43,7 @@ end
     base_inputs = [theta; va_vec; omega; delta]
     jac, lin_res, lin_converged = VortexStepMethod.linearize(
         solver, body_aero, base_inputs;
-        theta_idxs=1:4, va_idxs=5:7, omega_idxs=8:10, delta_idxs=11:14,
+        theta_idxs=1:4, va_vec_idxs=5:7, omega_idxs=8:10, delta_idxs=11:14,
         moment_frac=0.1,
         backend=AutoFiniteDiff(absstep=fd_step, relstep=fd_step),
     )
@@ -61,7 +61,7 @@ end
         VortexStepMethod.unrefined_deform!(
             ram_wing, perturbed_theta, perturbed_delta; smooth=false)
         reinit!(body_aero; init_aero=false,
-            va=perturbed_va_vec, omega=perturbed_omega)
+            va_vec=perturbed_va_vec, omega=perturbed_omega)
         VortexStepMethod.solve!(solver, body_aero; log=false)
         return [solver.sol.force; solver.sol.moment;
                 solver.sol.moment_unrefined_dist]
