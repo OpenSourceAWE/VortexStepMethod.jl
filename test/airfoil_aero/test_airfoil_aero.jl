@@ -371,6 +371,21 @@ end
     end
 end
 
+@testset "get_lower_upper takes both surfaces at the crease chord station" begin
+    camber(x) = 0.1 * sin(pi * x)
+    thickness(x) = 0.1 * sqrt(x) * (1 - x)
+    x_upper = range(1.0, 0.0, 400)
+    x_lower = range(0.0, 1.0, 400)[2:end]
+    x = [x_upper; x_lower]
+    y = [camber.(x_upper) .+ thickness.(x_upper); camber.(x_lower) .- thickness.(x_lower)]
+    crease_frac = 0.9
+    lower, upper = get_lower_upper(x, y, crease_frac)
+    @test camber(crease_frac) - thickness(crease_frac) > 0
+    @test lower ≈ camber(crease_frac) - thickness(crease_frac) atol = 1e-5
+    @test upper ≈ camber(crease_frac) + thickness(crease_frac) atol = 1e-5
+    @test_throws ArgumentError get_lower_upper(x_upper, camber.(x_upper), crease_frac)
+end
+
 @testset "load_neuralfoil_model missing weights errors" begin
     @test_throws ErrorException load_neuralfoil_model("nonexistent_size")
 

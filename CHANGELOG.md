@@ -5,8 +5,10 @@
 ### Added
 
 - `stability_derivatives` gives the force and moment coefficients and their derivatives
-  with respect to angle of attack and sideslip, and `trim_angle` the angles of attack at
-  which `CMy` changes sign, with the slope that says whether each trim is stable.
+  with respect to angle of attack, sideslip and the nondimensional roll, pitch and yaw
+  rates p̂ = pb/2V, q̂ = q c_ref/2V, r̂ = rb/2V, turning about `solver.reference_point`,
+  and `trim_angle` the angles of attack at which `CMy` changes sign, with the slope that
+  says whether each trim is stable.
 - `apparent_wind(alpha, beta, va)` gives the body-frame inflow vector at an angle
   of attack and sideslip, as `set_va!(body_aero, settings)` sets it.
 - `Solver(settings)` and `Solver(n_panels, n_unrefined_sections)` build a solver without
@@ -53,6 +55,13 @@
 - `shrink_wrap` splits the edges of a closed input to at most
   `min(0.01, min_concave_radius/2)` chord before wrapping it, so the deflected sections
   and polars `obj_to_yaml` generates from Kulfan contours move slightly.
+- BREAKING: `obj_to_yaml` and `perpendicular_sections` spread the sections evenly over
+  the span, measured along the quarter-chord line without its chordwise component,
+  instead of over leading-edge arc length, and `wingtip_distance` is that spanwise
+  length. A tip whose leading edge runs aft no longer gathers sections into its last
+  centimetres. The same mesh and settings give different section positions, so a tuned
+  `wingtip_distance` and any geometry generated from one have to be redone.
+  `march_edges` no longer returns `arclen`.
 
 ### Fixed
 
@@ -61,6 +70,11 @@
   `generate_aero_matrices` and `generate_polar_from_coordinates`), at zero clearance.
   `shrink_wrap` warns when the contour it returns crosses itself. A thin wrapped section
   came back with its surfaces crossing.
+- `get_lower_upper`, and with it the flap hinge in `deform_section`, takes the lower and
+  upper surface heights where the contour crosses `x = crease_frac`. It took the nearest
+  points below and above `y = 0`, which on a cambered section put the hinge near the
+  chord line or on the wrong surface. Polars with a flap deflection change slightly.
+  It throws an `ArgumentError` for a contour that crosses that line fewer than twice.
 - `write_polar_csv` for `SectionSolution`s, `write_polar_matrix_csv` and `write_aero_matrix`
   write coefficients at 16 significant digits instead of 4 decimals, so a `POLAR_MATRICES`
   table carries the drag response to a small flap deflection. Regenerate existing tables

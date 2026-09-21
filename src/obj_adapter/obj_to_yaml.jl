@@ -42,14 +42,13 @@ end
 
 Convert a 3D wing `.obj` mesh to the native YAML geometry route.
 
-Stations are placed at equal leading-edge arc-length intervals and sliced
+Stations are spread evenly over the span ([`station_indices`](@ref)) and sliced
 perpendicular to the local span (see [`perpendicular_sections`](@ref)), which
 keeps the airfoil undistorted near curved tips; each shape is then shrink-wrapped
 into a clean airfoil and evaluated with `aero_solver`. The leading edge is marched
-into `n_bins` stations. A tip that tapers to a
-point carries no airfoil, so the outermost stations stop at the last slice that
-still has a chord ([`station_indices`](@ref)); `wingtip_distance` moves them a
-further arc length inboard.
+into `n_bins` stations. A tip that tapers to a point carries no airfoil, so the
+outermost stations stop at the last slice that still has a chord; `wingtip_distance`
+moves them a further spanwise length inboard.
 
 `aero_solver` selects the 2D-airfoil backend: [`NeuralFoilSolver`](@ref) (default,
 fast) or [`XFoilSolver`](@ref) (viscous panel code); pass `aero_solver=XFoilSolver()`

@@ -494,8 +494,9 @@ section_polar_curves(plt, curve) = Tuple(channel[curve] for channel in plt.Y)
         @test deflected[1] ≈ panel.cl_interp.(flap_alphas, delta)
         @test deflected[2] ≈ panel.cd_interp.(flap_alphas, delta)
         @test deflected[3] ≈ panel.cm_interp.(flap_alphas, delta)
-        @test stored[2] ≈ panel.cd_interp.(flap_alphas, panel.delta)
-        @test deflected[2] != stored[2]
+        @test stored[1] ≈ panel.cl_interp.(flap_alphas, panel.delta)
+        # cd is stored to four decimals, which a 1 deg deflection does not reach; cl does.
+        @test deflected[1] != stored[1]
     end
 
     @testset "is_save writes section_polars.png" begin

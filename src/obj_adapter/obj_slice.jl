@@ -270,7 +270,7 @@ function slice_mesh_at_plane(vertices, faces, point, normal; tol=1e-6)
 end
 
 """
-    march_edges(vertices, faces; step) -> (; le, te, point, tangent, arclen)
+    march_edges(vertices, faces; step) -> (; le, te, point, tangent)
 
 March the leading edge outward from mid-span in both directions in steps of arc
 length `step`. Each cut is a vertical spanwise plane (both the chordwise and vertical
@@ -278,8 +278,8 @@ components of the running LE tangent dropped from the normal) so a tip that curl
 downward can't tilt the plane toward horizontal, where its min-chord "LE" pick would
 jump across the wing. Marching stops when the leading edge stops advancing spanwise.
 Cuts sample mesh *edges*, so the picks are robust to vertex density. Returns, ordered
-along the span, the LE/TE points, each cut's plane origin and tangent, and the
-cumulative LE arc length. Build the airfoil for a chosen station with `build_section`.
+along the span, the LE/TE points and each cut's plane origin and tangent. Build the
+airfoil for a chosen station with `build_section`.
 """
 function march_edges(vertices, faces; step)
     ys = [v[2] for v in vertices]
@@ -318,7 +318,7 @@ function march_edges(vertices, faces; step)
                     probe_mid = prev_le .+ mid .* tangent
                     here = cut(probe_mid, tangent)
                     # Reject a near-degenerate tip slice whose min-chord "LE" has jumped
-                    # chordwise (an artifact that would skew the leading-edge arc length).
+                    # chordwise (an artifact that would misplace the tip station).
                     valid = here !== nothing &&
                             abs(here.le[1] - prev_le[1]) < step &&
                             build_section(vertices, faces, here.le, here.te,
@@ -340,12 +340,8 @@ function march_edges(vertices, faces; step)
 
     center = (; mid_cut.le, mid_cut.te, point=[0.0, y_mid, 0.0], tangent=[0.0, 1.0, 0.0])
     rows = vcat(reverse(march(-1.0)), [center], march(1.0))
-    arclen = zeros(length(rows))
-    for i in 2:length(rows)
-        arclen[i] = arclen[i-1] + norm(rows[i].le - rows[i-1].le)
-    end
     return (; le=[r.le for r in rows], te=[r.te for r in rows],
-            point=[r.point for r in rows], tangent=[r.tangent for r in rows], arclen)
+            point=[r.point for r in rows], tangent=[r.tangent for r in rows])
 end
 
 """
@@ -409,12 +405,12 @@ end
 
 Extract `n_sections` airfoil cross-sections following a curved or swept span. The
 leading edge is marched into `n_bins` stations (`march_edges`); the airfoil is
-built (`build_section`) at the marched station nearest each equal
-**leading-edge arc-length** target. Each section is
+built (`build_section`) at the marched station nearest each of `n_sections` targets
+spread evenly over the span ([`station_indices`](@ref)). Each section is
 `(; LE_point, TE_point, span_dir, contour3d, x_airfoil, y_airfoil)`.
 
-Stations closed to a point at the tips are skipped ([`station_indices`](@ref)), and
-`wingtip_distance` insets the outermost sections a further arc length.
+Stations closed to a point at the tips are skipped, and `wingtip_distance` [m]
+insets the outermost sections a further spanwise length.
 
 The slicer assumes `x` = chordwise, `y` = spanwise, `z` = up. Pass a `3×3` rotation
 matrix to reorient a mesh stored in another convention before slicing.
@@ -435,19 +431,24 @@ end
 """
     station_indices(march, n; wingtip_distance=0.0, min_chord_frac=0.01) -> Vector{Int}
 
-Indices of the [`march_edges`](@ref) stations nearest `n` targets spread over the
-leading-edge arc length. Stations whose chord has closed to less than
-`min_chord_frac` of the longest one are left out of that range first, so a wing
-tapering to a point puts its outermost sections on the last stations that still
-have an airfoil to slice rather than on the point itself. The remaining first and
-last targets sit a further `wingtip_distance` (arc length) inboard.
+Indices of the [`march_edges`](@ref) stations nearest `n` targets spread evenly over
+the spanwise length of the quarter-chord line: its arc length with the chordwise `x`
+component dropped. Stations whose chord has closed to less than `min_chord_frac` of
+the longest one are left out of that range first, so a wing tapering to a point puts
+its outermost sections on the last stations that still have an airfoil to slice. The
+remaining first and last targets sit a further `wingtip_distance` [m] inboard.
 """
 function station_indices(march, n; wingtip_distance=0.0, min_chord_frac=0.01)
     chords = [norm(te .- le) for (le, te) in zip(march.le, march.te)]
     usable = findall(≥(min_chord_frac * maximum(chords)), chords)
-    arclen = march.arclen
-    inner, outer = arclen[first(usable)], arclen[last(usable)]
+    quarter_chord = [le .+ 0.25 .* (te .- le) for (le, te) in zip(march.le, march.te)]
+    span = zeros(length(quarter_chord))
+    for i in 2:length(span)
+        step = quarter_chord[i] .- quarter_chord[i-1]
+        span[i] = span[i-1] + hypot(step[2], step[3])
+    end
+    inner, outer = span[first(usable)], span[last(usable)]
     d = clamp(wingtip_distance, 0.0, (outer - inner) / 2)
-    n == 1 && return [argmin(abs.(arclen .- (inner + outer) / 2))]
-    return [argmin(abs.(arclen .- t)) for t in range(inner + d, outer - d, n)]
+    n == 1 && return [argmin(abs.(span .- (inner + outer) / 2))]
+    return [argmin(abs.(span .- t)) for t in range(inner + d, outer - d, n)]
 end
