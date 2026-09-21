@@ -12,8 +12,8 @@ function write_aero_matrix(filepath::AbstractString, matrix::Matrix{Float64},
         deltas_str = join(("δ=$(round(rad2deg(δ), digits=1))°" for δ in delta_range), ",")
         println(io, string(label, "/delta,", deltas_str))
         for i in eachindex(alpha_range)
-            coeffs_str = join((round(v; digits=4) for v in matrix[i, :]), ",")
-            println(io, string("α=$(round(rad2deg(alpha_range[i]), digits=1))°,", coeffs_str))
+            alpha_label = "α=$(round(rad2deg(alpha_range[i]), digits=1))°"
+            println(io, alpha_label, ",", csv_fields(matrix[i, :]))
         end
     end
     return filepath

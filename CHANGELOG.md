@@ -58,6 +58,10 @@
   points below and above `y = 0`, which on a cambered section put the hinge near the
   chord line or on the wrong surface. Polars with a flap deflection change slightly.
   It throws an `ArgumentError` for a contour that crosses that line fewer than twice.
+- `write_polar_csv` for `SectionSolution`s, `write_polar_matrix_csv` and `write_aero_matrix`
+  write coefficients at 16 significant digits instead of 4 decimals, so a `POLAR_MATRICES`
+  table carries the drag response to a small flap deflection. Regenerate existing tables
+  to benefit.
 - `solve!` and `solve` throw a `DimensionMismatch` naming both sizes for a `body_aero` whose
   panel or unrefined-section count differs from the solver's, where they failed on a
   broadcast partway through or silently left section results at zero.
