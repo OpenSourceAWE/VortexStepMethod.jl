@@ -28,7 +28,6 @@ calculate_cd
 calculate_cm
 calculate_cd_cm
 set_pitch_rate_dist!
-apparent_wind
 coeffs_at_angles
 nose_down
 bisect_sign_change

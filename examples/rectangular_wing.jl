@@ -41,7 +41,7 @@ refine!(wing)
 body_aero = BodyAerodynamics([wing])
 
 # Set inflow conditions
-va_vec = [cos(alpha), 0.0, sin(alpha)] .* va
+va_vec = apparent_wind(alpha, 0.0, va)
 set_va!(body_aero, va_vec, [0, 0, 0.1])
 
 # Step 4: Initialize solvers for both LLT and VSM methods

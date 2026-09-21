@@ -96,6 +96,7 @@ CurrentModule = VortexStepMethod
 ## Setting the inflow conditions and solving
 ```@docs
 set_va!
+apparent_wind
 section_pitch_rate
 solve
 solve!
