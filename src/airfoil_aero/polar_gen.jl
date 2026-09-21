@@ -63,10 +63,10 @@ end
 """
     get_lower_upper(x, y, crease_frac) -> (lower, upper)
 
-Heights of the lower and upper surfaces of the closed contour `(x, y)` at the chord
-station `x = crease_frac`: the lowest and highest crossing of that vertical line with
-the contour's segments. Throws an `ArgumentError` when the contour crosses it fewer
-than twice.
+Heights of the lower and upper surfaces of the contour `(x, y)` at the chord station
+`x = crease_frac`: the lowest and highest crossing of that vertical line with the
+segments between consecutive points, not including the one from the last point back
+to the first. Throws an `ArgumentError` when the contour crosses it fewer than twice.
 """
 function get_lower_upper(x, y, crease_frac)
     lower, upper = Inf, -Inf
@@ -79,6 +79,6 @@ function get_lower_upper(x, y, crease_frac)
         n_crossings += 1
     end
     n_crossings >= 2 || throw(ArgumentError("the contour crosses x = $crease_frac " *
-        "$n_crossings times; a closed one crosses it twice"))
+        "$n_crossings times; a closed one crosses it at least twice"))
     return lower, upper
 end
