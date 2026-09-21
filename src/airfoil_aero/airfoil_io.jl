@@ -14,11 +14,16 @@ function write_dat(filepath::String, name::String, x::Vector, y::Vector)
 end
 
 """
-    csv_fields(values) -> String
+    csv_fields(angles, coefficients) -> String
 
-Join `values` into one comma-separated CSV line at 16 significant digits.
+Join one CSV line: `angles` at 16 significant digits, so grid knots load back exactly,
+then `coefficients` at 4 significant digits.
 """
-csv_fields(values) = join((@sprintf("%.16g", v) for v in values), ",")
+function csv_fields(angles, coefficients)
+    fields = Iterators.flatten(((@sprintf("%.16g", a) for a in angles),
+                                (@sprintf("%.4g", c) for c in coefficients)))
+    return join(fields, ",")
+end
 
 """
     write_polar_csv(filepath, result::NeuralFoilResult)
@@ -30,8 +35,8 @@ function write_polar_csv(filepath::String, result::NeuralFoilResult)
     open(filepath, "w") do io
         println(io, "alpha,Cd,Cs,Cl,Cm")
         for i in 1:n
-            row = (result.alpha[i], result.CD[i], 0.0, result.CL[i], result.CM[i])
-            println(io, csv_fields(row))
+            println(io, csv_fields((result.alpha[i],),
+                                   (result.CD[i], 0.0, result.CL[i], result.CM[i])))
         end
     end
     return filepath

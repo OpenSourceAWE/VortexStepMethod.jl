@@ -43,8 +43,7 @@ function write_polar_csv(filepath::String, sols::Vector{SectionSolution})
         println(io, "alpha,Cd,Cs,Cl,Cm")
         for s in sols
             isnan(s.cl) && continue
-            row = (rad2deg(s.alpha), s.cd, 0.0, s.cl, s.cm)
-            println(io, csv_fields(row))
+            println(io, csv_fields((rad2deg(s.alpha),), (s.cd, 0.0, s.cl, s.cm)))
         end
     end
     return filepath
@@ -63,8 +62,8 @@ function write_polar_matrix_csv(filepath::String, alpha_range, delta_range,
     open(filepath, "w") do io
         println(io, "alpha,delta,Cl,Cd,Cm")
         for (j, d) in enumerate(delta_range), (i, a) in enumerate(alpha_range)
-            row = (rad2deg(a), rad2deg(d), cl[i, j], cd[i, j], cm[i, j])
-            println(io, csv_fields(row))
+            println(io, csv_fields((rad2deg(a), rad2deg(d)),
+                                   (cl[i, j], cd[i, j], cm[i, j])))
         end
     end
     return filepath
