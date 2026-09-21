@@ -117,7 +117,7 @@ Useful for tests that need to modify settings while using standard wing geometri
 
 # Example
 ```julia
-settings_file = create_temp_wing_settings("body_aerodynamics", "test_wing.yaml"; alpha=15.0, wind_speed=25.0)
+settings_file = create_temp_wing_settings("body_aerodynamics", "test_wing.yaml"; alpha=15.0, va=25.0)
 # Use settings_file...
 rm(settings_file)
 ```
@@ -134,7 +134,7 @@ function create_temp_wing_settings(module_name, wing_file;
     type_initial_gamma_distribution="ZEROS",
     alpha=10.0,
     beta=5.0,
-    wind_speed=15.0,
+    va=15.0,
     yaw_rate=0.0,
 )
     wing_file_path = isabspath(wing_file) ? wing_file : test_data_path(module_name, wing_file)
@@ -158,7 +158,7 @@ function create_temp_wing_settings(module_name, wing_file;
         "condition" => Dict(
             "alpha" => alpha,
             "beta" => beta,
-            "wind_speed" => wind_speed,
+            "va" => va,
             "yaw_rate" => yaw_rate,
         ),
     )

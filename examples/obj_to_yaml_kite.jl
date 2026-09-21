@@ -86,7 +86,7 @@ if PLOT
     plot_section_polars(body_aero; panels=[1, 10], is_show=true)
 
     plot_polars([solver], [body_aero], ["VSM (NeuralFoil polars from .obj)"];
-        angle_range=range(-5, 20, length=26), v_a=va,
+        angle_range=range(-5, 20, length=26), va=va,
         title="Ram air kite: obj_to_yaml route", is_save=false, use_tex=USE_TEX)
 end
 

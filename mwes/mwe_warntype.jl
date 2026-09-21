@@ -83,4 +83,4 @@ printstyled("\n$sep\n solve_base!\n$sep\n"; color=:cyan)
 @code_warntype solve_base!(solver, body_aero, nothing)
 
 printstyled("\n$sep\n calc_norm_dist!\n$sep\n"; color=:cyan)
-@code_warntype calc_norm_dist!(solver.br.va_norm_dist, solver.sol._va_dist)
+@code_warntype calc_norm_dist!(solver.br.va_dist, solver.sol.va_vec_dist)

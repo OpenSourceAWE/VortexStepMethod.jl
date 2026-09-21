@@ -99,7 +99,7 @@ if PLOT
         [body_xfoil, body_nf],
         ["XFoil", "NeuralFoil"];
         angle_range=range(-5, 25, length=31),
-        v_a=va,
+        va=va,
         title="Ram Air Kite: XFoil vs NeuralFoil",
         is_save=false,
         use_tex=USE_TEX

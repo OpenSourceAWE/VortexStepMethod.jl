@@ -6,7 +6,7 @@ Main structure for calculating aerodynamic properties of bodies. Use the constru
 # Fields
 - panels::Vector{<:Panel}: Vector of refined [`Panel`](@ref) structs
 - wings::Vector{W}: A vector of wings of type `W <: AbstractWing`; a body can have multiple wings
-- `va::MVec3` = zeros(MVec3):   A vector of the apparent wind speed, see: [`MVec3`](@ref)
+- `va_vec::MVec3` = zeros(MVec3): apparent wind vector [m/s], see: [`MVec3`](@ref)
 - `omega`::MVec3 = zeros(MVec3): A vector of the turn rates around the kite body axes
 - `reference_point`::MVec3 = zeros(MVec3): The point `omega` turns the body about [m]
 - `gamma_distribution`=zeros(Float64, P): A vector of the circulation
@@ -15,7 +15,8 @@ Main structure for calculating aerodynamic properties of bodies. Use the constru
 - `alpha_corrected`=zeros(Float64, P):   corrected angles of attack per panel
 - `stall_angle_list`=zeros(Float64, P):  stall angle per panel
 - `alpha_dist::MVector{P, Float64}` = zeros(Float64, P)
-- `v_a_dist::MVector{P, Float64}` = zeros(Float64, P)
+- `v_rel_dist::MVector{P, Float64}` = zeros(Float64, P): norm of the relative velocity
+    crossed with the panel spanwise axis, |v_rel × y_airf| [m/s]
 - `pitch_rate_dist::MVector{P, Float64}` = zeros(Float64, P): rotation rate of each
     panel about its own spanwise axis, positive nose-up [rad/s]; set by
     [`set_va!`](@ref) and read when the solver has `flow_curvature` enabled
@@ -33,7 +34,7 @@ Main structure for calculating aerodynamic properties of bodies. Use the constru
 @with_kw mutable struct BodyAerodynamics{P, W<:AbstractWing, T, PN<:Panel{T}}
     panels::Vector{PN}
     wings::Vector{W}
-    _va::MVector{3, T} = zeros(MVector{3, T})
+    va_vec::MVector{3, T} = zeros(MVector{3, T})
     has_distributed_va::Bool = false
     omega::MVector{3, T} = zeros(MVector{3, T})
     reference_point::MVector{3, T} = zeros(MVector{3, T})
@@ -42,7 +43,7 @@ Main structure for calculating aerodynamic properties of bodies. Use the constru
     alpha_corrected::MVector{P, T} = zeros(MVector{P, T})
     stall_angle_list::MVector{P, T} = zeros(MVector{P, T})
     alpha_dist::MVector{P, T} = zeros(MVector{P, T})
-    v_a_dist::MVector{P, T} = zeros(MVector{P, T})
+    v_rel_dist::MVector{P, T} = zeros(MVector{P, T})
     pitch_rate_dist::MVector{P, T} = zeros(MVector{P, T})
     work_vectors::NTuple{10, MVector{3, T}} = ntuple(_ -> zeros(MVector{3, T}), 10)
     AIC::Array{T, 3} = zeros(T, P, P, 3)
@@ -67,7 +68,7 @@ aerodynamic properties, returning a fully initialized structure ready for simula
 
 # Keyword Arguments
 - `kite_body_origin=zeros(MVec3)`: Origin point of kite body reference frame in CAD reference frame
-- `va=[15.0, 0.0, 0.0]`: Apparent wind vector
+- `va_vec=[15.0, 0.0, 0.0]`: Apparent wind vector [m/s]
 - `omega=zeros(3)`: Turn rate in kite body frame x y and z
 
 # Returns
@@ -76,13 +77,13 @@ aerodynamic properties, returning a fully initialized structure ready for simula
 # Example
 ```julia
 wing = Wing("wing.yaml"; n_panels=40); refine!(wing)
-body_aero = BodyAerodynamics([wing], va=[15.0, 0.0, 0.0], omega=zeros(3))
+body_aero = BodyAerodynamics([wing], va_vec=[15.0, 0.0, 0.0], omega=zeros(3))
 ```
 """
 function BodyAerodynamics(
     wings::Vector{W};
     kite_body_origin=zeros(MVec3),
-    va=[15.0, 0.0, 0.0],
+    va_vec=[15.0, 0.0, 0.0],
     omega=zeros(MVec3)
 ) where {T, W <: AbstractWing{T}}
     # Validate all wings are refined
@@ -124,7 +125,7 @@ function BodyAerodynamics(
     end
 
     body_aero = BodyAerodynamics{length(panels), W, T, eltype(panels)}(; panels, wings)
-    reinit!(body_aero; va, omega)
+    reinit!(body_aero; va_vec, omega)
     return body_aero
 end
 
@@ -140,25 +141,22 @@ wing_span_flip(wing) =
         wing.spanwise_direction) < 0 ? Int8(-1) : Int8(1)
 
 function Base.getproperty(obj::BodyAerodynamics, sym::Symbol)
-    if sym === :va
-        if getfield(obj, :has_distributed_va)
-            throw(ArgumentError(
-                "body_aero.va is undefined after set_va! with distributed inflow. " *
-                "Use panel.va or solver.sol._va_dist for per-panel inflow data."
-            ))
-        end
-        return getfield(obj, :_va)
+    if sym === :va_vec && getfield(obj, :has_distributed_va)
+        throw(ArgumentError(
+            "body_aero.va_vec is undefined after set_va! with distributed inflow. " *
+            "Use panel.va_vec or solver.sol.va_vec_dist for per-panel inflow data."
+        ))
     end
     return getfield(obj, sym)
 end
 
 function Base.setproperty!(obj::BodyAerodynamics, sym::Symbol, val)
-    if sym === :va
+    if sym === :va_vec
         set_va!(obj, val)
     elseif sym === :omega
-        set_va!(obj, obj._va, val)
+        set_va!(obj, getfield(obj, :va_vec), val)
     elseif sym === :reference_point
-        set_va!(obj, obj._va, obj.omega; reference_point=val)
+        set_va!(obj, getfield(obj, :va_vec), obj.omega; reference_point=val)
     else
         setfield!(obj, sym, val)
     end
@@ -288,7 +286,7 @@ function unrefined_deform!(body_aero::BodyAerodynamics, theta_angles, delta_angl
 end
 
 """
-    reinit!(body_aero::BodyAerodynamics; init_aero, va, omega, refine_mesh, recompute_mapping, sort_sections)
+    reinit!(body_aero::BodyAerodynamics; init_aero, va_vec, omega)
 
 Initialize a BodyAerodynamics struct in-place by setting up panels and coefficients.
 
@@ -297,7 +295,7 @@ Initialize a BodyAerodynamics struct in-place by setting up panels and coefficie
 
 # Keyword Arguments
 - `init_aero::Bool`: Whether to initialize the aero data or not
-- `va=[15.0, 0.0, 0.0]`: Apparent wind vector
+- `va_vec=[15.0, 0.0, 0.0]`: Apparent wind vector [m/s]
 - `omega=zeros(3)`: Turn rate in kite body frame x y and z
 
 # Returns
@@ -305,7 +303,7 @@ nothing
 """
 function reinit!(body_aero::BodyAerodynamics{P, W, T};
     init_aero=true,
-    va=[15.0, 0.0, 0.0],
+    va_vec=[15.0, 0.0, 0.0],
     omega=zeros(MVector{3, T})
 ) where {P, W, T}
     idx = 1
@@ -353,9 +351,9 @@ function reinit!(body_aero::BodyAerodynamics{P, W, T};
     body_aero.c_ref = maximum(panel.chord for panel in body_aero.panels)
     calculate_stall_angle_list!(body_aero.stall_angle_list, body_aero.panels)
     body_aero.alpha_dist .= 0.0
-    body_aero.v_a_dist .= 0.0
+    body_aero.v_rel_dist .= 0.0
     body_aero.AIC .= 0.0
-    set_va!(body_aero, va, omega)
+    set_va!(body_aero, va_vec, omega)
     return nothing
 end
 
@@ -858,9 +856,9 @@ function calculate_results(
             alpha_geometric[i] = NaN
         else
             inv_va = 1.0 / va
-            v_tangential = -dot3(panel.x_airf, panel.va) *
+            v_tangential = -dot3(panel.x_airf, panel.va_vec) *
                            inv_va / x_norm
-            v_normal = -dot3(panel.z_airf, panel.va) *
+            v_normal = -dot3(panel.z_airf, panel.va_vec) *
                        inv_va / z_norm
             alpha_geometric[i] = atan(-v_normal, -v_tangential)
         end
@@ -964,22 +962,22 @@ function calculate_results(
             "velocity magnitude."))
         q_panel = 0.5 * density * va_panel^2
         cross3!(dir_lift_prescribed_va,
-                panel.va, spanwise_direction)
+                panel.va_vec, spanwise_direction)
         normalize3!(dir_lift_prescribed_va)
 
-        cross3!(temp_vec, dir_lift_prescribed_va, panel.va)
+        cross3!(temp_vec, dir_lift_prescribed_va, panel.va_vec)
         inv_va_panel = 1.0 / va_panel
         @inbounds for k in 1:3
             temp_vec[k] *= inv_va_panel
         end
         lift_prescribed_va = dot(force, dir_lift_prescribed_va)
-        drag_prescribed_va = dot(force, panel.va) * inv_va_panel
+        drag_prescribed_va = dot(force, panel.va_vec) * inv_va_panel
         side_prescribed_va = dot(force, temp_vec)
 
         lift_wing_3D_sum += lift_prescribed_va *
             dot3(dir_lift_prescribed_va, dir_lift_ref)
         drag_wing_3D_sum += drag_prescribed_va *
-            (dot3(panel.va, va_ref_unit) * inv_va_panel)
+            (dot3(panel.va_vec, va_ref_unit) * inv_va_panel)
         side_wing_3D_sum += side_prescribed_va *
             dot3(temp_vec, dir_side_ref)
 
@@ -1072,7 +1070,7 @@ function calculate_results(
         "aspect_ratio_projected" => aspect_ratio_projected,
         "Rey" => reynolds_number,
         "q_ref" => q_ref,
-        "va_ref" => va_ref_vec,
+        "va_ref_vec" => va_ref_vec,
         "center_of_pressure" => center_of_pressure,
         "panel_cp_locations" => panel_cp_locations
     )
@@ -1111,13 +1109,13 @@ function set_va!(body_aero::BodyAerodynamics{P, W, T}, va_vec::AbstractVector,
 
     va_vec_dist = zeros(T, P, 3)
     for (i, panel) in enumerate(body_aero.panels)
-        panel.va .= va_vec .- omega × (panel.control_point .- body_aero.reference_point)
-        va_vec_dist[i, :] .= panel.va
+        panel.va_vec .= va_vec .- omega × (panel.control_point .- body_aero.reference_point)
+        va_vec_dist[i, :] .= panel.va_vec
     end
 
     # Update wake elements
     frozen_wake!(body_aero, va_vec_dist)
-    body_aero._va .= va_vec
+    getfield(body_aero, :va_vec) .= va_vec
     body_aero.has_distributed_va = false
     return nothing
 end
@@ -1147,30 +1145,30 @@ function set_va!(body_aero::BodyAerodynamics, va_vec_dist::AbstractMatrix;
     end
 
     for (i, panel) in enumerate(body_aero.panels)
-        panel.va .= va_vec_dist[i, :]
+        panel.va_vec .= va_vec_dist[i, :]
     end
 
     # Update wake elements
     frozen_wake!(body_aero, va_vec_dist)
-    body_aero._va .= [mean(va_vec_dist[:,i]) for i in 1:3]
+    getfield(body_aero, :va_vec) .= [mean(va_vec_dist[:,i]) for i in 1:3]
     body_aero.has_distributed_va = true
     return nothing
 end
 
 """
-    apparent_wind(alpha, beta, wind_speed)
+    apparent_wind(alpha, beta, va)
 
 Apparent wind vector in the body frame [m/s] at angle of attack `alpha` [rad], sideslip
-`beta` [rad] and `wind_speed` [m/s].
+`beta` [rad] and apparent wind speed `va` [m/s].
 """
-apparent_wind(alpha, beta, wind_speed) =
-    wind_speed .* [cos(alpha) * cos(beta), sin(beta), sin(alpha) * cos(beta)]
+apparent_wind(alpha, beta, va) =
+    va .* [cos(alpha) * cos(beta), sin(beta), sin(alpha) * cos(beta)]
 
 """
     set_va!(body_aero::BodyAerodynamics, settings::VSMSettings)
 
 Set the uniform inflow of `body_aero` to the [`apparent_wind`](@ref) at the `alpha` and
-`beta` [°] and `wind_speed` [m/s] of `settings.condition`, turning the body about
+`beta` [°] and apparent wind speed `va` [m/s] of `settings.condition`, turning the body about
 `body_aero.reference_point` at its `yaw_rate` [°/s] about Z_b.
 
 # Example
@@ -1183,6 +1181,6 @@ set_va!(body_aero, settings)
 function set_va!(body_aero::BodyAerodynamics, settings::VSMSettings)
     condition = settings.condition
     va_vec = apparent_wind(deg2rad(condition.alpha), deg2rad(condition.beta),
-        condition.wind_speed)
+        condition.va)
     set_va!(body_aero, va_vec, [0.0, 0.0, deg2rad(condition.yaw_rate)])
 end

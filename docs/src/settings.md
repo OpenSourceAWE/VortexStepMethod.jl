@@ -29,7 +29,7 @@ values shown are those defaults, and the docstrings linked below carry the rest.
 
 ```yaml
 condition:
-  wind_speed: 10.0                # free-stream velocity magnitude [m/s]
+  va: 10.0                # apparent wind speed [m/s]
   alpha: 5.0                      # angle of attack [°]
   beta: 0.0                       # sideslip angle [°]
   yaw_rate: 0.0                   # turn rate about the body z axis [°/s]
@@ -67,7 +67,7 @@ wings:
       delta_range: [-40, 10, 40]  # flap-deflection sweep [°]; null for no flap sweep
       # angles off the reference angle a live polar is re-solved at [°]
       live_offsets: [-12, -9, -6, -3, 0, 3, 6, 9, 12]
-      v_app: 25.0                 # apparent wind the Reynolds number is taken at [m/s]
+      va: 25.0                 # apparent wind the Reynolds number is taken at [m/s]
       chord_ref: 1.0              # reference (maximum panel) chord [m]
       table_format: arrow         # per-node table format: csv or arrow
 
@@ -111,4 +111,4 @@ One block answers for both the tables a mesh is sliced into and the live polars 
 deformed section is re-solved on, so the two cannot be generated at different
 transition settings or off different networks. [`alpha_range`](@ref),
 [`delta_range`](@ref) and [`reynolds`](@ref) turn the sweeps and the
-`density * v_app * chord_ref / mu` reference into what the polar generator takes.
+`density * va * chord_ref / mu` reference into what the polar generator takes.

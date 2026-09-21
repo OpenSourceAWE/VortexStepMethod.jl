@@ -40,7 +40,7 @@ omega_b_0  = zeros(3)
 theta_0    = zeros(n_unrefined)
 
 theta_idxs = 1:n_unrefined
-va_idxs    = (n_unrefined + 1):(n_unrefined + 3)
+va_vec_idxs    = (n_unrefined + 1):(n_unrefined + 3)
 omega_idxs = (n_unrefined + 4):(n_unrefined + 6)
 y0         = [theta_0; va_vec_b_0; omega_b_0]
 
@@ -48,7 +48,7 @@ y0         = [theta_0; va_vec_b_0; omega_b_0]
 t_fd = @elapsed begin
     jac_fd, x0_fd, conv_fd = linearize(
         solver, body_aero, y0;
-        theta_idxs, va_idxs, omega_idxs,
+        theta_idxs, va_vec_idxs, omega_idxs,
         aero_coeffs=true,
         backend=AutoFiniteDiff(absstep=1e-5, relstep=1e-5),
     )
@@ -59,7 +59,7 @@ conv_fd || @warn "FiniteDiff linearize did not converge at operating point"
 t_fwd = @elapsed begin
     jac_fwd, x0_fwd, conv_fwd = linearize(
         solver, body_aero, y0;
-        theta_idxs, va_idxs, omega_idxs,
+        theta_idxs, va_vec_idxs, omega_idxs,
         aero_coeffs=true,
         backend=AutoForwardDiff(),
     )
@@ -105,7 +105,7 @@ last_theta = fill(NaN, n_unrefined)
 
 function solve_at!(y)
     theta = y[theta_idxs]
-    va_vec = y[va_idxs]
+    va_vec = y[va_vec_idxs]
     omega = y[omega_idxs]
     if !all(theta .== last_theta)
         unrefined_deform!(wing, theta, nothing; smooth=false)
