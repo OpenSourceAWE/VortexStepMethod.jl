@@ -83,13 +83,13 @@ solver_flat = Solver(settings; reference_point=[0.422646, 0.0, 9.3667])
 solver_bill = Solver(settings; reference_point=[0.422646, 0.0, 9.3667])
 
 # --- Set flight conditions ---
-wind_speed = settings.condition.wind_speed
+va = settings.condition.va
 angle_of_attack_deg = 10.0
 sideslip_deg = settings.condition.beta
 
 α0 = deg2rad(angle_of_attack_deg)
 β0 = deg2rad(sideslip_deg)
-va_vec = apparent_wind(α0, β0, wind_speed)
+va_vec = apparent_wind(α0, β0, va)
 set_va!(body_aero_flat, va_vec)
 set_va!(body_aero_bill, va_vec)
 
@@ -141,7 +141,7 @@ if PLOT
         angle_type="angle_of_attack",
         angle_of_attack=angle_of_attack_deg,
         side_slip=sideslip_deg,
-        v_a=wind_speed,
+        va=va,
         title="V3 Kite flat vs billowing $(BILLOWING_PCT)%",
         save_path=OUTPUT_DIR,
         is_save=false || SAVE_ALL,

@@ -115,7 +115,7 @@ Plot polar data comparing different solvers and configurations.
 - `angle_type`: `"angle_of_attack"` or `"side_slip"` (default: `"angle_of_attack"`)
 - `angle_of_attack`: AoA for the polar sweep (default: `0.0`) [°]
 - `side_slip`: side slip angle (default: `0.0`) [°]
-- `v_a`: apparent wind speed magnitude (default: `10.0`) [m/s]
+- `va`: apparent wind speed (default: `10.0`) [m/s]
 - `title`: plot title (default: `"polar"`)
 - `data_type`: file extension for saving (default: `".png"`)
 - `save_path`: path to save plots (default: `nothing`)
@@ -160,7 +160,7 @@ in sequence.
 - `angle_type`: `"angle_of_attack"` or `"side_slip"` (default: `"angle_of_attack"`)
 - `angle_of_attack`: AoA in degrees (default: `0.0`)
 - `side_slip`: side slip angle in degrees (default: `0.0`)
-- `v_a`: wind speed in m/s (default: `10.0`)
+- `va`: apparent wind speed (default: `10.0`) [m/s]
 - `title`: overall figure title (default: `"Combined Analysis"`)
 - `view_elevation`: geometry view elevation in degrees (default: `15`)
 - `view_azimuth`: geometry view azimuth in degrees (default: `-120`)

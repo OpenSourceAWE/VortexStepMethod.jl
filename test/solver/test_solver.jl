@@ -10,7 +10,8 @@ end
 @testset "Solver Constructor Tests" begin
     @testset "Solver Constructor with VSMSettings" begin
         # Use module-specific test data files
-        settings_file = create_temp_wing_settings("solver", "solver_test_wing.yaml"; alpha=5.0, beta=0.0, wind_speed=10.0)
+        settings_file = create_temp_wing_settings("solver", "solver_test_wing.yaml";
+            alpha=5.0, beta=0.0, va=10.0)
 
         try
             # Test Solver constructor with VSMSettings
@@ -72,7 +73,7 @@ end
 @testset "NONLIN solve! re-runs across calls" begin
     settings_file = create_temp_wing_settings(
         "solver", "solver_test_wing.yaml";
-        alpha=5.0, beta=0.0, wind_speed=10.0,
+        alpha=5.0, beta=0.0, va=10.0,
     )
     try
         settings = VSMSettings(settings_file)
@@ -106,7 +107,7 @@ end
 @testset "NONLIN converges past stall, where LOOP already did" begin
     settings_file = create_temp_wing_settings(
         "solver", "solver_test_wing.yaml";
-        alpha=5.0, beta=0.0, wind_speed=10.0,
+        alpha=5.0, beta=0.0, va=10.0,
     )
     try
         settings = VSMSettings(settings_file)
@@ -151,7 +152,7 @@ end
 @testset "LOOP converges on the residual, not on the relaxed step" begin
     settings_file = create_temp_wing_settings(
         "solver", "solver_test_wing.yaml";
-        alpha=5.0, beta=0.0, wind_speed=10.0,
+        alpha=5.0, beta=0.0, va=10.0,
     )
     try
         settings = VSMSettings(settings_file)
@@ -180,7 +181,7 @@ calc_forces_allocs(solver, body_aero) =
 @testset "calc_forces! is zero-alloc" begin
     settings_file = create_temp_wing_settings(
         "solver", "solver_test_wing.yaml";
-        alpha=5.0, beta=0.0, wind_speed=10.0,
+        alpha=5.0, beta=0.0, va=10.0,
     )
     try
         settings = VSMSettings(settings_file)

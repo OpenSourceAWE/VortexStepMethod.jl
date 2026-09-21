@@ -7,7 +7,7 @@
 - `stability_derivatives` gives the force and moment coefficients and their derivatives
   with respect to angle of attack and sideslip, and `trim_angle` the angles of attack at
   which `CMy` changes sign, with the slope that says whether each trim is stable.
-- `apparent_wind(alpha, beta, wind_speed)` gives the body-frame inflow vector at an angle
+- `apparent_wind(alpha, beta, va)` gives the body-frame inflow vector at an angle
   of attack and sideslip, as `set_va!(body_aero, settings)` sets it.
 - `Solver(settings)` and `Solver(n_panels, n_unrefined_sections)` build a solver without
   a `BodyAerodynamics`; keyword arguments override the settings.
@@ -30,6 +30,19 @@
 - BREAKING: `ObjAdapter.center_to_com!`, `calculate_inertia_tensor` and
   `calc_inertia_y_rotation` are removed. Mesh mass properties are computed by
   SymbolicAWEModels, which reads the mesh with `read_faces`.
+- BREAKING: the apparent wind is `va` for the speed [m/s], `va_vec` for the 3-vector and
+  `va_dist` / `va_vec_dist` per panel, and the old names error:
+  - `body_aero.va` becomes `body_aero.va_vec`, and `va=` becomes `va_vec=` in
+    `BodyAerodynamics(...)` and `reinit!`.
+  - `Panel.va` becomes `Panel.va_vec`, and `SemiInfiniteFilament.vel_mag` becomes `va`.
+  - On `VSMSolution`, `_va_dist` becomes `va_vec_dist` and `va_unrefined_dist` becomes
+    `va_vec_unrefined_dist`.
+  - `v_a_dist` on `BodyAerodynamics` and `solver.lr` becomes `v_rel_dist`, and
+    `solver.br.va_norm_dist` becomes `va_dist`.
+  - The `linearize` keyword `va_idxs` becomes `va_vec_idxs`, the `calculate_results` key
+    `"va_ref"` becomes `"va_ref_vec"`, and the `plot_polars` / `plot_combined_analysis`
+    keyword `v_a` becomes `va`.
+  - The settings keys `condition.wind_speed` and `airfoil.v_app` become `va`.
 - Requires Julia 1.12 or 1.13; 1.10 and 1.11 keep resolving v5.1.1.
 - The Makie `plot!` methods for a `Panel` or a `BodyAerodynamics` return a
   `Vector{Makie.AbstractPlot}` instead of a `Vector{Any}`; for a `BodyAerodynamics`

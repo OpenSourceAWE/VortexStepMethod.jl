@@ -20,7 +20,7 @@ solver = Solver(vsm_settings)
 set_va!(body_aero, vsm_settings)
 
 # Extract values for plotting (optional - for reference)
-wind_speed = vsm_settings.condition.wind_speed
+va = vsm_settings.condition.va
 angle_of_attack_deg = vsm_settings.condition.alpha
 sideslip_deg = vsm_settings.condition.beta
 yaw_rate = vsm_settings.condition.yaw_rate
@@ -43,7 +43,7 @@ PLOT && plot_polars(
     angle_type="angle_of_attack",
     angle_of_attack=angle_of_attack_deg,
     side_slip=sideslip_deg,
-    v_a=wind_speed,
+    va=va,
     title="$(wing.n_panels)_panels_$(wing.spanwise_distribution)_pyramid_model",
     save_path=OUTPUT_DIR,
     is_save=false || SAVE_ALL,
@@ -70,7 +70,7 @@ PLOT && plot_distribution(
     [body_y_coordinates],
     [results],
     ["VSM"];
-    title="pyramid_spanwise_distributions_alpha_$(round(angle_of_attack_deg, digits=1))_delta_$(round(sideslip_deg, digits=1))_yaw_$(round(yaw_rate, digits=1))_va_$(round(wind_speed, digits=1))",
+    title="pyramid_spanwise_distributions_alpha_$(round(angle_of_attack_deg, digits=1))_delta_$(round(sideslip_deg, digits=1))_yaw_$(round(yaw_rate, digits=1))_va_$(round(va, digits=1))",
     save_path=OUTPUT_DIR,
     is_save=false || SAVE_ALL,
     is_show=true,

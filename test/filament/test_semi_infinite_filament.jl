@@ -52,13 +52,13 @@ end
             filament.direction,
             control_point,
             gamma,
-            filament.vel_mag,
+            filament.va,
             work_vectors
         )
         
         analytical = analytical_solution(
             control_point, gamma, filament.x1, filament.direction,
-            filament.filament_direction, filament.vel_mag  
+            filament.filament_direction, filament.va  
         )
         
         @test isapprox(induced_velocity, analytical, rtol=1e-6)
@@ -80,7 +80,7 @@ end
             filament.direction,
             start_point,
             gamma,
-            filament.vel_mag,
+            filament.va,
             work_vectors
         )
         @test all(isnan.(induced_velocity))
@@ -92,7 +92,7 @@ end
                 filament.direction,
                 point,
                 gamma,
-                filament.vel_mag,
+                filament.va,
                 work_vectors
             )
             @test all(isapprox.(induced_velocity, zeros(3), atol=1e-5))
@@ -106,9 +106,12 @@ end
         v2 = zeros(3)
         v4 = zeros(3)
         
-        velocity_3D_trailing_vortex_semiinfinite!(v1, filament, filament.direction, control_point, 1.0, filament.vel_mag, work_vectors)
-        velocity_3D_trailing_vortex_semiinfinite!(v2, filament, filament.direction, control_point, 2.0, filament.vel_mag, work_vectors)
-        velocity_3D_trailing_vortex_semiinfinite!(v4, filament, filament.direction, control_point, 4.0, filament.vel_mag, work_vectors)
+        velocity_3D_trailing_vortex_semiinfinite!(v1, filament, filament.direction,
+            control_point, 1.0, filament.va, work_vectors)
+        velocity_3D_trailing_vortex_semiinfinite!(v2, filament, filament.direction,
+            control_point, 2.0, filament.va, work_vectors)
+        velocity_3D_trailing_vortex_semiinfinite!(v4, filament, filament.direction,
+            control_point, 4.0, filament.va, work_vectors)
         
         @test isapprox(v4, 2 * v2)
         @test isapprox(v4, 4 * v1)
@@ -125,7 +128,7 @@ end
             filament.direction,
             [0.0, 1.0, 0.0],
             gamma,
-            filament.vel_mag,
+            filament.va,
             work_vectors
         )
         velocity_3D_trailing_vortex_semiinfinite!(
@@ -134,7 +137,7 @@ end
             filament.direction,
             [0.0, -1.0, 0.0],
             gamma,
-            filament.vel_mag,
+            filament.va,
             work_vectors
         )
 
@@ -151,7 +154,7 @@ end
                 v = zeros(3)
                 velocity_3D_trailing_vortex_semiinfinite!(
                     v, filament, direction, p, gamma,
-                    filament.vel_mag, work_vectors)
+                    filament.va, work_vectors)
 
                 r_radial = [0.0, p[2], p[3]]
                 @test isapprox(dot(v, direction), 0.0; atol=1e-10)
@@ -162,7 +165,7 @@ end
 
     @testset "Constant azimuthal direction inside core" begin
         filament = create_test_filament2()
-        va = filament.vel_mag
+        va = filament.va
 
         d_inside = 1e-4
         v1 = zeros(3); v2 = zeros(3)
