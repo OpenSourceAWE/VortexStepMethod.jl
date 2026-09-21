@@ -31,8 +31,9 @@
 
 - BREAKING: artificial damping is removed: the `is_with_artificial_damping` and
   `artificial_damping` keyword arguments of `Solver`, and the `artificial_damping`, `k2`
-  and `k4` solver settings. `k2` and `k4` had no effect. A settings file that still sets
-  these keys loads with a warning. The post-stall stabiliser is
+  and `k4` solver settings. `k2` and `k4` had no effect; `artificial_damping: true`
+  smoothed the circulation with fixed factors, so a solve that had it on now gives
+  different results. A settings file that still sets these keys loads with a warning. The post-stall stabiliser is
   `is_with_artificial_viscosity`.
 - BREAKING: `ObjAdapter.center_to_com!`, `calculate_inertia_tensor` and
   `calc_inertia_y_rotation` are removed. Mesh mass properties are computed by

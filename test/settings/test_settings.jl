@@ -120,6 +120,8 @@ end
     @test isempty(intersect(fieldnames(SolverSettings), (:artificial_damping, :k2, :k4)))
     @test isempty(intersect(fieldnames(Solver),
                             (:is_with_artificial_damping, :artificial_damping)))
+    @test_throws MethodError Solver(4, 2; is_with_artificial_damping=true)
+    @test_throws MethodError Solver(4, 2; artificial_damping=(k2=0.1, k4=0.0))
 end
 
 @testset "an unnamed mesh block slices as an unconfigured call" begin

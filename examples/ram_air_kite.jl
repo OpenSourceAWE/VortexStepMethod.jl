@@ -32,7 +32,7 @@ NF_SOLVER = NeuralFoilSolver(model_size=NF_MODEL_SIZE, n_crit=N_CRIT,
                              xtr_upper=XTR_UPPER, xtr_lower=XTR_LOWER)
 
 # VSM solver stability settings.
-RELAXATION         = 0.03   # iteration relaxation factor
+RELAXATION           = 0.03   # iteration relaxation factor
 ARTIFICIAL_VISCOSITY = false  # post-stall stabiliser for difficult cases
 
 # Convert-then-load: the .obj mesh is sliced per section, each section fitted and swept

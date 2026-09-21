@@ -37,7 +37,7 @@ XF_SOLVER = XFoilSolver(npan=XF_NPAN, max_iter=XF_MAX_ITER, ncrit=N_CRIT,
                         xtrip=(XTR_UPPER, XTR_LOWER), mach=XF_MACH)
 
 # VSM solver stability settings.
-RELAXATION         = 0.03   # iteration relaxation factor
+RELAXATION           = 0.03   # iteration relaxation factor
 ARTIFICIAL_VISCOSITY = false  # post-stall stabiliser for difficult cases
 
 # V3_25.obj is already in slicer convention (x=chord, y=span, z=up).
