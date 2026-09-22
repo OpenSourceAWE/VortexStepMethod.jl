@@ -1380,34 +1380,18 @@ function VortexStepMethod.plot_combined_analysis(
         color = colors[mod1(si, length(colors))]
         y_si = [panel.aero_center[2] for panel in body_aeros[si].panels]
 
-        cl_val = round(rs["cl"], digits=2)
-        lines!(ax_cl, Vector(y_si), Vector(rs["cl_distribution"]);
-            label="$lbl CL: $cl_val", color)
-
-        cd_val = round(rs["cd"], digits=2)
-        lines!(ax_cd, Vector(y_si), Vector(rs["cd_distribution"]);
-            label="$lbl CD: $cd_val", color)
-
+        lines!(ax_cl, Vector(y_si), Vector(rs["cl_distribution"]); color)
+        lines!(ax_cd, Vector(y_si), Vector(rs["cd_distribution"]); color)
         lines!(ax_gamma, Vector(y_si),
             Vector(rs["gamma_distribution"]); label=lbl, color)
-
         lines!(ax_alpha_geo, Vector(y_si),
-            rad2deg.(Vector(rs["alpha_geometric"])); label=lbl, color)
-
+            rad2deg.(Vector(rs["alpha_geometric"])); color)
         lines!(ax_alpha_ac, Vector(y_si),
-            rad2deg.(Vector(rs["alpha_at_ac"])); label=lbl, color)
-
+            rad2deg.(Vector(rs["alpha_at_ac"])); color)
         lines!(ax_alpha_unc, Vector(y_si),
-            rad2deg.(Vector(rs["alpha_uncorrected"]));
-            label=lbl, color)
-
-        force_axes = [ax_fx, ax_fy, ax_fz]
-        components = ["x", "y", "z"]
-        for (idx, (ax, comp)) in enumerate(zip(force_axes, components))
-            forces = rs["F_distribution"][idx, :]
-            total_force = round(rs["F$comp"], digits=2)
-            lines!(ax, Vector(y_si), Vector(forces);
-                label="$lbl ΣF$comp: $total_force N", color)
+            rad2deg.(Vector(rs["alpha_uncorrected"])); color)
+        for (idx, ax) in enumerate((ax_fx, ax_fy, ax_fz))
+            lines!(ax, Vector(y_si), Vector(rs["F_distribution"][idx, :]); color)
         end
     end
 
