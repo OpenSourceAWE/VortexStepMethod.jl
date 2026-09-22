@@ -60,6 +60,7 @@ dynamic_pressure
 flow_curvature_cm
 spanwise_flow_drag
 panel_force_directions
+prescribed_va_directions
 panel_moment
 panel_couple_force
 panel_loads
@@ -91,6 +92,7 @@ calculate_filaments_for_plotting
 ```@docs
 unrefined_deform!
 unrefined_section_range
+panel_range
 deform!
 compute_refined_panel_mapping!
 compute_refined_section_interpolation!
