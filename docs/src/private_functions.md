@@ -63,6 +63,7 @@ panel_force_directions
 panel_moment
 panel_couple_force
 panel_loads
+panel_body_loads
 ```
 
 ### Induced velocities

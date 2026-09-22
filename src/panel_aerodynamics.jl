@@ -198,3 +198,16 @@ along `y_airf`, as [`spanwise_flow_drag`](@ref) gives it.
                                 (c_span * q_dyn * chord) .* y_airf)
     return (; lift, drag, moment, force, pitching_moment=scale * width * moment)
 end
+
+"""
+    panel_body_loads(axes, dirs, q_dyn, cl, cd, cm, c_span, arm)
+
+[`panel_loads`](@ref) plus `body_moment`, the panel's moment about a reference point,
+with `arm` the vector from that point to the aerodynamic center.
+"""
+@noinline function panel_body_loads(axes, dirs, q_dyn, cl, cd, cm, c_span, arm)
+    # Not inlined: Julia 1.12 miscompiles the inlined form for 10-partial Duals on Zen 4/5.
+    loads = panel_loads(axes, dirs, q_dyn, cl, cd, cm; c_span)
+    return (; loads...,
+            body_moment=loads.pitching_moment .* axes.y_airf .+ cross(arm, loads.force))
+end

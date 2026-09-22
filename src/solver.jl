@@ -452,19 +452,18 @@ function calc_forces!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics;
             cd_dist[i] += viscous.delta_cd
             c_span = viscous.c_span
         end
-        loads = panel_loads(axes, dirs,
+        arm_vec = SVector{3, T}(panel.aero_center) - SVector{3, T}(reference_point)
+        loads = panel_body_loads(axes, dirs,
             dynamic_pressure(density, density, v_rel_dist[i]),
-            cl_dist[i], cd_dist[i], cm_dist[i]; c_span)
+            cl_dist[i], cd_dist[i], cm_dist[i], c_span, arm_vec)
         lift[i] = loads.lift
         drag[i] = loads.drag
         panel_moment_dist[i] = loads.moment
 
         force = loads.force
-        arm_vec = SVector{3, T}(panel.aero_center) - SVector{3, T}(reference_point)
-        moment = loads.pitching_moment .* axes.y_airf .+ cross(arm_vec, force)
         @inbounds for k in 1:3
             solver.sol.f_body_3D[k, i] = force[k]
-            solver.sol.m_body_3D[k, i] = moment[k]
+            solver.sol.m_body_3D[k, i] = loads.body_moment[k]
         end
 
         arm = (moment_frac - 0.25) * panel.chord
