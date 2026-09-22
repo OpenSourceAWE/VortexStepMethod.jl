@@ -57,8 +57,9 @@ to use XFoil instead. Each section's polar is written as `POLAR_VECTORS`.
 `crease_frac` is the chordwise hinge location (0–1) about which each `delta_range`
 trailing-edge deflection pivots.
 
-With `force=false` (default) an existing geometry YAML is reused; `force=true`
-regenerates it (e.g. after changing `delta_range` or the mesh).
+With `force=false` (default) an existing geometry YAML is reused, its tables converted
+to `table_format` where they are in another ([`migrate_node_tables`](@ref));
+`force=true` regenerates it (e.g. after changing `delta_range` or the mesh).
 
 `geometry_path` names the YAML itself, `output_dir/geometry.yaml` by default. Point it
 elsewhere to keep the YAML out of the table directory — the emitted table references
@@ -82,16 +83,16 @@ reused. With `reuse_valid_airfoils=false` the degenerate fit is written as is.
 
 # Output
 Writes into `output_dir`, indexed by source-airfoil id `j` (degenerate sections
-share a neighbour's id):
+share a neighbour's id), each table as `table_format` `:csv` (default, readable) or
+`:arrow` (binary, an order of magnitude faster to load):
 - `airfoils/{j}.dat`     — shrink-wrapped airfoil coordinates (matches the polar)
 - `airfoils/{j}_raw.dat` — raw sliced section points (the wrap encloses these)
 - `airfoils/{j}_d{tag}.dat` — each trailing-edge-deflected shape (with a `delta_range`);
   `{tag}` is the deflection in degrees with `m` for minus and `p` for the decimal point
   (e.g. `_dm3.dat`, `_d2p5.dat`)
-- `polars/{j}.csv`    — NeuralFoil polar (alpha, Cd, Cs, Cl, Cm)
+- `polars/{j}.{table_format}` — NeuralFoil polar (alpha, Cd, Cs, Cl, Cm)
 - `pressure/{j}_cp.{table_format}`, `_cf.{table_format}` — per-node surface pressure and
-  skin friction; `table_format` is `:csv` (default, readable) or `:arrow` (binary, an
-  order of magnitude faster to load)
+  skin friction
 - `geometry.yaml`     — `wing_sections` + `wing_airfoils` referencing the above
 
 # Returns
@@ -102,11 +103,11 @@ function obj_to_yaml end
 """
     migrate_node_tables(yaml_path, output_dir, table_format; verbose=true)
 
-Rewrite a generated dataset's per-node `Cp`/`cf` tables in `table_format` and point
-`geometry.yaml` at them, when they are not in that format already. This is what lets
-an existing directory change format without re-running the airfoil solver that
-produced it — the polars are the slow part and they are untouched. The source tables
-are left in place.
+Rewrite a generated dataset's per-node `Cp`/`cf` tables and polars in `table_format`
+and point `geometry.yaml` at them, when they are not in that format already; a legacy
+`csv_file_path` key is written back as `polar_file_path`. This is
+what lets an existing directory change format without re-running the airfoil solver
+that produced it. The source tables are left in place.
 
 `output_dir` is what the YAML's relative table references resolve against, which is
 its own directory — the rule the geometry loader follows.
@@ -125,7 +126,9 @@ function migrate_node_tables(yaml_path::String, output_dir::String,
     for row in airfoils["data"]
         info = row[info_col]
         info isa AbstractDict || continue
-        for key in ("cp_file", "cf_file")
+        haskey(info, "csv_file_path") &&
+            (info["polar_file_path"] = pop!(info, "csv_file_path"))
+        for key in ("cp_file", "cf_file", "polar_file_path")
             haskey(info, key) || continue
             relative = String(info[key])
             endswith(relative, ".$table_format") && continue
@@ -145,7 +148,7 @@ function migrate_node_tables(yaml_path::String, output_dir::String,
     write_geometry_yaml(yaml_path, data["wing_sections"]["data"],
                         [Any[row[id_col], row[type_col], row[info_col]]
                          for row in airfoils["data"]])
-    verbose && @info "Converted $converted node tables to :$table_format" yaml_path
+    verbose && @info "Converted $converted tables to :$table_format" yaml_path
     return yaml_path
 end
 
@@ -176,7 +179,7 @@ function prefix_table_paths!(airfoil_rows, prefix::String)
         info = row[end]
         info isa AbstractDict || continue
         for (key, value) in info
-            (endswith(String(key), "_file") || key == "csv_file_path") || continue
+            (endswith(String(key), "_file") || key == "polar_file_path") || continue
             value isa AbstractString && !isabspath(value) &&
                 (info[key] = joinpath(prefix, value))
         end
@@ -260,15 +263,17 @@ function obj_to_yaml(obj_path::String, output_dir::String;
 end
 
 """
-    resolve_aero_geometry(yaml_in, out_dir; verbose=true) -> yaml_out
+    resolve_aero_geometry(yaml_in, out_dir; table_format=:csv, verbose=true) -> yaml_out
 
 Read an awesIO-style geometry YAML and resolve every `wing_airfoils` entry to a
 core-loadable form via [`resolve_airfoil`](@ref) (`breukels_regression` → `poly`,
-`neuralfoil` → `polars` CSV, others pass through), writing generated CSVs and a
-resolved `geometry.yaml` under `out_dir`. `wing_sections` (incl. any `VUP` up-vectors)
-pass through unchanged. Load the result with `Wing(yaml_out)`.
+`neuralfoil` → `polars` table, others pass through). The generated polars go to
+`out_dir/polars` as `table_format` (`:csv` or `:arrow`), the resolved YAML to
+`out_dir/geometry.yaml`. `wing_sections` (incl. any `VUP` up-vectors) pass through
+unchanged. Load the result with `Wing(yaml_out)`.
 """
-function resolve_aero_geometry(yaml_in::String, out_dir::String; verbose=true)
+function resolve_aero_geometry(yaml_in::String, out_dir::String;
+                               table_format::Symbol=:csv, verbose=true)
     mkpath(out_dir)
     polar_dir = joinpath(out_dir, "polars")
     mkpath(polar_dir)
@@ -283,14 +288,15 @@ function resolve_aero_geometry(yaml_in::String, out_dir::String; verbose=true)
     base = dirname(abspath(yaml_in))
     for row in wa["data"]
         info = Dict{String,Any}(row[ii])
-        for k in ("dat_file_path", "csv_file_path", "cl_file_path",
+        for k in ("dat_file_path", "polar_file_path", "csv_file_path", "cl_file_path",
                   "cd_file_path", "cm_file_path")
             if haskey(info, k) && !isabspath(String(info[k]))
                 info[k] = abspath(joinpath(base, String(info[k])))
             end
         end
         new_type, new_info = resolve_airfoil(String(row[ti]), info, polar_dir,
-                                             row[idi]; Re, alpha_range)
+                                             row[idi]; Re, alpha_range,
+                                             table_format)
         row[ti] = new_type
         row[ii] = new_info
     end

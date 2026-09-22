@@ -8,7 +8,7 @@ using NPZ
 using Xfoil
 using Printf: @sprintf
 using ..VortexStepMethod: SectionAero, interpolate_matrix_nans!, delta_suffix,
-                          write_node_rows, section_surface, set_polar!,
+                          write_node_rows, csv_fields, section_surface, set_polar!,
                           read_dat_coordinates, KulfanParameters, calculate_cl,
                           calculate_cd, calculate_cm
 
@@ -44,7 +44,7 @@ export SectionSolution, DeformedSection, deform_section, analyze_section, analyz
 export create_2d_polars, generate_aero_matrices, generate_section_aero, lei_poly_coeffs
 export generate_airfoil_aero, write_section_aero
 export turn_trailing_edge!, get_lower_upper
-export read_dat_coordinates, write_dat, write_polar_csv, write_polar_matrix_csv
+export read_dat_coordinates, write_dat, write_polar, write_polar_matrix
 export generate_polar_from_coordinates, generate_polar_from_dat, resolve_airfoil
 export write_geometry_yaml, write_yaml, generate_airfoils
 

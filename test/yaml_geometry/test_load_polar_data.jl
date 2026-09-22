@@ -115,4 +115,11 @@ using Logging
         @test aero_model == INVISCID
         @test aero_data === nothing
     end
+
+    @testset "A non-numeric extra column rejects the file" begin
+        write(test_csv_path, "alpha,cl,cd,cm,source\n0.0,1.0,0.01,0.0,xfoil\n")
+        aero_data, aero_model = suppress_warnings(() -> load_polar_data(test_csv_path))
+        @test aero_model == INVISCID
+        @test aero_data === nothing
+    end
 end
