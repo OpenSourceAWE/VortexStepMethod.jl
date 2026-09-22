@@ -166,14 +166,15 @@ end
     )
     @test fig isa Figure
 
-    # CS of a symmetric wing is round-off noise; it must plot flat
-    fig = Figure()
-    ax_noise = Axis(fig[1, 1])
-    makie_ext.widen_flat_ylims!(ax_noise, [[1e-16, -1e-16], [0.0, NaN]])
-    @test ax_noise.limits[][2] == (-0.05, 0.05)
-    ax_wide = Axis(fig[1, 2])
-    makie_ext.widen_flat_ylims!(ax_wide, [[0.0, 0.5]])
-    @test isnothing(ax_wide.limits[][2])
+    @testset "round-off CS plots flat, a varying CS keeps its autoscale" begin
+        fig = Figure()
+        ax_noise = Axis(fig[1, 1])
+        makie_ext.widen_flat_ylims!(ax_noise, [[1e-16, -1e-16], [0.0, NaN]])
+        @test ax_noise.limits[][2] == (-0.05, 0.05)
+        ax_wide = Axis(fig[1, 2])
+        makie_ext.widen_flat_ylims!(ax_wide, [[0.0, 0.5]])
+        @test isnothing(ax_wide.limits[][2])
+    end
 
     # Test polar data plotting
     body_aero = BodyAerodynamics([ram_wing])

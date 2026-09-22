@@ -590,10 +590,20 @@ function set_axes_equal_makie!(ax, panels; zoom=1.8)
 end
 
 """
+    polar_style(idx, n_solvers)
+
+Marker, marker size and line style of the `idx`-th polar: solver output for
+`idx <= n_solvers`, literature otherwise.
+"""
+polar_style(idx, n_solvers) = idx <= n_solvers ?
+    (marker=:star5, markersize=12, linestyle=:solid) :
+    (marker=:circle, markersize=8, linestyle=:dash)
+
+"""
     widen_flat_ylims!(ax, series; min_span=0.1)
 
 Set the y-limits of `ax` to span at least `min_span` around the non-NaN values of
-all vectors in `series`, so that round-off noise on a zero quantity plots flat.
+all vectors in `series`.
 """
 function widen_flat_ylims!(ax, series; min_span=0.1)
     values = filter(!isnan, reduce(vcat, series))
@@ -975,33 +985,19 @@ function VortexStepMethod.plot_polars(
 
         for (i, (polar_data, cm, label)) in enumerate(
                 zip(polar_data_list, cm_data_list, labels_with_re))
-            marker = i <= n_solvers ? :star5 : :circle
-            markersize = i <= n_solvers ? 12 : 8
-            linestyle = i <= n_solvers ? :solid : :dash
+            style = polar_style(i, n_solvers)
             angles = polar_data[1]
-            scatterlines!(ax_cl, angles, polar_data[2];
-                label=label, marker=marker, markersize=markersize, linestyle)
-            scatterlines!(ax_cd, angles, polar_data[3];
-                label=label, marker=marker, markersize=markersize, linestyle)
-            scatterlines!(ax_cs, angles, polar_data[4];
-                label=label, marker=marker, markersize=markersize, linestyle)
+            scatterlines!(ax_cl, angles, polar_data[2]; label, style...)
+            scatterlines!(ax_cd, angles, polar_data[3]; label, style...)
+            scatterlines!(ax_cs, angles, polar_data[4]; label, style...)
             if !all(isnan, cm.cmx)
-                scatterlines!(ax_cmx, angles,
-                    Float64.(cm.cmx);
-                    label=label, marker=marker,
-                    markersize=markersize, linestyle)
+                scatterlines!(ax_cmx, angles, Float64.(cm.cmx); label, style...)
             end
             if !all(isnan, cm.cmy)
-                scatterlines!(ax_cmy, angles,
-                    Float64.(cm.cmy);
-                    label=label, marker=marker,
-                    markersize=markersize, linestyle)
+                scatterlines!(ax_cmy, angles, Float64.(cm.cmy); label, style...)
             end
             if !all(isnan, cm.cmz)
-                scatterlines!(ax_cmz, angles,
-                    Float64.(cm.cmz);
-                    label=label, marker=marker,
-                    markersize=markersize, linestyle)
+                scatterlines!(ax_cmz, angles, Float64.(cm.cmz); label, style...)
             end
         end
         widen_flat_ylims!(ax_cs, [pd[4] for pd in polar_data_list])
@@ -1027,28 +1023,15 @@ function VortexStepMethod.plot_polars(
 
         for (i, (polar_data, label)) in enumerate(
                 zip(polar_data_list, labels_with_re))
-            marker = i <= n_solvers ? :star5 : :circle
-            markersize = i <= n_solvers ? 12 : 8
-            linestyle = i <= n_solvers ? :solid : :dash
-            scatterlines!(ax_cl, polar_data[1], polar_data[2];
-                label=label, marker=marker,
-                markersize=markersize, linestyle)
-            scatterlines!(ax_cd, polar_data[1], polar_data[3];
-                label=label, marker=marker,
-                markersize=markersize, linestyle)
-            scatterlines!(ax_cs, polar_data[1], polar_data[4];
-                label=label, marker=marker,
-                markersize=markersize, linestyle)
+            style = polar_style(i, n_solvers)
+            scatterlines!(ax_cl, polar_data[1], polar_data[2]; label, style...)
+            scatterlines!(ax_cd, polar_data[1], polar_data[3]; label, style...)
+            scatterlines!(ax_cs, polar_data[1], polar_data[4]; label, style...)
             if cl_over_cd
                 cl_cd = polar_data[2] ./ polar_data[3]
-                scatterlines!(ax_fourth, polar_data[1], cl_cd;
-                    label=label, marker=marker,
-                    markersize=markersize, linestyle)
+                scatterlines!(ax_fourth, polar_data[1], cl_cd; label, style...)
             else
-                scatterlines!(ax_fourth, polar_data[3],
-                    polar_data[2];
-                    label=label, marker=marker,
-                    markersize=markersize, linestyle)
+                scatterlines!(ax_fourth, polar_data[3], polar_data[2]; label, style...)
             end
         end
         widen_flat_ylims!(ax_cs, [pd[4] for pd in polar_data_list])
@@ -1449,23 +1432,21 @@ function VortexStepMethod.plot_combined_analysis(
 
     for (idx, (pd, lbl)) in enumerate(polar_series)
         color = colors[mod1(idx, length(colors))]
-        marker = idx <= n_solvers ? :star5 : :circle
-        markersize = idx <= n_solvers ? 12 : 8
-        linestyle = idx <= n_solvers ? :solid : :dash
+        style = polar_style(idx, n_solvers)
 
         scatterlines!(ax_cl_polar, pd.angle, pd.cl;
-            label=lbl, marker, markersize, color, linestyle)
+            label=lbl, color, style...)
         scatterlines!(ax_cd_polar, pd.angle, pd.cd;
-            label=lbl, marker, markersize, color, linestyle)
+            label=lbl, color, style...)
         scatterlines!(ax_cs_polar, pd.angle, pd.cs;
-            label=lbl, marker, markersize, color, linestyle)
+            label=lbl, color, style...)
         if cl_over_cd
             cl_cd = pd.cl ./ pd.cd
             scatterlines!(ax_fourth_polar, pd.angle, cl_cd;
-                label=lbl, marker, markersize, color, linestyle)
+                label=lbl, color, style...)
         else
             scatterlines!(ax_fourth_polar, pd.cd, pd.cl;
-                label=lbl, marker, markersize, color, linestyle)
+                label=lbl, color, style...)
         end
     end
     widen_flat_ylims!(ax_cs_polar, [pd.cs for (pd, _) in polar_series])
