@@ -14,13 +14,13 @@ function linear_polar(slope, cd, cm)
 end
 
 """
-    solve_three_panel_wing(aero_model, polar_pos_y, polar_neg_y)
+    solve_three_panel_wing(aero_model, polar_pos_y=nothing, polar_neg_y=polar_pos_y)
 
 Solve a flat rectangular wing of three 1 m × 1 m panels at 5° incidence, whose two
 sections on the +y side carry `polar_pos_y` and whose two on the -y side carry
 `polar_neg_y`.
 """
-function solve_three_panel_wing(aero_model, polar_pos_y, polar_neg_y)
+function solve_three_panel_wing(aero_model, polar_pos_y=nothing, polar_neg_y=polar_pos_y)
     wing = Wing(3)
     for (y, polar) in ((1.5, polar_pos_y), (0.5, polar_pos_y),
                        (-0.5, polar_neg_y), (-1.5, polar_neg_y))
@@ -41,16 +41,18 @@ end
         @test sol.cl_dist ≈ [4π, 3π, 2π] .* sol.alpha_dist
         @test sol.cd_dist ≈ [0.1, 0.075, 0.05]
         @test sol.cm_dist ≈ [-0.02, -0.015, -0.01]
-        @test sol.moment[1] > 0
+        @testset "the stronger +y side rolls the wing positive about x" begin
+            @test sol.moment[1] > 0
+        end
     end
 
     @testset "a 2π·alpha polar matches INVISCID plus its profile drag" begin
         polar = linear_polar(2π, 0.05, 0.0)
-        sol_polar = solve_three_panel_wing(POLAR_VECTORS, polar, polar)
-        sol_inviscid = solve_three_panel_wing(INVISCID, nothing, nothing)
+        sol_polar = solve_three_panel_wing(POLAR_VECTORS, polar)
+        sol_inviscid = solve_three_panel_wing(INVISCID)
         @test sol_polar.gamma_distribution ≈ sol_inviscid.gamma_distribution rtol=1e-12
         @test sol_polar.lift_dist ≈ sol_inviscid.lift_dist rtol=1e-12
-        @test sol_polar.drag_dist ./ sol_polar.lift_dist ≈ 0.05 ./ sol_polar.cl_dist
+        @test sol_polar.cd_dist ≈ fill(0.05, 3)
         profile_drag = eachcol(sol_polar.f_body_3D .- sol_inviscid.f_body_3D)
         @test norm.(profile_drag) ≈ sol_polar.drag_dist .* sol_polar.width_dist
         @test abs(sol_polar.moment[1]) < 1e-10
