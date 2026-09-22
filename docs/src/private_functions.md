@@ -60,6 +60,7 @@ dynamic_pressure
 flow_curvature_cm
 spanwise_flow_drag
 panel_force_directions
+prescribed_va_directions
 panel_moment
 panel_couple_force
 panel_loads
@@ -92,6 +93,7 @@ calculate_filaments_for_plotting
 ```@docs
 unrefined_deform!
 unrefined_section_range
+panel_range
 deform!
 compute_refined_panel_mapping!
 compute_refined_section_interpolation!
@@ -124,11 +126,15 @@ same_knots
 polar_knots
 window_alpha
 assemble_polar_matrix
+load_polar_data
 load_matrix_polar_data
 read_aero_matrix
 read_dat_coordinates
 read_node_table
+read_arrow_columns
+read_csv_columns
 write_node_rows
+csv_fields
 convert_node_table
 delta_suffix
 interpolate_matrix_nans!
@@ -215,9 +221,8 @@ create_2d_polars
 lei_poly_coeffs
 resolve_airfoil
 write_dat
-csv_fields
-write_polar_csv
-write_polar_matrix_csv
+write_polar
+write_polar_matrix
 write_aero_matrix
 write_node_table
 flat_plate_cf
@@ -256,6 +261,9 @@ densify_contour
 create_interpolations
 find_circle_center_and_radius
 march_edges
+cut_station
+tip_station
+march_stations
 airfoils_from_yaml
 write_geometry_yaml
 resolve_aero_geometry

@@ -429,45 +429,43 @@ function calc_forces!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics;
     area_all_panels = zero(T)
     panel_areas = solver.sol.panel_area_dist
 
-    # Get wing properties
-    spanwise_direction = body_aero.wings[1].spanwise_direction
-
-    # Calculate wing geometry properties
     projected_area = body_aero.projected_area
     c_ref = body_aero.c_ref
-    
-    spanwise_unit = SVector{3, T}(spanwise_direction)
 
-    for (i, panel) in enumerate(panels)
-        panel_area = panel.chord * panel.width
-        area_all_panels += panel_area
-        panel_areas[i] = panel_area
+    for (wing_idx, wing) in enumerate(body_aero.wings)
+        spanwise_unit = SVector{3, T}(wing.spanwise_direction)
+        for i in panel_range(body_aero, wing_idx)
+            panel = panels[i]
+            panel_area = panel.chord * panel.width
+            area_all_panels += panel_area
+            panel_areas[i] = panel_area
 
-        axes = panel_axes(panel)
-        dirs = panel_force_directions(axes, alpha_corrected[i], spanwise_unit)
-        c_span = zero(T)
-        if solver.is_with_viscous_drag_correction
-            viscous = spanwise_flow_drag(v_rel_dist[i], solver.lr.v_span_dist[i],
-                panel.chord, density, solver.mu)
-            cd_dist[i] += viscous.delta_cd
-            c_span = viscous.c_span
+            axes = panel_axes(panel)
+            dirs = panel_force_directions(axes, alpha_corrected[i], spanwise_unit)
+            c_span = zero(T)
+            if solver.is_with_viscous_drag_correction
+                viscous = spanwise_flow_drag(v_rel_dist[i], solver.lr.v_span_dist[i],
+                    panel.chord, density, solver.mu)
+                cd_dist[i] += viscous.delta_cd
+                c_span = viscous.c_span
+            end
+            arm_vec = SVector{3, T}(panel.aero_center) - SVector{3, T}(reference_point)
+            loads = panel_body_loads(axes, dirs,
+                dynamic_pressure(density, density, v_rel_dist[i]),
+                cl_dist[i], cd_dist[i], cm_dist[i], c_span, arm_vec)
+            lift[i] = loads.lift
+            drag[i] = loads.drag
+            panel_moment_dist[i] = loads.moment
+
+            force = loads.force
+            @inbounds for k in 1:3
+                solver.sol.f_body_3D[k, i] = force[k]
+                solver.sol.m_body_3D[k, i] = loads.body_moment[k]
+            end
+
+            arm = (moment_frac - 0.25) * panel.chord
+            moment_dist[i] = dot(force, axes.z_airf) * arm + loads.pitching_moment
         end
-        arm_vec = SVector{3, T}(panel.aero_center) - SVector{3, T}(reference_point)
-        loads = panel_body_loads(axes, dirs,
-            dynamic_pressure(density, density, v_rel_dist[i]),
-            cl_dist[i], cd_dist[i], cm_dist[i], c_span, arm_vec)
-        lift[i] = loads.lift
-        drag[i] = loads.drag
-        panel_moment_dist[i] = loads.moment
-
-        force = loads.force
-        @inbounds for k in 1:3
-            solver.sol.f_body_3D[k, i] = force[k]
-            solver.sol.m_body_3D[k, i] = loads.body_moment[k]
-        end
-
-        arm = (moment_frac - 0.25) * panel.chord
-        moment_dist[i] = dot(force, axes.z_airf) * arm + loads.pitching_moment
     end
 
     # Python parity: normalize with area-weighted reference velocity for distributed inflow.
@@ -514,11 +512,11 @@ function calc_forces!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics;
         width_unrefined_dist .= 0.0
         fill!(unrefined_count_dist, 0)
 
-        panel_idx = 1
         for (wing_idx, wing) in enumerate(body_aero.wings)
             if wing.n_unrefined_sections > 0
                 section_range = unrefined_section_range(body_aero, wing_idx)
-                for local_panel_idx in 1:wing.n_panels
+                wing_panels = panel_range(body_aero, wing_idx)
+                for (local_panel_idx, panel_idx) in enumerate(wing_panels)
                     panel = body_aero.panels[panel_idx]
                     original_section_idx = wing.refined_panel_mapping[local_panel_idx]
                     target_unrefined_idx = section_range[original_section_idx]
@@ -540,7 +538,6 @@ function calc_forces!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics;
                     width_unrefined_dist[target_unrefined_idx] += panel.width
 
                     unrefined_count_dist[target_unrefined_idx] += 1
-                    panel_idx += 1
                 end
 
                 # Average coefficients and geometry. width and
@@ -562,9 +559,6 @@ function calc_forces!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics;
                         # sum of panel widths in the unrefined section
                     end
                 end
-            else
-                # Skip panels for wings with no unrefined sections
-                panel_idx += wing.n_panels
             end
         end
     end
