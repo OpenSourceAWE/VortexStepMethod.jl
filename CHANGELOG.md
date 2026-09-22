@@ -108,6 +108,11 @@
 - Inside its vortex core, `velocity_3D_trailing_vortex!` induces an azimuthal velocity
   instead of a radial one. Only points within the millimetre-scale Oseen core of a
   panel's chordwise trailing segment were affected.
+- `panel_axes` takes the panel normal from the quarter-chord step, so the frame
+  closes as `z_airf = x_airf × y_airf` and `z_airf` is square to the bound
+  vortex. `alpha` is measured against that normal, so `cl`, `cd` and `cm` were
+  wrong on panels whose two sections have differently-directed chords — twist,
+  sweep or dihedral, not taper alone.
 
 ## VortexStepMethod v5.1.1 2026-09-12
 
