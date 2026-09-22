@@ -78,9 +78,9 @@
 ### Fixed
 
 - `linearize` with `AutoForwardDiff` gives the right Jacobian under Julia 1.12 with
-  `--check-bounds=yes`, as `Pkg.test` runs, on some AMD Zen 4/5 CPUs. With ten inputs,
-  ForwardDiff's full chunk, Julia miscompiled the per-panel force assembly there and the
-  Jacobian came out about 5% off.
+  `--check-bounds=yes`, as `Pkg.test` runs, on AMD Zen 4/5 CPUs with AVX-512. With ten
+  inputs, ForwardDiff's full chunk, LLVM 18's SLP vectorizer miscompiled the per-panel
+  force assembly there (JuliaLang/julia#62368) and the Jacobian came out about 5% off.
 - On a body whose wings span different directions, such as a wing and a vertical fin,
   `solve!`, `solve` and `linearize` take each panel's lift, drag and side directions
   from its own wing's `spanwise_direction`, not the first wing's. `solve` computes
