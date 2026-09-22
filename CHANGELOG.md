@@ -82,6 +82,11 @@
   from its own wing's `spanwise_direction`, not the first wing's. `solve` computes
   `wing_span` and `aspect_ratio_projected` from the extent of all wings along the
   first wing's span, through the new `calculate_span(wings, spanwise_direction)`.
+- `plot_combined_analysis` saves the figure when `is_save` is true, spans its title over
+  the whole figure, frames the wing geometry, and draws literature polars dashed as
+  `plot_polars` does.
+- `plot_polars` and `plot_combined_analysis` draw a CS that is zero up to round-off as a
+  flat line instead of scaling the axis to the 1e-16 noise.
 - `ELLIPTIC` initial circulation works on a body with more than one wing, where it threw
   an `ArgumentError`: each wing gets an ellipse over its own span, along its own
   `spanwise_direction` and centred on its own mid-span, also for a single wing off y = 0.

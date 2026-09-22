@@ -590,6 +590,21 @@ function set_axes_equal_makie!(ax, panels; zoom=1.8)
 end
 
 """
+    widen_flat_ylims!(ax, series; min_span=0.1)
+
+Set the y-limits of `ax` to span at least `min_span` around the non-NaN values of
+all vectors in `series`, so that round-off noise on a zero quantity plots flat.
+"""
+function widen_flat_ylims!(ax, series; min_span=0.1)
+    values = filter(!isnan, reduce(vcat, series))
+    isempty(values) && return
+    low, high = extrema(values)
+    high - low >= min_span && return
+    mid = (low + high) / 2
+    ylims!(ax, mid - min_span / 2, mid + min_span / 2)
+end
+
+"""
     create_geometry_plot_makie(body_aero::BodyAerodynamics, title,
                                view_elevation, view_azimuth; zoom=1.8)
 
@@ -989,6 +1004,7 @@ function VortexStepMethod.plot_polars(
                     markersize=markersize, linestyle)
             end
         end
+        widen_flat_ylims!(ax_cs, [pd[4] for pd in polar_data_list])
         Legend(fig[3, 1:3], ax_cl;
             orientation=:horizontal, tellwidth=false,
             tellheight=true)
@@ -1035,6 +1051,7 @@ function VortexStepMethod.plot_polars(
                     markersize=markersize, linestyle)
             end
         end
+        widen_flat_ylims!(ax_cs, [pd[4] for pd in polar_data_list])
         Legend(fig[3, :], ax_cl;
             orientation=:horizontal, tellwidth=false,
             tellheight=true)
@@ -1215,7 +1232,7 @@ function VortexStepMethod.plot_combined_analysis(
         # Fallback if screen detection fails
         Figure(size=(1800, 1200))
     end
-    Label(fig[0, :], title, fontsize=20, font=:bold)
+    Label(fig[0, 1:2], title, fontsize=20, font=:bold)
 
     # Use first body_aero for geometry and polar data display
     first_body = body_aeros[1]
@@ -1280,7 +1297,7 @@ function VortexStepMethod.plot_combined_analysis(
     plot_line_segment_makie!(ax_geo, [va_vector_begin, va_vector_end],
         :lightblue, "va")
 
-    set_axes_equal_makie!(ax_geo, panels; zoom=0.5)
+    set_axes_equal_makie!(ax_geo, panels; zoom=1.0)
     axislegend(ax_geo; position=:lt)
 
     # [1,2] Polar Data Surfaces or Curves
@@ -1448,21 +1465,26 @@ function VortexStepMethod.plot_combined_analysis(
 
     for (idx, (pd, lbl)) in enumerate(polar_series)
         color = colors[mod1(idx, length(colors))]
-        marker = idx == 1 ? :star5 : :circle
-        markersize = idx == 1 ? 12 : 8
+        marker = idx <= n_solvers ? :star5 : :circle
+        markersize = idx <= n_solvers ? 12 : 8
+        linestyle = idx <= n_solvers ? :solid : :dash
 
-        scatterlines!(ax_cl_polar, pd.angle, pd.cl; label=lbl, marker, markersize, color)
-        scatterlines!(ax_cd_polar, pd.angle, pd.cd; label=lbl, marker, markersize, color)
-        scatterlines!(ax_cs_polar, pd.angle, pd.cs; label=lbl, marker, markersize, color)
+        scatterlines!(ax_cl_polar, pd.angle, pd.cl;
+            label=lbl, marker, markersize, color, linestyle)
+        scatterlines!(ax_cd_polar, pd.angle, pd.cd;
+            label=lbl, marker, markersize, color, linestyle)
+        scatterlines!(ax_cs_polar, pd.angle, pd.cs;
+            label=lbl, marker, markersize, color, linestyle)
         if cl_over_cd
             cl_cd = pd.cl ./ pd.cd
             scatterlines!(ax_fourth_polar, pd.angle, cl_cd;
-                label=lbl, marker, markersize, color)
+                label=lbl, marker, markersize, color, linestyle)
         else
             scatterlines!(ax_fourth_polar, pd.cd, pd.cl;
-                label=lbl, marker, markersize, color)
+                label=lbl, marker, markersize, color, linestyle)
         end
     end
+    widen_flat_ylims!(ax_cs_polar, [pd.cs for (pd, _) in polar_series])
     Legend(fig[2, 2][3, :], ax_cl_polar;
         orientation=:horizontal, nbanks=2,
         tellwidth=false, tellheight=true)
@@ -1471,6 +1493,7 @@ function VortexStepMethod.plot_combined_analysis(
     colsize!(fig.layout, 1, Relative(0.6))
     colsize!(fig.layout, 2, Relative(0.4))
 
+    is_save && save_plot(fig, save_path, title; data_type)
     is_show && show_plot(fig; name=title)
 
     return fig

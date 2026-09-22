@@ -143,11 +143,14 @@ end
         angle_of_attack=30.0,
         va=va,
         title="Combined Analysis",
-        is_save=false,
+        data_type=".png",
+        save_path=save_dir,
+        is_save=true,
         is_show=false,
         cl_over_cd=true
     )
     @test fig isa Figure
+    @test isfile(joinpath(save_dir, "Combined_Analysis.png"))
 
     # Plot combined analysis with cl_over_cd=false
     fig = plot_combined_analysis(
@@ -162,6 +165,15 @@ end
         cl_over_cd=false
     )
     @test fig isa Figure
+
+    # CS of a symmetric wing is round-off noise; it must plot flat
+    fig = Figure()
+    ax_noise = Axis(fig[1, 1])
+    makie_ext.widen_flat_ylims!(ax_noise, [[1e-16, -1e-16], [0.0, NaN]])
+    @test ax_noise.limits[][2] == (-0.05, 0.05)
+    ax_wide = Axis(fig[1, 2])
+    makie_ext.widen_flat_ylims!(ax_wide, [[0.0, 0.5]])
+    @test isnothing(ax_wide.limits[][2])
 
     # Test polar data plotting
     body_aero = BodyAerodynamics([ram_wing])

@@ -279,6 +279,7 @@ span_axis
 create_geometry_plot_makie
 plot_line_segment_makie!
 set_axes_equal_makie!
+widen_flat_ylims!
 map_airfoil_3d
 fitted_airfoil_3d
 generated_slices
