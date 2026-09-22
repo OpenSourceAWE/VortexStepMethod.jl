@@ -81,7 +81,7 @@ wing_airfoils:
   reynolds: 1000000
   headers: [airfoil_id, type, info_dict]
   data:
-    - [1, polars, {csv_file_path: "nonexistent.csv"}]
+    - [1, polars, {polar_file_path: "nonexistent.csv"}]
 """
         write(test_yaml_path, yaml_content)
         
@@ -106,7 +106,7 @@ wing_airfoils:
   reynolds: 1000000
   headers: [airfoil_id, type, info_dict]
   data:
-    - [1, polars, {csv_file_path: ""}]
+    - [1, polars, {polar_file_path: ""}]
 """
         write(test_yaml_path, yaml_content)
         
@@ -129,7 +129,7 @@ wing_airfoils:
   reynolds: 1000000
   headers: [airfoil_id, type, info_dict]
   data:
-    - [1, polars, {csv_file_path: "polars/1.csv"}]
+    - [1, polars, {polar_file_path: "polars/1.csv"}]
 """
         write(test_yaml_path, yaml_content)
 
@@ -141,6 +141,18 @@ wing_airfoils:
         @test_throws ArgumentError Wing(test_yaml_path; spanwise_direction=[1.0, 0.0, 0.0])
     end
     
+    @testset "The legacy csv_file_path key still names the polar" begin
+        legacy = replace(read(test_data_path("yaml_geometry", "simple_wing.yaml"), String),
+                         "polar_file_path" => "csv_file_path")
+        legacy_path = joinpath(work_dir, "legacy_wing.yaml")
+        write(legacy_path, legacy)
+        cp(test_data_path("yaml_geometry", "standard_airfoil.csv"),
+           joinpath(work_dir, "standard_airfoil.csv"); force=true)
+        wing = Wing(legacy_path; n_panels=2)
+        @test wing.unrefined_sections[1].aero_model == POLAR_VECTORS
+        @test wing.unrefined_sections[1].aero_data isa Tuple
+    end
+
     @testset "Relative Path Resolution" begin
         # Test that relative paths in CSV files are resolved relative to YAML file
         subdir = joinpath(work_dir, "subtest")

@@ -1,6 +1,7 @@
 using Test
 using VortexStepMethod.ObjAdapter
 using VortexStepMethod
+using VortexStepMethod: load_polar_data
 using VortexStepMethod.AirfoilAero: NeuralFoilSolver
 using LinearAlgebra
 import YAML
@@ -72,7 +73,8 @@ obj_path = normpath(joinpath(@__DIR__, "..", "..",
             verbose=false)
         @test isfile(yaml)
         info = Dict(YAML.load_file(yaml)["wing_airfoils"]["data"][1][3])
-        @test all(haskey(info, k) for k in ("dat_file", "csv_file_path", "cp_file", "cf_file"))
+        @test all(haskey(info, k)
+                  for k in ("dat_file", "polar_file_path", "cp_file", "cf_file"))
         @test isfile(joinpath(outdir, info["dat_file"]))
         @test isfile(joinpath(outdir, info["cp_file"]))
         @test isfile(joinpath(outdir, info["cf_file"]))
@@ -86,15 +88,20 @@ obj_path = normpath(joinpath(@__DIR__, "..", "..",
             alpha_range=-4:2:4, aero_solver=NeuralFoilSolver(model_size="medium"),
             verbose=false)
         csv_info = Dict(YAML.load_file(csv_yaml)["wing_airfoils"]["data"][1][3])
+        write(csv_yaml, replace(read(csv_yaml, String),
+                                "polar_file_path" => "csv_file_path"))
 
         arrow_yaml = obj_to_yaml(obj_path, outdir; n_sections=3, Re=5e5,
             verbose=false, table_format=:arrow)
         info = Dict(YAML.load_file(arrow_yaml)["wing_airfoils"]["data"][1][3])
-        @test endswith(info["cp_file"], ".arrow")
-        @test endswith(info["cf_file"], ".arrow")
-        @test isfile(joinpath(outdir, info["cp_file"]))
-        @test isfile(joinpath(outdir, info["cf_file"]))
-        @test isfile(joinpath(outdir, csv_info["cp_file"]))
+        @test !haskey(info, "csv_file_path")
+        for key in ("cp_file", "cf_file", "polar_file_path")
+            @test endswith(info[key], ".arrow")
+            @test isfile(joinpath(outdir, info[key]))
+            @test isfile(joinpath(outdir, csv_info[key]))
+        end
+        @test isequal(load_polar_data(joinpath(outdir, info["polar_file_path"])),
+                      load_polar_data(joinpath(outdir, csv_info["polar_file_path"])))
         @test Wing(arrow_yaml; n_panels=4) isa Wing
 
         # already in that format: nothing to convert, YAML untouched
@@ -120,7 +127,7 @@ obj_path = normpath(joinpath(@__DIR__, "..", "..",
         @test !isfile(joinpath(tables, "geometry.yaml"))
 
         info = Dict(YAML.load_file(yaml_path)["wing_airfoils"]["data"][1][3])
-        for key in ("csv_file_path", "dat_file")
+        for key in ("polar_file_path", "dat_file")
             @test startswith(info[key], "tables/")
             @test isfile(joinpath(dirname(yaml_path), info[key]))
         end
@@ -130,6 +137,29 @@ obj_path = normpath(joinpath(@__DIR__, "..", "..",
 
         @test ObjAdapter.table_path_prefix(joinpath(tables, "geometry.yaml"),
                                            tables) == ""
+    end
+
+    @testset "resolve_aero_geometry writes neuralfoil polars as table_format" begin
+        dir = mktempdir()
+        cp(joinpath(@__DIR__, "..", "airfoil_aero", "data", "test_airfoil.dat"),
+           joinpath(dir, "airfoil.dat"))
+        yaml_in = joinpath(dir, "awesio.yaml")
+        write_yaml(yaml_in, Dict(
+            "wing_sections" => Dict(
+                "headers" => ["airfoil_id", "LE_x", "LE_y", "LE_z", "TE_x", "TE_y", "TE_z"],
+                "data" => [Any[1, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0],
+                           Any[1, 0.0, -1.0, 0.0, 1.0, -1.0, 0.0]]),
+            "wing_airfoils" => Dict(
+                "alpha_range" => [-4, 4, 2], "reynolds" => 5e5,
+                "headers" => ["airfoil_id", "type", "info_dict"],
+                "data" => [Any[1, "neuralfoil", Dict("dat_file_path" => "airfoil.dat",
+                                                     "model_size" => "medium")]])))
+        yaml_out = resolve_aero_geometry(yaml_in, joinpath(dir, "out");
+                                         table_format=:arrow, verbose=false)
+        info = YAML.load_file(yaml_out)["wing_airfoils"]["data"][1][3]
+        @test endswith(info["polar_file_path"], "1.arrow")
+        @test isfile(info["polar_file_path"])
+        @test Wing(yaml_out; n_panels=2).unrefined_sections[1].aero_model == POLAR_VECTORS
     end
 
     @testset "write_yaml emits nested and scalar values" begin
