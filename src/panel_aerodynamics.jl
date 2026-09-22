@@ -204,7 +204,7 @@ end
 with `arm` the vector from that point to the aerodynamic center.
 """
 @noinline function panel_body_loads(axes, dirs, q_dyn, cl, cd, cm, c_span, arm)
-    # Not inlined: Julia 1.12 miscompiles the inlined form for 10-partial Duals on Zen 4/5.
+    # Not inlined: Julia 1.12 --check-bounds=yes miscompiles it for Dual{10} on Zen 4/5.
     loads = panel_loads(axes, dirs, q_dyn, cl, cd, cm; c_span)
     return (; loads...,
             body_moment=loads.pitching_moment .* axes.y_airf .+ cross(arm, loads.force))
