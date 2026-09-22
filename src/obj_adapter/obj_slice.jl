@@ -285,7 +285,8 @@ function cut_station(vertices, faces, point, tangent)
         push!(crossings, start_point)
         push!(crossings, end_point)
     end
-    return (; le=argmin(pt -> pt[1], crossings), te=argmax(pt -> pt[1], crossings))
+    return (; le=argmin(crossing -> crossing[1], crossings),
+            te=argmax(crossing -> crossing[1], crossings))
 end
 
 """
@@ -340,15 +341,11 @@ end
 """
     march_edges(vertices, faces; step) -> (; le, te, point, tangent)
 
-March the leading edge outward from mid-span in both directions in steps of arc
-length `step`. Each cut is a vertical spanwise plane (both the chordwise and vertical
-components of the running LE tangent dropped from the normal) so a tip that curls
-downward can't tilt the plane toward horizontal, where its min-chord "LE" pick would
-jump across the wing. Marching stops when the leading edge stops advancing spanwise.
-Cuts sample mesh *edges*, so the picks are robust to vertex density. Returns, ordered
-along the span, the LE/TE points, each cut's plane origin, and the LE tangent: the
-central difference over the neighbouring stations, where the end stations reuse their
-inner neighbour's. Build the airfoil for a chosen station with `build_section`.
+Cut the mesh at mid-span and march the leading edge outward from there in both
+directions with `march_stations`. Returns, ordered along the span, the LE/TE points,
+each cut's plane origin, and the LE tangent: the central difference over the
+neighbouring stations, where the end stations reuse their inner neighbour's. Build the
+airfoil for a chosen station with `build_section`.
 """
 function march_edges(vertices, faces; step)
     ys = [v[2] for v in vertices]
@@ -362,10 +359,10 @@ function march_edges(vertices, faces; step)
     negative_y = march_stations(vertices, faces, mid_cut.le, step, -1.0)
     positive_y = march_stations(vertices, faces, mid_cut.le, step, 1.0)
     rows = vcat(reverse(negative_y), [center], positive_y)
-    le = [r.le for r in rows]
+    le = [row.le for row in rows]
     middle = clamp.(eachindex(le), 2, length(le) - 1)
     tangent = [normalize(le[j + 1] .- le[j - 1]) for j in middle]
-    return (; le, te=[r.te for r in rows], point=[r.point for r in rows], tangent)
+    return (; le, te=[row.te for row in rows], point=[row.point for row in rows], tangent)
 end
 
 """
