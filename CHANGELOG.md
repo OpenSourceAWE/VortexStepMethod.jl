@@ -88,6 +88,11 @@
 - `shrink_wrap` cuts out the loops its `clearance` offset makes on a thin canopy, so a
   V3 section wrapped at the default `MeshSettings` is a simple closed curve and no longer
   warns; 6 of 18 crossed themselves.
+- On a body whose wings span different directions, such as a wing and a vertical fin,
+  `solve!`, `solve` and `linearize` take each panel's lift, drag and side directions
+  from its own wing's `spanwise_direction`, not the first wing's. `solve` computes
+  `wing_span` and `aspect_ratio_projected` from the extent of all wings along the
+  first wing's span, through the new `calculate_span(wings, spanwise_direction)`.
 - `ELLIPTIC` initial circulation works on a body with more than one wing, where it threw
   an `ArgumentError`: each wing gets an ellipse over its own span, along its own
   `spanwise_direction` and centred on its own mid-span, also for a single wing off y = 0.
@@ -114,6 +119,11 @@
 - Inside its vortex core, `velocity_3D_trailing_vortex!` induces an azimuthal velocity
   instead of a radial one. Only points within the millimetre-scale Oseen core of a
   panel's chordwise trailing segment were affected.
+- `panel_axes` takes the panel normal from the quarter-chord step, so the frame
+  closes as `z_airf = x_airf × y_airf` and `z_airf` is square to the bound
+  vortex. `alpha` is measured against that normal, so `cl`, `cd` and `cm` were
+  wrong on panels whose two sections have differently-directed chords — twist,
+  sweep or dihedral, not taper alone.
 
 ## VortexStepMethod v5.1.1 2026-09-12
 
