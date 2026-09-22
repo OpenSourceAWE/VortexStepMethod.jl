@@ -16,10 +16,11 @@ the wrapped airfoil the solver analyses; `x_raw`/`y_raw` the raw points it enclo
 Writes into `output_dir` (indexed by `id`), one directory per file kind:
 `airfoils/{id}.dat` (wrapped shape), `airfoils/{id}_{delta_suffix(δ)}.dat` (per
 deflection), `airfoils/{id}_raw.dat` (raw points); `pressure/{id}_cp.{table_format}` /
-`_cf.{table_format}` (per-node surface pressure and skin friction, `:csv` or the far
-faster-loading `:arrow`); and `polars/{id}.csv` (`POLAR_VECTORS`, or a `POLAR_MATRICES`
-grid when `delta_range` is set). `aero_solver` selects the backend
-([`NeuralFoilSolver`](@ref) default, [`XFoilSolver`](@ref) opt-in).
+`_cf.{table_format}` (per-node surface pressure and skin friction); and
+`polars/{id}.{table_format}` (`POLAR_VECTORS`, or a `POLAR_MATRICES` grid when
+`delta_range` is set). `table_format` is `:csv` or the far faster-loading `:arrow`.
+`aero_solver` selects the backend ([`NeuralFoilSolver`](@ref) default,
+[`XFoilSolver`](@ref) opt-in).
 
 With `reuse_valid_airfoils=true` an airfoil the solver cannot converge is skipped
 (the caller maps its sections to the nearest solved id); otherwise it errors.
@@ -37,7 +38,7 @@ function generate_airfoils(airfoils, output_dir::String;
     for af in airfoils
         j = af.id
         raw_rel = joinpath("airfoils", "$(j)_raw.dat")
-        csv_rel = joinpath("polars", "$j.csv")
+        polar_rel = joinpath("polars", "$j.$table_format")
         try
             alphas = deg2rad.(collect(Float64, alpha_range))
             deltas = isnothing(delta_range) ? [0.0] :
@@ -49,11 +50,11 @@ function generate_airfoils(airfoils, output_dir::String;
             clvals = collect(sol.cl for sol in sols[1])
             all(isnan, clvals) && error("solver produced no converged points")
             if isnothing(delta_range)
-                write_polar_csv(joinpath(output_dir, csv_rel), sols[1])
+                write_polar(joinpath(output_dir, polar_rel), sols[1])
             else
                 coeff(f) = [f(sols[jd][ia]) for ia in eachindex(alphas),
                             jd in eachindex(deltas)]
-                write_polar_matrix_csv(joinpath(output_dir, csv_rel), alphas, deltas,
+                write_polar_matrix(joinpath(output_dir, polar_rel), alphas, deltas,
                     coeff(s -> s.cl), coeff(s -> s.cd), coeff(s -> s.cm))
             end
             paths = write_section_aero(joinpath(output_dir, "airfoils", "$j"), aero;
@@ -63,7 +64,7 @@ function generate_airfoils(airfoils, output_dir::String;
                       af.x_raw, af.y_raw)
             push!(airfoil_rows, Any[j, "polar_vectors",
                 Dict("dat_file" => dat_rel, "raw_dat_file" => raw_rel,
-                     "csv_file_path" => csv_rel, "cp_file" => cp_rel,
+                     "polar_file_path" => polar_rel, "cp_file" => cp_rel,
                      "cf_file" => cf_rel)])
             push!(ok, j)
             finite_cl = [v for v in clvals if !isnan(v)]

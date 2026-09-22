@@ -1686,25 +1686,31 @@ end
 
 """
     spanwise_extent(wing::AbstractWing)
+    spanwise_extent(wings, spanwise_direction)
 
 Lowest and highest projection of the unrefined sections' LE and TE points on `wing`'s
-`spanwise_direction`, as `(lo, hi)` [m].
+`spanwise_direction`, or of all `wings` on `spanwise_direction`, as `(lo, hi)` [m].
 """
-function spanwise_extent(wing::AbstractWing)
-    axis = normalize(wing.spanwise_direction)
-    return extrema(dot(point, axis) for section in wing.unrefined_sections
+function spanwise_extent(wings, spanwise_direction)
+    axis = normalize(spanwise_direction)
+    return extrema(dot(point, axis) for wing in wings
+                   for section in wing.unrefined_sections
                    for point in (section.LE_point, section.TE_point))
 end
+spanwise_extent(wing::AbstractWing) = spanwise_extent((wing,), wing.spanwise_direction)
 
 """
     calculate_span(wing::AbstractWing)
+    calculate_span(wings, spanwise_direction)
 
-Wing span along `spanwise_direction` [m].
+Extent [m] of the unrefined sections of `wing` along its spanwise direction, or of all
+`wings` together along `spanwise_direction`.
 """
-function calculate_span(wing::AbstractWing)
-    lo, hi = spanwise_extent(wing)
+function calculate_span(wings, spanwise_direction)
+    lo, hi = spanwise_extent(wings, spanwise_direction)
     return hi - lo
 end
+calculate_span(wing::AbstractWing) = calculate_span((wing,), wing.spanwise_direction)
 
 # Project point onto plane
 @inline function project_onto_plane!(point_proj, point, normal)

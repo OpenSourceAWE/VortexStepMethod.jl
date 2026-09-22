@@ -4,6 +4,7 @@ using LinearAlgebra
 import YAML
 using ..AirfoilAero: shrink_wrap, ShrinkWrap, read_dat_coordinates,
     generate_airfoils, write_geometry_yaml, NeuralFoilSolver, AbstractAirfoilSolver
+using ..ObjAdapter: migrate_node_tables
 
 """
     surfplan_to_aero_yaml(adapter_dir, output_dir; aero_solver=NeuralFoilSolver(),
@@ -25,14 +26,16 @@ default, [`XFoilSolver`](@ref VortexStepMethod.AirfoilAero.XFoilSolver) opt-in).
 Sections that share an airfoil generate its
 tables once. `Re` defaults to the export's `wing_airfoils.reynolds`; `alpha_range`
 defaults to the full `-180:1:180` sweep rather than the export's narrow polar range.
-`table_format` writes the per-node surface tables as `:csv` (default, readable) or
-`:arrow` (binary, an order of magnitude faster to load).
+`table_format` writes the per-node surface tables and the polars as `:csv` (default,
+readable) or `:arrow` (binary, an order of magnitude faster to load).
 
 The `.txt` → adapter-YAML step (the upstream Python `SurfplanAdapter`) is the
 documented prerequisite. Load the result with `Wing(geometry_yaml_path)`.
 
-An existing `geometry.yaml` in `output_dir` is reused as-is, skipping the expensive
-polar generation; set `force=true` to regenerate the polars.
+An existing `geometry.yaml` in `output_dir` is reused, skipping the expensive polar
+generation, with its tables converted to `table_format` where they are in another
+([`migrate_node_tables`](@ref VortexStepMethod.ObjAdapter.migrate_node_tables)); set
+`force=true` to regenerate the polars.
 """
 function surfplan_to_aero_yaml(adapter_dir::AbstractString, output_dir::AbstractString;
         aero_solver::AbstractAirfoilSolver=NeuralFoilSolver(),
@@ -43,7 +46,7 @@ function surfplan_to_aero_yaml(adapter_dir::AbstractString, output_dir::Abstract
     yaml_path = joinpath(output_dir, "geometry.yaml")
     if !force && isfile(yaml_path)
         verbose && @info "Reusing existing $yaml_path (pass force=true to regenerate)"
-        return yaml_path
+        return migrate_node_tables(yaml_path, output_dir, table_format; verbose)
     end
     data = YAML.load_file(joinpath(adapter_dir, "aero_geometry.yaml"))
     wing_sections = data["wing_sections"]["data"]

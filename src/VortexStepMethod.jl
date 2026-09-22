@@ -15,6 +15,7 @@ using SciMLBase
 import NonlinearSolve: solve, solve!
 using Interpolations
 using Parameters
+using Printf: @sprintf
 using Serialization
 using Timers
 using PreallocationTools

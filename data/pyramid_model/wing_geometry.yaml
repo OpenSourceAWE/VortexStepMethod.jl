@@ -23,7 +23,7 @@ wing_airfoils:
   reynolds: 1e6
   headers: [airfoil_id, type, info_dict]
   data:
-    - [1, polars, {csv_file_path: "polars/V3_kite_midspan_airfoil_polar.csv"}]
+    - [1, polars, {polar_file_path: "polars/V3_kite_midspan_airfoil_polar.csv"}]
 
 bridle_nodes:
   # ---------------------------------------------------------------

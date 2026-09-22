@@ -26,9 +26,20 @@
   and at flap deflection `delta`, in one figure instead of one coefficient per call.
 - `linearize` takes a `BodyAerodynamics` with more than one wing; `theta_idxs` and
   `delta_idxs` then run over the unrefined sections of all wings in order.
+- `table_format=:arrow` writes the polars as `.arrow`, like the per-node `Cp`/`cf`
+  tables: `write_polar` and `write_polar_matrix` write Arrow for an `.arrow` path and
+  `load_polar_data` reads it. `resolve_aero_geometry` takes `table_format` too, for the
+  polars it generates. `obj_to_yaml` and `surfplan_to_aero_yaml` convert a reused
+  dataset's polars and node tables to `table_format`. A CSV polar loads as before
+  when every column is numeric; one with a non-numeric column warns and loads as
+  `INVISCID`.
 
 ### Changed
 
+- BREAKING: `write_polar_csv` is `write_polar` and `write_polar_matrix_csv` is
+  `write_polar_matrix`. The geometry YAML names the polar `polar_file_path`; the old
+  key `csv_file_path` is still read, and `obj_to_yaml` rewrites it when it migrates a
+  dataset.
 - BREAKING: artificial damping is removed: the `is_with_artificial_damping` and
   `artificial_damping` keyword arguments of `Solver`, and the `artificial_damping`, `k2`
   and `k4` solver settings. `k2` and `k4` had no effect; `artificial_damping: true`
@@ -66,6 +77,11 @@
 
 ### Fixed
 
+- On a body whose wings span different directions, such as a wing and a vertical fin,
+  `solve!`, `solve` and `linearize` take each panel's lift, drag and side directions
+  from its own wing's `spanwise_direction`, not the first wing's. `solve` computes
+  `wing_span` and `aspect_ratio_projected` from the extent of all wings along the
+  first wing's span, through the new `calculate_span(wings, spanwise_direction)`.
 - `perpendicular_sections` and `obj_to_yaml` orient each cut by the leading edge through
   the neighbouring stations, not by the step that reached the station, which near a
   closing tip grazed the surface and returned an 80%-thick section. Every section moves
@@ -78,7 +94,7 @@
   points below and above `y = 0`, which on a cambered section put the hinge near the
   chord line or on the wrong surface. Polars with a flap deflection change slightly.
   It throws an `ArgumentError` for a contour that crosses that line fewer than twice.
-- `write_polar_csv` for `SectionSolution`s, `write_polar_matrix_csv` and `write_aero_matrix`
+- `write_polar` for `SectionSolution`s, `write_polar_matrix` and `write_aero_matrix`
   write coefficients at 16 significant digits instead of 4 decimals, so a `POLAR_MATRICES`
   table carries the drag response to a small flap deflection. Regenerate existing tables
   to benefit.
@@ -96,6 +112,11 @@
 - Inside its vortex core, `velocity_3D_trailing_vortex!` induces an azimuthal velocity
   instead of a radial one. Only points within the millimetre-scale Oseen core of a
   panel's chordwise trailing segment were affected.
+- `panel_axes` takes the panel normal from the quarter-chord step, so the frame
+  closes as `z_airf = x_airf × y_airf` and `z_airf` is square to the bound
+  vortex. `alpha` is measured against that normal, so `cl`, `cd` and `cm` were
+  wrong on panels whose two sections have differently-directed chords — twist,
+  sweep or dihedral, not taper alone.
 
 ## VortexStepMethod v5.1.1 2026-09-12
 
