@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- A `POLY` section's cl and cd no longer jump at |α| = 20°: they blend from the
+  α-polynomial into the flat-plate post-stall form over 20°–25°. Past 20°, cl now has
+  the sign of α and cd stays positive, and cm holds its ±20° value instead of running
+  its quadratic unbounded. Results inside ±20° are unchanged.
+
 ## VortexStepMethod v6.0.0 2026-09-23
 
 ### Added

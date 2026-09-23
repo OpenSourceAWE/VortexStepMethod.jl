@@ -1,4 +1,7 @@
 using VortexStepMethod: Panel, Section, calculate_relative_alpha_and_relative_velocity, calculate_cl, calculate_cd_cm, reinit!, INVISCID, POLAR_VECTORS, MVec3
+using VortexStepMethod: Wing, add_section!, refine!, BodyAerodynamics, POLY, LINEAR,
+                        calculate_cd, calculate_cm
+using VortexStepMethod.AirfoilAero: lei_poly_coeffs
 using VortexStepMethod: panel_axes, panel_span_vector
 using Interpolations: linear_interpolation, Line
 using LinearAlgebra
@@ -214,5 +217,40 @@ end
         @test isapprox(flipped.y_airf, -axes.y_airf; atol=1e-12)
         @test isapprox(flipped.z_airf, -axes.z_airf; atol=1e-12)
         @test isapprox(flipped.x_airf, axes.x_airf; atol=1e-12)
+    end
+end
+
+@testset "POLY polar is continuous past its ±20° fit range" begin
+    coeffs = lei_poly_coeffs(0.1, 0.08)
+    wing = Wing(2; spanwise_distribution=LINEAR)
+    add_section!(wing, [0.0, 1.0, 0.0], [1.0, 1.0, 0.0], POLY, coeffs)
+    add_section!(wing, [0.0, -1.0, 0.0], [1.0, -1.0, 0.0], POLY, coeffs)
+    refine!(wing)
+    panel = BodyAerodynamics([wing]).panels[1]
+    polar(alpha) = (calculate_cl(panel, alpha), calculate_cd(panel, alpha),
+                    calculate_cm(panel, alpha))
+
+    @testset "the polynomial is untouched inside ±20°" begin
+        for alpha in deg2rad.(-20:0.5:20)
+            @test polar(alpha) == evalpoly.(rad2deg(alpha), coeffs)
+        end
+    end
+    @testset "no coefficient jumps between samples 0.01° apart" begin
+        alphas = deg2rad.(-60:0.01:60)
+        values = reduce(hcat, collect.(polar.(alphas)))
+        @test maximum(abs, diff(values; dims=2)) < 0.01
+    end
+    @testset "post-stall lift is odd and drag even and positive" begin
+        for alpha in deg2rad.(25:5:85)
+            @test calculate_cl(panel, -alpha) ≈ -calculate_cl(panel, alpha)
+            @test calculate_cd(panel, -alpha) ≈ calculate_cd(panel, alpha)
+            @test calculate_cd(panel, alpha) > 0
+        end
+    end
+    @testset "cm holds its ±20° value past the fit range" begin
+        for alpha_deg in 20:5:90, side in (-1, 1)
+            @test calculate_cm(panel, deg2rad(side * alpha_deg)) ≈
+                  evalpoly(side * 20.0, coeffs[3])
+        end
     end
 end
