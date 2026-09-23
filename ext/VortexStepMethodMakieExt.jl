@@ -728,8 +728,8 @@ function VortexStepMethod.plot_geometry(body_aero::BodyAerodynamics, title;
 
     if is_save
         views = (angled=(15, -120), top=(90, 0), front=(0, 0), side=(0, -90))
-        for (view, (elevation, azimuth)) in pairs(views)
-            view_title = "$(title)_$(view)_view"
+        for (view_name, (elevation, azimuth)) in pairs(views)
+            view_title = "$(title)_$(view_name)_view"
             fig = create_geometry_plot_makie(body_aero, view_title, elevation, azimuth;
                 show_title)
             save_plot(fig, save_path, view_title; data_type)

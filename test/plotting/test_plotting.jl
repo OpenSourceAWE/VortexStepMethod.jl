@@ -184,8 +184,7 @@ end
     @test fig isa Figure
 
     @testset "show_title=false hides the title but still names the file" begin
-        fig = plot_geometry(body_aero, "Hidden geometry"; save_path=save_dir,
-            is_save=true, is_show=false)
+        fig = plot_geometry(body_aero, "Hidden geometry"; is_show=false)
         @test "Hidden geometry" in drawn_titles(fig)
         fig = plot_geometry(body_aero, "Hidden geometry"; data_type=".png",
             save_path=save_dir, is_save=true, is_show=false, show_title=false)
