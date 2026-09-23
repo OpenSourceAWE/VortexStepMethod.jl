@@ -429,7 +429,9 @@ end
     calculate_AIC_matrices!(body_aero::BodyAerodynamics, model::Model, core_radius_fraction,
                             va_dist, va_unit_dist, target=body_aero.AIC)
 
-Calculate Aerodynamic Influence Coefficient matrices.
+Calculate the velocity each panel's unit-strength vortex ring induces at every control
+point (`VSM`, less the panel's own 2D bound vortex) or aerodynamic centre (`LLT`, less
+the panel's own bound filament).
 
 See also: [`BodyAerodynamics`](@ref), [`Model`](@ref)
 
@@ -442,7 +444,6 @@ Returns: nothing
                               target::AbstractArray{T, 3}=body_aero.AIC) where {P, W, T}
     # Determine evaluation point based on model
     evaluation_point = model == VSM ? :control_point : :aero_center
-    evaluation_point_on_bound = model == LLT
 
     # Allocate work vectors for this function (separate from those used by child functions)
     velocity_induced = zeros(MVector{3, T})
@@ -479,7 +480,7 @@ Returns: nothing
                 tempvel,
                 filaments,
                 ep,
-                evaluation_point_on_bound,
+                model == LLT && icp == jring,
                 va,
                 va_unit,
                 one(T),
