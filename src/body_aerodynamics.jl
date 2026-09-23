@@ -580,12 +580,12 @@ function update_effective_angle_of_attack!(alpha_corrected,
 end
 
 """
-    induced_velocity(body_aero::BodyAerodynamics, point, gamma, core_radius_fraction)
+    induced_velocity_at(body_aero::BodyAerodynamics, point, gamma, core_radius_fraction)
 
 Velocity [m/s] induced at `point` by the horseshoe vortices of all panels, panel `j`
 carrying circulation `gamma[j]` [m²/s] and its frozen wake.
 """
-function induced_velocity(body_aero::BodyAerodynamics{P, W, T}, point, gamma,
+function induced_velocity_at(body_aero::BodyAerodynamics{P, W, T}, point, gamma,
         core_radius_fraction) where {P, W, T}
     velocity_ring = body_aero.work_vectors[8]
     velocity_filament = body_aero.work_vectors[9]
@@ -606,21 +606,25 @@ end
 
 Kutta–Joukowski force [N] on the two chordwise trailed vortex segments of panel `i`,
 from its quarter-chord bound points to its trailing edge, and its moment [N·m] about
-`reference_point`, as `(; force, moment)`. Each segment carries `gamma[i]` and sees the
-panel inflow plus the [`induced_velocity`](@ref) at its three-quarter-chord point.
+`reference_point`, as `(; force, moment)`. Each segment carries `gamma[i]` and sees, at
+its three-quarter-chord point, the inflow turned by `body_aero.omega` plus the
+[`induced_velocity_at`](@ref) that point.
 """
 function attached_trailed_loads(body_aero::BodyAerodynamics{P, W, T}, i, gamma, density,
         core_radius_fraction, reference_point) where {P, W, T}
     panel = body_aero.panels[i]
+    three_quarter_chord = (0.75 - 0.25) / (1 - 0.25)
     force = zero(SVector{3, T})
     moment = zero(SVector{3, T})
     segments = ((panel.bound_point_1, panel.TE_point_1, 1),
                 (panel.bound_point_2, panel.TE_point_2, -1))
     for (bound_point, te_point, orientation) in segments
         chordwise = SVector{3, T}(te_point) - SVector{3, T}(bound_point)
-        point = SVector{3, T}(bound_point) + (2 / 3) * chordwise
-        velocity = SVector{3, T}(panel.va_vec) +
-            induced_velocity(body_aero, point, gamma, core_radius_fraction)
+        point = SVector{3, T}(bound_point) + three_quarter_chord * chordwise
+        arm = point - SVector{3, T}(panel.control_point)
+        inflow = SVector{3, T}(panel.va_vec) - cross(SVector{3, T}(body_aero.omega), arm)
+        velocity = inflow +
+            induced_velocity_at(body_aero, point, gamma, core_radius_fraction)
         segment_force = (density * orientation * gamma[i]) * cross(velocity, chordwise)
         force += segment_force
         moment += cross(point - SVector{3, T}(reference_point), segment_force)
