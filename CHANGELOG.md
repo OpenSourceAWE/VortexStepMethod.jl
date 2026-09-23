@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- `plot_geometry`, `plot_distribution`, `plot_combined_analysis`, `plot_section_polars`,
+  `plot_airfoil_fit` and `plot_airfoils` take `show_title=true`; with `false` the title
+  is not drawn, and it still names the saved file and the window where it did.
+
 ## VortexStepMethod v6.0.0 2026-09-23
 
 ### Added

@@ -616,7 +616,7 @@ end
 
 """
     create_geometry_plot_makie(body_aero::BodyAerodynamics, title,
-                               view_elevation, view_azimuth; zoom=1.8)
+                               view_elevation, view_azimuth; zoom=0.5, show_title=true)
 
 Create a 3D Makie plot of wing geometry including panels and filaments.
 
@@ -627,10 +627,11 @@ Create a 3D Makie plot of wing geometry including panels and filaments.
 - `view_azimuth`: initial view azimuth angle [°]
 
 # Keyword arguments
-- `zoom`: zoom factor (default: 1.8)
+- `zoom`: zoom factor (default: 0.5)
+- `show_title`: draw `title` above the axis (default: true)
 """
 function create_geometry_plot_makie(body_aero::BodyAerodynamics, title,
-    view_elevation, view_azimuth; zoom=0.5)
+    view_elevation, view_azimuth; zoom=0.5, show_title=true)
     panels = body_aero.panels
     va_vec = getfield(body_aero, :va_vec)
 
@@ -638,6 +639,7 @@ function create_geometry_plot_makie(body_aero::BodyAerodynamics, title,
     fig = Figure(size=(1400, 1400))
     ax = Axis3(fig[1, 1];
         title=title,
+        titlevisible=show_title,
         xlabel="x", ylabel="y", zlabel="z",
         aspect=:data,
         azimuth=deg2rad(view_azimuth),
@@ -695,7 +697,8 @@ end
     plot_geometry(body_aero::BodyAerodynamics, title;
                   data_type=nothing, save_path=nothing,
                   is_save=false, is_show=false,
-                  view_elevation=15, view_azimuth=-120, use_tex=false)
+                  view_elevation=15, view_azimuth=-120, use_tex=false,
+                  show_title=true)
 
 Makie implementation of [`plot_geometry`](@ref).
 
@@ -711,6 +714,7 @@ Makie implementation of [`plot_geometry`](@ref).
 - `view_elevation`: View elevation angle in degrees (default: 15)
 - `view_azimuth`: View azimuth angle in degrees (default: -120)
 - `use_tex`: Ignored for Makie (default: false)
+- `show_title`: Whether to draw the title; it names the files either way (default: true)
 """
 function VortexStepMethod.plot_geometry(body_aero::BodyAerodynamics, title;
     data_type=nothing,
@@ -719,27 +723,21 @@ function VortexStepMethod.plot_geometry(body_aero::BodyAerodynamics, title;
     is_show=false,
     view_elevation=15,
     view_azimuth=-120,
-    use_tex=false)
+    use_tex=false,
+    show_title=true)
 
     if is_save
-        # Angled view
-        fig = create_geometry_plot_makie(body_aero, "$(title)_angled_view", 15, -120)
-        save_plot(fig, save_path, "$(title)_angled_view", data_type=data_type)
-
-        # Top view
-        fig = create_geometry_plot_makie(body_aero, "$(title)_top_view", 90, 0)
-        save_plot(fig, save_path, "$(title)_top_view", data_type=data_type)
-
-        # Front view
-        fig = create_geometry_plot_makie(body_aero, "$(title)_front_view", 0, 0)
-        save_plot(fig, save_path, "$(title)_front_view", data_type=data_type)
-
-        # Side view
-        fig = create_geometry_plot_makie(body_aero, "$(title)_side_view", 0, -90)
-        save_plot(fig, save_path, "$(title)_side_view", data_type=data_type)
+        views = (angled=(15, -120), top=(90, 0), front=(0, 0), side=(0, -90))
+        for (view, (elevation, azimuth)) in pairs(views)
+            view_title = "$(title)_$(view)_view"
+            fig = create_geometry_plot_makie(body_aero, view_title, elevation, azimuth;
+                show_title)
+            save_plot(fig, save_path, view_title; data_type)
+        end
     end
 
-    fig = create_geometry_plot_makie(body_aero, title, view_elevation, view_azimuth)
+    fig = create_geometry_plot_makie(body_aero, title, view_elevation, view_azimuth;
+        show_title)
 
     is_show && show_plot(fig; name=title)
 
@@ -758,7 +756,8 @@ span_axis(position, title, ylabel) =
 """
     plot_distribution(y_coordinates_list, results_list, label_list;
                       title="spanwise_distribution", data_type=nothing,
-                      save_path=nothing, is_save=false, is_show=true, use_tex=false)
+                      save_path=nothing, is_save=false, is_show=true, use_tex=false,
+                      show_title=true)
 
 Makie implementation of [`plot_distribution`](@ref).
 
@@ -774,6 +773,7 @@ Makie implementation of [`plot_distribution`](@ref).
 - `is_save`: Whether to save (default: false)
 - `is_show`: Whether to display (default: true)
 - `use_tex`: Ignored for Makie (default: false)
+- `show_title`: Whether to draw the title; it names the file either way (default: true)
 """
 function VortexStepMethod.plot_distribution(y_coordinates_list, results_list, label_list;
     title="spanwise_distribution",
@@ -781,7 +781,8 @@ function VortexStepMethod.plot_distribution(y_coordinates_list, results_list, la
     save_path=nothing,
     is_save=false,
     is_show=true,
-    use_tex=false)
+    use_tex=false,
+    show_title=true)
 
     length(results_list) == length(label_list) || throw(ArgumentError(
         "Number of results ($(length(results_list))) must match labels ($(length(label_list)))"
@@ -789,7 +790,7 @@ function VortexStepMethod.plot_distribution(y_coordinates_list, results_list, la
 
     # Create figure with 3x3 grid
     fig = Figure(size=(1600, 1000))
-    Label(fig[0, :], title, fontsize=20)
+    show_title && Label(fig[0, :], title, fontsize=20)
 
     # Row 1: CL, CD, Gamma
     ax_cl = span_axis(fig[1, 1], "CL Distribution", "Lift Coefficient CL")
@@ -1121,7 +1122,8 @@ end
                           view_elevation=15, view_azimuth=-120,
                           is_show=true, use_tex=false,
                           literature_path_list=String[],
-                          data_type=".png", save_path=nothing, is_save=false)
+                          data_type=".png", save_path=nothing, is_save=false,
+                          show_title=true)
 
 Makie implementation of [`plot_combined_analysis`](@ref).
 
@@ -1151,6 +1153,7 @@ Makie implementation of [`plot_combined_analysis`](@ref).
 - `is_save`: Save plots to files (default: false)
 - `cl_over_cd`: Plot CL/CD vs angle instead of CL vs CD (default: true)
 - `angle_of_attack_for_spanwise_distribution`: AoA for spanwise plots (default: 5.0)
+- `show_title`: Whether to draw the overall title (default: true)
 """
 function VortexStepMethod.plot_combined_analysis(
     solver,
@@ -1174,6 +1177,7 @@ function VortexStepMethod.plot_combined_analysis(
     is_save=false,
     angle_of_attack_for_spanwise_distribution=5.0,
     cl_over_cd=true,
+    show_title=true,
 )
     # Normalize inputs to arrays for consistent handling
     solvers = solver isa Vector ? solver : [solver]
@@ -1215,7 +1219,7 @@ function VortexStepMethod.plot_combined_analysis(
         # Fallback if screen detection fails
         Figure(size=(1800, 1200))
     end
-    Label(fig[0, 1:2], title, fontsize=20, font=:bold)
+    show_title && Label(fig[0, 1:2], title, fontsize=20, font=:bold)
 
     # Use first body_aero for geometry and polar data display
     first_body = body_aeros[1]
@@ -1486,7 +1490,7 @@ Implementation of [`plot_section_polars`](@ref); rendered through `MakieControlP
 function VortexStepMethod.plot_section_polars(body_aero::BodyAerodynamics;
     panels=eachindex(body_aero.panels), alphas=deg2rad.(-20:0.5:30), delta=nothing,
     is_show::Bool=true, is_save::Bool=false, save_path=nothing,
-    data_type::String=".png")
+    data_type::String=".png", show_title::Bool=true)
 
     panel_indices = vcat(panels)
     chosen_panels = body_aero.panels[panel_indices]
@@ -1496,7 +1500,8 @@ function VortexStepMethod.plot_section_polars(body_aero::BodyAerodynamics;
               for (i, panel) in zip(panel_indices, chosen_panels)]
 
     plt = MakieControlPlots.plotx(rad2deg.(alphas), cl, cd, cm;
-        xlabel="α [deg]", ylabels=["cl", "cd", "cm"], title="Section polars",
+        xlabel="α [deg]", ylabels=["cl", "cd", "cm"],
+        title=show_title ? "Section polars" : "",
         labels=[labels], disp=(is_show || is_save))
 
     if is_save && !isnothing(save_path)
@@ -1734,7 +1739,8 @@ function ObjAdapter.plot_slices_3d(path::String; n_slices::Int=10, rotation=I,
 end
 
 """
-    plot_airfoil_fit(x::Vector, y::Vector; title="Airfoil Fit", is_show=true)
+    plot_airfoil_fit(x::Vector, y::Vector; title="Airfoil Fit", is_show=true,
+                     show_title=true)
 
 Plot a single airfoil with its Kulfan CST fit.
 
@@ -1744,15 +1750,17 @@ Plot a single airfoil with its Kulfan CST fit.
 # Keyword Arguments
 - `title`: Plot title
 - `is_show`: Display figure
+- `show_title`: Draw the title; it names the window either way
 
 # Returns
 - Makie Figure object and the fitted `KulfanParameters`
 """
 function ObjAdapter.plot_airfoil_fit(x::Vector, y::Vector; title::String="Airfoil Fit",
-                                     is_show::Bool=true)
+                                     is_show::Bool=true, show_title::Bool=true)
     fig = Figure(size=(800, 400))
     ax = Axis(fig[1, 1];
               title=title,
+              titlevisible=show_title,
               xlabel="x/c",
               ylabel="y/c",
               aspect=DataAspect())
@@ -1790,7 +1798,7 @@ end
 """
     plot_airfoils(geometry_file; overlay=nothing, symmetric=false,
                   idxs=nothing, n_cols=3, is_show=true, is_save=false,
-                  save_path=nothing, data_type=".png")
+                  save_path=nothing, data_type=".png", show_title=true)
 
 Makie implementation of [`plot_airfoils`](@ref).
 
@@ -1801,11 +1809,12 @@ becomes unreadable. Both modes show the raw `_raw.dat` slice points as dots with
 the fitted airfoil as a line. Pass `idxs` (e.g. `idxs=[1]`) to plot only those
 airfoils by position; otherwise `symmetric=true` shows just the first half of the
 sections (the wing is mirror-symmetric, so the other half is redundant).
+`show_title=false` leaves the `"Airfoils: <file>"` title off the figure.
 """
 function ObjAdapter.plot_airfoils(geometry_file::String;
     overlay=nothing, symmetric::Bool=false, idxs=nothing, n_cols::Int=3,
     is_show::Bool=true, is_save::Bool=false, save_path=nothing,
-    data_type::String=".png")
+    data_type::String=".png", show_title::Bool=true)
 
     airfoils = ObjAdapter.airfoils_from_yaml(geometry_file)
     isempty(airfoils) && error("No airfoils with a dat_file found in $geometry_file")
@@ -1823,7 +1832,8 @@ function ObjAdapter.plot_airfoils(geometry_file::String;
         ids = [af.id for af in airfoils]
         crange = (minimum(ids), maximum(ids))
         fig = Figure(size=(900, 600))
-        ax = Axis(fig[1, 1]; title, xlabel="x/c", ylabel="y/c", aspect=DataAspect())
+        ax = Axis(fig[1, 1]; title, titlevisible=show_title, xlabel="x/c", ylabel="y/c",
+            aspect=DataAspect())
         for af in airfoils
             isempty(af.x_raw) || scatter!(ax, af.x_raw, af.y_raw;
                 color=af.id, colorrange=crange, colormap=:viridis, markersize=3)
@@ -1834,7 +1844,7 @@ function ObjAdapter.plot_airfoils(geometry_file::String;
         ncol = min(n_cols, n)
         nrow = ceil(Int, n / ncol)
         fig = Figure(size=(380 * ncol, 320 * nrow))
-        Label(fig[0, :], title, fontsize=16)
+        show_title && Label(fig[0, :], title, fontsize=16)
         for (i, af) in enumerate(airfoils)
             ax = Axis(fig[div(i - 1, ncol) + 1, mod1(i, ncol)];
                 title="Airfoil $(af.id)", xlabel="x/c", ylabel="y/c",
