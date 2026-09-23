@@ -93,6 +93,11 @@
   from its own wing's `spanwise_direction`, not the first wing's. `solve` computes
   `wing_span` and `aspect_ratio_projected` from the extent of all wings along the
   first wing's span, through the new `calculate_span(wings, spanwise_direction)`.
+- `plot_combined_analysis` saves the figure when `is_save` is true, spans its title over
+  the whole figure, frames the wing geometry, and draws literature polars dashed as
+  `plot_polars` does.
+- `plot_polars` and `plot_combined_analysis` draw a CS that is zero up to round-off as a
+  flat line instead of scaling the axis to the round-off noise.
 - `perpendicular_sections` and `obj_to_yaml` orient each cut by the leading edge through
   the neighbouring stations, not by the step that reached the station, which near a
   closing tip grazed the surface and returned an 80%-thick section. Every section moves
