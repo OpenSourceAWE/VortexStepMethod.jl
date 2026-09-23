@@ -4,6 +4,10 @@
 
 ### Fixed
 
+- A `POLY` section's cl and cd no longer jump at |α| = 20°: they blend from the
+  α-polynomial into the flat-plate post-stall form over 20°–25°. Past 20°, cl now has
+  the sign of α and cd stays positive, and cm holds its ±20° value instead of running
+  its quadratic unbounded. Results inside ±20° are unchanged.
 - The docs define the body frame as KiteUtils' `KA` frame: x from LE to TE, y towards
   the right tip, z = x × y up. The separate `KB` definition, whose `Z = Y × X` pointed
   down, is gone; the solver's frame is unchanged. CL, CD and CS are documented as

@@ -489,6 +489,32 @@ function calculate_relative_alpha_and_velocity(panel::Panel, induced_velocity)
     return flow.alpha, flow.v_eff
 end
 
+"Edge of the `POLY` α-polynomial fit [deg]."
+const POLY_FIT_LIMIT = 20.0
+"Width over which a `POLY` cl and cd blend into the flat-plate post-stall form [deg]."
+const POLY_BLEND_WIDTH = 5.0
+
+"Flat-plate post-stall lift coefficient at `alpha` [rad]."
+flat_plate_cl(alpha) = 2 * cos(alpha) * sin(alpha) * abs(sin(alpha))
+"Flat-plate post-stall drag coefficient at `alpha` [rad]."
+flat_plate_cd(alpha) = 2 * abs(sin(alpha))^3
+
+"""
+    blend_post_stall(coeffs, flat_plate, alpha)
+
+`POLY` coefficient at `alpha` [rad]: the α-polynomial `coeffs` (α in degrees) inside
+±`POLY_FIT_LIMIT`, the flat-plate form `flat_plate(alpha)` past ±(`POLY_FIT_LIMIT` +
+`POLY_BLEND_WIDTH`), and a cubic smoothstep between the two.
+"""
+function blend_post_stall(coeffs, flat_plate, alpha)
+    alpha_deg = rad2deg(alpha)
+    polynomial = evalpoly(alpha_deg, coeffs)
+    abs(alpha_deg) <= POLY_FIT_LIMIT && return polynomial
+    progress = min((abs(alpha_deg) - POLY_FIT_LIMIT) / POLY_BLEND_WIDTH, 1)
+    weight = progress^2 * (3 - 2progress)
+    return (1 - weight) * polynomial + weight * flat_plate(alpha)
+end
+
 """
     calculate_cl(panel::Panel, alpha)
     calculate_cl(panel::Panel, alpha, delta)
@@ -507,11 +533,7 @@ function calculate_cl(panel::Panel{Tp}, alpha::Ta, delta::Td) where {Tp, Ta, Td}
     isnan(alpha) && return R(NaN)
     alpha = window_alpha(panel, alpha)
     if panel.aero_model == POLY
-        cl = evalpoly(rad2deg(alpha), panel.cl_coeffs)
-        if abs(alpha) > (π/9)
-            cl = 2 * cos(alpha) * sin(alpha)^2
-        end
-        return R(cl)
+        return R(blend_post_stall(panel.cl_coeffs, flat_plate_cl, alpha))
     elseif panel.aero_model == INVISCID
         return R(2π * alpha)
     end
@@ -537,10 +559,7 @@ function calculate_cd(panel::Panel{Tp}, alpha::Ta, delta::Td) where {Tp, Ta, Td}
     isnan(alpha) && return R(NaN)
     alpha = window_alpha(panel, alpha)
     if panel.aero_model == POLY
-        if abs(alpha) > (π/9)  # Outside ±20 degrees
-            return R(2 * sin(alpha)^3)
-        end
-        return R(evalpoly(rad2deg(alpha), panel.cd_coeffs))
+        return R(blend_post_stall(panel.cd_coeffs, flat_plate_cd, alpha))
     elseif panel.aero_model in (POLAR_VECTORS, POLAR_MATRICES)
         cd_interp = panel.cd_interp
         cd_interp === nothing &&
@@ -567,7 +586,8 @@ function calculate_cm(panel::Panel{Tp}, alpha::Ta, delta::Td) where {Tp, Ta, Td}
     isnan(alpha) && return R(NaN)
     alpha = window_alpha(panel, alpha)
     if panel.aero_model == POLY
-        return R(evalpoly(rad2deg(alpha), panel.cm_coeffs))
+        return R(evalpoly(clamp(rad2deg(alpha), -POLY_FIT_LIMIT, POLY_FIT_LIMIT),
+                          panel.cm_coeffs))
     elseif panel.aero_model in (POLAR_VECTORS, POLAR_MATRICES)
         cm_interp = panel.cm_interp
         cm_interp === nothing &&

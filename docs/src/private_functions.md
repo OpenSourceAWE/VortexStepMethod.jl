@@ -124,6 +124,9 @@ reads_from
 same_knots
 polar_knots
 window_alpha
+blend_post_stall
+flat_plate_cl
+flat_plate_cd
 assemble_polar_matrix
 load_polar_data
 load_matrix_polar_data

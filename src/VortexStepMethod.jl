@@ -254,7 +254,9 @@ Enumeration of the implemented aerodynamic models. See also: [`AeroData`](@ref)
 
 # Elements
 - `POLY`: α-polynomial coefficients for cl/cd/cm (e.g. Breukels LEI coeffs, generated
-  by the `AirfoilAero` package). Core only evaluates the polynomial.
+  by the `AirfoilAero` package), fitted inside ±20°. Past that, cl and cd blend into the
+  flat-plate forms 2 sin α |sin α| cos α and 2 |sin α|³ by ±25°, and cm holds its ±20°
+  value.
 - `POLAR_VECTORS`: Polar vectors as function of alpha (lookup tables with interpolation).
   A panel's table may be rewritten at run time by [`set_polar!`](@ref
   VortexStepMethod.set_polar!), which is how a live polar source regenerates it from the

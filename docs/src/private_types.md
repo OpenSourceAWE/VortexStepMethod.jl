@@ -19,6 +19,8 @@ SemiInfiniteFilament
 ```@docs
 LEI_AIRFOIL_BREUKELS
 SCAN_KNOT_MAX
+POLY_FIT_LIMIT
+POLY_BLEND_WIDTH
 ```
 
 ### Airfoil aerodynamics (AirfoilAero)
