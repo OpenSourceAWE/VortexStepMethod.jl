@@ -49,8 +49,7 @@ end
         @test solver_kwargs(settings).is_with_attached_trailed_force
     end
 
-    # Gaunaa, Li & Pirrung, TORQUE 2026, §5.1-5.2: omitting the force overpredicts CL
-    # by about 2 % on a swept, anhedral wing and barely changes a straight one.
+    # Gaunaa, Li & Pirrung 2026 §5: without the force CL is ~2 % high on the curved wing.
     @testset "lowers lift by about 2 % on a swept, anhedral wing ($model)" for
             model in (VSM, LLT)
         straight, aspect_ratio = curved_elliptic_wing(; sweep=0.0, anhedral=0.0)
