@@ -11,7 +11,7 @@ Reference frames are needed for following purposes:
 A geometric model is always created using the CAD reference frame.
 It can have any origin (with respect to the kite), but usually either the center of gravity of the body or the bridle point/ Kite Control Unit is used. 
 
-- Y defined spanwise, looking at the kite from the front (so seeing the LE first) the front left is positive.
+- Y is defined spanwise, towards the right tip (seen from the front, the left side).
 - X is defined chord wise, from LE to TE, positive.
 - Z is defined as positive upwards.
 
@@ -22,7 +22,7 @@ The body-fixed frame of the kite is the **KA** frame of
 - Y is defined spanwise, towards the right tip (seen from the front, the left side).
 - Z is defined as the cross product of X and Y, so positive upwards.
 
-Drag is therefore along +X, side force along +Y and lift along +Z.
+The body-axis force components are Fx, Fy and Fz, with the matching coefficients `cfx`, `cfy` and `cfz`.
 
 The origin of the KA frame can be defined by the user by passing the keyword argument `kite_body_origin = ...` to the `BodyAerodynamics` constructor.
 
@@ -33,4 +33,5 @@ The turn rates $\mathrm{omega} = [\mathrm{omega_x}, \mathrm{omega_y} ,\mathrm{om
 - when running a simulation, the turnrate of the kite must be provided on each time step
 - the apparent wind speed vector `va_vec` is defined in the **KA** frame
 - the resulting forces are defined in the **KA** frame
-- the **CL**, **CD**, **CS** and the resulting moments and moment coefficients are defined in the **KA** frame
+- the moments and moment coefficients are defined in the **KA** frame
+- **CD** is along the apparent wind, **CL** along `va × y` and **CS** completes the wind axes, so they match Fx, Fz and Fy only at α = β = 0
