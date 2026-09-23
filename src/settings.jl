@@ -179,6 +179,8 @@ Solver configuration, used within [`VSMSettings`](@ref).
     section (default `false`)
 - `is_with_viscous_drag_correction`: Add the spanwise-flow viscous drag and side
     force to each section (default `false`)
+- `is_with_attached_trailed_force`: Add the force on the chordwise trailed vortex
+    segments bound to each panel (default `false`)
 """
 @with_kw mutable struct SolverSettings
     n_panels::Int64 = 40
@@ -199,6 +201,7 @@ Solver configuration, used within [`VSMSettings`](@ref).
     correct_aoa::Bool=false                 # perform aoa correction
     flow_curvature::Bool=false              # thin-airfoil pitch-rate moment increment
     is_with_viscous_drag_correction::Bool=false # spanwise-flow viscous force (Gaunaa 2024)
+    is_with_attached_trailed_force::Bool=false # chordwise bound-vortex force (Gaunaa 2026)
 end
 
 """

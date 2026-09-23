@@ -21,6 +21,11 @@
   doi:10.1088/1742-6596/2767/2/022068): each section gets a drag increment and a force
   along its span from the flow across it, in `solve!`, `solve` and `linearize`. Opt-in
   via `is_with_viscous_drag_correction` (default `false`) on the solver settings.
+- Force on the chordwise trailed vortex segments bound to each panel (Gaunaa, Li &
+  Pirrung 2026, doi:10.1088/1742-6596/3224/4/042030): Kutta–Joukowski with the total
+  velocity at their three-quarter-chord point, in `solve!`, `solve` and `linearize`. It
+  lowers `CL` by about 2 % on a swept, anhedral wing whose sections are perpendicular to
+  the quarter-chord line. Opt-in via `is_with_attached_trailed_force` (default `false`).
 - `plot_section_polars(body_aero; panels, alphas, delta)` draws cl, cd and cm against α
   per panel through `calculate_cl`/`calculate_cd`/`calculate_cm`, for every aero model
   and at flap deflection `delta`, in one figure instead of one coefficient per call.
