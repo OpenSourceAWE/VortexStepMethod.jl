@@ -8,6 +8,13 @@
   `plot_airfoil_fit` and `plot_airfoils` take `show_title=true`; with `false` the title
   is not drawn, and still names the saved file and window.
 
+### Fixed
+
+- The docs define the body frame as KiteUtils' `KA` frame: x from LE to TE, y towards
+  the right tip, z = x × y up. The separate `KB` definition, whose `Z = Y × X` pointed
+  down, is gone; the solver's frame is unchanged. CL, CD and CS are documented as
+  wind-axis coefficients, `cfx`, `cfy` and `cfz` as the body-axis ones.
+
 ## VortexStepMethod v6.0.0 2026-09-23
 
 ### Added
