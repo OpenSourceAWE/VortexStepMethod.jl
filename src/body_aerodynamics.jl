@@ -579,6 +579,81 @@ function update_effective_angle_of_attack!(alpha_corrected,
     nothing
 end
 
+"""
+    induced_velocity_at(body_aero::BodyAerodynamics, point, gamma, core_radius_fraction)
+
+Velocity [m/s] induced at `point` by the horseshoe vortices of all panels, panel `j`
+carrying circulation `gamma[j]` [m²/s] and its frozen wake.
+"""
+function induced_velocity_at(body_aero::BodyAerodynamics{P, W, T}, point, gamma,
+        core_radius_fraction) where {P, W, T}
+    velocity_ring = body_aero.work_vectors[8]
+    velocity_filament = body_aero.work_vectors[9]
+    velocity = zero(SVector{3, T})
+    for (j, panel) in enumerate(body_aero.panels)
+        wake = panel.filaments[4]
+        calculate_velocity_induced_single_ring_semiinfinite!(velocity_ring,
+            velocity_filament, panel.filaments, point, false, wake.va, wake.direction,
+            gamma[j], core_radius_fraction, body_aero.work_vectors)
+        velocity += SVector{3, T}(velocity_ring)
+    end
+    return velocity
+end
+
+"""
+    attached_trailed_loads(body_aero::BodyAerodynamics, i, gamma, density,
+                           core_radius_fraction, reference_point)
+
+Kutta–Joukowski force [N] on the two chordwise trailed vortex segments of panel `i`,
+from its quarter-chord bound points to its trailing edge, and its moment [N·m] about
+`reference_point`, as `(; force, moment)`. Each segment carries `gamma[i]` and sees, at
+its three-quarter-chord point, the inflow turned by `body_aero.omega` plus the
+[`induced_velocity_at`](@ref) that point.
+"""
+function attached_trailed_loads(body_aero::BodyAerodynamics{P, W, T}, i, gamma, density,
+        core_radius_fraction, reference_point) where {P, W, T}
+    panel = body_aero.panels[i]
+    three_quarter_chord = (0.75 - 0.25) / (1 - 0.25)
+    force = zero(SVector{3, T})
+    moment = zero(SVector{3, T})
+    segments = ((panel.bound_point_1, panel.TE_point_1, 1),
+                (panel.bound_point_2, panel.TE_point_2, -1))
+    for (bound_point, te_point, orientation) in segments
+        chordwise = SVector{3, T}(te_point) - SVector{3, T}(bound_point)
+        point = SVector{3, T}(bound_point) + three_quarter_chord * chordwise
+        arm = point - SVector{3, T}(panel.control_point)
+        inflow = SVector{3, T}(panel.va_vec) - cross(SVector{3, T}(body_aero.omega), arm)
+        velocity = inflow +
+            induced_velocity_at(body_aero, point, gamma, core_radius_fraction)
+        segment_force = (density * orientation * gamma[i]) * cross(velocity, chordwise)
+        force += segment_force
+        moment += cross(point - SVector{3, T}(reference_point), segment_force)
+    end
+    return (; force, moment)
+end
+
+"""
+    panel_force_moment(body_aero::BodyAerodynamics, i, loads, y_airf, gamma, density,
+                       core_radius_fraction, reference_point,
+                       is_with_attached_trailed_force)
+
+Force [N] and moment [N·m] about `reference_point` of panel `i`: its section `loads`
+from [`panel_loads`](@ref) acting at the aerodynamic centre, plus
+[`attached_trailed_loads`](@ref) when `is_with_attached_trailed_force`.
+Returns `(; force, moment)`.
+"""
+function panel_force_moment(body_aero::BodyAerodynamics{P, W, T}, i, loads, y_airf, gamma,
+        density, core_radius_fraction, reference_point,
+        is_with_attached_trailed_force) where {P, W, T}
+    arm = SVector{3, T}(body_aero.panels[i].aero_center) - SVector{3, T}(reference_point)
+    force = loads.force
+    moment = loads.pitching_moment .* y_airf .+ cross(arm, force)
+    is_with_attached_trailed_force || return (; force, moment)
+    attached = attached_trailed_loads(body_aero, i, gamma, density, core_radius_fraction,
+        reference_point)
+    return (; force=force + attached.force, moment=moment + attached.moment)
+end
+
 @inline function intersect_line_with_plane(
     x_cp, f_unit, plane_point, plane_normal; tol=1e-6
 )
@@ -796,14 +871,15 @@ end
                       x_airf_dist, z_airf_dist, va_vec_dist, va_dist, va_unit_dist,
                       panels::Vector{<:Panel}, is_only_f_and_gamma_output::Bool;
                       correct_aoa=false, flow_curvature=false,
-                      is_with_viscous_drag_correction=false, v_span_dist=nothing)
+                      is_with_viscous_drag_correction=false,
+                      is_with_attached_trailed_force=false, v_span_dist=nothing)
 
 Calculate final aerodynamic results. Reference point is in the kite body (KB) frame.
 
 `flow_curvature` adds [`flow_curvature_cm`](@ref) to every section moment, read
 from `body_aero.omega`. `is_with_viscous_drag_correction` adds
 [`spanwise_flow_drag`](@ref) to every section, from the velocity along `y_airf` in
-`v_span_dist`.
+`v_span_dist`. `is_with_attached_trailed_force` adds [`attached_trailed_loads`](@ref).
 
 Returns:
     Dict: Results including forces, coefficients and distributions
@@ -828,6 +904,7 @@ function calculate_results(
     correct_aoa::Bool=false,
     flow_curvature::Bool=false,
     is_with_viscous_drag_correction::Bool=false,
+    is_with_attached_trailed_force::Bool=false,
     v_span_dist=nothing,
 )
 
@@ -926,11 +1003,7 @@ function calculate_results(
     va_ref = norm3(va_ref_vec)
     va_ref > 0.0 || throw(ArgumentError(
         "Reference freestream magnitude must be positive."))
-    va_ref_unit = body_aero.work_vectors[1]
-    inv_va_ref = 1.0 / va_ref
-    @inbounds for k in 1:3
-        va_ref_unit[k] = va_ref_vec[k] * inv_va_ref
-    end
+    va_ref_unit = SVector{3}(va_ref_vec) / va_ref
     reference_dirs = prescribed_va_directions(SVector{3}(va_ref_vec), reference_spanwise)
     all(isfinite, reference_dirs.dir_lift) || throw(ArgumentError(
         "Reference lift direction is undefined because " *
@@ -956,7 +1029,9 @@ function calculate_results(
             loads = panel_loads(axes, dirs,
                 dynamic_pressure(density, density, v_rel_dist[i]),
                 cl_dist[i], cd_dist[i], cm_dist[i]; c_span)
-            force = loads.force
+            (; force, moment) = panel_force_moment(body_aero, i, loads, axes.y_airf,
+                gamma_new, density, core_radius_fraction, reference_point,
+                is_with_attached_trailed_force)
 
             va_panel = va_dist[i]
             va_panel > 0.0 || throw(ArgumentError(
@@ -981,8 +1056,6 @@ function calculate_results(
             cd_prescribed_va[i] = drag_prescribed_va * inv_q_area
             cs_prescribed_va[i] = dot(force, wing_dirs.dir_side) * inv_q_area
 
-            arm = SVector{3}(panel.aero_center) - SVector{3}(reference_point)
-            moment = loads.pitching_moment .* axes.y_airf .+ cross(arm, force)
             @inbounds for k in 1:3
                 f_body_3D[k, i] = force[k]
                 m_body_3D[k, i] = moment[k]
