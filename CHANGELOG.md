@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- The docs define the body frame as KiteUtils' `KA` frame: x from LE to TE, y towards
+  the right tip, z = x × y up. The separate `KB` definition, whose `Z = Y × X` pointed
+  down, is gone; the solver's frame is unchanged.
+
 ## VortexStepMethod v6.0.0 2026-09-23
 
 ### Added

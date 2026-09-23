@@ -798,7 +798,7 @@ end
                       correct_aoa=false, flow_curvature=false,
                       is_with_viscous_drag_correction=false, v_span_dist=nothing)
 
-Calculate final aerodynamic results. Reference point is in the kite body (KB) frame.
+Calculate final aerodynamic results. Reference point is in the kite aero body (KA) frame.
 
 `flow_curvature` adds [`flow_curvature_cm`](@ref) to every section moment, read
 from `body_aero.omega`. `is_with_viscous_drag_correction` adds

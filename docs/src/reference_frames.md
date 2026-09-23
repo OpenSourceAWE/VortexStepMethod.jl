@@ -15,21 +15,22 @@ It can have any origin (with respect to the kite), but usually either the center
 - X is defined chord wise, from LE to TE, positive.
 - Z is defined as positive upwards.
 
-### Kite Body reference frame (KB)
-This is a body-fixed reference frame.
-- Y defined spanwise, looking at the kite from the front (so seeing the LE first) the front left is positive.
+### Kite aero body frame (KA)
+The body-fixed frame of the kite is the **KA** frame of
+[KiteUtils.jl](https://github.com/OpenSourceAWE/KiteUtils.jl), aft-right-up:
 - X is defined chord wise, from LE to TE, positive.
-- Z is defined as the cross product of Y and X
+- Y is defined spanwise, towards the right tip (seen from the front, the left side).
+- Z is defined as the cross product of X and Y, so positive upwards.
 
-The origin of the kite reference frame can be defined by the user by passing the keyword argument `kite_body_origin = ...` to the `BodyAerodynamics` constructor.
+Drag is therefore along +X, side force along +Y and lift along +Z.
 
-This reference frame is different from the kite reference frame **K** used in `KiteModels.jl` and `KiteUtils.jl`.
+The origin of the KA frame can be defined by the user by passing the keyword argument `kite_body_origin = ...` to the `BodyAerodynamics` constructor.
 
 ## The turn rates
-The turn rates $\mathrm{omega} = [\mathrm{omega_x}, \mathrm{omega_y} ,\mathrm{omega_z}]$ are defined in the **KB** reference frame. The unit of the components is $\mathrm{rad}~\mathrm{s^{-1}}$.
+The turn rates $\mathrm{omega} = [\mathrm{omega_x}, \mathrm{omega_y} ,\mathrm{omega_z}]$ are defined in the **KA** frame. The unit of the components is $\mathrm{rad}~\mathrm{s^{-1}}$.
 
 ## Input and output
 - when running a simulation, the turnrate of the kite must be provided on each time step
-- the apparent wind speed vector `va_vec` is defined in the **KB** reference frame
-- the resulting forces are defined in the **KB** reference frame
-- the **CL**, **CD**, **CS** and the resulting moments and moment coefficients are defined in the **KB** reference frame
+- the apparent wind speed vector `va_vec` is defined in the **KA** frame
+- the resulting forces are defined in the **KA** frame
+- the **CL**, **CD**, **CS** and the resulting moments and moment coefficients are defined in the **KA** frame
