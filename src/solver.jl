@@ -20,7 +20,7 @@ Struct for storing the solution of the [`solve!`](@ref) function. Must contain a
 - `f_body_3D`::Matrix{Float64}: Matrix of the aerodynamic forces (x, y, z vectors) [N]
 - `m_body_3D`::Matrix{Float64}: Matrix of the aerodynamic moments [Nm]
 - `gamma_distribution`::Union{Nothing, Vector{Float64}}: Vector containing the panel circulations.
-- force::MVec3: Aerodynamic force vector in KB reference frame [N]
+- force::MVec3: Aerodynamic force vector in the KA frame [N]
 - moment::MVec3: Aerodynamic moments [Mx, My, Mz] around the reference point [Nm]
 - force_coeffs::MVec3: Aerodynamic force coefficients [CFx, CFy, CFz] [-]
 - `moment_coeffs`::MVec3: Aerodynamic moment coefficients [CMx, CMy, CMz] [-]
@@ -290,9 +290,9 @@ finite_full(x::ForwardDiff.Dual) =
           log=false, reference_point=solver.reference_point, moment_frac=0.1,
           throw_on_fail=false)
 
-Main solving routine for the aerodynamic model. Reference point is in the kite body (KB) frame.
-This version is modifying the `solver.sol` struct and is faster than the `solve` function which returns
-a dictionary.
+Main solving routine for the aerodynamic model. Reference point is in the kite aero body
+(KA) frame. This version is modifying the `solver.sol` struct and is faster than the
+`solve` function which returns a dictionary.
 
 # Arguments:
 - solver::Solver: The solver to use, could be a VSM or LLT solver. See: [`Solver`](@ref)
@@ -592,7 +592,8 @@ end
     solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=nothing; 
           log=false, reference_point=solver.reference_point)
 
-Main solving routine for the aerodynamic model. Reference point is in the kite body (KB) frame.
+Main solving routine for the aerodynamic model. Reference point is in the kite aero body
+(KA) frame.
 See also: [`solve!`](@ref)
 
 # Arguments:
