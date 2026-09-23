@@ -25,6 +25,23 @@ using Test
 
 const makie_ext = Base.get_extension(VortexStepMethod, :VortexStepMethodMakieExt)
 
+"""
+    drawn_titles(fig) -> Vector{String}
+
+Texts of the `Label`s and of the visible `Axis`/`Axis3` titles drawn on `fig`.
+"""
+function drawn_titles(fig)
+    titles = String[]
+    for block in fig.content
+        if block isa Label
+            push!(titles, string(block.text[]))
+        elseif block isa Union{Axis, Axis3} && block.titlevisible[]
+            push!(titles, string(block.title[]))
+        end
+    end
+    return titles
+end
+
 global ram_wing = ram_air_matrix_wing(; n_panels=20, n_sections=4,
                           alpha_range=deg2rad.(-1:1.0:1),
                           delta_range=deg2rad.(-1:1.0:1))
@@ -165,6 +182,38 @@ end
         cl_over_cd=false
     )
     @test fig isa Figure
+
+    @testset "show_title=false hides the title but still names the file" begin
+        fig = plot_geometry(body_aero, "Hidden geometry"; save_path=save_dir,
+            is_save=true, is_show=false)
+        @test "Hidden geometry" in drawn_titles(fig)
+        fig = plot_geometry(body_aero, "Hidden geometry"; data_type=".png",
+            save_path=save_dir, is_save=true, is_show=false, show_title=false)
+        @test isempty(drawn_titles(fig))
+        @test isfile(joinpath(save_dir, "Hidden_geometry_top_view.png"))
+
+        distribution_args = ([y_coordinates], [results_vsm], ["VSM"])
+        fig = plot_distribution(distribution_args...; title="Hidden distribution",
+            is_show=false)
+        @test "Hidden distribution" in drawn_titles(fig)
+        fig = plot_distribution(distribution_args...; title="Hidden distribution",
+            data_type=".png", save_path=save_dir, is_save=true, is_show=false,
+            show_title=false)
+        @test "Hidden distribution" ∉ drawn_titles(fig)
+        @test "CL Distribution" in drawn_titles(fig)
+        @test isfile(joinpath(save_dir, "Hidden_distribution.png"))
+
+        combined_kwargs = (angle_range=range(0, 10, 2), va, is_show=false)
+        fig = plot_combined_analysis(vsm_solver, body_aero, results_vsm;
+            title="Hidden combined", combined_kwargs...)
+        @test "Hidden combined" in drawn_titles(fig)
+        fig = plot_combined_analysis(vsm_solver, body_aero, results_vsm;
+            title="Hidden combined", data_type=".png", save_path=save_dir,
+            is_save=true, show_title=false, combined_kwargs...)
+        @test "Hidden combined" ∉ drawn_titles(fig)
+        @test "Wing Geometry" in drawn_titles(fig)
+        @test isfile(joinpath(save_dir, "Hidden_combined.png"))
+    end
 
     @testset "round-off CS plots flat, a varying CS keeps its autoscale" begin
         fig = Figure()
@@ -603,6 +652,32 @@ end
         slices, _, _ = @test_nowarn makie_ext.generated_slices(gen_dir, delta, fit_pts)
         @test all(s -> !isempty(s.d2.def), slices)
         @test all(s -> s.def3d !== nothing, slices)
+    end
+end
+
+@testset "show_title=false hides the airfoil and section polar titles" begin
+    body_aero, _ = create_body_aero_with_skin()
+    @test plot_section_polars(body_aero; is_show=false).title == "Section polars"
+    @test plot_section_polars(body_aero; is_show=false, show_title=false).title == ""
+
+    _, geometry_file = ram_air_matrix_dir(; n_sections=4,
+        alpha_range=deg2rad.(-1:1.0:1), delta_range=deg2rad.(-1:1.0:1))
+    obj_adapter = VortexStepMethod.ObjAdapter
+    airfoil = first(obj_adapter.airfoils_from_yaml(geometry_file))
+    fig, _ = obj_adapter.plot_airfoil_fit(airfoil.x, airfoil.y; title="Hidden fit",
+        is_show=false)
+    @test "Hidden fit" in drawn_titles(fig)
+    fig, _ = obj_adapter.plot_airfoil_fit(airfoil.x, airfoil.y; title="Hidden fit",
+        is_show=false, show_title=false)
+    @test drawn_titles(fig) == ["Kulfan Parameters"]
+
+    airfoils_title = "Airfoils: geometry.yaml"
+    for overlay in (false, true)
+        fig = obj_adapter.plot_airfoils(geometry_file; overlay, is_show=false)
+        @test airfoils_title in drawn_titles(fig)
+        fig = obj_adapter.plot_airfoils(geometry_file; overlay, is_show=false,
+            show_title=false)
+        @test airfoils_title ∉ drawn_titles(fig)
     end
 end
 
