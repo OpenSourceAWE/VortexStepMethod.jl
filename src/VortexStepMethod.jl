@@ -77,6 +77,7 @@ Plot wing geometry from different viewpoints and optionally save/show plots.
 - `view_elevation`: initial view elevation angle in degrees (default: `15`)
 - `view_azimuth`: initial view azimuth angle in degrees (default: `-120`)
 - `use_tex`: use external `pdflatex` for rendering (default: `false`; ignored by Makie)
+- `show_title`: draw the title; it names the saved files either way (default: `true`)
 """
 function plot_geometry end
 
@@ -97,6 +98,7 @@ Plot spanwise distributions of aerodynamic properties.
 - `is_save`: whether to save (default: `false`)
 - `is_show`: whether to display (default: `true`)
 - `use_tex`: use external `pdflatex` for rendering (default: `false`; ignored by Makie)
+- `show_title`: draw the title; it names the saved file either way (default: `true`)
 """
 function plot_distribution end
 
@@ -172,6 +174,7 @@ in sequence.
 - `save_path`: directory to save files (default: `nothing`)
 - `is_save`: whether to save (default: `false`)
 - `cl_over_cd`: plot CL/CD vs angle (default: `true`)
+- `show_title`: draw the overall title (default: `true`)
 """
 function plot_combined_analysis end
 
@@ -196,6 +199,7 @@ Rendered through `MakieControlPlots`; returns its plot object.
 - `is_save`: whether to save (default: `false`)
 - `save_path`: directory to save the figure (default: `nothing`)
 - `data_type`: file extension for saving (default: `".png"`)
+- `show_title`: draw the title (default: `true`)
 """
 function plot_section_polars end
 
