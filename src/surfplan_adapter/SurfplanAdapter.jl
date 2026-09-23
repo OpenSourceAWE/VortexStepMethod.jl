@@ -76,7 +76,7 @@ function surfplan_to_aero_yaml(adapter_dir::AbstractString, output_dir::Abstract
     end
 
     airfoil_rows, ok = generate_airfoils(airfoils, output_dir; Re, alpha_range,
-        delta_range, aero_solver, crease_frac, verbose, table_format)
+        delta_range, aero_solver, crease_frac, verbose, table_format, wrap_method)
     isempty(ok) && error("No airfoil produced a valid polar from $adapter_dir")
 
     remap(id) = id in ok ? id : ok[argmin(abs.(ok .- id))]

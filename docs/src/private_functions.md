@@ -177,10 +177,20 @@ pivot_step
 push_arc!
 edge_normal
 pivot_contour
+cut_loops
 largest_linking_gap
+densify_contour
 enforce_min_spacing!
 resample_arc
 smoothed_curvature
+```
+
+### Section contour checks
+```@docs
+crossing_panels
+segments_cross
+extents_overlap
+side_of_line
 ```
 
 ### NeuralFoil network
@@ -256,7 +266,6 @@ build_section
 contour_to_airfoil
 plane_contour_to_airfoil
 reorder_airfoil_selig
-densify_contour
 create_interpolations
 find_circle_center_and_radius
 march_edges

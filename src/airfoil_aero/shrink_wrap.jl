@@ -145,7 +145,8 @@ of the cloud from its leftmost point; the points it touches are the polygon's
 vertices in order, the ones inside a concavity narrower than the disk having been
 skipped and bridged straight. The offset rounds each convex vertex with an arc of
 radius `clearance` and chamfers each reflex one across the bisector, so it holds that
-distance from every contact.
+distance from every contact, and the loops the offset makes where contacts lie closer
+than `clearance` are cut out ([`cut_loops`](@ref)).
 """
 function pivot_contour(x, y, r, clearance)
     start = argmin(x)
@@ -182,7 +183,39 @@ function pivot_contour(x, y, r, clearance)
         end
         from = to
     end
-    return px, py
+    return cut_loops(px, py)
+end
+
+"""
+    cut_loops(px, py) -> (x, y)
+
+The closed polyline `(px, py)` walked from its first node with every loop it makes
+by crossing itself cut out, the crossing point taking the loop's place, so what comes
+back is a simple closed curve.
+"""
+function cut_loops(px, py)
+    n = length(px)
+    x, y = [px[1]], [py[1]]
+    for k in 2:n+1
+        closing = k > n
+        p = (px[mod1(k, n)], py[mod1(k, n)])
+        a = (x[end], y[end])
+        for j in (closing ? 2 : 1):length(x)-2
+            r, s = (x[j], y[j]), (x[j+1], y[j+1])
+            segments_cross(r, s, a, p) || continue
+            t = side_of_line(r, s, a) / (side_of_line(r, s, a) - side_of_line(r, s, p))
+            resize!(x, j)
+            resize!(y, j)
+            push!(x, a[1] + t * (p[1] - a[1]))
+            push!(y, a[2] + t * (p[2] - a[2]))
+            break
+        end
+        if !closing
+            push!(x, p[1])
+            push!(y, p[2])
+        end
+    end
+    return x, y
 end
 
 """
@@ -216,6 +249,25 @@ function largest_linking_gap(x, y)
         end
     end
     return sqrt(gap2)
+end
+
+"""
+    densify_contour(contour, max_edge) -> Vector
+
+Insert evenly spaced points along the edges of the point sequence `contour` longer
+than `max_edge`, at most 100 pieces per edge.
+"""
+function densify_contour(contour, max_edge)
+    out = eltype(contour)[]
+    for i in 1:length(contour)-1
+        p1, p2 = contour[i], contour[i+1]
+        n = clamp(ceil(Int, norm(p2 .- p1) / max_edge), 1, 100)
+        for k in 0:n-1
+            push!(out, p1 .+ (p2 .- p1) .* (k / n))
+        end
+    end
+    push!(out, contour[end])
+    return out
 end
 
 """
@@ -331,18 +383,24 @@ LE → TE lower), following [`ShrinkWrap`](@ref): the rolling ball
 (`min_concave_radius`) is pivoted around the cloud, its contact side offset outward
 by `clearance` ([`pivot_contour`](@ref)), and the resulting arcs are resampled to
 cosine panels in a curvature-weighted arclength measure. The first and last point
-coincide at the
-trailing edge (the TE cap is part of the contour). A closed loop (first and last
-cloud points coincident) keeps its true `clearance`, so `clearance=0` hugs the input
-and leaves a sharp trailing edge sharp; an open single-membrane cloud is floored at
-`min_clearance`. The output stays in the
-normalized frame of the input cloud (chord slightly longer than 1, nose apex near
+coincide at the trailing edge (the TE cap is part of the contour). A closed loop
+(first and last cloud points coincident) is wrapped as the polygon through its points,
+its edges split to at most `min(0.01, min_concave_radius/2)` chord
+([`densify_contour`](@ref)), and keeps its true `clearance`, so `clearance=0` hugs the
+input and leaves a sharp trailing edge sharp; an open single-membrane cloud is floored
+at `min_clearance`. Warns when the wrapped contour crosses itself. The output stays in
+the normalized frame of the input cloud (chord slightly longer than 1, nose apex near
 `x = -clearance`) and is ready to write as a `.dat` or fit with
 [`LeastSquaresFit`](@ref).
 """
 function shrink_wrap(x, y, method::ShrinkWrap)
     xn, yn, _ = normalize_airfoil(collect(float.(x)), collect(float.(y)))
     closed = hypot(xn[end] - xn[1], yn[end] - yn[1]) < 0.02
+    if closed
+        max_edge = min(0.01, method.min_concave_radius / 2)
+        nodes = densify_contour(collect(zip(xn, yn)), max_edge)
+        xn, yn = first.(nodes), last.(nodes)
+    end
     gap = closed ? method.clearance : max(method.clearance, method.min_clearance)
     linking = largest_linking_gap(xn, yn)
     ball = max(method.min_concave_radius, 1.01 * linking / 2)
@@ -364,5 +422,10 @@ function shrink_wrap(x, y, method::ShrinkWrap)
                           method.curvature_weight)
     xl, yl = resample_arc(vcat(px[le:end], px[1]), vcat(py[le:end], py[1]),
                           method.n_points, method.curvature_weight)
-    return vcat(xu, xl[2:end]), vcat(yu, yl[2:end])
+    xo, yo = vcat(xu, xl[2:end]), vcat(yu, yl[2:end])
+    crossing = crossing_panels(xo, yo)
+    isnothing(crossing) || @warn "shrink_wrap: panels $(crossing) of the wrapped " *
+        "contour cross; the rolling ball ($(round(ball; sigdigits=3))) or the " *
+        "clearance ($(gap)) does not fit this cloud"
+    return xo, yo
 end

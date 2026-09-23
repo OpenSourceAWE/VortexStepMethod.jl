@@ -238,7 +238,7 @@ function obj_to_yaml(obj_path::String, output_dir::String;
                  x_raw = stations[j].xa, y_raw = stations[j].ya) for j in unique(ids)]
     airfoil_rows, ok = generate_airfoils(airfoils, output_dir; Re, alpha_range,
         delta_range, aero_solver, reuse_valid_airfoils, crease_frac, verbose,
-        table_format)
+        table_format, wrap_method)
     isempty(ok) && error("No section produced a valid polar in $obj_path")
     prefix_table_paths!(airfoil_rows, table_path_prefix(yaml_path, output_dir))
 

@@ -1542,7 +1542,8 @@ function fitted_airfoil_3d(s, wrap_method; delta=0.0, crease_frac=0.75)
                                      collect(pz ./ chord), wrap_method)
     maximum(abs, yf) > 1.0 && return nothing
     if !iszero(delta)
-        def = AirfoilAero.deform_section(xf, yf, deg2rad(delta); crease_frac)
+        def = AirfoilAero.deform_section(xf, yf, deg2rad(delta); crease_frac,
+                                         wrap_method)
         xf, yf = def.x, def.y
     end
     return reduce(hcat, [s.LE_point .+ x_af .* (x0 + xf[i] * chord) .+ z_af .* (yf[i] * chord)
@@ -1672,7 +1673,8 @@ function ObjAdapter.plot_slices_3d(path::String; n_slices::Int=10, rotation=I,
             xf, yf = AirfoilAero.shrink_wrap(collect(Float64, s.x_airfoil),
                                              collect(Float64, s.y_airfoil), wrap_method)
             def = iszero(delta) ? nothing :
-                  AirfoilAero.deform_section(xf, yf, deg2rad(delta); crease_frac)
+                  AirfoilAero.deform_section(xf, yf, deg2rad(delta); crease_frac,
+                                             wrap_method)
             d2 = (; raw=Point2f.(s.x_airfoil, s.y_airfoil), fit=Point2f.(xf, yf),
                   fit_kulfan=fit_pts(xf, yf),
                   def=def === nothing ? Point2f[] : Point2f.(def.x, def.y),
