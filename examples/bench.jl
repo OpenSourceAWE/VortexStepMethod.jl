@@ -45,7 +45,6 @@ llt_solver = Solver(wing.n_panels, wing.n_unrefined_sections; aerodynamic_model_
 vsm_solver = Solver(wing.n_panels, wing.n_unrefined_sections; aerodynamic_model_type=VSM)
 
 # Step 5: Solve using both methods
-results_vsm = solve(vsm_solver, body_aero, nothing)
 sol = solve!(vsm_solver, body_aero, nothing)
 results_vsm_base = solve_base!(vsm_solver, body_aero, nothing)
 println("Rectangular wing, solve_base!:")
@@ -54,8 +53,6 @@ println("Rectangular wing, solve_base!:")
 # time Julia:   0.35 ms Ryzen 7950x
 println("Rectangular wing, solve!:")
 @time sol = solve!(vsm_solver, body_aero, nothing)
-println("Rectangular wing, solve:")
-@time solve(vsm_solver, body_aero, nothing)
 
 # Create wing geometry (convert-then-load: obj -> per-section NeuralFoil POLAR_MATRICES)
 ram_yaml = obj_to_yaml(

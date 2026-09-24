@@ -6,7 +6,7 @@ end
 using BenchmarkTools
 using StaticArrays
 using VortexStepMethod
-using VortexStepMethod: calculate_AIC_matrices!, gamma_loop!, calculate_results,
+using VortexStepMethod: calculate_AIC_matrices!, gamma_loop!,
                        update_effective_angle_of_attack!, calculate_projected_area,
                        calculate_cl, calculate_cd_cm,
                        calculate_velocity_induced_single_ring_semiinfinite!,
@@ -163,58 +163,7 @@ using LinearAlgebra
         end
     end
     
-    @testset "Results Calculation" begin
-        # Pre-allocate arrays
-        alpha_dist = zeros(n_panels)
-        v_rel_dist = zeros(n_panels)
-        chord_dist = zeros(n_panels)
-        x_airf_dist = zeros(n_panels, 3)
-        y_airf_dist = zeros(n_panels, 3)
-        z_airf_dist = zeros(n_panels, 3)
-        va_vec_dist = zeros(n_panels, 3)
-        va_dist = zeros(n_panels)
-        va_unit_dist = zeros(n_panels, 3)
-        reference_point = zeros(3)
-        
-
-        set_va!(body_aero, va_vec)
-        # Fill arrays with panel data to satisfy calculate_results preconditions.
-        for (i, panel) in enumerate(body_aero.panels)
-            chord_dist[i] = panel.chord
-            x_airf_dist[i, :] .= panel.x_airf
-            y_airf_dist[i, :] .= panel.y_airf
-            z_airf_dist[i, :] .= panel.z_airf
-            va_vec_dist[i, :] .= panel.va_vec
-            va_dist[i] = norm(panel.va_vec)
-            va_unit_dist[i, :] .=
-                va_dist[i] > 0.0 ? panel.va_vec ./ va_dist[i] : [1.0, 0.0, 0.0]
-            v_rel_dist[i] = va_dist[i]
-        end
-        results = @MVector zeros(3)
-        
-        result = @benchmark calculate_results(
-            $body_aero,
-            $gamma,
-            $reference_point,
-            $density,
-            1e-20,
-            0.0,
-            $alpha_dist,
-            $v_rel_dist,
-            $chord_dist,
-            $x_airf_dist,
-            $z_airf_dist,
-            $va_vec_dist,
-            $va_dist,
-            $va_unit_dist,
-            $body_aero.panels,
-            false
-        ) samples=1 evals=1
-        @info "Calculate Results Allocations: $(result.allocs) Memory: $(result.memory)"
-        @test result.allocs ≤ 700
-    end
-
-    @testset "Allocation Tests for solve() and solve!()" begin
+    @testset "Allocation Tests for solve_base!() and solve!()" begin
         result = @benchmark  solve_base!($solver, $body_aero, nothing) samples=1 evals=1
         @test result.allocs <= 55
         # time Python: 32.0 ms  Ryzen 7950x

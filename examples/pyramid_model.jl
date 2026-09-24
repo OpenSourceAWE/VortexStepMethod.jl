@@ -26,7 +26,7 @@ sideslip_deg = vsm_settings.condition.beta
 yaw_rate = vsm_settings.condition.yaw_rate
 
 # Run the solver
-results = VortexStepMethod.solve(solver, body_aero; log=true)
+results = solve!(solver, body_aero; log=true)
 
 # Using plotting modules, to create more comprehensive plots
 PLOT = true

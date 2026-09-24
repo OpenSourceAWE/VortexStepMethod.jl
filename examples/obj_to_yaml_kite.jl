@@ -75,7 +75,7 @@ VortexStepMethod.reinit!(body_aero)
 solver = Solver(wing.n_panels, wing.n_unrefined_sections;
     aerodynamic_model_type=VSM, rtol=1e-5, solver_type=LOOP)
 set_va!(body_aero, apparent_wind(deg2rad(8), 0.0, va))
-results = VortexStepMethod.solve(solver, body_aero; log=true)
+results = solve!(solver, body_aero; log=true)
 
 if PLOT
     plot_geometry(body_aero, "Ram air kite (converted from .obj)"; is_show=true,

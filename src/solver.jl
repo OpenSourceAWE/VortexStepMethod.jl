@@ -24,6 +24,24 @@ Struct for storing the solution of the [`solve!`](@ref) function. Must contain a
 - moment::MVec3: Aerodynamic moments [Mx, My, Mz] around the reference point [Nm]
 - force_coeffs::MVec3: Aerodynamic force coefficients [CFx, CFy, CFz] [-]
 - `moment_coeffs`::MVec3: Aerodynamic moment coefficients [CMx, CMy, CMz] [-]
+- `lift`, `drag`, `side`: Total force along the lift, drag and side directions of the
+  reference inflow `va_ref_vec` [N]
+- `cl`, `cd`, `cs`: `lift`, `drag` and `side` divided by `q_ref * projected_area` [-]
+- `cl_distribution`, `cd_distribution`, `cs_distribution`::Vector{Float64}: Panel force along
+  the lift, drag and side directions of the panel's own inflow, divided by its dynamic
+  pressure and area [-]; unlike `cl_dist` and `cd_dist`, these include every force term
+- `alpha_uncorrected`::Vector{Float64}: Angle of attack of each panel at its evaluation
+  point, before the aerodynamic-center correction [rad]
+- `va_ref_vec`::MVec3: Area-weighted reference inflow velocity [m/s]
+- `q_ref`: Dynamic pressure of `va_ref_vec` [Pa]
+- `rey`: Reynolds number of `va_ref_vec` on the reference chord [-]
+- `area_all_panels`: Sum of the panel areas [m²]
+- `projected_area`: Projected area of the body [m²]
+- `wing_span`: Span along the first wing's spanwise direction [m]
+- `aspect_ratio_projected`: `wing_span^2 / projected_area` [-]
+- `center_of_pressure`::MVec3: Point where the line of action of `force` crosses a
+  panel, `NaN` where it crosses none [m]
+- `panel_cp_locations`::Vector{MVec3}: Center of pressure of each panel [m]
 - `moment_dist`::Vector{Float64}: Pitching moments around the spanwise vector of each panel. [Nm]
 - `moment_coeff_dist`::Vector{Float64}: Pitching moment coefficient around the spanwise vector of each panel. [-]
 - `moment_unrefined_dist`::MVector{U, Float64}: Averaged moments for unrefined sections [Nm]
@@ -59,8 +77,25 @@ Struct for storing the solution of the [`solve!`](@ref) function. Must contain a
     moment::MVector{3, T} = zeros(MVector{3, T})
     force_coeffs::MVector{3, T} = zeros(MVector{3, T})
     moment_coeffs::MVector{3, T} = zeros(MVector{3, T})
-    center_of_pressure::Union{Nothing, MVector{3, T}} = nothing
-    panel_cp_locations::Vector{MVector{3, T}} = MVector{3, T}[]
+    lift::T = zero(T)
+    drag::T = zero(T)
+    side::T = zero(T)
+    cl::T = zero(T)
+    cd::T = zero(T)
+    cs::T = zero(T)
+    cl_distribution::Vector{T} = zeros(T, P)
+    cd_distribution::Vector{T} = zeros(T, P)
+    cs_distribution::Vector{T} = zeros(T, P)
+    alpha_uncorrected::Vector{T} = zeros(T, P)
+    va_ref_vec::MVector{3, T} = zeros(MVector{3, T})
+    q_ref::T = zero(T)
+    rey::T = zero(T)
+    area_all_panels::T = zero(T)
+    projected_area::T = zero(T)
+    wing_span::T = zero(T)
+    aspect_ratio_projected::T = zero(T)
+    center_of_pressure::MVector{3, T} = zeros(MVector{3, T})
+    panel_cp_locations::Vector{MVector{3, T}} = [zeros(MVector{3, T}) for _ in 1:P]
     moment_dist::MVector{P, T} = zeros(MVector{P, T})
     moment_coeff_dist::MVector{P, T} = zeros(MVector{P, T})
     moment_unrefined_dist::MVector{U, T} = zeros(MVector{U, T})
@@ -108,7 +143,7 @@ end
 """
     Solver
 
-Main solver structure for the Vortex Step Method.See also: [`solve`](@ref)
+Main solver structure for the Vortex Step Method. See also: [`solve!`](@ref)
 
 # Attributes
 
@@ -295,8 +330,7 @@ finite_full(x::ForwardDiff.Dual) =
           throw_on_fail=false)
 
 Main solving routine for the aerodynamic model. Reference point is in the kite body (KB) frame.
-This version is modifying the `solver.sol` struct and is faster than the `solve` function which returns
-a dictionary.
+Fills and returns `solver.sol`.
 
 # Arguments:
 - solver::Solver: The solver to use, could be a VSM or LLT solver. See: [`Solver`](@ref)
@@ -474,7 +508,8 @@ function calc_forces!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics;
     end
 
     # Python parity: normalize with area-weighted reference velocity for distributed inflow.
-    va_ref_vec = _compute_reference_velocity_from_distribution(
+    va_ref_vec = solver.sol.va_ref_vec
+    va_ref_vec .= _compute_reference_velocity_from_distribution(
         solver.sol.va_vec_dist,
         length(panels),
         panel_areas
@@ -482,6 +517,8 @@ function calc_forces!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics;
     va_ref = norm(va_ref_vec)
     va_ref > 0.0 || throw(ArgumentError("Reference freestream magnitude must be positive."))
     q_ref = 0.5 * density * va_ref^2
+    solver.sol.q_ref = q_ref
+    solver.sol.rey = density * va_ref * c_ref / solver.mu
     moment_coeff_dist .= moment_dist ./ (q_ref * projected_area * c_ref)
 
     # Only compute unrefined arrays if there are unrefined sections
@@ -579,9 +616,17 @@ function calc_forces!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics;
     end
     solver.sol.force_coeffs .= solver.sol.force ./ (q_ref * projected_area)
     solver.sol.moment_coeffs .= solver.sol.moment ./ (q_ref * projected_area * c_ref)
-    # Keep solve! fast: center-of-pressure is only computed in solve() dictionary path.
-    solver.sol.center_of_pressure = nothing
-    empty!(solver.sol.panel_cp_locations)
+    solver.sol.alpha_uncorrected .= alpha_dist
+    solver.sol.area_all_panels = area_all_panels
+    solver.sol.projected_area = projected_area
+    reference_spanwise = body_aero.wings[1].spanwise_direction
+    solver.sol.wing_span = calculate_span(body_aero.wings, reference_spanwise)
+    solver.sol.aspect_ratio_projected = solver.sol.wing_span^2 / projected_area
+    inflow_loads!(solver.sol, body_aero, density)
+    find_center_of_pressure!(solver.sol.center_of_pressure, body_aero, solver.sol.force,
+        solver.sol.moment, reference_point)
+    compute_panel_center_of_pressures!(solver.sol.panel_cp_locations, body_aero,
+        solver.sol.f_body_3D, solver.sol.m_body_3D, reference_point)
     if converged
         # TODO: Check if the result if feasible if converged
         solver.sol.solver_status = FEASIBLE
@@ -593,59 +638,45 @@ function calc_forces!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics;
 end
 
 """
-    solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=nothing; 
-          log=false, reference_point=solver.reference_point)
+    inflow_loads!(sol::VSMSolution, body_aero::BodyAerodynamics, density)
 
-Main solving routine for the aerodynamic model. Reference point is in the kite body (KB) frame.
-See also: [`solve!`](@ref)
-
-# Arguments:
-- solver::Solver: The solver to use, could be a VSM or LLT solver. See: [`Solver`](@ref)
-- body_aero::BodyAerodynamics: The aerodynamic body. See: [`BodyAerodynamics`](@ref)
-- gamma_distribution: Initial circulation vector or nothing; Length: Number of segments. [m²/s]
-
-# Keyword Arguments:
-- log=false: If true, print the number of iterations and other info.
-- reference_point=solver.reference_point
-
-# Returns
-A dictionary with the results.
+Fill `lift`, `drag`, `side`, `cl`, `cd`, `cs` and `cl_distribution`, `cd_distribution`,
+`cs_distribution` of `sol` by projecting the panel forces `sol.f_body_3D` on the lift, drag
+and side directions of the reference inflow `sol.va_ref_vec` and of each panel's own inflow.
 """
-function solve(solver::Solver, body_aero::BodyAerodynamics, gamma_distribution=nothing; 
-    log=false, reference_point=solver.reference_point)
-    reference_point_checked = check_reference_point(reference_point)
-    # calculate intermediate result
-    solve_base!(solver, body_aero, gamma_distribution; log)
+function inflow_loads!(sol::VSMSolution, body_aero::BodyAerodynamics, density)
+    reference_spanwise = SVector{3}(body_aero.wings[1].spanwise_direction)
+    va_ref = SVector{3}(sol.va_ref_vec)
+    va_ref_unit = va_ref / norm(va_ref)
+    reference_dirs = prescribed_va_directions(va_ref, reference_spanwise)
+    lift = drag = side = zero(sol.q_ref)
+    for (wing_idx, wing) in enumerate(body_aero.wings)
+        spanwise_unit = SVector{3}(wing.spanwise_direction)
+        for i in panel_range(body_aero, wing_idx)
+            force = SVector{3}(sol.f_body_3D[1, i], sol.f_body_3D[2, i], sol.f_body_3D[3, i])
+            panel_va = SVector{3}(sol.va_vec_dist[i, 1], sol.va_vec_dist[i, 2],
+                sol.va_vec_dist[i, 3])
+            va_panel = norm(panel_va)
+            panel_drag = dot(force, panel_va) / va_panel
+            wing_dirs = prescribed_va_directions(panel_va, spanwise_unit)
+            body_dirs = prescribed_va_directions(panel_va, reference_spanwise)
 
-    # Calculate final results as dictionary
-    results = calculate_results(
-        body_aero,
-        solver.lr.gamma_new,
-        reference_point_checked,
-        solver.density,
-        solver.core_radius_fraction,
-        solver.mu,
-        solver.lr.alpha_dist,
-        solver.lr.v_rel_dist,
-        solver.sol._chord_dist,
-        solver.sol._x_airf_dist,
-        solver.sol._z_airf_dist,
-        solver.sol.va_vec_dist,
-        solver.br.va_dist,
-        solver.br.va_unit_dist,
-        body_aero.panels,
-        solver.is_only_f_and_gamma_output;
-        correct_aoa=solver.correct_aoa,
-        flow_curvature=solver.flow_curvature,
-        is_with_viscous_drag_correction=solver.is_with_viscous_drag_correction,
-        is_with_attached_trailed_force=solver.is_with_attached_trailed_force,
-        v_span_dist=solver.lr.v_span_dist,
-    )
-    # Attach geometric AoA (already computed in calculate_results) to solver.sol
-    if haskey(results, "alpha_geometric")
-        solver.sol.alpha_geometric_dist .= results["alpha_geometric"]
+            lift += dot(force, body_dirs.dir_lift) *
+                dot(body_dirs.dir_lift, reference_dirs.dir_lift)
+            drag += panel_drag * dot(panel_va, va_ref_unit) / va_panel
+            side += dot(force, body_dirs.dir_side) *
+                dot(body_dirs.dir_side, reference_dirs.dir_side)
+
+            q_area = dynamic_pressure(density, density, va_panel) * sol.panel_area_dist[i]
+            sol.cl_distribution[i] = dot(force, wing_dirs.dir_lift) / q_area
+            sol.cd_distribution[i] = panel_drag / q_area
+            sol.cs_distribution[i] = dot(force, wing_dirs.dir_side) / q_area
+        end
     end
-    return results
+    q_area_ref = sol.q_ref * sol.projected_area
+    sol.lift, sol.drag, sol.side = lift, drag, side
+    sol.cl, sol.cd, sol.cs = lift / q_area_ref, drag / q_area_ref, side / q_area_ref
+    return nothing
 end
 
 @inline @inbounds function calc_norm_dist!(va_dist, va_vec_dist)

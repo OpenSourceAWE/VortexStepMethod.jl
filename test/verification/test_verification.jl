@@ -62,9 +62,9 @@ function lift_drag_polar(wing, model, alphas; va, relaxation_factor)
     CD = zeros(length(alphas))
     for (i, alpha) in enumerate(alphas)
         set_va!(body_aero, va .* [cosd(alpha), 0.0, sind(alpha)])
-        results = solve(solver, body_aero)
-        CL[i] = results["cl"]
-        CD[i] = results["cd"]
+        sol = solve!(solver, body_aero, nothing)
+        CL[i] = sol.cl
+        CD[i] = sol.cd
     end
     return CL, CD
 end

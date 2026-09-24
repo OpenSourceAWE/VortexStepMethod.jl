@@ -49,19 +49,19 @@ llt_solver = Solver(wing.n_panels, wing.n_unrefined_sections; aerodynamic_model_
 vsm_solver = Solver(wing.n_panels, wing.n_unrefined_sections; aerodynamic_model_type=VSM)
 
 # Step 5: Solve using both methods
-results_llt = solve(llt_solver, body_aero)
-results_vsm = solve(vsm_solver, body_aero)
-@time solve(llt_solver, body_aero)
-@time solve(vsm_solver, body_aero)
+results_llt = solve!(llt_solver, body_aero)
+results_vsm = solve!(vsm_solver, body_aero)
+@time solve!(llt_solver, body_aero)
+@time solve!(vsm_solver, body_aero)
 
 # Print results comparison
 println("\nLifting Line Theory Results:")
-println("CL = $(round(results_llt["cl"], digits=4))")
-println("CD = $(round(results_llt["cd"], digits=4))")
+println("CL = $(round(results_llt.cl, digits=4))")
+println("CD = $(round(results_llt.cd, digits=4))")
 println("\nVortex Step Method Results:")
-println("CL = $(round(results_vsm["cl"], digits=4))")
-println("CD = $(round(results_vsm["cd"], digits=4))")
-println("Projected area = $(round(results_vsm["projected_area"], digits=4)) m²")
+println("CL = $(round(results_vsm.cl, digits=4))")
+println("CD = $(round(results_vsm.cd, digits=4))")
+println("Projected area = $(round(results_vsm.projected_area, digits=4)) m²")
 
 # Step 6: Plot geometry
 PLOT && plot_geometry(
