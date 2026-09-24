@@ -85,8 +85,8 @@ end
         aerodynamic_model_type=LLT)
 
     # Solve the VSM and LLT
-    results_vsm = solve(vsm_solver, body_aero)
-    results_llt = solve(llt_solver, body_aero)
+    results_vsm = solve!(vsm_solver, body_aero)
+    results_llt = solve!(llt_solver, body_aero)
 
     # Plot spanwise distributions
     y_coordinates = [panel.aero_center[2]

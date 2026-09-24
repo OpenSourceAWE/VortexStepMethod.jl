@@ -37,8 +37,8 @@ function lift_and_oswald(wing, aspect_ratio, model, is_with_attached_trailed_for
     solver = Solver(wing.n_panels, wing.n_unrefined_sections; use_gamma_prev=false,
         aerodynamic_model_type=model, is_with_attached_trailed_force)
     set_va!(body_aero, 20.0 .* [cosd(10), 0.0, sind(10)])
-    results = solve(solver, body_aero)
-    return results["cl"], results["cl"]^2 / (π * aspect_ratio * results["cd"])
+    sol = solve!(solver, body_aero)
+    return sol.cl, sol.cl^2 / (π * aspect_ratio * sol.cd)
 end
 
 @testset "Attached trailed vortex force" begin
@@ -84,9 +84,6 @@ end
             @test solver_on.sol.f_body_3D[:, i] ≈ force_off[:, i] .+ attached.force
             @test solver_on.sol.m_body_3D[:, i] ≈ moment_off[:, i] .+ attached.moment
         end
-        results = solve(solver_on, body_aero)
-        @test results["F_distribution"] ≈ solver_on.sol.f_body_3D
-        @test results["M_distribution"] ≈ solver_on.sol.m_body_3D
         @test (@allocated calc_forces!(solver_on, body_aero)) == 0
     end
 

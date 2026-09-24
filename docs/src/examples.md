@@ -91,20 +91,20 @@ julia> vsm_solver = Solver(wing.n_panels, wing.n_unrefined_sections; aerodynamic
 #### Step 6: Solve using both methods
 
 ```julia
-julia> results_llt = solve(llt_solver, body_aero)
-julia> results_vsm = solve(vsm_solver, body_aero)
+julia> results_llt = solve!(llt_solver, body_aero)
+julia> results_vsm = solve!(vsm_solver, body_aero)
 ```
 
 ##### Print results comparison
 
 ```julia
 julia> println("\nLifting Line Theory Results:")
-julia> println("CL = $(round(results_llt["cl"], digits=4))")
-julia> println("CD = $(round(results_llt["cd"], digits=4))")
+julia> println("CL = $(round(results_llt.cl, digits=4))")
+julia> println("CD = $(round(results_llt.cd, digits=4))")
 julia> println("\nVortex Step Method Results:")
-julia> println("CL = $(round(results_vsm["cl"], digits=4))")
-julia> println("CD = $(round(results_vsm["cd"], digits=4))")
-julia> println("Projected area = $(round(results_vsm["projected_area"], digits=4)) m²")
+julia> println("CL = $(round(results_vsm.cl, digits=4))")
+julia> println("CD = $(round(results_vsm.cd, digits=4))")
+julia> println("Projected area = $(round(results_vsm.projected_area, digits=4)) m²")
 ```
 
 #### Step 7: Plot combined analysis

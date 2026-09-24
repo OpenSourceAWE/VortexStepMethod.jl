@@ -123,21 +123,17 @@ function generate_polar_data(
         set_va!(body_aero,
             [cos(α) * cos(β), sin(β), sin(α)] * va)
 
-        results = solve(solver, body_aero,
-            gamma_distribution[i, :])
+        sol = solve!(solver, body_aero, gamma_distribution[i, :])
 
-        cl[i] = results["cl"]
-        cd[i] = results["cd"]
-        cs[i] = results["cs"]
-        cmx[i] = get(results, "cmx", NaN)
-        cmy[i] = get(results, "cmy", NaN)
-        cmz[i] = get(results, "cmz", NaN)
-        gamma_distribution[i, :] =
-            results["gamma_distribution"]
-        cl_distribution[i, :] = results["cl_distribution"]
-        cd_distribution[i, :] = results["cd_distribution"]
-        cs_distribution[i, :] = results["cs_distribution"]
-        reynolds_number[i] = results["Rey"]
+        cl[i] = sol.cl
+        cd[i] = sol.cd
+        cs[i] = sol.cs
+        cmx[i], cmy[i], cmz[i] = sol.moment_coeffs
+        gamma_distribution[i, :] = sol.gamma_distribution
+        cl_distribution[i, :] = sol.cl_distribution
+        cd_distribution[i, :] = sol.cd_distribution
+        cs_distribution[i, :] = sol.cs_distribution
+        reynolds_number[i] = sol.rey
     end
 
     polar_data = [

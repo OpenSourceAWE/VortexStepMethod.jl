@@ -60,7 +60,6 @@ end
                               Solver(wing.n_panels, n_sections + 1))
                     @test_throws DimensionMismatch solve!(other, body_aero)
                     @test_throws "Solver built for" solve!(other, body_aero)
-                    @test_throws DimensionMismatch solve(other, body_aero)
                 end
             end
         finally
@@ -196,6 +195,55 @@ calc_forces_allocs(solver, body_aero) =
     finally
         rm(settings_file; force=true)
     end
+end
+
+"""
+    inviscid_plates_aero(y_ranges; chord=1.0)
+
+`BodyAerodynamics` of one flat inviscid rectangle per `(y_start, y_end)` in `y_ranges`,
+with its leading edge on `x = 0`, in a 5° inflow of 12 m/s.
+"""
+function inviscid_plates_aero(y_ranges; chord=1.0)
+    wings = map(y_ranges) do (y_start, y_end)
+        wing = Wing(10)
+        add_section!(wing, [0.0, y_start, 0.0], [chord, y_start, 0.0], INVISCID)
+        add_section!(wing, [0.0, y_end, 0.0], [chord, y_end, 0.0], INVISCID)
+        refine!(wing)
+        wing
+    end
+    body_aero = BodyAerodynamics(collect(wings))
+    set_va!(body_aero, 12.0 .* [cosd(5), 0.0, sind(5)])
+    return body_aero
+end
+
+@testset "solve! fills the reference inflow and the centers of pressure" begin
+    body_aero = inviscid_plates_aero([(4.0, -4.0)])
+    solver = Solver(length(body_aero.panels), 2)
+    sol = solve!(solver, body_aero)
+    @test sol.va_ref_vec ≈ 12.0 .* [cosd(5), 0.0, sind(5)]
+    @test sol.q_ref ≈ 0.5 * solver.density * 12.0^2
+    @test sol.rey ≈ solver.density * 12.0 * body_aero.c_ref / solver.mu
+    @test sol.alpha_uncorrected == solver.lr.alpha_dist
+    # a flat plate carries no section moment, so each load acts at its quarter chord
+    @test sol.center_of_pressure ≈ [0.25, 0.0, 0.0] atol = 1e-6
+    for (location, panel) in zip(sol.panel_cp_locations, body_aero.panels)
+        @test location ≈ panel.aero_center
+    end
+
+    # calc_only_f_and_gamma keeps the analysis fields at their last value
+    cl, cl_distribution, lift = sol.cl, copy(sol.cl_distribution), sol.lift
+    solver.is_only_f_and_gamma_output = true
+    set_va!(body_aero, 12.0 .* [cosd(10), 0.0, sind(10)])
+    skipped = solve!(solver, body_aero)
+    @test skipped.force[3] > 1.5 * lift
+    @test skipped.cl == cl
+    @test skipped.lift == lift
+    @test skipped.cl_distribution == cl_distribution
+
+    # two plates with a gap between them: the line of action runs through the gap
+    gapped = inviscid_plates_aero([(6.0, 2.0), (-2.0, -6.0)])
+    solver = Solver(length(gapped.panels), 4)
+    @test all(isnan, solve!(solver, gapped).center_of_pressure)
 end
 
 @testset "Spanwise Laplacian tip closures" begin

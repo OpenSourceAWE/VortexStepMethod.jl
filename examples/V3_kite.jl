@@ -76,7 +76,7 @@ sideslip_deg = settings.condition.beta
 yaw_rate = settings.condition.yaw_rate
 
 set_va!(body_aero, settings)
-results = VortexStepMethod.solve(solver, body_aero; log=true)
+results = solve!(solver, body_aero; log=true)
 
 PLOT && plot_polars(
     solvers,

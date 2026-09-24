@@ -77,9 +77,9 @@ PLOT && plot_geometry(
 )
 
 # Solving and plotting distributions
-results = solve(vsm_solver, body_aero)
-@time results_with_stall = solve(VSM_with_stall_correction, body_aero)
-@time results_with_stall = solve(VSM_with_stall_correction, body_aero)
+results = solve!(vsm_solver, body_aero)
+@time results_with_stall = solve!(VSM_with_stall_correction, body_aero)
+@time results_with_stall = solve!(VSM_with_stall_correction, body_aero)
 
 CAD_y_coordinates = [panel.aero_center[2] for panel in body_aero.panels]
 

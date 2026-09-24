@@ -663,9 +663,9 @@ end
     denominator = dot3(plane_normal, f_unit)
     abs(denominator) < tol && return nothing
     λ = numerator / denominator
-    return MVec3(x_cp[1] + λ*f_unit[1],
-                 x_cp[2] + λ*f_unit[2],
-                 x_cp[3] + λ*f_unit[3])
+    return SVector{3}(x_cp[1] + λ*f_unit[1],
+                      x_cp[2] + λ*f_unit[2],
+                      x_cp[3] + λ*f_unit[3])
 end
 
 @inline function point_in_triangle(pt, v0, v1, v2; tol=1e-8)
@@ -717,7 +717,15 @@ end
     return (s >= -tol) && (t >= -tol) && (s + t <= 1 + tol)
 end
 
-function find_center_of_pressure(
+"""
+    find_center_of_pressure!(center_of_pressure, body_aero::BodyAerodynamics, force,
+                             moment, reference_point; force_tol=1e-12)
+
+Set `center_of_pressure` to the first point where the line of action of `force` and
+`moment` about `reference_point` crosses a panel, or to `NaN` where it crosses none.
+"""
+function find_center_of_pressure!(
+    center_of_pressure,
     body_aero::BodyAerodynamics,
     force,
     moment,
@@ -728,9 +736,10 @@ function find_center_of_pressure(
     M0 = moment
     r0 = reference_point
     F_norm_sq = dot3(F, F)
+    center_of_pressure .= NaN
     # Treat near-zero forces as "CoP undefined"
     if !(isfinite(F_norm_sq)) || F_norm_sq ≤ force_tol^2
-        return nothing
+        return center_of_pressure
     end
 
     wv = body_aero.work_vectors
@@ -771,25 +780,31 @@ function find_center_of_pressure(
                 r0_moment, f_unit, cross_tmp, normal)
             if !isnothing(intersection) &&
                point_in_quad(intersection, corners)
-                return MVec3(intersection)
+                center_of_pressure .= intersection
+                return center_of_pressure
             end
         end
     end
-
-    @warn "No intersection found with any panel " *
-          "in center-of-pressure calculation."
-    return nothing
+    return center_of_pressure
 end
 
-function compute_panel_center_of_pressures(
+"""
+    compute_panel_center_of_pressures!(panel_cp_locations, body_aero::BodyAerodynamics,
+                                       f_distribution, m_distribution, reference_point)
+
+Set each entry of `panel_cp_locations` to the point on its panel's chord, clamped between
+leading and trailing edge, where the panel's column of `f_distribution` gives its column of
+`m_distribution` about `reference_point`; to the aerodynamic center where that force has
+no finite component normal to the chord.
+"""
+function compute_panel_center_of_pressures!(
+    panel_cp_locations,
     body_aero::BodyAerodynamics,
     f_distribution::AbstractMatrix,
     m_distribution::AbstractMatrix,
     reference_point
 )
-    n = length(body_aero.panels)
-    panel_cp_locations = Vector{MVec3}(undef, n)
-    for i in 1:n
+    for i in eachindex(body_aero.panels)
         panel = body_aero.panels[i]
         @views F = f_distribution[:, i]
         @views M_ref = m_distribution[:, i]
@@ -800,7 +815,7 @@ function compute_panel_center_of_pressures(
 
         # Guard against non-finite forces and near-zero forces
         if !all(isfinite, F) || dot3(F, F) ≤ 1e-24
-            panel_cp_locations[i] = MVec3(ac)
+            panel_cp_locations[i] .= ac
             continue
         end
 
@@ -825,13 +840,13 @@ function compute_panel_center_of_pressures(
                      cz*span_dir[3]
 
         if abs(F_perp_mag) < 1e-12
-            panel_cp_locations[i] = MVec3(ac)
+            panel_cp_locations[i] .= ac
             continue
         end
 
         lever = clamp(m_pitch / F_perp_mag,
                       -0.25 * c, 0.75 * c)
-        panel_cp_locations[i] = MVec3(
+        panel_cp_locations[i] .= (
             ac[1] + lever*chord_dir[1],
             ac[2] + lever*chord_dir[2],
             ac[3] + lever*chord_dir[3])
@@ -864,294 +879,6 @@ Lift and side unit vectors, `(; dir_lift, dir_side)`, of inflow `va` on a wing a
     dir_lift = normalize(cross(va, spanwise))
     return (; dir_lift, dir_side=cross(dir_lift, va) / norm(va))
 end
-
-"""
-    calculate_results(body_aero::BodyAerodynamics, gamma_new, reference_point, density,
-                      core_radius_fraction, mu, alpha_dist, v_rel_dist, chord_dist,
-                      x_airf_dist, z_airf_dist, va_vec_dist, va_dist, va_unit_dist,
-                      panels::Vector{<:Panel}, is_only_f_and_gamma_output::Bool;
-                      correct_aoa=false, flow_curvature=false,
-                      is_with_viscous_drag_correction=false,
-                      is_with_attached_trailed_force=false, v_span_dist=nothing)
-
-Calculate final aerodynamic results. Reference point is in the kite body (KB) frame.
-
-`flow_curvature` adds [`flow_curvature_cm`](@ref) to every section moment, read
-from `body_aero.omega`. `is_with_viscous_drag_correction` adds
-[`spanwise_flow_drag`](@ref) to every section, from the velocity along `y_airf` in
-`v_span_dist`. `is_with_attached_trailed_force` adds [`attached_trailed_loads`](@ref).
-
-Returns:
-    Dict: Results including forces, coefficients and distributions
-"""
-function calculate_results(
-    body_aero::BodyAerodynamics,
-    gamma_new,
-    reference_point,
-    density,
-    core_radius_fraction,
-    mu,
-    alpha_dist,
-    v_rel_dist,
-    chord_dist,
-    x_airf_dist,
-    z_airf_dist,
-    va_vec_dist,
-    va_dist,
-    va_unit_dist,
-    panels::Vector{<:Panel},
-    is_only_f_and_gamma_output::Bool;
-    correct_aoa::Bool=false,
-    flow_curvature::Bool=false,
-    is_with_viscous_drag_correction::Bool=false,
-    is_with_attached_trailed_force::Bool=false,
-    v_span_dist=nothing,
-)
-
-    n_panels = length(panels)
-    if length(body_aero.cache) < 15
-        append!(body_aero.cache, [LazyBufferCache() for _ in 1:(15 - length(body_aero.cache))])
-    end
-
-    cl_dist = body_aero.cache[5][alpha_dist]
-    cd_dist = body_aero.cache[6][alpha_dist]
-    cm_dist = body_aero.cache[7][alpha_dist]
-    panel_width_dist = body_aero.cache[8][alpha_dist]
-    alpha_corrected = body_aero.cache[9][alpha_dist]
-    cl_prescribed_va = body_aero.cache[10][alpha_dist]
-    cd_prescribed_va = body_aero.cache[11][alpha_dist]
-    cs_prescribed_va = body_aero.cache[12][alpha_dist]
-    f_body_3D = body_aero.cache[13][alpha_dist, (3, length(alpha_dist))]
-    m_body_3D = body_aero.cache[14][alpha_dist, (3, length(alpha_dist))]
-    alpha_geometric = body_aero.cache[15][alpha_dist]
-
-    fill!(f_body_3D, 0.0)
-    fill!(m_body_3D, 0.0)
-
-    # Calculate coefficients and geometric AoA for each panel
-    for (i, panel) in enumerate(panels)
-        cl_dist[i] = calculate_cl(panel, alpha_dist[i])
-        cd_dist[i], cm_dist[i] = calculate_cd_cm(
-            panel, alpha_dist[i])
-        if flow_curvature
-            cm_dist[i] += flow_curvature_cm(
-                body_aero.pitch_rate_dist[i], chord_dist[i], v_rel_dist[i])
-        end
-        panel_width_dist[i] = panel.width
-        va = va_dist[i]
-        x_norm = norm3(panel.x_airf)
-        z_norm = norm3(panel.z_airf)
-        if va == 0.0 || x_norm == 0.0 || z_norm == 0.0
-            alpha_geometric[i] = NaN
-        else
-            inv_va = 1.0 / va
-            v_tangential = -dot3(panel.x_airf, panel.va_vec) *
-                           inv_va / x_norm
-            v_normal = -dot3(panel.z_airf, panel.va_vec) *
-                       inv_va / z_norm
-            alpha_geometric[i] = atan(-v_normal, -v_tangential)
-        end
-    end
-
-    # Calculate alpha corrections based on model type
-    if correct_aoa
-        update_effective_angle_of_attack!(
-            alpha_corrected,
-            body_aero,
-            gamma_new,
-            core_radius_fraction,
-            z_airf_dist,
-            x_airf_dist,
-            va_vec_dist,
-            va_dist,
-            va_unit_dist
-        )
-    else
-        alpha_corrected .= alpha_dist
-    end
-
-    area_all_panels = 0.0
-    lift_wing_3D_sum = 0.0
-    drag_wing_3D_sum = 0.0
-    side_wing_3D_sum = 0.0
-
-    reference_spanwise = SVector{3}(body_aero.wings[1].spanwise_direction)
-    va_ref_vec = MVec3(0.0, 0.0, 0.0)
-    weighted_speed_sq = 0.0
-    total_area = 0.0
-    @inbounds for i in 1:n_panels
-        area_i = chord_dist[i] * panel_width_dist[i]
-        total_area += area_i
-        speed_i = va_dist[i]
-        weighted_speed_sq += area_i * speed_i^2
-        va_ref_vec[1] += area_i * va_vec_dist[i, 1]
-        va_ref_vec[2] += area_i * va_vec_dist[i, 2]
-        va_ref_vec[3] += area_i * va_vec_dist[i, 3]
-    end
-    total_area > 0.0 || throw(ArgumentError(
-        "Total panel area must be positive."))
-    reference_speed = sqrt(weighted_speed_sq / total_area)
-    direction_norm = norm3(va_ref_vec)
-    if direction_norm <= 0.0
-        va_ref_vec .= (1.0, 0.0, 0.0)
-        direction_norm = 1.0
-    end
-    @inbounds for k in 1:3
-        va_ref_vec[k] = va_ref_vec[k] / direction_norm *
-                        reference_speed
-    end
-    va_ref = norm3(va_ref_vec)
-    va_ref > 0.0 || throw(ArgumentError(
-        "Reference freestream magnitude must be positive."))
-    va_ref_unit = SVector{3}(va_ref_vec) / va_ref
-    reference_dirs = prescribed_va_directions(SVector{3}(va_ref_vec), reference_spanwise)
-    all(isfinite, reference_dirs.dir_lift) || throw(ArgumentError(
-        "Reference lift direction is undefined because " *
-        "reference flow is parallel to spanwise direction."))
-    q_ref = 0.5 * density * va_ref^2
-
-    for (wing_idx, wing) in enumerate(body_aero.wings)
-        spanwise_unit = SVector{3}(wing.spanwise_direction)
-        for i in panel_range(body_aero, wing_idx)
-            panel = panels[i]
-            panel_area = panel.chord * panel.width
-            area_all_panels += panel_area
-
-            axes = panel_axes(panel)
-            dirs = panel_force_directions(axes, alpha_corrected[i], spanwise_unit)
-            c_span = 0.0
-            if is_with_viscous_drag_correction
-                viscous = spanwise_flow_drag(v_rel_dist[i], v_span_dist[i], panel.chord,
-                    density, mu)
-                cd_dist[i] += viscous.delta_cd
-                c_span = viscous.c_span
-            end
-            loads = panel_loads(axes, dirs,
-                dynamic_pressure(density, density, v_rel_dist[i]),
-                cl_dist[i], cd_dist[i], cm_dist[i]; c_span)
-            (; force, moment) = panel_force_moment(body_aero, i, loads, axes.y_airf,
-                gamma_new, density, core_radius_fraction, reference_point,
-                is_with_attached_trailed_force)
-
-            va_panel = va_dist[i]
-            va_panel > 0.0 || throw(ArgumentError(
-                "Panel $i has non-positive apparent " *
-                "velocity magnitude."))
-            q_panel = 0.5 * density * va_panel^2
-            panel_va = SVector{3}(panel.va_vec)
-            inv_va_panel = 1.0 / va_panel
-            drag_prescribed_va = dot(force, panel_va) * inv_va_panel
-            wing_dirs = prescribed_va_directions(panel_va, spanwise_unit)
-            body_dirs = prescribed_va_directions(panel_va, reference_spanwise)
-
-            lift_wing_3D_sum += dot(force, body_dirs.dir_lift) *
-                dot(body_dirs.dir_lift, reference_dirs.dir_lift)
-            drag_wing_3D_sum += drag_prescribed_va *
-                (dot(panel_va, va_ref_unit) * inv_va_panel)
-            side_wing_3D_sum += dot(force, body_dirs.dir_side) *
-                dot(body_dirs.dir_side, reference_dirs.dir_side)
-
-            inv_q_area = 1.0 / (q_panel * panel_area)
-            cl_prescribed_va[i] = dot(force, wing_dirs.dir_lift) * inv_q_area
-            cd_prescribed_va[i] = drag_prescribed_va * inv_q_area
-            cs_prescribed_va[i] = dot(force, wing_dirs.dir_side) * inv_q_area
-
-            @inbounds for k in 1:3
-                f_body_3D[k, i] = force[k]
-                m_body_3D[k, i] = moment[k]
-            end
-        end
-    end
-
-    if is_only_f_and_gamma_output
-        return Dict{String,Any}(
-            "F_distribution" => copy(f_body_3D),
-            "gamma_distribution" => gamma_new
-        )
-    end
-
-    # Calculate wing geometry properties
-    projected_area = body_aero.projected_area
-    wing_span = calculate_span(body_aero.wings, reference_spanwise)
-    aspect_ratio_projected = wing_span^2 / projected_area
-
-    # Calculate Reynolds number
-    c_ref = body_aero.c_ref
-    reynolds_number = density * va_ref * c_ref / mu
-
-    force_total = body_aero.work_vectors[9]
-    moment_total = body_aero.work_vectors[10]
-    force_total .= 0.0
-    moment_total .= 0.0
-    @inbounds for i in 1:n_panels
-        force_total[1] += f_body_3D[1, i]
-        force_total[2] += f_body_3D[2, i]
-        force_total[3] += f_body_3D[3, i]
-        moment_total[1] += m_body_3D[1, i]
-        moment_total[2] += m_body_3D[2, i]
-        moment_total[3] += m_body_3D[3, i]
-    end
-    center_of_pressure = try
-        find_center_of_pressure(body_aero, force_total, moment_total, reference_point)
-    catch err
-        @warn "Center-of-pressure calculation failed: $(err)"
-        nothing
-    end
-    panel_cp_locations = compute_panel_center_of_pressures(
-        body_aero,
-        f_body_3D,
-        m_body_3D,
-        reference_point
-    )
-
-    # Create results dictionary
-    results = Dict{String,Any}(
-        "Fx" => force_total[1],
-        "Fy" => force_total[2],
-        "Fz" => force_total[3],
-        "Mx" => moment_total[1],
-        "My" => moment_total[2],
-        "Mz" => moment_total[3],
-        "lift" => lift_wing_3D_sum,
-        "drag" => drag_wing_3D_sum,
-        "side" => side_wing_3D_sum,
-        "cl" => lift_wing_3D_sum / (q_ref * projected_area),
-        "cd" => drag_wing_3D_sum / (q_ref * projected_area),
-        "cs" => side_wing_3D_sum / (q_ref * projected_area),
-        "cmx" => moment_total[1] / (q_ref * projected_area * c_ref),
-        "cmy" => moment_total[2] / (q_ref * projected_area * c_ref),
-        "cmz" => moment_total[3] / (q_ref * projected_area * c_ref),
-        "cl_distribution" => copy(cl_prescribed_va),
-        "cd_distribution" => copy(cd_prescribed_va),
-        "cs_distribution" => copy(cs_prescribed_va),
-        "F_distribution" => copy(f_body_3D),
-        "M_distribution" => copy(m_body_3D),
-        "cfx" => (force_total[1] / (q_ref * projected_area)),
-        "cfy" => (force_total[2] / (q_ref * projected_area)),
-        "cfz" => (force_total[3] / (q_ref * projected_area)),
-        "alpha_at_ac" => copy(alpha_corrected),
-        "alpha_uncorrected" => alpha_dist,
-        "alpha_geometric" => copy(alpha_geometric),
-        "gamma_distribution" => gamma_new,
-        "area_all_panels" => area_all_panels,
-        "projected_area" => projected_area,
-        "wing_span" => wing_span,
-        "aspect_ratio_projected" => aspect_ratio_projected,
-        "Rey" => reynolds_number,
-        "q_ref" => q_ref,
-        "va_ref_vec" => va_ref_vec,
-        "center_of_pressure" => center_of_pressure,
-        "panel_cp_locations" => panel_cp_locations
-    )
-
-    @debug "Results summary:" cl=results["cl"] cd=results["cd"] cs=results["cs"]
-    @debug "Forces:" lift=lift_wing_3D_sum drag=drag_wing_3D_sum side=side_wing_3D_sum
-    @debug "Areas:" total=area_all_panels projected=projected_area
-    @debug "Aspect ratio:" ar=aspect_ratio_projected
-
-    return results
-end
-
 
 """
     set_va!(body_aero::BodyAerodynamics, va_vec::VelVector, omega=zeros(MVec3);

@@ -44,22 +44,14 @@ end
         @test pair.f_body_3D[:, rotated] ≈ rotation * solo.f_body_3D rtol = 1e-5
         @test pair.lift_dist[rotated] ≈ solo.lift_dist rtol = 1e-5
         @test pair.drag_dist[rotated] ≈ solo.drag_dist rtol = 1e-5
-    end
-
-    @testset "solve" begin
-        solo, pair = map((solo_aero, pair_aero)) do body_aero
-            solver = Solver(length(body_aero.panels), 2length(body_aero.wings))
-            solve(solver, body_aero)
-        end
-        rotated_forces = pair["F_distribution"][:, rotated]
-        @test rotated_forces ≈ rotation * solo["F_distribution"] rtol = 1e-5
-        for key in ("cl_distribution", "cd_distribution", "cs_distribution")
-            @test pair[key][rotated] ≈ solo[key] rtol = 1e-5 atol = 1e-8
+        for field in (:cl_distribution, :cd_distribution, :cs_distribution)
+            rotated_values = getfield(pair, field)[rotated]
+            @test rotated_values ≈ getfield(solo, field) rtol = 1e-5 atol = 1e-8
         end
         # along x the inflow makes z the body's lift and y its side direction
-        @test pair["lift"] ≈ pair["Fz"] rtol = 1e-10
-        @test pair["side"] ≈ pair["Fy"] rtol = 1e-10
-        @test pair["drag"] ≈ pair["Fx"] rtol = 1e-10
+        @test pair.lift ≈ pair.force[3] rtol = 1e-10
+        @test pair.side ≈ pair.force[2] rtol = 1e-10
+        @test pair.drag ≈ pair.force[1] rtol = 1e-10
     end
 end
 
@@ -68,7 +60,7 @@ end
         rectangular_wing(I(3), [0.0, 6.0, 0.0])])
     set_va!(body_aero, [20.0, 0.0, 0.0])
     solver = Solver(length(body_aero.panels), 2length(body_aero.wings))
-    results = solve(solver, body_aero)
-    @test results["wing_span"] ≈ 12.0
-    @test results["aspect_ratio_projected"] ≈ 12.0^2 / 18.0
+    sol = solve!(solver, body_aero)
+    @test sol.wing_span ≈ 12.0
+    @test sol.aspect_ratio_projected ≈ 12.0^2 / 18.0
 end

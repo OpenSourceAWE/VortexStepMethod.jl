@@ -64,6 +64,9 @@ flow_curvature_cm
 spanwise_flow_drag
 panel_force_directions
 prescribed_va_directions
+analysis_fields!
+find_center_of_pressure!
+compute_panel_center_of_pressures!
 panel_moment
 panel_couple_force
 panel_loads

@@ -343,13 +343,9 @@ end
         atol=1e-8,
         rtol=1e-8
     )
-    results_NEW = solve(loop_solver, body_aero; reference_point=[0,1,0])
-    # println(results_NEW)
-
-    @test results_NEW isa Dict
+    loop_sol = solve!(loop_solver, body_aero; reference_point=[0,1,0])
 
     @testset "Loop and nonlin solve!" begin
-        loop_sol = solve!(loop_solver, body_aero; reference_point=[0,1,0])
         nonlin_sol = solve!(nonlin_solver, body_aero; reference_point=[0,1,0])
 
         @test all(isapprox.(nonlin_sol.gamma_distribution, loop_sol.gamma_distribution; atol=1e-4))
@@ -375,7 +371,7 @@ end
     end
 
     # Calculate forces using uncorrected alpha
-    alpha = results_NEW["alpha_uncorrected"]
+    alpha = loop_sol.alpha_uncorrected
     dyn_visc = 0.5 * density * norm(va_vec)^2
     n_panels = length(body_aero.panels)
     lift = zeros(n_panels)
@@ -392,7 +388,7 @@ end
     Fmag = hcat(lift, drag, moment)
 
     # Calculate coefficients using corrected alpha
-    alpha = results_NEW["alpha_at_ac"]
+    alpha = loop_sol.alpha_dist
     aero_coeffs = hcat(
         [alpha[i] for (i, panel) in enumerate(body_aero.panels)],
         [calculate_cl(panel, alpha[i]) for (i, panel) in enumerate(body_aero.panels)],
@@ -410,25 +406,25 @@ end
 
     # Compare results
     @info "Comparing results"
-    @info "cl_calculated: $(results_NEW["cl"]), CL_ref: $CL_ref"
-    @info "cd_calculated: $(results_NEW["cd"]), CD_ref: $CD_ref"
-    @info "cs_calculated: $(results_NEW["cs"]), CS_ref: $CS_ref"
-    @info "L_calculated: $(results_NEW["lift"]), Ltot_ref: $Ltot_ref"
-    @info "D_calculated: $(results_NEW["drag"]), Dtot_ref: $Dtot_ref"
+    @info "cl_calculated: $(loop_sol.cl), CL_ref: $CL_ref"
+    @info "cd_calculated: $(loop_sol.cd), CD_ref: $CD_ref"
+    @info "cs_calculated: $(loop_sol.cs), CS_ref: $CS_ref"
+    @info "L_calculated: $(loop_sol.lift), Ltot_ref: $Ltot_ref"
+    @info "D_calculated: $(loop_sol.drag), Dtot_ref: $Dtot_ref"
 
     # Assert results
-    @test isapprox(results_NEW["cl"], CL_ref, rtol=1e-4)
-    @test isapprox(results_NEW["cd"], CD_ref, rtol=1e-4)
-    @test isapprox(results_NEW["cs"], CS_ref, rtol=1e-4)
-    @test isapprox(results_NEW["lift"], Ltot_ref, rtol=1e-4)
-    @test isapprox(results_NEW["drag"], Dtot_ref, rtol=1e-4)
-    @test isapprox(results_NEW["Fx"], results_NEW["Mz"], rtol=1e-4) # 1 meter arm
-    @test isapprox(results_NEW["My"], 0.0, atol=1e-3)
-    @test isapprox(results_NEW["Fz"], -results_NEW["Mx"], rtol=1e-4) # 1 meter arm
+    @test isapprox(loop_sol.cl, CL_ref, rtol=1e-4)
+    @test isapprox(loop_sol.cd, CD_ref, rtol=1e-4)
+    @test isapprox(loop_sol.cs, CS_ref, rtol=1e-4)
+    @test isapprox(loop_sol.lift, Ltot_ref, rtol=1e-4)
+    @test isapprox(loop_sol.drag, Dtot_ref, rtol=1e-4)
+    @test isapprox(loop_sol.force[1], loop_sol.moment[3], rtol=1e-4) # 1 meter arm
+    @test isapprox(loop_sol.moment[2], 0.0, atol=1e-3)
+    @test isapprox(loop_sol.force[3], -loop_sol.moment[1], rtol=1e-4) # 1 meter arm
 
     # Check array shapes
-    @test length(results_NEW["cl_distribution"]) == length(body_aero.panels)
-    @test length(results_NEW["cd_distribution"]) == length(body_aero.panels)
+    @test length(loop_sol.cl_distribution) == length(body_aero.panels)
+    @test length(loop_sol.cd_distribution) == length(body_aero.panels)
 end
 
 @testset "set_va! with VSMSettings applies the yaw rate about body z" begin

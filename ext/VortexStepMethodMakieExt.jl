@@ -764,7 +764,7 @@ Makie implementation of [`plot_distribution`](@ref).
 
 # Arguments
 - `y_coordinates_list`: List of spanwise coordinates
-- `results_list`: List of result dictionaries
+- `results_list`: List of [`VSMSolution`](@ref)s
 - `label_list`: List of labels for different results
 
 # Keyword arguments
@@ -811,39 +811,40 @@ function VortexStepMethod.plot_distribution(y_coordinates_list, results_list, la
 
     # Plot CL
     for (y_coords, results, label) in zip(y_coordinates_list, results_list, label_list)
-        value = round(results["cl"], digits=2)
-        lines!(ax_cl, Vector(y_coords), Vector(results["cl_distribution"]),
+        value = round(results.cl, digits=2)
+        lines!(ax_cl, Vector(y_coords), Vector(results.cl_distribution),
             label="$label CL: $value")
     end
 
     # Plot CD
     for (y_coords, results, label) in zip(y_coordinates_list, results_list, label_list)
-        value = round(results["cd"], digits=2)
-        lines!(ax_cd, Vector(y_coords), Vector(results["cd_distribution"]),
+        value = round(results.cd, digits=2)
+        lines!(ax_cd, Vector(y_coords), Vector(results.cd_distribution),
             label="$label CD: $value")
     end
 
     # Plot Gamma
     for (y_coords, results, label) in zip(y_coordinates_list, results_list, label_list)
-        lines!(ax_gamma, Vector(y_coords), Vector(results["gamma_distribution"]),
+        lines!(ax_gamma, Vector(y_coords), Vector(results.gamma_distribution),
             label=label)
     end
 
     # Plot alpha geometric
     for (y_coords, results, label) in zip(y_coordinates_list, results_list, label_list)
-        lines!(ax_alpha_geo, Vector(y_coords), rad2deg.(Vector(results["alpha_geometric"])),
+        lines!(ax_alpha_geo, Vector(y_coords),
+            rad2deg.(Vector(results.alpha_geometric_dist)),
             label=label)
     end
 
     # Plot alpha at ac
     for (y_coords, results, label) in zip(y_coordinates_list, results_list, label_list)
-        lines!(ax_alpha_ac, Vector(y_coords), rad2deg.(Vector(results["alpha_at_ac"])),
+        lines!(ax_alpha_ac, Vector(y_coords), rad2deg.(Vector(results.alpha_dist)),
             label=label)
     end
 
     # Plot alpha uncorrected
     for (y_coords, results, label) in zip(y_coordinates_list, results_list, label_list)
-        lines!(ax_alpha_unc, Vector(y_coords), rad2deg.(Vector(results["alpha_uncorrected"])),
+        lines!(ax_alpha_unc, Vector(y_coords), rad2deg.(Vector(results.alpha_uncorrected)),
             label=label)
     end
 
@@ -852,12 +853,12 @@ function VortexStepMethod.plot_distribution(y_coordinates_list, results_list, la
     components = ["x", "y", "z"]
     for (idx, (ax, comp)) in enumerate(zip(force_axes, components))
         for (y_coords, results, label) in zip(y_coordinates_list, results_list, label_list)
-            forces = results["F_distribution"][idx, :]
+            forces = results.f_body_3D[idx, :]
             if length(y_coords) != length(forces)
                 @warn "Dimension mismatch" length(y_coords) length(forces) comp
                 continue
             end
-            total_force = round(results["F$comp"], digits=2)
+            total_force = round(results.force[idx], digits=2)
             lines!(ax, Vector(y_coords), Vector(forces),
                 label="$label ΣF$comp: $total_force N")
         end
@@ -1128,7 +1129,8 @@ Makie implementation of [`plot_combined_analysis`](@ref).
 # Arguments
 - `solver`: Aerodynamic solver
 - `body_aero`: BodyAerodynamics object
-- `results`: Solution dictionary from solve()
+- `results`: [`VSMSolution`](@ref) of each solver, used for the spanwise plots when
+  `angle_of_attack_for_spanwise_distribution` is `nothing`
 
 # Keyword arguments
 - `labels`: Optional label string or label vector. If a vector with length
@@ -1232,8 +1234,7 @@ function VortexStepMethod.plot_combined_analysis(
             omega_old = copy(ba.omega)
             set_va!(ba, [cos(α_span) * cos(β_span), sin(β_span),
                 sin(α_span)] * va)
-            results_spanwise_list[i] = solve(s, ba,
-                s.sol.gamma_distribution)
+            results_spanwise_list[i] = solve!(s, ba)
             set_va!(ba, va_vec_old, omega_old)
         end
     end
@@ -1363,18 +1364,18 @@ function VortexStepMethod.plot_combined_analysis(
         color = colors[mod1(si, length(colors))]
         y_si = [panel.aero_center[2] for panel in body_aeros[si].panels]
 
-        lines!(ax_cl, Vector(y_si), Vector(rs["cl_distribution"]); color)
-        lines!(ax_cd, Vector(y_si), Vector(rs["cd_distribution"]); color)
+        lines!(ax_cl, Vector(y_si), Vector(rs.cl_distribution); color)
+        lines!(ax_cd, Vector(y_si), Vector(rs.cd_distribution); color)
         lines!(ax_gamma, Vector(y_si),
-            Vector(rs["gamma_distribution"]); label=lbl, color)
+            Vector(rs.gamma_distribution); label=lbl, color)
         lines!(ax_alpha_geo, Vector(y_si),
-            rad2deg.(Vector(rs["alpha_geometric"])); color)
+            rad2deg.(Vector(rs.alpha_geometric_dist)); color)
         lines!(ax_alpha_ac, Vector(y_si),
-            rad2deg.(Vector(rs["alpha_at_ac"])); color)
+            rad2deg.(Vector(rs.alpha_dist)); color)
         lines!(ax_alpha_unc, Vector(y_si),
-            rad2deg.(Vector(rs["alpha_uncorrected"])); color)
+            rad2deg.(Vector(rs.alpha_uncorrected)); color)
         for (idx, ax) in enumerate((ax_fx, ax_fy, ax_fz))
-            lines!(ax, Vector(y_si), Vector(rs["F_distribution"][idx, :]); color)
+            lines!(ax, Vector(y_si), Vector(rs.f_body_3D[idx, :]); color)
         end
     end
 
