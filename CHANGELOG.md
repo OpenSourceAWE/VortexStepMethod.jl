@@ -1,5 +1,33 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- `VSMSolution` holds everything the removed `solve` dictionary held, filled by every
+  `solve!`: `lift`, `drag`, `side`, `cl`, `cd`, `cs`, `cl_distribution`,
+  `cd_distribution`, `cs_distribution`, `alpha_uncorrected`, `va_ref_vec`, `q_ref`, `rey`,
+  `area_all_panels`, `projected_area`, `wing_span`, `aspect_ratio_projected`,
+  `center_of_pressure` and `panel_cp_locations`. `calc_only_f_and_gamma` skips the
+  projections, span and centers of pressure.
+
+### Changed
+
+- BREAKING: `solve` and `calculate_results` are removed; use `solve!`, which returns the
+  solver's `VSMSolution`, and `solve!(solver, body_aero, nothing)` to start from a fresh
+  circulation as `solve` did. Keys that became other fields: `Fx`/`Fy`/`Fz` → `force`,
+  `Mx`/`My`/`Mz` → `moment`, `cfx`… → `force_coeffs`, `cmx`… → `moment_coeffs`,
+  `F_distribution` → `f_body_3D`, `M_distribution` → `m_body_3D`, `alpha_at_ac` →
+  `alpha_dist`, `alpha_geometric` → `alpha_geometric_dist`, `Rey` → `rey`.
+- BREAKING: `plot_distribution` and `plot_combined_analysis` take `VSMSolution`s instead of
+  dictionaries. `plot_combined_analysis`, `plot_polars` and `generate_polar_data` solve
+  through `solve!`, so they leave `solver.sol` at their last angle.
+- An LLT solver with `correct_aoa` no longer corrects the angle of attack in any result,
+  as `solve!` already did; `solve` did, and gave `cl` up to 0.3 % and `cmx` up to 4.5 %
+  apart from `solve!`.
+- `center_of_pressure` is `NaN` where the line of action crosses no panel, instead of
+  `nothing` with a warning.
+
 ## VortexStepMethod v6.0.0 2026-09-23
 
 ### Added

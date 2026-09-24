@@ -45,7 +45,8 @@ end
         @test pair.lift_dist[rotated] ≈ solo.lift_dist rtol = 1e-5
         @test pair.drag_dist[rotated] ≈ solo.drag_dist rtol = 1e-5
         for field in (:cl_distribution, :cd_distribution, :cs_distribution)
-            @test getfield(pair, field)[rotated] ≈ getfield(solo, field) rtol = 1e-5 atol = 1e-8
+            rotated_values = getfield(pair, field)[rotated]
+            @test rotated_values ≈ getfield(solo, field) rtol = 1e-5 atol = 1e-8
         end
         # along x the inflow makes z the body's lift and y its side direction
         @test pair.lift ≈ pair.force[3] rtol = 1e-10

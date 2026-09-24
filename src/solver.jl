@@ -24,12 +24,13 @@ Struct for storing the solution of the [`solve!`](@ref) function. Must contain a
 - moment::MVec3: Aerodynamic moments [Mx, My, Mz] around the reference point [Nm]
 - force_coeffs::MVec3: Aerodynamic force coefficients [CFx, CFy, CFz] [-]
 - `moment_coeffs`::MVec3: Aerodynamic moment coefficients [CMx, CMy, CMz] [-]
-- `lift`, `drag`, `side`: Total force along the lift, drag and side directions of the
+- `lift`, `drag`, `side`¹: Total force along the lift, drag and side directions of the
   reference inflow `va_ref_vec` [N]
-- `cl`, `cd`, `cs`: `lift`, `drag` and `side` divided by `q_ref * projected_area` [-]
-- `cl_distribution`, `cd_distribution`, `cs_distribution`::Vector{Float64}: Panel force along
-  the lift, drag and side directions of the panel's own inflow, divided by its dynamic
-  pressure and area [-]; unlike `cl_dist` and `cd_dist`, these include every force term
+- `cl`, `cd`, `cs`¹: `lift`, `drag` and `side` divided by `q_ref * projected_area` [-]
+- `cl_distribution`, `cd_distribution`, `cs_distribution`¹::Vector{Float64}: Panel force
+  along the lift, drag and side directions of the panel's own inflow, divided by its
+  dynamic pressure and area [-]; unlike `cl_dist` and `cd_dist`, these include every
+  force term
 - `alpha_uncorrected`::Vector{Float64}: Angle of attack of each panel at its evaluation
   point, before the aerodynamic-center correction [rad]
 - `va_ref_vec`::MVec3: Area-weighted reference inflow velocity [m/s]
@@ -37,11 +38,11 @@ Struct for storing the solution of the [`solve!`](@ref) function. Must contain a
 - `rey`: Reynolds number of `va_ref_vec` on the reference chord [-]
 - `area_all_panels`: Sum of the panel areas [m²]
 - `projected_area`: Projected area of the body [m²]
-- `wing_span`: Span along the first wing's spanwise direction [m]
-- `aspect_ratio_projected`: `wing_span^2 / projected_area` [-]
-- `center_of_pressure`::MVec3: Point where the line of action of `force` crosses a
+- `wing_span`¹: Span along the first wing's spanwise direction [m]
+- `aspect_ratio_projected`¹: `wing_span^2 / projected_area` [-]
+- `center_of_pressure`¹::MVec3: Point where the line of action of `force` crosses a
   panel, `NaN` where it crosses none [m]
-- `panel_cp_locations`::Vector{MVec3}: Center of pressure of each panel [m]
+- `panel_cp_locations`¹::Vector{MVec3}: Center of pressure of each panel [m]
 - `moment_dist`::Vector{Float64}: Pitching moments around the spanwise vector of each panel. [Nm]
 - `moment_coeff_dist`::Vector{Float64}: Pitching moment coefficient around the spanwise vector of each panel. [-]
 - `moment_unrefined_dist`::MVector{U, Float64}: Averaged moments for unrefined sections [Nm]
@@ -51,6 +52,8 @@ Struct for storing the solution of the [`solve!`](@ref) function. Must contain a
 - `moment_coeff_unrefined_dist`::MVector{U, Float64}: Summed `moment_frac`-referenced pitching-moment coefficient per unrefined section [-]
 - `alpha_unrefined_dist`::MVector{U, Float64}: Averaged angles of attack for unrefined sections [rad]
 - `solver_status`::SolverStatus: enum, see [`SolverStatus`](@ref)
+
+¹ Kept at its last value when the solver's `calc_only_f_and_gamma` is set.
 """
 @with_kw mutable struct VSMSolution{P, U, T}
     ### private vectors of solve_base!
@@ -167,7 +170,8 @@ Main solver structure for the Vortex Step Method. See also: [`solve!`](@ref)
 - `core_radius_fraction`::Float64 = 0.05: Bound vortex core cut-off, as a fraction of the
     filament length, following Damiani et al. (2019)
 - mu::Float64 = 1.81e-5: Dynamic viscosity [N·s/m²]
-- `is_only_f_and_gamma_output`::Bool = false: Whether to only output f and gamma
+- `is_only_f_and_gamma_output`::Bool = false: Whether `solve!` skips the fields of
+  [`VSMSolution`](@ref) that only analysis reads, see [`SolverSettings`](@ref)
 - `flow_curvature`::Bool = false: Add the thin-airfoil pitch-rate moment
     increment `-(π/4) q̂` to each section, see: [`flow_curvature_cm`](@ref)
 - `is_with_viscous_drag_correction`::Bool = false: Add the spanwise-flow viscous drag
@@ -619,14 +623,8 @@ function calc_forces!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics;
     solver.sol.alpha_uncorrected .= alpha_dist
     solver.sol.area_all_panels = area_all_panels
     solver.sol.projected_area = projected_area
-    reference_spanwise = body_aero.wings[1].spanwise_direction
-    solver.sol.wing_span = calculate_span(body_aero.wings, reference_spanwise)
-    solver.sol.aspect_ratio_projected = solver.sol.wing_span^2 / projected_area
-    inflow_loads!(solver.sol, body_aero, density)
-    find_center_of_pressure!(solver.sol.center_of_pressure, body_aero, solver.sol.force,
-        solver.sol.moment, reference_point)
-    compute_panel_center_of_pressures!(solver.sol.panel_cp_locations, body_aero,
-        solver.sol.f_body_3D, solver.sol.m_body_3D, reference_point)
+    solver.is_only_f_and_gamma_output ||
+        analysis_fields!(solver.sol, body_aero, density, reference_point)
     if converged
         # TODO: Check if the result if feasible if converged
         solver.sol.solver_status = FEASIBLE
@@ -638,14 +636,24 @@ function calc_forces!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics;
 end
 
 """
-    inflow_loads!(sol::VSMSolution, body_aero::BodyAerodynamics, density)
+    analysis_fields!(sol::VSMSolution, body_aero::BodyAerodynamics, density,
+                     reference_point)
 
-Fill `lift`, `drag`, `side`, `cl`, `cd`, `cs` and `cl_distribution`, `cd_distribution`,
-`cs_distribution` of `sol` by projecting the panel forces `sol.f_body_3D` on the lift, drag
-and side directions of the reference inflow `sol.va_ref_vec` and of each panel's own inflow.
+Fill the fields of `sol` that `calc_only_f_and_gamma` skips: `wing_span`,
+`aspect_ratio_projected`, both centers of pressure, and `lift`, `drag`, `side`, `cl`, `cd`,
+`cs` and their `_distribution`s, which project the panel forces `sol.f_body_3D` on the
+lift, drag and side directions of the reference inflow `sol.va_ref_vec` and of each
+panel's own inflow.
 """
-function inflow_loads!(sol::VSMSolution, body_aero::BodyAerodynamics, density)
+function analysis_fields!(sol::VSMSolution, body_aero::BodyAerodynamics, density,
+        reference_point)
     reference_spanwise = SVector{3}(body_aero.wings[1].spanwise_direction)
+    sol.wing_span = calculate_span(body_aero.wings, reference_spanwise)
+    sol.aspect_ratio_projected = sol.wing_span^2 / sol.projected_area
+    find_center_of_pressure!(sol.center_of_pressure, body_aero, sol.force, sol.moment,
+        reference_point)
+    compute_panel_center_of_pressures!(sol.panel_cp_locations, body_aero, sol.f_body_3D,
+        sol.m_body_3D, reference_point)
     va_ref = SVector{3}(sol.va_ref_vec)
     va_ref_unit = va_ref / norm(va_ref)
     reference_dirs = prescribed_va_directions(va_ref, reference_spanwise)
@@ -653,7 +661,8 @@ function inflow_loads!(sol::VSMSolution, body_aero::BodyAerodynamics, density)
     for (wing_idx, wing) in enumerate(body_aero.wings)
         spanwise_unit = SVector{3}(wing.spanwise_direction)
         for i in panel_range(body_aero, wing_idx)
-            force = SVector{3}(sol.f_body_3D[1, i], sol.f_body_3D[2, i], sol.f_body_3D[3, i])
+            force = SVector{3}(sol.f_body_3D[1, i], sol.f_body_3D[2, i],
+                sol.f_body_3D[3, i])
             panel_va = SVector{3}(sol.va_vec_dist[i, 1], sol.va_vec_dist[i, 2],
                 sol.va_vec_dist[i, 3])
             va_panel = norm(panel_va)

@@ -831,7 +831,8 @@ function VortexStepMethod.plot_distribution(y_coordinates_list, results_list, la
 
     # Plot alpha geometric
     for (y_coords, results, label) in zip(y_coordinates_list, results_list, label_list)
-        lines!(ax_alpha_geo, Vector(y_coords), rad2deg.(Vector(results.alpha_geometric_dist)),
+        lines!(ax_alpha_geo, Vector(y_coords),
+            rad2deg.(Vector(results.alpha_geometric_dist)),
             label=label)
     end
 

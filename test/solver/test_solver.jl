@@ -230,6 +230,13 @@ end
         @test location ≈ panel.aero_center
     end
 
+    # calc_only_f_and_gamma leaves the analysis fields alone
+    skipping = Solver(length(body_aero.panels), 2; is_only_f_and_gamma_output=true)
+    skipped = solve!(skipping, body_aero)
+    @test skipped.force ≈ sol.force
+    @test skipped.cl == 0.0
+    @test all(iszero, skipped.cl_distribution)
+
     # two plates with a gap between them: the line of action runs through the gap
     gapped = flat_plate_aero([(6.0, 2.0), (-2.0, -6.0)])
     solver = Solver(length(gapped.panels), 4)

@@ -171,7 +171,8 @@ Solver configuration, used within [`VSMSettings`](@ref).
 - `core_radius_fraction`: Bound vortex core cut-off, as a fraction of the filament
     length, following Damiani et al. (2019) (default `0.05`)
 - `mu`: Dynamic viscosity (N*s/m^2) (default `1.81e-5`)
-- `calc_only_f_and_gamma`: Only output forces and circulation
+- `calc_only_f_and_gamma`: Leave the analysis fields of [`VSMSolution`](@ref) (`lift`,
+    `cl`, their distributions, span and centers of pressure) at their last values
     (default `false`)
 - `correct_aoa`: Perform angle of attack correction
     (default `false`)
@@ -197,7 +198,7 @@ Solver configuration, used within [`VSMSettings`](@ref).
     use_gamma_prev::Bool = true             # if false, always reinitialize gamma from type_initial_gamma_distribution
     core_radius_fraction::Float64 = 0.05
     mu::Float64 = 1.81e-5                   # dynamic viscosity [N·s/m²]
-    calc_only_f_and_gamma::Bool=false       # whether to only output f and gamma
+    calc_only_f_and_gamma::Bool=false       # skip the analysis fields of VSMSolution
     correct_aoa::Bool=false                 # perform aoa correction
     flow_curvature::Bool=false              # thin-airfoil pitch-rate moment increment
     is_with_viscous_drag_correction::Bool=false # spanwise-flow viscous force (Gaunaa 2024)

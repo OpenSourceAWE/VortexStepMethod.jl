@@ -86,7 +86,7 @@ Plot spanwise distributions of aerodynamic properties.
 
 # Arguments
 - `y_coordinates_list`: list of spanwise coordinate arrays
-- `results_list`: list of result dictionaries from [`solve!`](@ref)
+- `results_list`: list of [`VSMSolution`](@ref)s from [`solve!`](@ref)
 - `label_list`: list of labels for each result
 
 # Keyword arguments
@@ -151,7 +151,7 @@ in sequence.
 # Arguments
 - `solver`: solver or vector of solvers
 - `body_aero`: [`BodyAerodynamics`](@ref) object or vector thereof
-- `results`: results dictionary (or vector) from [`solve!`](@ref)
+- `results`: [`VSMSolution`](@ref) (or vector of them) from [`solve!`](@ref)
 
 # Keyword arguments
 - `solver_label`: label string for the solver (backward-compatible alias for `labels`)
