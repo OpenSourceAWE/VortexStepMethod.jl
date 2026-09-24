@@ -29,8 +29,8 @@ Struct for storing the solution of the [`solve!`](@ref) function. Must contain a
 - `cl`, `cd`, `cs`¹: `lift`, `drag` and `side` divided by `q_ref * projected_area` [-]
 - `cl_distribution`, `cd_distribution`, `cs_distribution`¹::Vector{Float64}: Panel force
   along the lift, drag and side directions of the panel's own inflow, divided by its
-  dynamic pressure and area [-]; unlike `cl_dist` and `cd_dist`, these include every
-  force term
+  dynamic pressure and area [-], `NaN` on a panel without inflow; unlike `cl_dist` and
+  `cd_dist`, these include every force term
 - `alpha_uncorrected`::Vector{Float64}: Angle of attack of each panel at its evaluation
   point, before the aerodynamic-center correction [rad]
 - `va_ref_vec`::MVec3: Area-weighted reference inflow velocity [m/s]

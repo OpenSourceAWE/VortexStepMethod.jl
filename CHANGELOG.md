@@ -22,9 +22,8 @@
 - BREAKING: `plot_distribution` and `plot_combined_analysis` take `VSMSolution`s instead of
   dictionaries. `plot_combined_analysis`, `plot_polars` and `generate_polar_data` solve
   through `solve!`, so they leave `solver.sol` at their last angle.
-- An LLT solver with `correct_aoa` no longer corrects the angle of attack in any result,
-  as `solve!` already did; `solve` did, and gave `cl` up to 0.3 % and `cmx` up to 4.5 %
-  apart from `solve!`.
+- `correct_aoa` applies to the VSM model only. With LLT, results that came from `solve`
+  move by up to 0.34 % in `cl`, 0.43 % in `cd` and 4.5 % in `cmx`.
 - `center_of_pressure` is `NaN` where the line of action crosses no panel, instead of
   `nothing` with a warning.
 

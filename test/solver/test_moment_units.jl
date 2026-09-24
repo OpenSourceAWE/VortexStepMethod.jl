@@ -47,5 +47,4 @@ end
         @test large.moment_coeffs ≈ small.moment_coeffs rtol = 1e-6
         @test large.moment_coeff_dist ≈ small.moment_coeff_dist rtol = 1e-6
     end
-
 end

@@ -788,6 +788,15 @@ function find_center_of_pressure!(
     return center_of_pressure
 end
 
+"""
+    compute_panel_center_of_pressures!(panel_cp_locations, body_aero::BodyAerodynamics,
+                                       f_distribution, m_distribution, reference_point)
+
+Set each entry of `panel_cp_locations` to the point on its panel's chord, clamped between
+leading and trailing edge, where the panel's column of `f_distribution` gives its column of
+`m_distribution` about `reference_point`; to the aerodynamic center where that force has
+no finite component normal to the chord.
+"""
 function compute_panel_center_of_pressures!(
     panel_cp_locations,
     body_aero::BodyAerodynamics,

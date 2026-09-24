@@ -174,7 +174,7 @@ Solver configuration, used within [`VSMSettings`](@ref).
 - `calc_only_f_and_gamma`: Leave the analysis fields of [`VSMSolution`](@ref) (`lift`,
     `cl`, their distributions, span and centers of pressure) at their last values
     (default `false`)
-- `correct_aoa`: Perform angle of attack correction
+- `correct_aoa`: Perform angle of attack correction (VSM model only)
     (default `false`)
 - `flow_curvature`: Add the thin-airfoil pitch-rate moment increment to each
     section (default `false`)

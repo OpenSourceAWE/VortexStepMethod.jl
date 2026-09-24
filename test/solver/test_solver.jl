@@ -198,12 +198,12 @@ calc_forces_allocs(solver, body_aero) =
 end
 
 """
-    flat_plate_aero(y_ranges; chord=1.0)
+    inviscid_plates_aero(y_ranges; chord=1.0)
 
 `BodyAerodynamics` of one flat inviscid rectangle per `(y_start, y_end)` in `y_ranges`,
 with its leading edge on `x = 0`, in a 5° inflow of 12 m/s.
 """
-function flat_plate_aero(y_ranges; chord=1.0)
+function inviscid_plates_aero(y_ranges; chord=1.0)
     wings = map(y_ranges) do (y_start, y_end)
         wing = Wing(10)
         add_section!(wing, [0.0, y_start, 0.0], [chord, y_start, 0.0], INVISCID)
@@ -217,7 +217,7 @@ function flat_plate_aero(y_ranges; chord=1.0)
 end
 
 @testset "solve! fills the reference inflow and the centers of pressure" begin
-    body_aero = flat_plate_aero([(4.0, -4.0)])
+    body_aero = inviscid_plates_aero([(4.0, -4.0)])
     solver = Solver(length(body_aero.panels), 2)
     sol = solve!(solver, body_aero)
     @test sol.va_ref_vec ≈ 12.0 .* [cosd(5), 0.0, sind(5)]
@@ -230,15 +230,18 @@ end
         @test location ≈ panel.aero_center
     end
 
-    # calc_only_f_and_gamma leaves the analysis fields alone
-    skipping = Solver(length(body_aero.panels), 2; is_only_f_and_gamma_output=true)
-    skipped = solve!(skipping, body_aero)
-    @test skipped.force ≈ sol.force
-    @test skipped.cl == 0.0
-    @test all(iszero, skipped.cl_distribution)
+    # calc_only_f_and_gamma keeps the analysis fields at their last value
+    cl, cl_distribution, lift = sol.cl, copy(sol.cl_distribution), sol.lift
+    solver.is_only_f_and_gamma_output = true
+    set_va!(body_aero, 12.0 .* [cosd(10), 0.0, sind(10)])
+    skipped = solve!(solver, body_aero)
+    @test skipped.force[3] > 1.5 * lift
+    @test skipped.cl == cl
+    @test skipped.lift == lift
+    @test skipped.cl_distribution == cl_distribution
 
     # two plates with a gap between them: the line of action runs through the gap
-    gapped = flat_plate_aero([(6.0, 2.0), (-2.0, -6.0)])
+    gapped = inviscid_plates_aero([(6.0, 2.0), (-2.0, -6.0)])
     solver = Solver(length(gapped.panels), 4)
     @test all(isnan, solve!(solver, gapped).center_of_pressure)
 end
