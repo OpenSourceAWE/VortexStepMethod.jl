@@ -1,5 +1,5 @@
 using VortexStepMethod: Panel, Section, calculate_relative_alpha_and_relative_velocity, calculate_cl, calculate_cd_cm, reinit!, INVISCID, POLAR_VECTORS, MVec3
-using VortexStepMethod: panel_axes, panel_span_vector
+using VortexStepMethod: panel_axes, panel_span_vector, panel_inflow
 using Interpolations: linear_interpolation, Line
 using LinearAlgebra
 using Test
@@ -214,5 +214,18 @@ end
         @test isapprox(flipped.y_airf, -axes.y_airf; atol=1e-12)
         @test isapprox(flipped.z_airf, -axes.z_airf; atol=1e-12)
         @test isapprox(flipped.x_airf, axes.x_airf; atol=1e-12)
+    end
+
+    @testset "alpha is measured in the plane square to the bound vortex" begin
+        chord_in_plane = normalize(axes.x_airf .- dot(axes.x_airf, axes.y_airf) .* axes.y_airf)
+        for v_eff in ([1.0, 0.0, 0.0], [1.0, 0.3, 0.1]), orient in (1, -1)
+            oriented = panel_axes(le_1, te_1, le_2, te_2, 0.5, orient)
+            alpha = panel_inflow(oriented, v_eff, v_eff, zeros(3)).alpha
+            @test alpha ≈ atan(dot(v_eff, oriented.z_airf), dot(v_eff, chord_in_plane))
+            along_span = v_eff .+ 2.0 .* axes.y_airf
+            @test panel_inflow(oriented, along_span, along_span, zeros(3)).alpha ≈ alpha
+        end
+        @test rad2deg(panel_inflow(axes, [1.0, 0, 0], [1.0, 0, 0], zeros(3)).alpha) ≈
+              -20.097 atol = 1e-3
     end
 end

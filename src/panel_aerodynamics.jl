@@ -96,6 +96,15 @@ already sampled at three-quarter chord.
            zero(pitch_rate * chord))
 
 """
+    inflow_angle(velocity, y_airf, z_airf)
+
+Angle of attack of `velocity` in the plane square to `y_airf`: from the chord's
+projection on that plane, `y_airf × z_airf`, towards `z_airf`.
+"""
+@inline inflow_angle(velocity, y_airf, z_airf) =
+    atan(dot(velocity, z_airf), dot(velocity, cross(y_airf, z_airf)))
+
+"""
     effective_alpha(alpha, deficiency)
 
 Angle the polars are read at: the geometric inflow angle less an unsteady lag. The
@@ -115,9 +124,9 @@ leaves it zero. `deficiency` feeds [`effective_alpha`](@ref).
 """
 @inline function panel_inflow(axes, va_vec_1, va_vec_2, v_ind, dva_vec_1=nothing,
                               dva_vec_2=nothing, deficiency=0)
-    (; x_airf, y_airf, z_airf, chord) = axes
+    (; y_airf, z_airf, chord) = axes
     v_eff = 0.5 .* (va_vec_1 .+ va_vec_2) .+ v_ind
-    alpha = atan(dot(v_eff, z_airf), dot(v_eff, x_airf))
+    alpha = inflow_angle(v_eff, y_airf, z_airf)
     v_span = cross(v_eff, y_airf)
     pitch_rate = isnothing(dva_vec_1) ? zero(chord) :
         section_pitch_rate(0.5 .* (dva_vec_1 .+ dva_vec_2), z_airf, chord)
@@ -143,8 +152,8 @@ Lift and drag unit vectors, `(; dir_lift, dir_drag)`. `alpha_dir` is the angle t
 turns the force, `spanwise` the wing's spanwise direction.
 """
 @inline function panel_force_directions(axes, alpha_dir, spanwise)
-    (; x_airf, y_airf, z_airf) = axes
-    dir_inflow = cos(alpha_dir) .* x_airf .+ sin(alpha_dir) .* z_airf
+    (; y_airf, z_airf) = axes
+    dir_inflow = cos(alpha_dir) .* cross(y_airf, z_airf) .+ sin(alpha_dir) .* z_airf
     lift_cross = cross(dir_inflow, y_airf)
     dir_lift = lift_cross ./ smooth_norm(lift_cross)
     drag_cross = cross(spanwise, dir_lift)

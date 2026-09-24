@@ -523,20 +523,16 @@ end
 
 """
     update_effective_angle_of_attack!(alpha_corrected, body_aero::BodyAerodynamics, gamma,
-                                      core_radius_fraction, z_airf_dist, x_airf_dist,
-                                      va_vec_dist, va_dist, va_unit_dist)
+                                      core_radius_fraction, va_vec_dist, va_dist,
+                                      va_unit_dist)
 
-Update angle of attack at aerodynamic center for VSM method.
-
-Returns:
-    nothing
+Write each panel's [`inflow_angle`](@ref) at its aerodynamic centre into
+`alpha_corrected`, the induced velocity taken from `gamma` on the LLT influence matrix.
 """
 function update_effective_angle_of_attack!(alpha_corrected,
-    body_aero::BodyAerodynamics, 
+    body_aero::BodyAerodynamics,
     gamma,
     core_radius_fraction,
-    z_airf_dist,
-    x_airf_dist,
     va_vec_dist,
     va_dist,
     va_unit_dist)
@@ -551,31 +547,11 @@ function update_effective_angle_of_attack!(alpha_corrected,
         mul!(view(induced_velocity, :, k), view(body_aero.AIC_aero_center, :, :, k), gamma)
     end
 
-    # In-place relative velocity calculation
-    relative_velocity = body_aero.cache[2][va_vec_dist]
-    relative_velocity .= va_vec_dist .+ induced_velocity
-
-    # Preallocate and compute dot products manually
-    n = size(relative_velocity, 1)
-    v_normal     = body_aero.cache[3][relative_velocity]
-    v_tangential = body_aero.cache[4][relative_velocity]
-    
-    @inbounds for i in 1:n
-        vn = 0.0
-        vt = 0.0
-        for j in 1:3
-            vn += z_airf_dist[i, j] * relative_velocity[i, j]
-            vt += x_airf_dist[i, j] * relative_velocity[i, j]
-        end
-        v_normal[i] = vn
-        v_tangential[i] = vt
+    @inbounds for (i, panel) in enumerate(body_aero.panels)
+        v_rel = matrix_row(va_vec_dist, i) .+ matrix_row(induced_velocity, i)
+        alpha_corrected[i] = inflow_angle(v_rel, SVector{3}(panel.y_airf),
+                                          SVector{3}(panel.z_airf))
     end
-
-    # Direct angle calculation without temporary arrays
-    @inbounds for i in 1:n
-        alpha_corrected[i] = atan(v_normal[i], v_tangential[i])
-    end
-
     nothing
 end
 
@@ -861,19 +837,8 @@ function calculate_results(
                 body_aero.pitch_rate_dist[i], chord_dist[i], v_rel_dist[i])
         end
         panel_width_dist[i] = panel.width
-        va = va_dist[i]
-        x_norm = norm3(panel.x_airf)
-        z_norm = norm3(panel.z_airf)
-        if va == 0.0 || x_norm == 0.0 || z_norm == 0.0
-            alpha_geometric[i] = NaN
-        else
-            inv_va = 1.0 / va
-            v_tangential = -dot3(panel.x_airf, panel.va_vec) *
-                           inv_va / x_norm
-            v_normal = -dot3(panel.z_airf, panel.va_vec) *
-                       inv_va / z_norm
-            alpha_geometric[i] = atan(-v_normal, -v_tangential)
-        end
+        alpha_geometric[i] = iszero(va_dist[i]) ? NaN : inflow_angle(panel.va_vec,
+            SVector{3}(panel.y_airf), SVector{3}(panel.z_airf))
     end
 
     # Calculate alpha corrections based on model type
@@ -883,8 +848,6 @@ function calculate_results(
             body_aero,
             gamma_new,
             core_radius_fraction,
-            z_airf_dist,
-            x_airf_dist,
             va_vec_dist,
             va_dist,
             va_unit_dist

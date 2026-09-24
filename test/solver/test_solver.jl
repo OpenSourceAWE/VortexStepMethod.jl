@@ -328,3 +328,36 @@ end
     @test VortexStepMethod.finite_full(ForwardDiff.Dual(1.0, 2.0))
     @test !VortexStepMethod.finite_full(ForwardDiff.Dual(1.0, Inf))
 end
+
+@testset "alpha is the crossflow angle on a swept, tapered wing" begin
+    polar = (deg2rad.([-20.0, 0.0, 20.0]), [-1.8, 0.2, 2.2], fill(0.02, 3), fill(-0.05, 3))
+    wing = Wing(8; spanwise_distribution=LINEAR)
+    add_section!(wing, [1.5, 4.0, 0.3], [2.2, 4.0, 0.1], POLAR_VECTORS, polar)
+    add_section!(wing, [0.0, 0.0, 0.0], [2.0, 0.0, 0.0], POLAR_VECTORS, polar)
+    add_section!(wing, [1.5, -4.0, 0.3], [2.2, -4.0, 0.1], POLAR_VECTORS, polar)
+    refine!(wing)
+    body_aero = BodyAerodynamics([wing])
+    va = [15.0, 1.0, 1.5]
+    set_va!(body_aero, va)
+
+    function crossflow_alpha(panel, velocity)
+        chord_in_plane = panel.x_airf .- dot(panel.x_airf, panel.y_airf) .* panel.y_airf
+        return atan(dot(velocity, panel.z_airf), dot(velocity, normalize(chord_in_plane)))
+    end
+    induced(AIC, gamma, i) = [dot(AIC[i, :, k], gamma) for k in 1:3]
+
+    for correct_aoa in (false, true)
+        solver = Solver(length(body_aero.panels), 3; correct_aoa)
+        sol = solve!(solver, body_aero)
+        @test sol.solver_status == FEASIBLE
+        gamma = solver.lr.gamma_new
+        for (i, panel) in enumerate(body_aero.panels)
+            @test solver.lr.alpha_dist[i] ≈
+                  crossflow_alpha(panel, va .+ induced(body_aero.AIC, gamma, i)) atol = 1e-6
+            @test sol.alpha_geometric_dist[i] ≈ crossflow_alpha(panel, va) atol = 1e-10
+            correct_aoa || continue
+            @test sol.alpha_dist[i] ≈ crossflow_alpha(panel,
+                va .+ induced(body_aero.AIC_aero_center, gamma, i)) atol = 1e-8
+        end
+    end
+end
