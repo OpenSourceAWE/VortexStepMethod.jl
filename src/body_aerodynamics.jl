@@ -28,7 +28,7 @@ Main structure for calculating aerodynamic properties of bodies. Use the constru
                         influence coefficients, used only for the corrected angle of attack
 - `projected_area::Float64` = 1.0: The area projected onto the xy-plane of the KA body frame [m²]
 - `c_ref::Float64` = 1.0: Reference chord length (max panel chord) [m]
-- `cache::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}}` = [LazyBufferCache() for _ in 1:15]
+- `cache::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}}` = [LazyBufferCache() for _ in 1:12]
 """
 @with_kw mutable struct BodyAerodynamics{P, W<:AbstractWing, T, PN<:Panel{T}}
     panels::Vector{PN}
@@ -49,7 +49,7 @@ Main structure for calculating aerodynamic properties of bodies. Use the constru
     AIC_aero_center::Array{T, 3} = zeros(T, P, P, 3)
     projected_area::T = one(T)
     c_ref::T = one(T)
-    cache::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}} = [LazyBufferCache() for _ in 1:15]
+    cache::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}} = [LazyBufferCache() for _ in 1:12]
 end
 
 """
@@ -808,21 +808,21 @@ function calculate_results(
 )
 
     n_panels = length(panels)
-    if length(body_aero.cache) < 15
-        append!(body_aero.cache, [LazyBufferCache() for _ in 1:(15 - length(body_aero.cache))])
+    if length(body_aero.cache) < 12
+        append!(body_aero.cache, [LazyBufferCache() for _ in 1:(12 - length(body_aero.cache))])
     end
 
-    cl_dist = body_aero.cache[5][alpha_dist]
-    cd_dist = body_aero.cache[6][alpha_dist]
-    cm_dist = body_aero.cache[7][alpha_dist]
-    panel_width_dist = body_aero.cache[8][alpha_dist]
-    alpha_corrected = body_aero.cache[9][alpha_dist]
-    cl_prescribed_va = body_aero.cache[10][alpha_dist]
-    cd_prescribed_va = body_aero.cache[11][alpha_dist]
-    cs_prescribed_va = body_aero.cache[12][alpha_dist]
-    f_body_3D = body_aero.cache[13][alpha_dist, (3, length(alpha_dist))]
-    m_body_3D = body_aero.cache[14][alpha_dist, (3, length(alpha_dist))]
-    alpha_geometric = body_aero.cache[15][alpha_dist]
+    cl_dist = body_aero.cache[2][alpha_dist]
+    cd_dist = body_aero.cache[3][alpha_dist]
+    cm_dist = body_aero.cache[4][alpha_dist]
+    panel_width_dist = body_aero.cache[5][alpha_dist]
+    alpha_corrected = body_aero.cache[6][alpha_dist]
+    cl_prescribed_va = body_aero.cache[7][alpha_dist]
+    cd_prescribed_va = body_aero.cache[8][alpha_dist]
+    cs_prescribed_va = body_aero.cache[9][alpha_dist]
+    f_body_3D = body_aero.cache[10][alpha_dist, (3, length(alpha_dist))]
+    m_body_3D = body_aero.cache[11][alpha_dist, (3, length(alpha_dist))]
+    alpha_geometric = body_aero.cache[12][alpha_dist]
 
     fill!(f_body_3D, 0.0)
     fill!(m_body_3D, 0.0)

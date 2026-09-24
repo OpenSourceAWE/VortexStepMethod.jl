@@ -104,6 +104,9 @@ projection on that plane, `y_airf × z_airf`, towards `z_airf`.
 @inline inflow_angle(velocity, y_airf, z_airf) =
     atan(dot(velocity, z_airf), dot(velocity, cross(y_airf, z_airf)))
 
+"""Row `i` of an `n×3` matrix as a 3-vector."""
+@inline matrix_row(matrix, i) = SVector(matrix[i, 1], matrix[i, 2], matrix[i, 3])
+
 """
     effective_alpha(alpha, deficiency)
 

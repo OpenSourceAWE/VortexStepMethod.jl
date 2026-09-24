@@ -1,8 +1,11 @@
 using VortexStepMethod: Panel, Section, calculate_relative_alpha_and_relative_velocity, calculate_cl, calculate_cd_cm, reinit!, INVISCID, POLAR_VECTORS, MVec3
-using VortexStepMethod: panel_axes, panel_span_vector, panel_inflow
+using VortexStepMethod: panel_axes, panel_span_vector, panel_inflow, panel_force_directions
 using Interpolations: linear_interpolation, Line
 using LinearAlgebra
 using Test
+if !@isdefined(test_data_path)
+    include("../test_data_utils.jl")
+end
 
 function create_panel(section1::Section, section2::Section)
     # Calculate panel geometry
@@ -217,14 +220,17 @@ end
     end
 
     @testset "alpha is measured in the plane square to the bound vortex" begin
-        chord_in_plane = normalize(axes.x_airf .-
-                                   dot(axes.x_airf, axes.y_airf) .* axes.y_airf)
         for v_eff in ([1.0, 0.0, 0.0], [1.0, 0.3, 0.1]), orient in (1, -1)
             oriented = panel_axes(le_1, te_1, le_2, te_2, 0.5, orient)
+            (; x_airf, y_airf, z_airf) = oriented
             alpha = panel_inflow(oriented, v_eff, v_eff, zeros(3)).alpha
-            @test alpha ≈ atan(dot(v_eff, oriented.z_airf), dot(v_eff, chord_in_plane))
-            along_span = v_eff .+ 2.0 .* axes.y_airf
+            @test alpha ≈ crossflow_alpha(v_eff, x_airf, y_airf, z_airf)
+            along_span = v_eff .+ 2.0 .* y_airf
             @test panel_inflow(oriented, along_span, along_span, zeros(3)).alpha ≈ alpha
+            dir_lift = panel_force_directions(oriented, alpha, y_airf).dir_lift
+            v_crossflow = v_eff .- dot(v_eff, y_airf) .* y_airf
+            @test abs(dot(dir_lift, v_crossflow)) < 1e-12
+            @test abs(dot(dir_lift, y_airf)) < 1e-12
         end
         @test rad2deg(panel_inflow(axes, [1.0, 0, 0], [1.0, 0, 0], zeros(3)).alpha) ≈
               -20.097 atol = 1e-3

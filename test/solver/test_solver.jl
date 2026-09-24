@@ -340,24 +340,21 @@ end
     va = [15.0, 1.0, 1.5]
     set_va!(body_aero, va)
 
-    function crossflow_alpha(panel, velocity)
-        chord_in_plane = panel.x_airf .- dot(panel.x_airf, panel.y_airf) .* panel.y_airf
-        return atan(dot(velocity, panel.z_airf), dot(velocity, normalize(chord_in_plane)))
-    end
-    induced(AIC, gamma, i) = [dot(AIC[i, :, k], gamma) for k in 1:3]
-
     for correct_aoa in (false, true)
         solver = Solver(length(body_aero.panels), 3; correct_aoa)
         sol = solve!(solver, body_aero)
         @test sol.solver_status == FEASIBLE
         gamma = solver.lr.gamma_new
         for (i, panel) in enumerate(body_aero.panels)
+            frame = (panel.x_airf, panel.y_airf, panel.z_airf)
+            induced = body_aero.AIC[i, :, :]' * gamma
             @test solver.lr.alpha_dist[i] ≈
-                  crossflow_alpha(panel, va .+ induced(body_aero.AIC, gamma, i)) atol = 1e-6
-            @test sol.alpha_geometric_dist[i] ≈ crossflow_alpha(panel, va) atol = 1e-10
+                  crossflow_alpha(va .+ induced, frame...) atol = 1e-6
+            @test sol.alpha_geometric_dist[i] ≈ crossflow_alpha(va, frame...) atol = 1e-10
             correct_aoa || continue
-            @test sol.alpha_dist[i] ≈ crossflow_alpha(panel,
-                va .+ induced(body_aero.AIC_aero_center, gamma, i)) atol = 1e-8
+            induced_aero_center = body_aero.AIC_aero_center[i, :, :]' * gamma
+            @test sol.alpha_dist[i] ≈
+                  crossflow_alpha(va .+ induced_aero_center, frame...) atol = 1e-8
         end
     end
 end

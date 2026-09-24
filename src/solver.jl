@@ -728,9 +728,6 @@ end
 
 @inline smooth_sqrt(x) = sqrt(x + 1e-30)
 
-"""Row `i` of an `n×3` matrix as a 3-vector."""
-@inline matrix_row(matrix, i) = SVector(matrix[i, 1], matrix[i, 2], matrix[i, 3])
-
 @inline function update_gamma_candidate!(
     gamma_out,
     gamma_in,
