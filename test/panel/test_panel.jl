@@ -217,7 +217,8 @@ end
     end
 
     @testset "alpha is measured in the plane square to the bound vortex" begin
-        chord_in_plane = normalize(axes.x_airf .- dot(axes.x_airf, axes.y_airf) .* axes.y_airf)
+        chord_in_plane = normalize(axes.x_airf .-
+                                   dot(axes.x_airf, axes.y_airf) .* axes.y_airf)
         for v_eff in ([1.0, 0.0, 0.0], [1.0, 0.3, 0.1]), orient in (1, -1)
             oriented = panel_axes(le_1, te_1, le_2, te_2, 0.5, orient)
             alpha = panel_inflow(oriented, v_eff, v_eff, zeros(3)).alpha

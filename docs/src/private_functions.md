@@ -41,6 +41,7 @@ calculate_circulation_distribution_elliptical_wing
 _compute_reference_velocity_from_distribution
 smooth_distribution!
 make_dual_shadow
+matrix_row
 ```
 
 ### Panel aerodynamics
@@ -54,6 +55,7 @@ smooth_norm
 panel_span_vector
 panel_chord_weight
 panel_axes
+inflow_angle
 effective_alpha
 panel_inflow
 dynamic_pressure
