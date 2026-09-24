@@ -8,6 +8,10 @@
   the right tip, z = x × y up. The separate `KB` definition, whose `Z = Y × X` pointed
   down, is gone; the solver's frame is unchanged. CL, CD and CS are documented as
   wind-axis coefficients, `cfx`, `cfy` and `cfz` as the body-axis ones.
+- The angle of attack is measured in the plane square to the quarter-chord line, from
+  the chord's projection on that plane (Gaunaa, Li & Pirrung 2026, CP1), everywhere it
+  is formed and where it turns the lift direction. Swept panels read their polars at a
+  different angle than before; unswept panels are unchanged.
 
 ## VortexStepMethod v6.0.0 2026-09-23
 
