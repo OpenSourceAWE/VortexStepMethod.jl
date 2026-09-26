@@ -16,34 +16,10 @@ NEURALFOIL = true
 # Rolling-ball radius of the shrink wrap; fillets the concave tube-canopy junction.
 MIN_CONCAVE_RADIUS = 0.4
 OUTPUT_DIR = joinpath(dirname(@__DIR__), "output")
-REFERENCE_POINT = [0.422646, 0.0, 9.3667]
 
-project_dir = dirname(@__DIR__)
-literature_paths = [
-    joinpath(project_dir, "data", "TUDELFT_V3_KITE", "literature_results",
-        "CFD_RANS_Rey_5e5_Poland2025_alpha_sweep_beta_0_NoStruts.csv"),
-    joinpath(project_dir, "data", "TUDELFT_V3_KITE", "literature_results",
-        "CFD_RANS_Rey_10e5_Poland2025_alpha_sweep_beta_0.csv"),
-    joinpath(project_dir, "data", "TUDELFT_V3_KITE", "literature_results",
-        "python_alpha_sweep.csv"),
-    joinpath(project_dir, "data", "TUDELFT_V3_KITE", "literature_results",
-        "windtunnel_alpha_sweep_beta_00_0_Poland_2025_Rey_5e5.csv"),
-]
-beta_literature_paths = [
-    joinpath(project_dir, "data", "TUDELFT_V3_KITE", "literature_results",
-        "windtunnel_beta_sweep_alpha_07_4_Poland_2025_Rey_5e5.csv"),
-]
-
-settings = VSMSettings(joinpath(project_dir, "data", "TUDELFT_V3_KITE",
-    "vsm_settings.yaml"); data_prefix=false)
-settings.wings[1].geometry_file = joinpath(project_dir,
-    settings.wings[1].geometry_file)
-wing = Wing(settings)
-refine!(wing)
-body_aero = BodyAerodynamics([wing])
-VortexStepMethod.reinit!(body_aero)
-solver = Solver(settings)
-solver.reference_point .= REFERENCE_POINT
+include("V3_kite_setup.jl")
+beta_literature_paths = [joinpath(literature_dir,
+    "windtunnel_beta_sweep_alpha_07_4_Poland_2025_Rey_5e5.csv")]
 
 if DEFORM
     VortexStepMethod.unrefined_deform!(

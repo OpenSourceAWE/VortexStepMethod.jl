@@ -5,24 +5,6 @@ using Test
 
 relative_error(jac, reference) = maximum(abs.(jac .- reference)) / maximum(abs, reference)
 
-# Affine tables: bilinear interpolation is exact, so the grid knots are not kinks.
-function affine_matrix_wing()
-    alphas = deg2rad.(-5:5:25)
-    deltas = deg2rad.(-3:3:3)
-    cl = [0.2 + 5.5alpha + 1.5delta for alpha in alphas, delta in deltas]
-    cd = [0.03 + 0.2alpha + 0.05delta for alpha in alphas, delta in deltas]
-    cm = [-0.05 - 0.1alpha - 0.3delta for alpha in alphas, delta in deltas]
-    wing = Wing(8, spanwise_distribution=LINEAR)
-    radius = 3.0
-    for phi in deg2rad.((50, 17, -17, -50))
-        le = [0.0, radius * sin(phi), radius * (cos(phi) - 1)]
-        add_section!(wing, le, le .+ [1.0, 0.0, 0.0], POLAR_MATRICES,
-            (alphas, deltas, cl, cd, cm))
-    end
-    refine!(wing)
-    return wing
-end
-
 @testset "ForwardDiff linearize" begin
     n_panels = 10
     span = 20.0
@@ -75,9 +57,20 @@ end
     end
 
     @testset "AutoForwardDiff matches AutoFiniteDiff (LOOP, POLAR_MATRICES)" begin
-        matrix_wing = affine_matrix_wing()
-        matrix_body = BodyAerodynamics([matrix_wing])
-        matrix_solver = Solver(matrix_wing.n_panels, matrix_wing.n_unrefined_sections;
+        # At this operating point the LOOP solve converges the mid-span
+        # panels' local alpha to ~6.5-9.1deg and the tip panels' to
+        # ~14.9-15.0deg. The default 5deg-spaced alpha_range=-5:5:15 puts the
+        # tip cluster within ulp-scale distance of the 15deg knot on some
+        # platforms (Windows, Julia 1.12), so AutoForwardDiff and the FD
+        # reference land on opposite sides of that non-differentiable kink
+        # and disagree by several percent (#360). Offset the grid so no knot
+        # is near either cluster (margin >0.8deg here vs <0.04deg before).
+        ram_wing = ram_air_matrix_wing(; n_panels=8, n_sections=4,
+            alpha_range=deg2rad.(-2:5:23),
+            delta_range=deg2rad.(-3:3:3),
+        )
+        ram_body = BodyAerodynamics([ram_wing])
+        ram_solver = Solver(ram_wing.n_panels, ram_wing.n_unrefined_sections;
             aerodynamic_model_type=VSM,
             rtol=1e-11,
             solver_type=LOOP,
@@ -91,13 +84,13 @@ end
                 zeros(3)]
 
         jac_fwd, _, conv_fwd = VortexStepMethod.linearize(
-            matrix_solver, matrix_body, y_op;
+            ram_solver, ram_body, y_op;
             theta_idxs=1:4, va_vec_idxs=5:7, omega_idxs=8:10,
             aero_coeffs=true, backend=AutoForwardDiff())
         @test conv_fwd
 
         jac_fd, _, conv_fd = VortexStepMethod.linearize(
-            matrix_solver, matrix_body, y_op;
+            ram_solver, ram_body, y_op;
             theta_idxs=1:4, va_vec_idxs=5:7, omega_idxs=8:10,
             aero_coeffs=true, backend=nothing)
         @test conv_fd
@@ -107,7 +100,7 @@ end
 
         @testset "the Jacobian does not depend on the ForwardDiff chunk size" begin
             jac_chunk5, _, _ = VortexStepMethod.linearize(
-                matrix_solver, matrix_body, y_op;
+                ram_solver, ram_body, y_op;
                 theta_idxs=1:4, va_vec_idxs=5:7, omega_idxs=8:10,
                 aero_coeffs=true, backend=AutoForwardDiff(chunksize=5))
             @test relative_error(jac_chunk5, jac_fwd) < 1e-12

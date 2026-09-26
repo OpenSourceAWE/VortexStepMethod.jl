@@ -2,7 +2,7 @@
     generate_airfoils(airfoils, output_dir; Re, alpha_range=-180:1:180,
                       delta_range=nothing, aero_solver=NeuralFoilSolver(),
                       reuse_valid_airfoils=true, crease_frac=0.75, verbose=true,
-                      table_format=:csv) -> (airfoil_rows, ok)
+                      table_format=:csv, wrap_method=ShrinkWrap()) -> (airfoil_rows, ok)
 
 Run the 2D solver over a set of already-shrink-wrapped airfoils and write the per
 section files each geometry route references. Shared by the `.obj` and Surfplan
@@ -12,6 +12,7 @@ placement; this writes the surface pressure/friction tables, polars and airfoil
 
 `airfoils` is a vector of `(; id, x_fit, y_fit, x_raw, y_raw)`: `x_fit`/`y_fit` is
 the wrapped airfoil the solver analyses; `x_raw`/`y_raw` the raw points it enclosed.
+`wrap_method` is the [`ShrinkWrap`](@ref) that produced `x_fit`/`y_fit`.
 
 Writes into `output_dir` (indexed by `id`), one directory per file kind:
 `airfoils/{id}.dat` (wrapped shape), `airfoils/{id}_{delta_suffix(δ)}.dat` (per
@@ -29,7 +30,7 @@ function generate_airfoils(airfoils, output_dir::String;
         Re::Real, alpha_range=-180:1:180, delta_range=nothing,
         aero_solver::AbstractAirfoilSolver=NeuralFoilSolver(),
         reuse_valid_airfoils::Bool=true, crease_frac=0.75, verbose::Bool=true,
-        table_format::Symbol=:csv)
+        table_format::Symbol=:csv, wrap_method::ShrinkWrap=ShrinkWrap())
     mkpath(joinpath(output_dir, "airfoils"))
     mkpath(joinpath(output_dir, "polars"))
     mkpath(joinpath(output_dir, "pressure"))
@@ -46,7 +47,7 @@ function generate_airfoils(airfoils, output_dir::String;
             aero, sols = generate_airfoil_aero(aero_solver,
                 fit_kulfan_parameters(af.x_fit, af.y_fit, LeastSquaresFit());
                 alpha_range=alphas, delta_range=deltas,
-                reynolds_number=Float64(Re), crease_frac)
+                reynolds_number=Float64(Re), crease_frac, wrap_method)
             clvals = collect(sol.cl for sol in sols[1])
             all(isnan, clvals) && error("solver produced no converged points")
             if isnothing(delta_range)

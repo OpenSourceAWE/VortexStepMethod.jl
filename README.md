@@ -16,7 +16,9 @@ This package was translated from the Python code version 1.0.0 available at http
 
 Example output is shown in the figure below, where the aerodynamic predictions of the TU Delft V3 LEI kite obtained with the Julia and Python implementations of the VSM are compared against CFD simulations and wind tunnel measurements.
 
-![Example output](docs/v3_example_output.png)
+![Example output](docs/TU_Delft_V3_Kite.png)
+
+The figure is rendered by [examples/readme_figure.jl](examples/readme_figure.jl).
 
 ## Installation
 Install [Julia 1.12](https://ufechner7.github.io/2024/08/09/installing-julia-with-juliaup.html) or later, 
@@ -89,7 +91,7 @@ Three kinds of input data is needed:
   - kite wing: model of polars included, n sections to define
 
 - The airflow and turn rate:
-  - `va_vec` vector and `omega` (turn rate) vector in Kite Body (KB) reference frame
+  - `va_vec` vector and `omega` (turn rate) vector in the kite aero body (KA) frame
 
 - The configuration:
   - how many panels  

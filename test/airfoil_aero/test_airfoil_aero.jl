@@ -1,10 +1,11 @@
 using Test
+using Logging
 using VortexStepMethod.AirfoilAero
 import VortexStepMethod
 using VortexStepMethod.AirfoilAero: KulfanParameters, LeastSquaresFit, ShrinkWrap,
                        shrink_wrap, fit_kulfan_parameters, kulfan_to_coordinates,
                        neuralfoil_aero, class_function, bernstein_basis,
-                       leading_edge_basis, normalize_airfoil
+                       leading_edge_basis, normalize_airfoil, crossing_panels
 using VortexStepMethod: SectionAero, section_surface, read_section_aero
 using VortexStepMethod.AirfoilAero: write_section_aero, write_aero_matrix
 using VortexStepMethod: load_polar_data
@@ -274,6 +275,59 @@ end
     end
 end
 
+@testset "re-wrapping a wrapped section keeps it a simple closed curve" begin
+    obj = joinpath(pkgdir(VortexStepMethod), "data", "TUDELFT_V3_KITE", "V3_25.obj")
+    vertices, faces = VortexStepMethod.ObjAdapter.read_faces(obj)
+    canopy = VortexStepMethod.ObjAdapter.perpendicular_sections(vertices, faces, 18;
+                                                                n_bins=100)
+    for radius in (0.02, 0.2)
+        wrap = ShrinkWrap(clearance=0.0, min_concave_radius=radius)
+        for section in canopy, delta in deg2rad.((0.0, 5.0))
+            xw, yw = shrink_wrap(section.x_airfoil, section.y_airfoil, wrap)
+            def = deform_section(xw, yw, delta; wrap_method=wrap)
+            @test isnothing(crossing_panels(def.x, def.y))
+        end
+    end
+end
+
+@testset "re-wrapping a clearance-padded wrap keeps its area" begin
+    shoelace(x, y) = abs(sum(x[i] * y[mod1(i + 1, end)] - x[mod1(i + 1, end)] * y[i]
+                             for i in eachindex(x))) / 2
+    xw, yw = shrink_wrap(read_dat_coordinates(joinpath(@__DIR__, "data",
+                                                       "test_airfoil.dat"))...,
+                         ShrinkWrap())
+    def = deform_section(xw, yw, 0.0; wrap_method=ShrinkWrap())
+    @test isnothing(crossing_panels(def.x, def.y))
+    @test shoelace(def.x, def.y) ≈ shoelace(xw, yw) rtol = 0.05
+end
+
+@testset "shrink_wrap cuts the loops its clearance offset makes" begin
+    obj = joinpath(pkgdir(VortexStepMethod), "data", "TUDELFT_V3_KITE", "V3_25.obj")
+    vertices, faces = VortexStepMethod.ObjAdapter.read_faces(obj)
+    canopy = VortexStepMethod.ObjAdapter.perpendicular_sections(vertices, faces, 18;
+                                                                n_bins=100)
+    for section in canopy
+        xw, yw = @test_logs min_level=Logging.Warn shrink_wrap(section.x_airfoil,
+                                                               section.y_airfoil,
+                                                               ShrinkWrap())
+        @test isnothing(crossing_panels(xw, yw))
+    end
+    x = collect(range(0.0, 1.0, 400))
+    y = 0.02 .* sin.(20pi .* x) .+ 0.05 .* sin.(pi .* x)
+    @test_logs min_level=Logging.Warn shrink_wrap(x, y, ShrinkWrap(clearance=0.05))
+end
+
+@testset "shrink_wrap warns when its contour crosses itself" begin
+    x = collect(range(1.0, 0.0, 800))
+    camber = 0.05 .* sin.(pi .* x) .+ 0.02 .* sin.(20pi .* x)
+    loop(half) = (vcat(x, reverse(x)[2:end]),
+                  vcat(camber .+ half, reverse(camber .- half)[2:end]))
+    @test_logs (:warn, r"cross") match_mode=:any shrink_wrap(loop(1e-4)...,
+                                                             ShrinkWrap(clearance=0.0))
+    @test_logs min_level=Logging.Warn shrink_wrap(loop(1e-3)...,
+                                                  ShrinkWrap(clearance=0.0))
+end
+
 @testset "generate_polar_from_coordinates POLAR_VECTORS sweep" begin
     x, y = read_dat_coordinates(joinpath(@__DIR__, "data", "test_airfoil.dat"))
     csv = joinpath(mktempdir(), "polar.csv")
@@ -423,4 +477,25 @@ end
     # A second shrink wrap inflates the section by its clearance, 0.006 — 60x this bound.
     @test maximum(abs, collect(extrema(written_y)) .-
                        collect(extrema(fitted_y))) < 1e-4
+end
+
+@testset "crossing_panels finds the first pair of crossing panels" begin
+    clean = KulfanParameters(fill(0.15, 8), fill(-0.15, 8), 0.0, 0.0)
+    x, y = collect.(kulfan_to_coordinates(clean; n_points=60))
+    @test isnothing(crossing_panels(x, y))
+
+    # the upper surface driven through the lower one over a stretch of the chord
+    folded = copy(y)
+    folded[20:40] .= -3 .* folded[20:40]
+    @test !isnothing(crossing_panels(x, folded))
+
+    # a contour whose only crossing is the panel closing it back to node 1
+    @test crossing_panels([0.0, 1.0, 1.0, 2.0], [0.0, 2.0, -2.0, 1.0]) == (2, 4)
+
+    # disjoint panels along one straight edge, whose side tests round to either sign
+    edge_x = [0.0008647734705084547, 0.000648580102881341, 0.00043238673525422734,
+              0.00021619336762711367, 0.0]
+    edge_y = [0.0044110473582233455, 0.003308285518667509, 0.0022055236791116727,
+              0.0011027618395558364, 0.0]
+    @test isnothing(crossing_panels([edge_x; 0.001], [edge_y; -0.002]))
 end

@@ -81,8 +81,7 @@ end
 
 """
     deform_section(x, y, delta; crease_frac=0.9, thickness_frac=1.0,
-                   flip_thickness_neg=true,
-                   wrap_method=ShrinkWrap(clearance=0.0))
+                   flip_thickness_neg=true, wrap_method=ShrinkWrap())
         -> DeformedSection
 
 Deform the airfoil coordinates `(x, y)` by trailing-edge deflection `delta` (radians)
@@ -92,24 +91,71 @@ into clean cosine panels and fit [`LeastSquaresFit`](@ref) Kulfan parameters to 
 XFoil consumes the coordinates directly, NeuralFoil the Kulfan parameters.
 
 `flip_thickness_neg` folds a soft membrane about its lower surface for negative `delta`.
-The re-wrap uses zero clearance (it hugs the deflected shape at `min_clearance`);
-the rolling-ball wrap bridges the crease with a `min_concave_radius` fillet instead
-of the overlapping panels that XFoil's own repaneling can hit there. The wrap runs
-for every `delta` including `0`, so all deflections share the same node count
-(`2·n_points - 1`).
+`wrap_method` is the wrap `(x, y)` came from: the re-wrap rolls the same ball at zero
+clearance, bridging the crease with a `min_concave_radius` fillet. It runs for every
+`delta` including `0`, so all deflections share the same node count (`2·n_points - 1`).
 """
 function deform_section(x, y, delta; crease_frac=0.9, thickness_frac=1.0,
-                        flip_thickness_neg=true,
-                        wrap_method::ShrinkWrap=ShrinkWrap(clearance=0.0))
+                        flip_thickness_neg=true, wrap_method::ShrinkWrap=ShrinkWrap())
     xd, yd = collect(float.(x)), collect(float.(y))
     if !iszero(delta)
         pivot = flip_thickness_neg && delta < 0 ? 1 - thickness_frac : thickness_frac
         lower, upper = get_lower_upper(xd, yd, crease_frac)
         turn_trailing_edge!(delta, xd, yd, lower, upper, crease_frac; thickness_frac=pivot)
     end
-    xd, yd = shrink_wrap(xd, yd, wrap_method)
+    rewrap = ShrinkWrap(; clearance=0.0,
+                        min_concave_radius=wrap_method.min_concave_radius,
+                        min_clearance=wrap_method.min_clearance,
+                        n_points=wrap_method.n_points,
+                        curvature_weight=wrap_method.curvature_weight)
+    xd, yd = shrink_wrap(xd, yd, rewrap)
     kulfan = fit_kulfan_parameters(xd, yd, LeastSquaresFit())
     return DeformedSection(kulfan, xd, yd)
+end
+
+"""
+    side_of_line(a, b, p)
+
+Twice the signed area of the triangle `a`, `b`, `p`: positive with `p` left of the
+line from `a` to `b`, negative right of it, zero on it.
+"""
+side_of_line(a, b, p) = (b[1] - a[1]) * (p[2] - a[2]) - (b[2] - a[2]) * (p[1] - a[1])
+
+"""
+    segments_cross(p, q, r, s) -> Bool
+
+Whether the segments `p`-`q` and `r`-`s` cross properly, each strictly separating
+the other's endpoints. Touching at an endpoint or lying along each other does not
+count, nor do segments whose coordinate extents do not overlap.
+"""
+segments_cross(p, q, r, s) =
+    extents_overlap(p[1], q[1], r[1], s[1]) && extents_overlap(p[2], q[2], r[2], s[2]) &&
+    side_of_line(p, q, r) * side_of_line(p, q, s) < 0 &&
+    side_of_line(r, s, p) * side_of_line(r, s, q) < 0
+
+"""
+    extents_overlap(a1, a2, b1, b2) -> Bool
+
+Whether the intervals spanned by `a1`, `a2` and by `b1`, `b2` overlap.
+"""
+extents_overlap(a1, a2, b1, b2) =
+    max(min(a1, a2), min(b1, b2)) <= min(max(a1, a2), max(b1, b2))
+
+"""
+    crossing_panels(x, y) -> Tuple{Int,Int} or nothing
+
+The first pair of non-neighbouring panels of the contour `(x, y)` that cross, or
+`nothing` when the contour is a simple closed curve. A contour that does not end on its
+first node is closed by a panel back to it, which carries the highest panel index.
+"""
+function crossing_panels(x, y)
+    nodes = collect(zip(x, y))
+    last(nodes) == first(nodes) || push!(nodes, first(nodes))
+    last_panel = length(nodes) - 1
+    for i in 1:last_panel, j in (i + 2):last_panel
+        segments_cross(nodes[i], nodes[i+1], nodes[j], nodes[j+1]) && return (i, j)
+    end
+    return nothing
 end
 
 """

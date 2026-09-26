@@ -178,10 +178,20 @@ pivot_step
 push_arc!
 edge_normal
 pivot_contour
+cut_loops
 largest_linking_gap
+densify_contour
 enforce_min_spacing!
 resample_arc
 smoothed_curvature
+```
+
+### Section contour checks
+```@docs
+crossing_panels
+segments_cross
+extents_overlap
+side_of_line
 ```
 
 ### NeuralFoil network
@@ -257,7 +267,6 @@ build_section
 contour_to_airfoil
 plane_contour_to_airfoil
 reorder_airfoil_selig
-densify_contour
 create_interpolations
 find_circle_center_and_radius
 march_edges
@@ -283,6 +292,8 @@ span_axis
 create_geometry_plot_makie
 plot_line_segment_makie!
 set_axes_equal_makie!
+polar_style
+widen_flat_ylims!
 map_airfoil_3d
 fitted_airfoil_3d
 generated_slices

@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+### Fixed
+
+- The docs define the body frame as KiteUtils' `KA` frame: x from LE to TE, y towards
+  the right tip, z = x × y up. The separate `KB` definition, whose `Z = Y × X` pointed
+  down, is gone; the solver's frame is unchanged. CL, CD and CS are documented as
+  wind-axis coefficients, `cfx`, `cfy` and `cfz` as the body-axis ones.
+- `linearize` with `AutoForwardDiff` gives the right Jacobian under Julia 1.12 with
+  `--check-bounds=yes`, as `Pkg.test` runs, on AMD Zen 4/5 CPUs with AVX-512. With ten
+  inputs, ForwardDiff's full chunk, LLVM 18's SLP vectorizer miscompiled the per-panel
+  force assembly there (JuliaLang/julia#62368) and the Jacobian came out about 5% off.
+
+## VortexStepMethod v6.0.0 2026-09-23
+
 ### Added
 
 - `stability_derivatives` gives the force and moment coefficients and their derivatives
@@ -67,6 +80,9 @@
 - `Solver(body_aero; kwargs...)` and `Solver(body_aero, settings)` are deprecated and warn
   on use; build the solver with `Solver(settings)` or
   `Solver(n_panels, n_unrefined_sections)` instead.
+- `shrink_wrap` splits the edges of a closed input to at most
+  `min(0.01, min_concave_radius/2)` chord before wrapping it, so the deflected sections
+  and polars `obj_to_yaml` generates from Kulfan contours move slightly.
 - BREAKING: `obj_to_yaml` and `perpendicular_sections` spread the sections evenly over
   the span, measured along the quarter-chord line without its chordwise component,
   instead of over leading-edge arc length, and `wingtip_distance` is that spanwise
@@ -77,15 +93,24 @@
 
 ### Fixed
 
-- `linearize` with `AutoForwardDiff` gives the right Jacobian under Julia 1.12 with
-  `--check-bounds=yes`, as `Pkg.test` runs, on AMD Zen 4/5 CPUs with AVX-512. With ten
-  inputs, ForwardDiff's full chunk, LLVM 18's SLP vectorizer miscompiled the per-panel
-  force assembly there (JuliaLang/julia#62368) and the Jacobian came out about 5% off.
+- `deform_section` re-wraps a section with the rolling ball it was first wrapped with,
+  passed as `wrap_method` (also taken by `generate_airfoils`, `generate_airfoil_aero`,
+  `generate_aero_matrices` and `generate_polar_from_coordinates`), at zero clearance.
+  `shrink_wrap` warns when the contour it returns crosses itself. A thin wrapped section
+  came back with its surfaces crossing.
+- `shrink_wrap` cuts out the loops its `clearance` offset makes on a thin canopy, so a
+  V3 section wrapped at the default `MeshSettings` is a simple closed curve and no longer
+  warns; 6 of 18 crossed themselves.
 - On a body whose wings span different directions, such as a wing and a vertical fin,
   `solve!`, `solve` and `linearize` take each panel's lift, drag and side directions
   from its own wing's `spanwise_direction`, not the first wing's. `solve` computes
   `wing_span` and `aspect_ratio_projected` from the extent of all wings along the
   first wing's span, through the new `calculate_span(wings, spanwise_direction)`.
+- `plot_combined_analysis` saves the figure when `is_save` is true, spans its title over
+  the whole figure, frames the wing geometry, and draws literature polars dashed as
+  `plot_polars` does.
+- `plot_polars` and `plot_combined_analysis` draw a CS that is zero up to round-off as a
+  flat line instead of scaling the axis to the round-off noise.
 - `perpendicular_sections` and `obj_to_yaml` orient each cut by the leading edge through
   the neighbouring stations, not by the step that reached the station, which near a
   closing tip grazed the surface and returned an 80%-thick section. Every section moves

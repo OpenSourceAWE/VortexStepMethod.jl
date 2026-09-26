@@ -1,21 +1,24 @@
 """
     generate_airfoil_aero(solver, base; alpha_range, delta_range, reynolds_number,
-                          crease_frac=0.9, remove_nan=true) -> (SectionAero, sols)
+                          crease_frac=0.9, remove_nan=true, wrap_method=ShrinkWrap())
+        -> (SectionAero, sols)
 
 Run **one** solver sweep of a base airfoil (Kulfan) over the `(alpha, delta)` grid
 (radians) and return both the [`SectionAero`](@ref) (contour + `Cp` + `cf` per node) and
 the raw `sols::Vector{Vector{SectionSolution}}` (one inner vector per delta). The `sols`
 also carry `cl/cd/cm`, so a caller can write the polar from the same sweep — this is how
 `obj_to_yaml` avoids a second sweep. Non-converged points stay `NaN` and, when
-`remove_nan`, are filled per node with `interpolate_matrix_nans!`.
+`remove_nan`, are filled per node with `interpolate_matrix_nans!`. `wrap_method` is the
+[`ShrinkWrap`](@ref) the base airfoil was wrapped with ([`deform_section`](@ref)).
 """
 function generate_airfoil_aero(solver::AbstractAirfoilSolver, base::KulfanParameters;
-        alpha_range, delta_range, reynolds_number, crease_frac=0.9, remove_nan=true)
+        alpha_range, delta_range, reynolds_number, crease_frac=0.9, remove_nan=true,
+        wrap_method::ShrinkWrap=ShrinkWrap())
     x0, y0 = kulfan_to_coordinates(base)
     n_alpha, n_delta = length(alpha_range), length(delta_range)
     sols = Vector{Vector{SectionSolution}}(undef, n_delta)
     for (jd, delta) in enumerate(delta_range)
-        def = deform_section(x0, y0, delta; crease_frac)
+        def = deform_section(x0, y0, delta; crease_frac, wrap_method)
         sols[jd] = analyze_sweep(solver, def, alpha_range, reynolds_number)
     end
 
@@ -52,14 +55,14 @@ end
 """
     generate_airfoil_aero(solver, x::Vector, y::Vector; kwargs...) -> (SectionAero, sols)
 
-Convenience: [`shrink_wrap`](@ref) the coordinates and fit base Kulfan parameters
-([`LeastSquaresFit`](@ref)) first.
+Convenience: [`shrink_wrap`](@ref) the coordinates with `wrap_method` (keyword,
+default `ShrinkWrap()`) and fit base Kulfan parameters ([`LeastSquaresFit`](@ref)) first.
 """
 function generate_airfoil_aero(solver::AbstractAirfoilSolver, x::Vector, y::Vector;
-        kwargs...)
-    xw, yw = shrink_wrap(x, y, ShrinkWrap())
+        wrap_method::ShrinkWrap=ShrinkWrap(), kwargs...)
+    xw, yw = shrink_wrap(x, y, wrap_method)
     return generate_airfoil_aero(solver, fit_kulfan_parameters(xw, yw, LeastSquaresFit());
-                                 kwargs...)
+                                 wrap_method, kwargs...)
 end
 
 """
@@ -70,12 +73,8 @@ Just the [`SectionAero`](@ref) from [`generate_airfoil_aero`](@ref) (drops the r
 generate_section_aero(solver::AbstractAirfoilSolver, base::KulfanParameters; kwargs...) =
     generate_airfoil_aero(solver, base; kwargs...)[1]
 
-function generate_section_aero(solver::AbstractAirfoilSolver, x::Vector, y::Vector;
-        kwargs...)
-    xw, yw = shrink_wrap(x, y, ShrinkWrap())
-    return generate_section_aero(solver, fit_kulfan_parameters(xw, yw, LeastSquaresFit());
-                                 kwargs...)
-end
+generate_section_aero(solver::AbstractAirfoilSolver, x::Vector, y::Vector; kwargs...) =
+    generate_airfoil_aero(solver, x, y; kwargs...)[1]
 
 """
     fill_node_nans!(grid, i)
