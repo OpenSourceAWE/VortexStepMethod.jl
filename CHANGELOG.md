@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Added
+
+- The panel plots (`plot!(ax, panel)`, `plot!(ax, body)`, `plot(panel)`, `plot(body)`)
+  take `border_color`, default `:black`, for the panel outlines.
+
 ### Fixed
 
 - The docs define the body frame as KiteUtils' `KA` frame: x from LE to TE, y towards

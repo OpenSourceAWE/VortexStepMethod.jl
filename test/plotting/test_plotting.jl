@@ -594,6 +594,25 @@ end
     @test length(plots_lw) == 2 * length(plain_body.panels)
 end
 
+@testset "border_color colours every panel border" begin
+    body = create_body_aero()
+    border_colors(plots) = [p.color[] for p in plots if p isa Lines]
+    gray = Makie.to_color(:gray)
+    for use_observables in (false, true)
+        plots = Makie.plot!(Axis3(Figure()[1, 1]), body; use_observables,
+            border_color=:gray)
+        @test border_colors(plots) == fill(gray, length(body.panels))
+    end
+    panel_plots = Makie.plot!(Axis3(Figure()[1, 1]), body.panels[1]; border_color=:gray)
+    @test border_colors(panel_plots) == [gray]
+    for (target, n_borders) in ((body, length(body.panels)), (body.panels[1], 1))
+        fig = Makie.plot(target; border_color=:gray)
+        @test border_colors(content(fig[1, 1]).scene.plots) == fill(gray, n_borders)
+    end
+    default_plots = Makie.plot!(Axis3(Figure()[1, 1]), body)
+    @test all(==(Makie.to_color(:black)), border_colors(default_plots))
+end
+
 @testset "generated_slices reads the deflected .dat under its generated name" begin
     gen_dir, _ = ram_air_matrix_dir(; n_sections=4,
         alpha_range=deg2rad.(-1:1.0:1), delta_range=deg2rad.(-1:1.0:1))
