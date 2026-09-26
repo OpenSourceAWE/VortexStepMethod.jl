@@ -97,5 +97,13 @@ relative_error(jac, reference) = maximum(abs.(jac .- reference)) / maximum(abs, 
 
         @info "POLAR_MATRICES jacobian norms" norm_fwd=norm(jac_fwd) norm_fd=norm(jac_fd)
         @test relative_error(jac_fd, jac_fwd) < 1e-4
+
+        @testset "the Jacobian does not depend on the ForwardDiff chunk size" begin
+            jac_chunk5, _, _ = VortexStepMethod.linearize(
+                ram_solver, ram_body, y_op;
+                theta_idxs=1:4, va_vec_idxs=5:7, omega_idxs=8:10,
+                aero_coeffs=true, backend=AutoForwardDiff(chunksize=5))
+            @test relative_error(jac_chunk5, jac_fwd) < 1e-12
+        end
     end
 end

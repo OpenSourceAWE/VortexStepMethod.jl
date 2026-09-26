@@ -953,9 +953,10 @@ function calculate_results(
                 cd_dist[i] += viscous.delta_cd
                 c_span = viscous.c_span
             end
-            loads = panel_loads(axes, dirs,
+            arm = SVector{3}(panel.aero_center) - SVector{3}(reference_point)
+            loads = panel_body_loads(axes, dirs,
                 dynamic_pressure(density, density, v_rel_dist[i]),
-                cl_dist[i], cd_dist[i], cm_dist[i]; c_span)
+                cl_dist[i], cd_dist[i], cm_dist[i], c_span, arm)
             force = loads.force
 
             va_panel = va_dist[i]
@@ -981,11 +982,9 @@ function calculate_results(
             cd_prescribed_va[i] = drag_prescribed_va * inv_q_area
             cs_prescribed_va[i] = dot(force, wing_dirs.dir_side) * inv_q_area
 
-            arm = SVector{3}(panel.aero_center) - SVector{3}(reference_point)
-            moment = loads.pitching_moment .* axes.y_airf .+ cross(arm, force)
             @inbounds for k in 1:3
                 f_body_3D[k, i] = force[k]
-                m_body_3D[k, i] = moment[k]
+                m_body_3D[k, i] = loads.body_moment[k]
             end
         end
     end

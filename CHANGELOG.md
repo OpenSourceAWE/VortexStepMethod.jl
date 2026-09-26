@@ -8,6 +8,10 @@
   the right tip, z = x × y up. The separate `KB` definition, whose `Z = Y × X` pointed
   down, is gone; the solver's frame is unchanged. CL, CD and CS are documented as
   wind-axis coefficients, `cfx`, `cfy` and `cfz` as the body-axis ones.
+- `linearize` with `AutoForwardDiff` gives the right Jacobian under Julia 1.12 with
+  `--check-bounds=yes`, as `Pkg.test` runs, on AMD Zen 4/5 CPUs with AVX-512. With ten
+  inputs, ForwardDiff's full chunk, LLVM 18's SLP vectorizer miscompiled the per-panel
+  force assembly there (JuliaLang/julia#62368) and the Jacobian came out about 5% off.
 
 ## VortexStepMethod v6.0.0 2026-09-23
 
