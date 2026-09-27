@@ -112,12 +112,13 @@ end
 
 Plot a single `Panel` as a flat-plate `mesh`, kinked at the flap hinge by the
 panel's `delta`/`crease_frac` (see [`panel_plate_geometry`](@ref)); with `delta == 0`
-this is the flat quad LE1-TE1-TE2-LE2.
+this is the flat quad LE1-TE1-TE2-LE2, outlined in `border_color` at `border_linewidth`.
 
 If `use_observables=true`, creates observables for dynamic updates.
 """
 function Makie.plot!(ax, panel::VortexStepMethod.Panel; color=(:red, 0.2), R_b_w=nothing, T_b_w=nothing,
-    use_observables=false, border_linewidth=1.5, transparency=true, kwargs...)
+    use_observables=false, border_color=:black, border_linewidth=1.5, transparency=true,
+    kwargs...)
     plots = Makie.AbstractPlot[]
     points = panel_plate_geometry(panel; R_b_w, T_b_w)
 
@@ -129,7 +130,7 @@ function Makie.plot!(ax, panel::VortexStepMethod.Panel; color=(:red, 0.2), R_b_w
 
         p = mesh!(ax, vertices_obs, faces_obs; color, transparency, kwargs...)
         push!(plots, p)
-        p = lines!(ax, border_obs; color=:black, linewidth=border_linewidth,
+        p = lines!(ax, border_obs; color=border_color, linewidth=border_linewidth,
                    transparency, kwargs...)
         push!(plots, p)
 
@@ -139,8 +140,8 @@ function Makie.plot!(ax, panel::VortexStepMethod.Panel; color=(:red, 0.2), R_b_w
         # Static plotting (original behavior)
         p = mesh!(ax, points, PLATE_FACES; color, transparency, kwargs...)
         push!(plots, p)
-        p = lines!(ax, points[PLATE_BORDER_IDX]; color=:black, linewidth=border_linewidth,
-                   transparency, kwargs...)
+        p = lines!(ax, points[PLATE_BORDER_IDX]; color=border_color,
+                   linewidth=border_linewidth, transparency, kwargs...)
         push!(plots, p)
     end
 
@@ -243,9 +244,10 @@ end
     plot!(ax, body::VortexStepMethod.BodyAerodynamics; use_observables=false,
           airfoils=false, kwargs...)
 
-Plot a `BodyAerodynamics` object. By default draws each panel as a flat quad; with
-`airfoils=true` instead draws the lofted airfoil skin (one see-through wing-shaped
-mesh with a contour rib line per section, see [`airfoil_skin_geometry`](@ref)).
+Plot a `BodyAerodynamics` object. By default draws each panel as a flat quad outlined in
+`border_color`; with `airfoils=true` instead draws the lofted airfoil skin (one
+see-through wing-shaped mesh with a contour rib line per section, see
+[`airfoil_skin_geometry`](@ref)).
 
 If `use_observables=true`, creates observables for dynamic updates keyed by (body_id, panel_index).
 Otherwise, creates static plots (original behavior).
@@ -253,7 +255,7 @@ Otherwise, creates static plots (original behavior).
 function Makie.plot!(ax, body::VortexStepMethod.BodyAerodynamics; color=(:red, 0.2), R_b_w=nothing, T_b_w=nothing,
     use_observables=false, airfoils=false,
     airfoil_color=:deepskyblue, airfoil_opacity=0.2, rib_color=:black,
-    border_linewidth=1.5, transparency=true, kwargs...)
+    border_color=:black, border_linewidth=1.5, transparency=true, kwargs...)
     plots = Makie.AbstractPlot[]
 
     if airfoils
@@ -303,7 +305,7 @@ function Makie.plot!(ax, body::VortexStepMethod.BodyAerodynamics; color=(:red, 0
             # Plot using observables
             p = mesh!(ax, vertices_obs, faces_obs; color, transparency, kwargs...)
             push!(plots, p)
-            p = lines!(ax, border_obs; color=:black, linewidth=border_linewidth,
+            p = lines!(ax, border_obs; color=border_color, linewidth=border_linewidth,
                        transparency, kwargs...)
             push!(plots, p)
 
@@ -318,7 +320,8 @@ function Makie.plot!(ax, body::VortexStepMethod.BodyAerodynamics; color=(:red, 0
         # Static plotting (original behavior)
         for panel in body.panels
             append!(plots, Makie.plot!(ax, panel; color, R_b_w, T_b_w,
-                use_observables=false, border_linewidth, transparency, kwargs...))
+                use_observables=false, border_color, border_linewidth, transparency,
+                kwargs...))
         end
     end
 
@@ -365,7 +368,7 @@ function Makie.plot!(body::VortexStepMethod.BodyAerodynamics; R_b_w=nothing, T_b
 end
 
 function Makie.plot(panel::VortexStepMethod.Panel; size=(1200, 800),
-    R_b_w=nothing, T_b_w=nothing, color=(:red, 0.2), kwargs...)
+    R_b_w=nothing, T_b_w=nothing, color=(:red, 0.2), border_color=:black, kwargs...)
     fig = Figure(; size)
     ax = Axis3(fig[1, 1]; aspect=:data,
         xlabel="X", ylabel="Y", zlabel="Z",
@@ -383,7 +386,7 @@ function Makie.plot(panel::VortexStepMethod.Panel; size=(1200, 800),
 
     # Plot border
     border_obs = Observable(points[PLATE_BORDER_IDX])
-    lines!(ax, border_obs; color=:black, transparency=true, kwargs...)
+    lines!(ax, border_obs; color=border_color, transparency=true, kwargs...)
 
     # Store observables globally for updates
     panel_id = objectid(panel)
@@ -401,7 +404,7 @@ end
 
 function Makie.plot(body_aero::VortexStepMethod.BodyAerodynamics; size=(1200, 800),
     limitmargin=0.1, R_b_w=nothing, T_b_w=nothing, color=(:red, 0.2),
-    kwargs...)
+    border_color=:black, kwargs...)
     fig = Figure(; size)
     ax = Axis3(fig[1, 1]; aspect=:data,
         xlabel="X", ylabel="Y", zlabel="Z",
@@ -430,7 +433,7 @@ function Makie.plot(body_aero::VortexStepMethod.BodyAerodynamics; size=(1200, 80
 
         # Plot using observables
         mesh!(ax, vertices_obs, faces_obs; color, transparency=true, kwargs...)
-        lines!(ax, border_obs; color=:black, transparency=true, kwargs...)
+        lines!(ax, border_obs; color=border_color, transparency=true, kwargs...)
 
         # Store observables with stable key
         PANEL_MESH_OBSERVABLES[][(body_id, panel_idx)] = (
