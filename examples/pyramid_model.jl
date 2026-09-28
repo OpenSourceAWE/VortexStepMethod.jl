@@ -34,23 +34,6 @@ SAVE_ALL = false
 USE_TEX = false
 OUTPUT_DIR = joinpath(dirname(@__DIR__), "output")
 
-# Plotting polars
-PLOT && plot_polars(
-    [solver],
-    [body_aero],
-    ["VSM Pyramid Model"],
-    angle_range=range(-5, 25, length=30),
-    angle_type="angle_of_attack",
-    angle_of_attack=angle_of_attack_deg,
-    side_slip=sideslip_deg,
-    va=va,
-    title="$(wing.n_panels)_panels_$(wing.spanwise_distribution)_pyramid_model",
-    save_path=OUTPUT_DIR,
-    is_save=false || SAVE_ALL,
-    is_show=true,
-    use_tex=USE_TEX
-)
-
 # Plotting geometry
 PLOT && plot_geometry(
     body_aero,
@@ -71,6 +54,23 @@ PLOT && plot_distribution(
     [results],
     ["VSM"];
     title="pyramid_spanwise_distributions_alpha_$(round(angle_of_attack_deg, digits=1))_delta_$(round(sideslip_deg, digits=1))_yaw_$(round(yaw_rate, digits=1))_va_$(round(va, digits=1))",
+    save_path=OUTPUT_DIR,
+    is_save=false || SAVE_ALL,
+    is_show=true,
+    use_tex=USE_TEX
+)
+
+# Plotting polars
+PLOT && plot_polars(
+    [solver],
+    [body_aero],
+    ["VSM Pyramid Model"],
+    angle_range=range(-5, 25, length=30),
+    angle_type="angle_of_attack",
+    angle_of_attack=angle_of_attack_deg,
+    side_slip=sideslip_deg,
+    va=va,
+    title="$(wing.n_panels)_panels_$(wing.spanwise_distribution)_pyramid_model",
     save_path=OUTPUT_DIR,
     is_save=false || SAVE_ALL,
     is_show=true,

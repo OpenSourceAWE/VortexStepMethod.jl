@@ -78,25 +78,6 @@ yaw_rate = settings.condition.yaw_rate
 set_va!(body_aero, settings)
 results = solve!(solver, body_aero; log=true)
 
-PLOT && plot_polars(
-    solvers,
-    bodies,
-    labels,
-    literature_path_list=literature_paths,
-    angle_range=range(-5, 25, length=31),
-    angle_type="angle_of_attack",
-    angle_of_attack=angle_of_attack_deg,
-    side_slip=sideslip_deg,
-    va=va,
-    title="$(wing.n_panels)_panels_$(wing.spanwise_distribution)_from_yaml_settings",
-    save_path=OUTPUT_DIR,
-    is_save=false || SAVE_ALL,
-    is_show=true,
-    use_tex=USE_TEX,
-    show_moments=false,
-    cl_over_cd=true
-)
-
 # Plotting geometry
 PLOT && plot_geometry(
     body_aero,
@@ -122,6 +103,25 @@ PLOT && plot_distribution(
     is_save=false || SAVE_ALL,
     is_show=true,
     use_tex=USE_TEX
+)
+
+PLOT && plot_polars(
+    solvers,
+    bodies,
+    labels,
+    literature_path_list=literature_paths,
+    angle_range=range(-5, 25, length=31),
+    angle_type="angle_of_attack",
+    angle_of_attack=angle_of_attack_deg,
+    side_slip=sideslip_deg,
+    va=va,
+    title="$(wing.n_panels)_panels_$(wing.spanwise_distribution)_from_yaml_settings",
+    save_path=OUTPUT_DIR,
+    is_save=false || SAVE_ALL,
+    is_show=true,
+    use_tex=USE_TEX,
+    show_moments=false,
+    cl_over_cd=true
 )
 
 # --- Beta sweep ---
