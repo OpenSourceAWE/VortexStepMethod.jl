@@ -10,6 +10,8 @@
   `area_all_panels`, `projected_area`, `wing_span`, `aspect_ratio_projected`,
   `center_of_pressure` and `panel_cp_locations`. `calc_only_f_and_gamma` skips the
   projections, span and centers of pressure.
+- The panel plots (`plot!(ax, panel)`, `plot!(ax, body)`, `plot(panel)`, `plot(body)`)
+  take `border_color`, default `:black`, for the panel outlines.
 
 ### Changed
 
@@ -26,6 +28,13 @@
   move by up to 0.34 % in `cl`, 0.43 % in `cd` and 4.5 % in `cmx`.
 - `center_of_pressure` is `NaN` where the line of action crosses no panel, instead of
   `nothing` with a warning.
+
+### Fixed
+
+- The docs define the body frame as KiteUtils' `KA` frame: x from LE to TE, y towards
+  the right tip, z = x × y up. The separate `KB` definition, whose `Z = Y × X` pointed
+  down, is gone; the solver's frame is unchanged. CL, CD and CS are documented as
+  wind-axis coefficients, `cfx`, `cfy` and `cfz` as the body-axis ones.
 
 ## VortexStepMethod v6.0.0 2026-09-23
 

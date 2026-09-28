@@ -94,7 +94,7 @@ Three kinds of input data is needed:
   - kite wing: model of polars included, n sections to define
 
 - The airflow and turn rate:
-  - `va_vec` vector and `omega` (turn rate) vector in Kite Body (KB) reference frame
+  - `va_vec` vector and `omega` (turn rate) vector in the kite aero body (KA) frame
 
 - The configuration:
   - how many panels  

@@ -7,7 +7,7 @@ Main structure for calculating aerodynamic properties of bodies. Use the constru
 - panels::Vector{<:Panel}: Vector of refined [`Panel`](@ref) structs
 - wings::Vector{W}: A vector of wings of type `W <: AbstractWing`; a body can have multiple wings
 - `va_vec::MVec3` = zeros(MVec3): apparent wind vector [m/s], see: [`MVec3`](@ref)
-- `omega`::MVec3 = zeros(MVec3): A vector of the turn rates around the kite body axes
+- `omega`::MVec3 = zeros(MVec3): A vector of the turn rates around the KA body axes
 - `reference_point`::MVec3 = zeros(MVec3): The point `omega` turns the body about [m]
 - `gamma_distribution`=zeros(Float64, P): A vector of the circulation
                         of the velocity field; Length: Number of segments. [m²/s]
@@ -26,7 +26,7 @@ Main structure for calculating aerodynamic properties of bodies. Use the constru
                         each `AIC[:, :, k]` slice is a contiguous BLAS matrix
 - `AIC_aero_center::Array{Float64, 3}` = zeros(P, P, 3): aerodynamic-centre (LLT)
                         influence coefficients, used only for the corrected angle of attack
-- `projected_area::Float64` = 1.0: The area projected onto the xy-plane of the kite body reference frame [m²]
+- `projected_area::Float64` = 1.0: The area projected onto the xy-plane of the KA body frame [m²]
 - `c_ref::Float64` = 1.0: Reference chord length (max panel chord) [m]
 - `cache::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}}` = [LazyBufferCache() for _ in 1:15]
 """
@@ -65,9 +65,9 @@ aerodynamic properties, returning a fully initialized structure ready for simula
 - `wings::Vector{T}`: Vector of wings to analyze, where T is an AbstractWing type
 
 # Keyword Arguments
-- `kite_body_origin=zeros(MVec3)`: Origin point of kite body reference frame in CAD reference frame
+- `kite_body_origin=zeros(MVec3)`: Origin point of the KA body frame in CAD reference frame
 - `va_vec=[15.0, 0.0, 0.0]`: Apparent wind vector [m/s]
-- `omega=zeros(3)`: Turn rate in kite body frame x y and z
+- `omega=zeros(3)`: Turn rate about the KA body x, y and z axes
 
 # Returns
 - [`BodyAerodynamics`](@ref) object initialized with panels and wings
@@ -303,7 +303,7 @@ Initialize a BodyAerodynamics struct in-place by setting up panels and coefficie
 # Keyword Arguments
 - `init_aero::Bool`: Whether to initialize the aero data or not
 - `va_vec=[15.0, 0.0, 0.0]`: Apparent wind vector [m/s]
-- `omega=zeros(3)`: Turn rate in kite body frame x y and z
+- `omega=zeros(3)`: Turn rate about the KA body x, y and z axes
 
 # Returns
 nothing

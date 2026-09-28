@@ -1,7 +1,8 @@
 """
     @with_kw mutable struct Panel
 
-Represents a panel in a vortex step method simulation. All points and vectors are in the kite body (KB) frame.
+Represents a panel in a vortex step method simulation. All points and vectors are in the
+kite aero body (KA) frame.
 
 # Fields
 - `TE_point_1`::MVec3=zeros(MVec3): First trailing edge point
