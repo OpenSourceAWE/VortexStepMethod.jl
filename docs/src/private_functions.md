@@ -34,6 +34,9 @@ bisect_sign_change
 calculate_relative_alpha_and_velocity
 calculate_relative_alpha_and_relative_velocity
 update_effective_angle_of_attack!
+induced_velocity_at
+attached_trailed_loads
+panel_force_moment
 calculate_stall_angle_list
 wing_span_flip
 spanwise_extent
