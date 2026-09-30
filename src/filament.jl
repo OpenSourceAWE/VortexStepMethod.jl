@@ -128,7 +128,6 @@ scaled linearly with the distance to the axis. Without a core, it is zero on the
             vel[k] = coeff * r1Xr2[k]
         end
     else
-        # The core-boundary velocity scaled by axis_distance / epsilon, in closed form.
         nr0sq = nr0 * nr0
         d_r1_r0 = dot3(r1, r0)
         d_r2_r0 = dot3(r2, r0)

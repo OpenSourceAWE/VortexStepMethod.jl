@@ -407,7 +407,7 @@ function calc_forces!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics;
     aerodynamic_model_type = solver.aerodynamic_model_type
 
     # Calculate coefficients for each panel
-    for (i, panel) in enumerate(panels)                                               # zero bytes
+    for (i, panel) in enumerate(panels)
         cl_dist[i] = calculate_cl(panel, alpha_dist[i])
         cd_dist[i], cm_dist[i] = calculate_cd_cm(panel, alpha_dist[i])
         if solver.flow_curvature
@@ -452,7 +452,6 @@ function calc_forces!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics;
     drag = solver.sol.drag_dist
     panel_moment_dist = solver.sol.panel_moment_dist
 
-    # Calculate alpha corrections based on model type
     if solver.correct_aoa && aerodynamic_model_type == VSM
         update_effective_angle_of_attack!(
             alpha_corrected,

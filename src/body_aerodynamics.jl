@@ -442,11 +442,9 @@ Returns: nothing
                               va_dist::AbstractVector{T},
                               va_unit_dist::AbstractMatrix{T},
                               target::AbstractArray{T, 3}=body_aero.AIC) where {P, W, T}
-    evaluation_point = model == VSM ? :control_point : :aero_center
-
     velocity_induced = zeros(MVector{3, T})
     U_2D = zeros(MVector{3, T})
-    # Slots 1-7 are the filament kernels' scratch; these two escape into them.
+    # Slots 1-5 are the filament kernels' scratch; these two escape into them.
     tempvel = body_aero.work_vectors[8]
     va_unit = body_aero.work_vectors[9]
 
@@ -473,8 +471,7 @@ Returns: nothing
         filaments = panel_jring.filaments
         for icp in eachindex(body_aero.panels)
             panel_icp = body_aero.panels[icp]
-            ep = evaluation_point == :control_point ? panel_icp.control_point :
-                 panel_icp.aero_center
+            ep = model == VSM ? panel_icp.control_point : panel_icp.aero_center
             calculate_velocity_induced_single_ring_semiinfinite!(
                 velocity_induced,
                 tempvel,
@@ -488,7 +485,6 @@ Returns: nothing
                 body_aero.work_vectors
             )
                       
-            # Subtract 2D induced velocity for VSM
             if icp == jring && model == VSM
                 calculate_velocity_induced_bound_2D!(U_2D, panel_jring, ep, body_aero.work_vectors)
                 velocity_induced .-= U_2D
@@ -541,8 +537,7 @@ function update_effective_angle_of_attack!(alpha_corrected,
     va_dist,
     va_unit_dist)
 
-    # Its own buffer: `AIC` holds the control-point matrix the circulation was solved
-    # against, so overwriting it here would leave post-solve readers on the LLT one.
+    # Not `AIC`: that holds the control-point matrix post-solve readers expect.
     calculate_AIC_matrices!(body_aero, LLT, core_radius_fraction, va_dist,
                             va_unit_dist, body_aero.AIC_aero_center)
 
@@ -551,11 +546,9 @@ function update_effective_angle_of_attack!(alpha_corrected,
         mul!(view(induced_velocity, :, k), view(body_aero.AIC_aero_center, :, :, k), gamma)
     end
 
-    # In-place relative velocity calculation
     relative_velocity = body_aero.cache[2][va_vec_dist]
     relative_velocity .= va_vec_dist .+ induced_velocity
 
-    # Preallocate and compute dot products manually
     n = size(relative_velocity, 1)
     v_normal     = body_aero.cache[3][relative_velocity]
     v_tangential = body_aero.cache[4][relative_velocity]
@@ -571,7 +564,6 @@ function update_effective_angle_of_attack!(alpha_corrected,
         v_tangential[i] = vt
     end
 
-    # Direct angle calculation without temporary arrays
     @inbounds for i in 1:n
         alpha_corrected[i] = atan(v_normal[i], v_tangential[i])
     end

@@ -26,6 +26,18 @@ function inviscid_wing(section_y; n_panels=length(section_y) - 1)
     return wing
 end
 
+"""
+    uniform_AIC!(body_aero, model, core_radius_fraction, va_vec)
+
+Write into `body_aero.AIC` the influence matrices of `model` under the uniform inflow
+`va_vec` [m/s].
+"""
+function uniform_AIC!(body_aero, model, core_radius_fraction, va_vec)
+    n_panels = length(body_aero.panels)
+    calculate_AIC_matrices!(body_aero, model, core_radius_fraction,
+        fill(norm(va_vec), n_panels), repeat(normalize(va_vec)', n_panels))
+end
+
 @testset "Induction Matrix Creation" begin
     # Setup
     n_panels = 3
@@ -79,17 +91,7 @@ end
             LLT
         )
 
-        # Calculate new matrices
-        va_dist = fill(norm(va_vec), length(body_aero.panels))
-        va_unit_dist = repeat(reshape(va_vec ./ norm(va_vec), 1, 3),
-                              length(body_aero.panels))
-        calculate_AIC_matrices!(
-            body_aero,
-            LLT,
-            core_radius_fraction,
-            va_dist,
-            va_unit_dist
-        )
+        uniform_AIC!(body_aero, LLT, core_radius_fraction, va_vec)
         AIC_x, AIC_y, AIC_z = @views body_aero.AIC[:, :, 1], body_aero.AIC[:, :, 2], body_aero.AIC[:, :, 3]
 
         # Compare matrices
@@ -115,17 +117,7 @@ end
             VSM
         )
 
-        # Calculate new matrices
-        va_dist = fill(norm(va_vec), length(body_aero.panels))
-        va_unit_dist = repeat(reshape(va_vec ./ norm(va_vec), 1, 3),
-                              length(body_aero.panels))
-        calculate_AIC_matrices!(
-            body_aero,
-            VSM,
-            core_radius_fraction,
-            va_dist,
-            va_unit_dist
-        )
+        uniform_AIC!(body_aero, VSM, core_radius_fraction, va_vec)
         AIC_x, AIC_y, AIC_z = body_aero.AIC[:, :, 1], body_aero.AIC[:, :, 2], body_aero.AIC[:, :, 3]
 
         # Compare matrices with higher precision for VSM
@@ -146,10 +138,8 @@ end
     body_aero = BodyAerodynamics([wing])
     va_vec = 10.0 .* [cosd(5), 0.0, sind(5)]
     set_va!(body_aero, va_vec)
-    n_panels = length(body_aero.panels)
     core_radius_fraction = 0.05
-    calculate_AIC_matrices!(body_aero, LLT, core_radius_fraction,
-        fill(norm(va_vec), n_panels), repeat(normalize(va_vec)', n_panels))
+    uniform_AIC!(body_aero, LLT, core_radius_fraction, va_vec)
 
     work_vectors = body_aero.work_vectors
     velocity = zeros(3)
@@ -187,9 +177,7 @@ end
     body_aero = BodyAerodynamics([wing])
     va_vec = 10.0 .* [cosd(5), 0.0, sind(5)]
     set_va!(body_aero, va_vec)
-    n_panels = length(body_aero.panels)
-    calculate_AIC_matrices!(body_aero, LLT, 1e-20, fill(norm(va_vec), n_panels),
-        repeat(normalize(va_vec)', n_panels))
+    uniform_AIC!(body_aero, LLT, 1e-20, va_vec)
 
     @test all(isfinite, body_aero.AIC)
 end

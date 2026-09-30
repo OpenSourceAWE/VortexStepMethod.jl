@@ -57,7 +57,7 @@ solver_settings:
   # --- Core Aerodynamic Model ---
   aerodynamic_model_type: VSM # VSM=3D vortex method, LLT=lifting line theory
   solver_type: LOOP # LOOP=fixed-point iteration, NONLIN=nonlinear solver
-  correct_aoa: true # true=force directions from the flow at 1/4 chord, false=at 3/4 chord
+  correct_aoa: true # true=forces turned by the 1/4-chord flow
 
   # --- Physical Properties ---
   density: 1.225 # [kg/m³] Air density (ISA sea level)

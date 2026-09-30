@@ -27,6 +27,22 @@ function analytical_solution(control_point, gamma)
            dot(r0, r1/norm(r1) - r2/norm(r2))
 end
 
+"""
+    off_axis_velocity(offset, gamma, core_radius_fraction)
+
+z velocity [m/s] induced by the unit filament from the origin along x at the point `offset`
+[m] off its axis, half a length beyond its end.
+"""
+function off_axis_velocity(offset, gamma, core_radius_fraction)
+    T = typeof(offset)
+    filament = BoundFilament{T}()
+    reinit!(filament, zeros(T, 3), T[1, 0, 0])
+    velocity = zeros(T, 3)
+    velocity_3D_bound_vortex!(velocity, filament, [1.5, offset, 0.0], gamma,
+        core_radius_fraction, ntuple(_ -> zeros(T, 3), 10))
+    return velocity[3]
+end
+
 @testset "BoundFilament Tests" begin
     gamma = 1.0
     core_radius_fraction = 0.01
@@ -263,18 +279,10 @@ end
     end
 
     @testset "ForwardDiff sees the core's slope on the extended axis" begin
-        function off_axis_velocity(offset)
-            T = typeof(offset)
-            filament = BoundFilament{T}()
-            reinit!(filament, zeros(T, 3), T[1, 0, 0])
-            velocity = zeros(T, 3)
-            velocity_3D_bound_vortex!(velocity, filament, [1.5, offset, 0.0], gamma,
-                core_radius_fraction, ntuple(_ -> zeros(T, 3), 10))
-            return velocity[3]
-        end
-        slope = ForwardDiff.derivative(off_axis_velocity, 0.0)
+        velocity_at(offset) = off_axis_velocity(offset, gamma, core_radius_fraction)
+        slope = ForwardDiff.derivative(velocity_at, 0.0)
 
         @test slope != 0
-        @test slope ≈ off_axis_velocity(1e-4) / 1e-4 rtol = 1e-9
+        @test slope ≈ velocity_at(1e-4) / 1e-4 rtol = 1e-9
     end
 end
