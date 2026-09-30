@@ -72,7 +72,7 @@ def export_model(model, npz_path):
 
 def threshold_rows(model, row):
     """Copies of `row` moved onto each output's first root split, where float32 matters."""
-    scaler, multi_output = model.named_steps["scale"], model.named_steps["model"]
+    scaler, multi_output = (step for _, step in model.steps)
     rows = []
     for forest in multi_output.estimators_:
         tree = forest.estimators_[0].tree_

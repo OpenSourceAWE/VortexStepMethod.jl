@@ -232,7 +232,8 @@ sigmoid
 ```@docs
 MASURE_PARAMETERS
 MASURE_REYNOLDS
-predict
+forest_predict
+one_based
 scale_input
 ```
 

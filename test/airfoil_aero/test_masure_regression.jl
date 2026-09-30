@@ -3,7 +3,7 @@ import YAML
 using VortexStepMethod
 using VortexStepMethod.ObjAdapter: resolve_aero_geometry
 using VortexStepMethod.AirfoilAero: MASURE_PARAMETERS, load_masure_model, masure_aero,
-                                    write_yaml, npzread
+                                    resolve_airfoil, write_yaml, npzread
 
 fixture_dir = joinpath(@__DIR__, "data", "masure")
 
@@ -14,7 +14,7 @@ fixture_dir = joinpath(@__DIR__, "data", "masure")
         for (row, expected) in zip(eachrow(reference["X"]), eachrow(reference["Y"]))
             params = Dict(zip(MASURE_PARAMETERS, row[1:6]))
             cl, cd, cm = masure_aero(model, params, [row[7]])
-            @test [cd[1], cl[1], cm[1]] ≈ expected atol=1e-12
+            @test [cd[1], cl[1], cm[1]] == expected
         end
     end
 
@@ -23,6 +23,14 @@ fixture_dir = joinpath(@__DIR__, "data", "masure")
             3e6, fixture_dir)
         @test_throws "Masure regression model not found" load_masure_model(
             5e6, fixture_dir)
+    end
+
+    @testset "resolve_airfoil names the airfoil and the missing parameters" begin
+        info = Dict("t" => 0.08, "eta" => 0.2, "kappa" => 0.09, "delta" => -2.0,
+                    "lamba" => 0.2, "phi" => 0.6)
+        @test_throws "masure_regression airfoil 3 lacks lambda" resolve_airfoil(
+            "masure_regression", info, mktempdir(), 3; Re=1e6, alpha_range=[0.0],
+            ml_models_dir=fixture_dir)
     end
 
     @testset "resolve_aero_geometry turns masure_regression into a loadable polar" begin

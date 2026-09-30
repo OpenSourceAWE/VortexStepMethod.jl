@@ -92,6 +92,9 @@ function resolve_airfoil(type::AbstractString, info::AbstractDict, out_dir, id;
     elseif type == "masure_regression"
         ml_models_dir === nothing &&
             error("masure_regression airfoil $id needs ml_models_dir.")
+        absent = [name for name in MASURE_PARAMETERS if !haskey(info, name)]
+        isempty(absent) || error("masure_regression airfoil $id lacks " *
+            "$(join(absent, ", ")); it takes $(join(MASURE_PARAMETERS, ", ")).")
         alpha = collect(Float64, alpha_range)
         cl, cd, cm = masure_aero(load_masure_model(Re, ml_models_dir), info, alpha)
         write_polar(polar, deg2rad.(alpha), cl, cd, cm)

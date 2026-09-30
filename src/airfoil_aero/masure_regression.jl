@@ -1,6 +1,3 @@
-# Masure regression: the Extra-Trees models of https://doi.org/10.5281/zenodo.16925758,
-# converted to .npz by scripts/export_masure_models.py, evaluated as sklearn does.
-
 "Airfoil parameters the masure regression takes, in its input order (alpha follows)."
 const MASURE_PARAMETERS = ("t", "eta", "kappa", "delta", "lambda", "phi")
 
@@ -40,13 +37,17 @@ struct MasureModel
     forests::Vector{ExtraTreesForest}
 end
 
-const MASURE_CACHE = Dict{Tuple{Float64,String}, MasureModel}()
+const MASURE_CACHE = Dict{String, MasureModel}()
+
+"Index array `key` of an exported model, shifted from 0-based to 1-based."
+one_based(data::AbstractDict, key::String) = data[key] .+ Int32(1)
 
 function ExtraTreesForest(data::AbstractDict, prefix::String)
-    one_based(name) = data["$(prefix)_$(name)"] .+ Int32(1)
-    return ExtraTreesForest(one_based("roots"), one_based("left"), one_based("right"),
-                            one_based("feature"), data["$(prefix)_threshold"],
-                            data["$(prefix)_value"])
+    return ExtraTreesForest(one_based(data, "$(prefix)_roots"),
+                            one_based(data, "$(prefix)_left"),
+                            one_based(data, "$(prefix)_right"),
+                            one_based(data, "$(prefix)_feature"),
+                            data["$(prefix)_threshold"], data["$(prefix)_value"])
 end
 
 """
@@ -58,23 +59,22 @@ Load the masure regression model for Reynolds number `Re` (1e6, 5e6 or 2e7) from
 function load_masure_model(Re::Real, ml_models_dir::AbstractString)
     haskey(MASURE_REYNOLDS, Re) || error("No masure regression model for Re = $Re; " *
         "available: $(join(sort!(collect(keys(MASURE_REYNOLDS))), ", ")).")
-    path = joinpath(ml_models_dir, "ET_re$(MASURE_REYNOLDS[Re]).npz")
-    return get!(MASURE_CACHE, (Float64(Re), abspath(path))) do
-        isfile(path) || error("Masure regression model not found at $path. Download " *
-            "the models from https://doi.org/10.5281/zenodo.16925758 and convert them " *
-            "with scripts/export_masure_models.py.")
-        data = npzread(path)
-        MasureModel(data["input_mean"], data["input_scale"],
-                    [ExtraTreesForest(data, "output$k") for k in 0:2])
-    end
+    path = abspath(joinpath(ml_models_dir, "ET_re$(MASURE_REYNOLDS[Re]).npz"))
+    haskey(MASURE_CACHE, path) && return MASURE_CACHE[path]
+    isfile(path) || error("Masure regression model not found at $path. Download " *
+        "the models from https://doi.org/10.5281/zenodo.16925758 and convert them " *
+        "with scripts/export_masure_models.py.")
+    data = npzread(path)
+    return MASURE_CACHE[path] = MasureModel(data["input_mean"], data["input_scale"],
+        [ExtraTreesForest(data, "output$k") for k in 0:2])
 end
 
 """
-    predict(forest::ExtraTreesForest, x) -> Float64
+    forest_predict(forest::ExtraTreesForest, x) -> Float64
 
 Mean of the leaf values the scaled input `x` reaches in each tree.
 """
-function predict(forest::ExtraTreesForest, x::AbstractVector{Float32})
+function forest_predict(forest::ExtraTreesForest, x::AbstractVector{Float32})
     total = 0.0
     for root in forest.roots
         node = root
@@ -101,7 +101,7 @@ function masure_aero(model::MasureModel, params::AbstractDict, alpha::AbstractVe
     for (i, angle) in enumerate(alpha)
         x[end] = scale_input(model, angle, length(x))
         for (k, forest) in enumerate(model.forests)
-            coefficients[i, k] = predict(forest, x)
+            coefficients[i, k] = forest_predict(forest, x)
         end
     end
     return coefficients[:, 2], coefficients[:, 1], coefficients[:, 3]

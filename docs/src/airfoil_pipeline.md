@@ -126,18 +126,7 @@ so generated geometry files stay diff-friendly and consistent.
 
 ## Parametric LEI airfoils: the masure regression
 
-A geometry YAML can also describe a leading-edge-inflatable airfoil by six shape
-parameters instead of a slice, as the `wing_airfoils` entry
-`[id, masure_regression, {t, eta, kappa, delta, lambda, phi}]`: tube diameter, chordwise
-and vertical position of maximum camber, trailing-edge reflex angle [deg], camber tension
-and leading-edge tension. [`resolve_aero_geometry`](@ref VortexStepMethod.ObjAdapter.resolve_aero_geometry)
-turns it into a `POLAR_VECTORS` table over the block's `alpha_range` with
-[`masure_aero`](@ref), which evaluates the Extra-Trees regression of K.R.G. Masure,
-trained on 2D RANS simulations, in pure Julia. The models exist for `reynolds` 1e6, 5e6
-and 2e7. Download them from [Zenodo](https://doi.org/10.5281/zenodo.16925758), convert
-them once with `python scripts/export_masure_models.py ET_re*.pkl --out DIR` (needs numpy
-and scikit-learn), and pass `ml_models_dir=DIR`. The converted model gives the same
-coefficients as scikit-learn's `predict`.
+A geometry YAML can also describe a leading-edge-inflatable airfoil by six shape parameters instead of a slice, as the `wing_airfoils` entry `[id, masure_regression, {t, eta, kappa, delta, lambda, phi}]`: tube diameter, chordwise and vertical position of maximum camber, trailing-edge reflex angle [deg], camber tension and leading-edge tension. [`resolve_aero_geometry`](@ref VortexStepMethod.ObjAdapter.resolve_aero_geometry) turns it into a `POLAR_VECTORS` table over the block's `alpha_range` with [`masure_aero`](@ref), which evaluates the Extra-Trees regression of K.R.G. Masure, trained on 2D RANS simulations, in pure Julia. The models exist for `reynolds` 1e6, 5e6 and 2e7. Download them from [Zenodo](https://doi.org/10.5281/zenodo.16925758), convert them once with `python scripts/export_masure_models.py ET_re*.pkl --out DIR` (needs numpy and scikit-learn), and pass `ml_models_dir=DIR`. The converted model gives the same coefficients as scikit-learn's `predict`. Keep `alpha_range` within the angles the models were trained on: outside them the trees return a constant.
 
 ## Why this is useful
 
