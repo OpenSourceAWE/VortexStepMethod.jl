@@ -1031,9 +1031,12 @@ end
 
 Position of the centre of `section` along `wing.spanwise_direction`.
 """
-section_span_position(wing, section) =
-    sum(wing.spanwise_direction[k] * (section.LE_point[k] + section.TE_point[k]) * 0.5
-        for k in 1:3)
+function section_span_position(wing, section)
+    direction = wing.spanwise_direction
+    return (direction[1] * (section.LE_point[1] + section.TE_point[1]) +
+            direction[2] * (section.LE_point[2] + section.TE_point[2]) +
+            direction[3] * (section.LE_point[3] + section.TE_point[3])) * 0.5
+end
 
 """
     compute_refined_panel_mapping!(wing::AbstractWing)
@@ -1063,8 +1066,12 @@ function compute_refined_panel_mapping!(wing::AbstractWing)
         return nothing
     end
 
-    span_middle = 0.5 * sum(extrema(section_span_position(wing, u)
-                                    for u in wing.unrefined_sections))
+    span_min, span_max = Inf, -Inf
+    for u in wing.unrefined_sections
+        span = section_span_position(wing, u)
+        span_min, span_max = min(span_min, span), max(span_max, span)
+    end
+    span_middle = 0.5 * (span_min + span_max)
     # For each refined panel, find closest unrefined section
     # using scalar arithmetic to avoid MVec3 allocations
     for pi in 1:n_panels
