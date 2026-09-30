@@ -1,18 +1,11 @@
-"""
-Masure regression - pure Julia evaluation of the Extra-Trees models that predict the
-polars of a parametric leading-edge-inflatable (LEI) airfoil.
-
-The trained scikit-learn models are https://doi.org/10.5281/zenodo.16925758;
-`scripts/export_masure_models.py` converts them to the `.npz` files read here.
-"""
+# Masure regression: the Extra-Trees models of https://doi.org/10.5281/zenodo.16925758,
+# converted to .npz by scripts/export_masure_models.py, evaluated as sklearn does.
 
 "Airfoil parameters the masure regression takes, in its input order (alpha follows)."
 const MASURE_PARAMETERS = ("t", "eta", "kappa", "delta", "lambda", "phi")
 
 "Reynolds numbers a masure regression model exists for, with their file suffix."
 const MASURE_REYNOLDS = Dict(1.0e6 => "1e6", 5.0e6 => "5e6", 2.0e7 => "2e7")
-
-const _MASURE_CACHE = Dict{Tuple{Float64,String}, Any}()
 
 """
     ExtraTreesForest
@@ -47,11 +40,13 @@ struct MasureModel
     forests::Vector{ExtraTreesForest}
 end
 
+const MASURE_CACHE = Dict{Tuple{Float64,String}, MasureModel}()
+
 function ExtraTreesForest(data::AbstractDict, prefix::String)
-    array(name) = data["$(prefix)_$(name)"]
-    return ExtraTreesForest(array("roots") .+ Int32(1), array("left") .+ Int32(1),
-                            array("right") .+ Int32(1), array("feature") .+ Int32(1),
-                            array("threshold"), array("value"))
+    one_based(name) = data["$(prefix)_$(name)"] .+ Int32(1)
+    return ExtraTreesForest(one_based("roots"), one_based("left"), one_based("right"),
+                            one_based("feature"), data["$(prefix)_threshold"],
+                            data["$(prefix)_value"])
 end
 
 """
@@ -64,14 +59,14 @@ function load_masure_model(Re::Real, ml_models_dir::AbstractString)
     haskey(MASURE_REYNOLDS, Re) || error("No masure regression model for Re = $Re; " *
         "available: $(join(sort!(collect(keys(MASURE_REYNOLDS))), ", ")).")
     path = joinpath(ml_models_dir, "ET_re$(MASURE_REYNOLDS[Re]).npz")
-    get!(_MASURE_CACHE, (Float64(Re), abspath(path))) do
+    return get!(MASURE_CACHE, (Float64(Re), abspath(path))) do
         isfile(path) || error("Masure regression model not found at $path. Download " *
             "the models from https://doi.org/10.5281/zenodo.16925758 and convert them " *
             "with scripts/export_masure_models.py.")
         data = npzread(path)
         MasureModel(data["input_mean"], data["input_scale"],
                     [ExtraTreesForest(data, "output$k") for k in 0:2])
-    end::MasureModel
+    end
 end
 
 """
@@ -100,17 +95,23 @@ Lift, drag and moment coefficients of the LEI airfoil described by `params` (key
 [deg].
 """
 function masure_aero(model::MasureModel, params::AbstractDict, alpha::AbstractVector)
-    raw = [Float64(params[name]) for name in MASURE_PARAMETERS]
-    x = zeros(Float32, length(raw) + 1)
+    x = [scale_input(model, params[name], j) for (j, name) in enumerate(MASURE_PARAMETERS)]
+    push!(x, 0.0f0)
     coefficients = zeros(length(alpha), length(model.forests))
     for (i, angle) in enumerate(alpha)
-        for (j, value) in enumerate((raw..., Float64(angle)))
-            # sklearn trees compare the scaled input rounded to Float32.
-            x[j] = Float32((value - model.input_mean[j]) / model.input_scale[j])
-        end
+        x[end] = scale_input(model, angle, length(x))
         for (k, forest) in enumerate(model.forests)
             coefficients[i, k] = predict(forest, x)
         end
     end
     return coefficients[:, 2], coefficients[:, 1], coefficients[:, 3]
 end
+
+"""
+    scale_input(model, value, j) -> Float32
+
+Input `j` standardised as the model's scaler does, rounded to `Float32` as sklearn trees
+compare it.
+"""
+scale_input(model::MasureModel, value::Real, j::Int) =
+    Float32((Float64(value) - model.input_mean[j]) / model.input_scale[j])

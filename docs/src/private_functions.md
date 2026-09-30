@@ -233,6 +233,7 @@ sigmoid
 MASURE_PARAMETERS
 MASURE_REYNOLDS
 predict
+scale_input
 ```
 
 ### Polars and airfoil IO

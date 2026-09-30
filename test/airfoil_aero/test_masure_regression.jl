@@ -8,7 +8,7 @@ using VortexStepMethod.AirfoilAero: MASURE_PARAMETERS, load_masure_model, masure
 fixture_dir = joinpath(@__DIR__, "data", "masure")
 
 @testset "masure regression" begin
-    @testset "Extra-Trees evaluation matches sklearn predict, rows on a split included" begin
+    @testset "Extra-Trees evaluation matches sklearn predict, on-split rows too" begin
         reference = npzread(joinpath(fixture_dir, "reference.npz"))
         model = load_masure_model(1e6, fixture_dir)
         for (row, expected) in zip(eachrow(reference["X"]), eachrow(reference["Y"]))
