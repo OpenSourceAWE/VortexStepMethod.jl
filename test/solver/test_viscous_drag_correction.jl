@@ -71,14 +71,6 @@ end
         end
     end
 
-    @testset "solve reports the corrected forces" begin
-        set_va!(body_aero, va_vec_sideslip)
-        solve!(solver_on, body_aero)
-        results = solve(solver_on, body_aero)
-        @test [results["Fx"], results["Fy"], results["Fz"]] ≈ solver_on.sol.force
-        @test results["F_distribution"] ≈ solver_on.sol.f_body_3D
-    end
-
     @testset "linearize reports the corrected forces" begin
         y = [va_vec_sideslip; zeros(3)]
         results_for(solver) = VortexStepMethod.linearize(solver, body_aero, y;

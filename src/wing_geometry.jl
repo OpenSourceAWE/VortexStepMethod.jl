@@ -1692,10 +1692,15 @@ Lowest and highest projection of the unrefined sections' LE and TE points on `wi
 `spanwise_direction`, or of all `wings` on `spanwise_direction`, as `(lo, hi)` [m].
 """
 function spanwise_extent(wings, spanwise_direction)
-    axis = normalize(spanwise_direction)
-    return extrema(dot(point, axis) for wing in wings
-                   for section in wing.unrefined_sections
-                   for point in (section.LE_point, section.TE_point))
+    axis = SVector{3}(spanwise_direction) / norm(spanwise_direction)
+    lo, hi = Inf, -Inf
+    for wing in wings, section in wing.unrefined_sections
+        for point in (section.LE_point, section.TE_point)
+            distance = dot(point, axis)
+            lo, hi = min(lo, distance), max(hi, distance)
+        end
+    end
+    return lo, hi
 end
 spanwise_extent(wing::AbstractWing) = spanwise_extent((wing,), wing.spanwise_direction)
 

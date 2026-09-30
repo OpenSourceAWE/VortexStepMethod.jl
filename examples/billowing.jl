@@ -94,15 +94,15 @@ set_va!(body_aero_flat, va_vec)
 set_va!(body_aero_bill, va_vec)
 
 # --- Solve and compare ---
-results_flat = VortexStepMethod.solve(
+results_flat = solve!(
     solver_flat, body_aero_flat; log=true)
-results_bill = VortexStepMethod.solve(
+results_bill = solve!(
     solver_bill, body_aero_bill; log=true)
 
-println("\nFlat wing: CL=$(round(results_flat["cl"]; digits=4)), " *
-        "CD=$(round(results_flat["cd"]; digits=4))")
-println("Billowed:  CL=$(round(results_bill["cl"]; digits=4)), " *
-        "CD=$(round(results_bill["cd"]; digits=4))")
+println("\nFlat wing: CL=$(round(results_flat.cl; digits=4)), " *
+        "CD=$(round(results_flat.cd; digits=4))")
+println("Billowed:  CL=$(round(results_bill.cl; digits=4)), " *
+        "CD=$(round(results_bill.cd; digits=4))")
 
 if PLOT
     # Plot geometry (flat wing)

@@ -13,7 +13,7 @@ labels = ["VSM Julia", "CFD Re=5e5", "CFD Re=10e5", "VSM Python Re=5e5",
     "Wind tunnel Re=5e5"]
 
 set_va!(body_aero, settings)
-results = VortexStepMethod.solve(solver, body_aero)
+results = solve!(solver, body_aero)
 
 plot_combined_analysis(solver, body_aero, results;
     labels,

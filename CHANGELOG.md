@@ -4,11 +4,33 @@
 
 ### Added
 
+- `VSMSolution` holds everything the removed `solve` dictionary held, filled by every
+  `solve!`: `lift`, `drag`, `side`, `cl`, `cd`, `cs`, `cl_distribution`,
+  `cd_distribution`, `cs_distribution`, `alpha_uncorrected`, `va_ref_vec`, `q_ref`, `rey`,
+  `area_all_panels`, `projected_area`, `wing_span`, `aspect_ratio_projected`,
+  `center_of_pressure` and `panel_cp_locations`. `calc_only_f_and_gamma` skips the
+  projections, span and centers of pressure.
 - `plot_geometry`, `plot_distribution`, `plot_combined_analysis`, `plot_section_polars`,
   `plot_airfoil_fit` and `plot_airfoils` take `show_title=true`; with `false` the title
   is not drawn, and still names the saved file and window.
 - The panel plots (`plot!(ax, panel)`, `plot!(ax, body)`, `plot(panel)`, `plot(body)`)
   take `border_color`, default `:black`, for the panel outlines.
+
+### Changed
+
+- BREAKING: `solve` and `calculate_results` are removed; use `solve!`, which returns the
+  solver's `VSMSolution`, and `solve!(solver, body_aero, nothing)` to start from a fresh
+  circulation as `solve` did. Keys that became other fields: `Fx`/`Fy`/`Fz` → `force`,
+  `Mx`/`My`/`Mz` → `moment`, `cfx`… → `force_coeffs`, `cmx`… → `moment_coeffs`,
+  `F_distribution` → `f_body_3D`, `M_distribution` → `m_body_3D`, `alpha_at_ac` →
+  `alpha_dist`, `alpha_geometric` → `alpha_geometric_dist`, `Rey` → `rey`.
+- BREAKING: `plot_distribution` and `plot_combined_analysis` take `VSMSolution`s instead of
+  dictionaries. `plot_combined_analysis`, `plot_polars` and `generate_polar_data` solve
+  through `solve!`, so they leave `solver.sol` at their last angle.
+- `correct_aoa` applies to the VSM model only. With LLT, results that came from `solve`
+  move by up to 0.34 % in `cl`, 0.43 % in `cd` and 4.5 % in `cmx`.
+- `center_of_pressure` is `NaN` where the line of action crosses no panel, instead of
+  `nothing` with a warning.
 
 ### Fixed
 

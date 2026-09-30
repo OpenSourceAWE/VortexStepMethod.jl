@@ -98,14 +98,12 @@ CurrentModule = VortexStepMethod
 set_va!
 apparent_wind
 section_pitch_rate
-solve
 solve!
 solve_base!
 reinit!(body_aero::BodyAerodynamics{P, W, T}) where {P, W, T}
 linearize
 stability_derivatives
 trim_angle
-calculate_results
 ```
 
 ## Main Plotting Functions
