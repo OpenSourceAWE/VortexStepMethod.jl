@@ -84,7 +84,7 @@ as implemented in KiteAeroDyn".
     r1 = work_vectors[1]
     r1 .= XVP .- filament.x1
     axial_distance = abs(dot3(r1, filament.r0)) / filament.length
-    epsilon = sqrt(4 * ALPHA0 * NU * axial_distance / va)
+    epsilon = lamb_oseen_core_radius(axial_distance, va)
     velocity_3D_vortex_segment!(vel, filament, XVP, gamma, epsilon, work_vectors)
 end
 
@@ -113,8 +113,7 @@ scaled linearly with the distance to the axis. Without a core, it is zero within
 
     cross3!(r1Xr0, r1, r0)
     axis_distance = norm3(r1Xr0) / nr0
-    rounding = 1e-12 * norm3(r1)
-    if epsilon <= rounding && axis_distance <= rounding
+    if on_axis_without_core(axis_distance, epsilon, norm3(r1))
         vel .= 0.0
     elseif axis_distance > epsilon
         cross3!(r1Xr2, r1, r2)
@@ -130,11 +129,9 @@ scaled linearly with the distance to the axis. Without a core, it is zero within
         end
     else
         nr0sq = nr0 * nr0
-        d_r1_r0 = dot3(r1, r0)
-        d_r2_r0 = dot3(r2, r0)
-        d_sum = d_r1_r0 / sqrt(d_r1_r0^2 / nr0sq + epsilon^2) -
-                d_r2_r0 / sqrt(d_r2_r0^2 / nr0sq + epsilon^2)
-        coeff = -(gamma / (4π)) * d_sum / (epsilon^2 * nr0sq)
+        end_terms = core_end_term(dot3(r1, r0), nr0sq, epsilon) -
+                    core_end_term(dot3(r2, r0), nr0sq, epsilon)
+        coeff = -core_coefficient(gamma, end_terms, nr0sq, epsilon)
         @inbounds for k in 1:3
             vel[k] = coeff * r1Xr0[k]
         end
@@ -180,6 +177,13 @@ Calculate the velocity induced at `XVP` by a semi-infinite trailing vortex filam
 `Vf`, with a Lamb–Oseen core radius grown over the axial distance of `XVP` from `x1`.
 Inside the core the velocity is scaled linearly with the distance to the axis. Without a
 core, it is zero within 1e-12 of the axis, relative to the distance from `x1`.
+
+# Arguments
+- `Vf`: unit direction of the filament [-]
+- `XVP`: evaluation point [m]
+- `GAMMA`: vortex strength [m²/s]
+- `va`: apparent wind speed [m/s]
+- `work_vectors`: preallocated 3-vectors for intermediate results
 """
 function velocity_3D_trailing_vortex_semiinfinite!(
     vel,
@@ -197,27 +201,61 @@ function velocity_3D_trailing_vortex_semiinfinite!(
 
     d_r1_Vf = dot3(r1, Vf)
     nVf = norm3(Vf)
-    epsilon = sqrt(4 * ALPHA0 * NU * abs(d_r1_Vf) * nVf / va)
+    epsilon = lamb_oseen_core_radius(abs(d_r1_Vf) / nVf, va)
 
     cross3!(r1XVf, r1, Vf)
     nr1XVf = norm3(r1XVf)
     axis_distance = nr1XVf / nVf
     nr1 = norm3(r1)
-    rounding = 1e-12 * nr1
-    if epsilon <= rounding && axis_distance <= rounding
+    if on_axis_without_core(axis_distance, epsilon, nr1)
         vel .= 0.0
         return nothing
     elseif axis_distance > epsilon
         K = GAMMA / (4π) / (nr1XVf^2) * (1 + d_r1_Vf / nr1)
     else
-        K = GAMMA / (4π) / (nVf * epsilon)^2 *
-            (1 + d_r1_Vf / sqrt(d_r1_Vf^2 / nVf^2 + epsilon^2))
+        nVfsq = nVf * nVf
+        K = core_coefficient(GAMMA, 1 + core_end_term(d_r1_Vf, nVfsq, epsilon), nVfsq,
+                             epsilon)
     end
     @inbounds for k in 1:3
         vel[k] = K * r1XVf[k]
     end
     nothing
 end
+
+"""
+    lamb_oseen_core_radius(axial_distance, va)
+
+Lamb–Oseen core radius [m] of a trailing vortex `axial_distance` [m] downstream of its
+start, in an apparent wind of `va` [m/s].
+"""
+lamb_oseen_core_radius(axial_distance, va) = sqrt(4 * ALPHA0 * NU * axial_distance / va)
+
+"""
+    on_axis_without_core(axis_distance, epsilon, nr1)
+
+True when both the distance to the filament axis and the core radius `epsilon` are
+within 1e-12 of `nr1`, the distance from the filament start.
+"""
+@inline on_axis_without_core(axis_distance, epsilon, nr1) =
+    max(axis_distance, epsilon) <= 1e-12 * nr1
+
+"""
+    core_end_term(d, nr0sq, epsilon)
+
+Contribution of one filament end to the core velocity, for `d` the dot product of the
+end-to-point vector with the axis vector of squared length `nr0sq`.
+"""
+@inline core_end_term(d, nr0sq, epsilon) = d / sqrt(d^2 / nr0sq + epsilon^2)
+
+"""
+    core_coefficient(gamma, end_terms, nr0sq, epsilon)
+
+Factor on the cross product of the point vector and the axis vector that gives the
+velocity inside a core of radius `epsilon`, linear in the distance to the axis.
+"""
+@inline core_coefficient(gamma, end_terms, nr0sq, epsilon) =
+    (gamma / (4π)) * end_terms / (epsilon^2 * nr0sq)
 
 """
     cross3!(result::AbstractVector{T}, a::AbstractVector{T}, b::AbstractVector{T}) where T
