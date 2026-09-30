@@ -890,21 +890,17 @@ end
                               chord_dist)
 
 Fill `panel_relaxation` with the LOOP relaxation factor of each panel: `relaxation_factor`,
-scaled by `reference / stiffness_i` on each panel whose self-induced stiffness
-`stiffness_i = 1 + π c_i |z_airf_i ⋅ AIC[i, i, :]|` exceeds `reference`, the geometric
-mean of the stiffness over all panels.
+capped at `1 / stiffness_i`, the diagonal step of the panel's self-induced stiffness
+`stiffness_i = 1 + π c_i |z_airf_i ⋅ AIC[i, i, :]|`.
 """
 function panel_relaxation_factors!(panel_relaxation, relaxation_factor, AIC, z_airf_dist,
         chord_dist)
-    log_reference = zero(eltype(panel_relaxation))
     @inbounds for i in eachindex(panel_relaxation)
         normal_self_induction = z_airf_dist[i, 1] * AIC[i, i, 1] +
             z_airf_dist[i, 2] * AIC[i, i, 2] + z_airf_dist[i, 3] * AIC[i, i, 3]
-        panel_relaxation[i] = 1 + π * chord_dist[i] * abs(normal_self_induction)
-        log_reference += log(panel_relaxation[i])
+        stiffness = 1 + π * chord_dist[i] * abs(normal_self_induction)
+        panel_relaxation[i] = min(relaxation_factor, 1 / stiffness)
     end
-    reference = exp(log_reference / length(panel_relaxation))
-    @. panel_relaxation = relaxation_factor * min(1, reference / panel_relaxation)
     return panel_relaxation
 end
 
