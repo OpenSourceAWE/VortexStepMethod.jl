@@ -213,3 +213,14 @@ function get_complete_settings_file(module_name)
         return create_temp_wing_settings(module_name, basename(get_standard_wing_file(module_name)))
     end
 end
+
+"""
+    crossflow_alpha(velocity, x_airf, y_airf, z_airf)
+
+Angle of `velocity` in the plane square to `y_airf`, from the chord `x_airf` projected
+onto that plane towards `z_airf`: Gaunaa et al. 2026 Eqs. (1) and (3), formed directly.
+"""
+function crossflow_alpha(velocity, x_airf, y_airf, z_airf)
+    chord_in_plane = normalize(x_airf .- dot(x_airf, y_airf) .* y_airf)
+    return atan(dot(velocity, z_airf), dot(velocity, chord_in_plane))
+end

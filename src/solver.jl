@@ -57,7 +57,6 @@ Struct for storing the solution of the [`solve!`](@ref) function. Must contain a
 """
 @with_kw mutable struct VSMSolution{P, U, T}
     ### private vectors of solve_base!
-    _x_airf_dist::Matrix{T} = zeros(T, P, 3)
     _y_airf_dist::Matrix{T} = zeros(T, P, 3)
     _z_airf_dist::Matrix{T} = zeros(T, P, 3)
     va_vec_dist::Matrix{T} = zeros(T, P, 3)
@@ -222,7 +221,7 @@ sol::VSMSolution = VSMSolution(): The result of calling [`solve!`](@ref)
     # Intermediate results
     lr::LoopResult{P, T} = LoopResult{P, T}()
     br::BaseResult{P, T} = BaseResult{P, T}()
-    cache::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}} = [LazyBufferCache() for _ in 1:10]
+    cache::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}} = [LazyBufferCache() for _ in 1:8]
     cache_base::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}}  = [LazyBufferCache()]
     cache_lin::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}} = [LazyBufferCache() for _ in 1:4]
 
@@ -417,35 +416,9 @@ function calc_forces!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics;
         end
         width_dist[i] = panel.width
 
-        # Geometric AoA using panel-local axes and prescribed
-        # freestream — scalar ops to avoid allocations
-        begin
-            va1 = solver.sol.va_vec_dist[i,1]
-            va2 = solver.sol.va_vec_dist[i,2]
-            va3 = solver.sol.va_vec_dist[i,3]
-            va = sqrt(va1^2 + va2^2 + va3^2)
-            x1 = solver.sol._x_airf_dist[i,1]
-            x2 = solver.sol._x_airf_dist[i,2]
-            x3 = solver.sol._x_airf_dist[i,3]
-            x_norm = sqrt(x1^2 + x2^2 + x3^2)
-            z1 = solver.sol._z_airf_dist[i,1]
-            z2 = solver.sol._z_airf_dist[i,2]
-            z3 = solver.sol._z_airf_dist[i,3]
-            z_norm = sqrt(z1^2 + z2^2 + z3^2)
-            if va == 0 || x_norm == 0 || z_norm == 0
-                alpha_geometric_dist[i] = NaN
-            else
-                inv_va = -1.0 / va
-                vu1 = va1 * inv_va
-                vu2 = va2 * inv_va
-                vu3 = va3 * inv_va
-                v_tangential = (x1*vu1+x2*vu2+x3*vu3) / x_norm
-                v_normal = (z1*vu1+z2*vu2+z3*vu3) / z_norm
-                alpha_geometric_dist[i] = atan(
-                    -v_normal, -v_tangential)
-            end
-        end
-
+        va_vec = matrix_row(solver.sol.va_vec_dist, i)
+        alpha_geometric_dist[i] = iszero(va_vec) ? NaN : inflow_angle(va_vec,
+            matrix_row(solver.sol._y_airf_dist, i), matrix_row(solver.sol._z_airf_dist, i))
     end
 
     lift = solver.sol.lift_dist
@@ -458,8 +431,6 @@ function calc_forces!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics;
             body_aero,
             gamma_new,
             solver.core_radius_fraction,
-            solver.sol._z_airf_dist,
-            solver.sol._x_airf_dist,
             solver.sol.va_vec_dist,
             solver.br.va_dist,
             solver.br.va_unit_dist
@@ -737,7 +708,6 @@ function solve_base!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics, gamma
     relaxation_factor = solver.relaxation_factor
     
     # Clear arrays
-    solver.sol._x_airf_dist .= 0
     solver.sol._y_airf_dist .= 0
     solver.sol._z_airf_dist .= 0
     solver.sol.va_vec_dist .= 0
@@ -746,7 +716,6 @@ function solve_base!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics, gamma
     # Fill arrays from panels
     for (i, panel) in enumerate(panels)
         @inbounds for k in 1:3
-            solver.sol._x_airf_dist[i, k] = panel.x_airf[k]
             solver.sol._y_airf_dist[i, k] = panel.y_airf[k]
             solver.sol._z_airf_dist[i, k] = panel.z_airf[k]
             solver.sol.va_vec_dist[i, k] = panel.va_vec[k]
@@ -820,9 +789,6 @@ end
     relative_velocity_crossz,
     v_acrossz_dist,
     z_airf_dist,
-    x_airf_dist,
-    v_normal_dist,
-    v_tangential_dist,
     va_magw_dist,
     cl_dist,
     chord_dist,
@@ -851,20 +817,11 @@ end
     end
 
     @inbounds for i in 1:n_panels
-        v_normal_dist[i] =
-            z_airf_dist[i,1]*relative_velocity_dist[i,1] +
-            z_airf_dist[i,2]*relative_velocity_dist[i,2] +
-            z_airf_dist[i,3]*relative_velocity_dist[i,3]
-        v_tangential_dist[i] =
-            x_airf_dist[i,1]*relative_velocity_dist[i,1] +
-            x_airf_dist[i,2]*relative_velocity_dist[i,2] +
-            x_airf_dist[i,3]*relative_velocity_dist[i,3]
-        solver.lr.v_span_dist[i] =
-            y_airf_dist[i,1]*relative_velocity_dist[i,1] +
-            y_airf_dist[i,2]*relative_velocity_dist[i,2] +
-            y_airf_dist[i,3]*relative_velocity_dist[i,3]
+        v_rel = matrix_row(relative_velocity_dist, i)
+        y_airf = matrix_row(y_airf_dist, i)
+        solver.lr.alpha_dist[i] = inflow_angle(v_rel, y_airf, matrix_row(z_airf_dist, i))
+        solver.lr.v_span_dist[i] = dot(y_airf, v_rel)
     end
-    solver.lr.alpha_dist .= atan.(v_normal_dist, v_tangential_dist)
 
     @inbounds for i in 1:n_panels
         solver.lr.v_rel_dist[i] = smooth_sqrt(
@@ -990,7 +947,6 @@ function gamma_loop!(
 ) where {P, U, T}
     va_vec_dist = solver.sol.va_vec_dist
     chord_dist = solver.sol._chord_dist
-    x_airf_dist = solver.sol._x_airf_dist
     y_airf_dist = solver.sol._y_airf_dist
     z_airf_dist = solver.sol._z_airf_dist
     solver.lr.converged   = false
@@ -1006,8 +962,6 @@ function gamma_loop!(
     relative_velocity_crossz = solver.cache[6][va_vec_dist]
     v_acrossz_dist           = solver.cache[7][va_vec_dist]
     cl_dist                  = solver.cache[8][solver.lr.gamma_new]
-    v_normal_dist            = solver.cache[9][solver.lr.gamma_new]
-    v_tangential_dist        = solver.cache[10][solver.lr.gamma_new]
 
     AIC_x = @view body_aero.AIC[:, :, 1]
     AIC_y = @view body_aero.AIC[:, :, 2]
@@ -1036,9 +990,7 @@ function gamma_loop!(
             velocity_view_x, velocity_view_y, velocity_view_z,
             va_vec_dist, induced_velocity_all, relative_velocity_dist,
             y_airf_dist, relative_velocity_crossz, v_acrossz_dist,
-            z_airf_dist, x_airf_dist,
-            v_normal_dist, v_tangential_dist,
-            va_magw_dist, cl_dist, chord_dist,
+            z_airf_dist, va_magw_dist, cl_dist, chord_dist,
         )
         @inbounds for i in 1:n_panels
             residual[i] -= gamma_iter[i]
@@ -1058,9 +1010,7 @@ function gamma_loop!(
                     velocity_view_x, velocity_view_y, velocity_view_z,
                     va_vec_dist, induced_velocity_all, relative_velocity_dist,
                     y_airf_dist, relative_velocity_crossz, v_acrossz_dist,
-                    z_airf_dist, x_airf_dist,
-                    v_normal_dist, v_tangential_dist,
-                    va_magw_dist, cl_dist, chord_dist,
+                    z_airf_dist, va_magw_dist, cl_dist, chord_dist,
                 )
                 inv_step = 1.0 / step
                 for i in 1:n_panels
@@ -1087,9 +1037,7 @@ function gamma_loop!(
                     velocity_view_x, velocity_view_y, velocity_view_z,
                     va_vec_dist, induced_velocity_all, relative_velocity_dist,
                     y_airf_dist, relative_velocity_crossz, v_acrossz_dist,
-                    z_airf_dist, x_airf_dist,
-                    v_normal_dist, v_tangential_dist,
-                    va_magw_dist, cl_dist, chord_dist,
+                    z_airf_dist, va_magw_dist, cl_dist, chord_dist,
                 )
                 @inbounds for i in 1:n_panels
                     residual_perturbed[i] -= gamma_perturbed[i]
@@ -1153,9 +1101,6 @@ function gamma_loop!(
                 relative_velocity_crossz,
                 v_acrossz_dist,
                 z_airf_dist,
-                x_airf_dist,
-                v_normal_dist,
-                v_tangential_dist,
                 va_magw_dist,
                 cl_dist,
                 chord_dist,

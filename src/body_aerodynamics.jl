@@ -28,7 +28,7 @@ Main structure for calculating aerodynamic properties of bodies. Use the constru
                         influence coefficients, used only for the corrected angle of attack
 - `projected_area::Float64` = 1.0: The area projected onto the xy-plane of the KA body frame [m²]
 - `c_ref::Float64` = 1.0: Reference chord length (max panel chord) [m]
-- `cache::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}}` = [LazyBufferCache() for _ in 1:15]
+- `cache::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}}` = [LazyBufferCache() for _ in 1:3]
 """
 @with_kw mutable struct BodyAerodynamics{P, W<:AbstractWing, T, PN<:Panel{T}}
     panels::Vector{PN}
@@ -49,7 +49,7 @@ Main structure for calculating aerodynamic properties of bodies. Use the constru
     AIC_aero_center::Array{T, 3} = zeros(T, P, P, 3)
     projected_area::T = one(T)
     c_ref::T = one(T)
-    cache::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}} = [LazyBufferCache() for _ in 1:15]
+    cache::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}} = [LazyBufferCache() for _ in 1:3]
 end
 
 """
@@ -449,11 +449,11 @@ Returns: nothing
     va_unit = body_aero.work_vectors[9]
 
     # Python parity: one shared area-weighted wake vector for all panels.
-    panel_areas = body_aero.cache[5][va_dist]
+    panel_areas = body_aero.cache[2][va_dist]
     for (i, panel) in enumerate(body_aero.panels)
         panel_areas[i] = panel.chord * panel.width
     end
-    va_vec_dist = body_aero.cache[6][va_unit_dist]
+    va_vec_dist = body_aero.cache[3][va_unit_dist]
     va_vec_dist .= va_unit_dist .* va_dist
     wake_velocity = _compute_reference_velocity_from_distribution(
         va_vec_dist,
@@ -520,19 +520,17 @@ end
 
 """
     update_effective_angle_of_attack!(alpha_corrected, body_aero::BodyAerodynamics, gamma,
-                                      core_radius_fraction, z_airf_dist, x_airf_dist,
-                                      va_vec_dist, va_dist, va_unit_dist)
+                                      core_radius_fraction, va_vec_dist, va_dist,
+                                      va_unit_dist)
 
-Write into `alpha_corrected` [rad] the angle of attack at each panel's aerodynamic centre,
-from the inflow plus the velocity `gamma` induces there without the panel's own bound
+Write each panel's [`inflow_angle`](@ref) at its aerodynamic centre into
+`alpha_corrected`, the induced velocity taken from `gamma` without the panel's own bound
 filament.
 """
 function update_effective_angle_of_attack!(alpha_corrected,
-    body_aero::BodyAerodynamics, 
+    body_aero::BodyAerodynamics,
     gamma,
     core_radius_fraction,
-    z_airf_dist,
-    x_airf_dist,
     va_vec_dist,
     va_dist,
     va_unit_dist)
@@ -546,28 +544,11 @@ function update_effective_angle_of_attack!(alpha_corrected,
         mul!(view(induced_velocity, :, k), view(body_aero.AIC_aero_center, :, :, k), gamma)
     end
 
-    relative_velocity = body_aero.cache[2][va_vec_dist]
-    relative_velocity .= va_vec_dist .+ induced_velocity
-
-    n = size(relative_velocity, 1)
-    v_normal     = body_aero.cache[3][relative_velocity]
-    v_tangential = body_aero.cache[4][relative_velocity]
-    
-    @inbounds for i in 1:n
-        vn = 0.0
-        vt = 0.0
-        for j in 1:3
-            vn += z_airf_dist[i, j] * relative_velocity[i, j]
-            vt += x_airf_dist[i, j] * relative_velocity[i, j]
-        end
-        v_normal[i] = vn
-        v_tangential[i] = vt
+    @inbounds for (i, panel) in enumerate(body_aero.panels)
+        v_rel = matrix_row(va_vec_dist, i) .+ matrix_row(induced_velocity, i)
+        alpha_corrected[i] = inflow_angle(v_rel, SVector{3}(panel.y_airf),
+                                          SVector{3}(panel.z_airf))
     end
-
-    @inbounds for i in 1:n
-        alpha_corrected[i] = atan(v_normal[i], v_tangential[i])
-    end
-
     nothing
 end
 
