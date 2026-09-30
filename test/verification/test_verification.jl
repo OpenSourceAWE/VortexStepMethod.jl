@@ -105,6 +105,17 @@ max_error(actual, expected) = maximum(abs.(actual .- expected))
         @test max_error(CD_llt, CD_vsm) < 1e-2
     end
 
+    @testset "elliptic AR 4 wing reaches Oswald efficiency 1 (Gaunaa et al. 2026)" begin
+        aspect_ratio = 4.0
+        span = aspect_ratio * π / 4
+        coordinates = generate_coordinates_el_wing(1.0, span, 41, "cos")
+        wing = wing_from_coordinates(coordinates, INVISCID)
+        CL, CD = lift_drag_polar(wing, VSM, [10.0]; va=10.0, relaxation_factor=0.05)
+        oswald_efficiency = only(CL)^2 / (π * aspect_ratio * only(CD))
+
+        @test oswald_efficiency ≈ 1 atol = 0.01
+    end
+
     @testset "curved Clark Y wing matches RANS" begin
         alphas = [9.0]
         coordinates = generate_coordinates_curved_wing(2.18, 6.969, π / 4, 4.673, 60,

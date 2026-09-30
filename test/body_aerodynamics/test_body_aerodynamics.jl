@@ -1,5 +1,7 @@
 using VortexStepMethod
-using VortexStepMethod: calculate_cl, calculate_cd_cm, calculate_projected_area, calculate_AIC_matrices!
+using VortexStepMethod: calculate_cl, calculate_cd_cm, calculate_projected_area, calculate_AIC_matrices!,
+    velocity_3D_bound_vortex!, velocity_3D_trailing_vortex!,
+    velocity_3D_trailing_vortex_semiinfinite!
 using LinearAlgebra
 using Test
 using Logging
@@ -130,6 +132,47 @@ end
         @test isapprox(MatrixU, AIC_x, atol=1e-8)
         @test isapprox(MatrixV, -AIC_y, atol=1e-8)
         @test isapprox(MatrixW, AIC_z, atol=1e-8)
+    end
+end
+
+@testset "LLT matrix leaves out only each panel's own bound filament" begin
+    radius = 4.0
+    wing = Wing(3)
+    for theta in range(-π / 4, π / 4, length=4)
+        section_point = [0.0, radius * sin(theta), radius * cos(theta)]
+        add_section!(wing, section_point, section_point .+ [1.0, 0.0, 0.0], INVISCID)
+    end
+    refine!(wing)
+    body_aero = BodyAerodynamics([wing])
+    va_vec = 10.0 .* [cosd(5), 0.0, sind(5)]
+    set_va!(body_aero, va_vec)
+    n_panels = length(body_aero.panels)
+    core_radius_fraction = 0.05
+    calculate_AIC_matrices!(body_aero, LLT, core_radius_fraction,
+        fill(norm(va_vec), n_panels), repeat(normalize(va_vec)', n_panels))
+
+    work_vectors = body_aero.work_vectors
+    velocity = zeros(3)
+    for (i, panel_i) in enumerate(body_aero.panels), (j, panel_j) in enumerate(body_aero.panels)
+        filaments = panel_j.filaments
+        expected = zeros(3)
+        for filament in filaments[2:3]
+            velocity_3D_trailing_vortex!(velocity, filament, panel_i.aero_center, 1.0,
+                norm(va_vec), work_vectors)
+            expected .+= velocity
+        end
+        for filament in filaments[4:5]
+            velocity_3D_trailing_vortex_semiinfinite!(velocity, filament, normalize(va_vec),
+                panel_i.aero_center, 1.0, norm(va_vec), work_vectors)
+            expected .+= velocity
+        end
+        if i != j
+            velocity_3D_bound_vortex!(velocity, filaments[1], panel_i.aero_center, 1.0,
+                core_radius_fraction, work_vectors)
+            @test norm(velocity) > 1e-3
+            expected .+= velocity
+        end
+        @test body_aero.AIC[i, j, :] ≈ expected atol = 1e-12
     end
 end
 

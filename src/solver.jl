@@ -172,6 +172,8 @@ Main solver structure for the Vortex Step Method. See also: [`solve!`](@ref)
 - mu::Float64 = 1.81e-5: Dynamic viscosity [N·s/m²]
 - `is_only_f_and_gamma_output`::Bool = false: Whether `solve!` skips the fields of
   [`VSMSolution`](@ref) that only analysis reads, see [`SolverSettings`](@ref)
+- `correct_aoa`::Bool = true: Turn each section force by the flow at its aerodynamic
+    centre rather than at its control point, VSM model only
 - `flow_curvature`::Bool = false: Add the thin-airfoil pitch-rate moment
     increment `-(π/4) q̂` to each section, see: [`flow_curvature_cm`](@ref)
 - `is_with_viscous_drag_correction`::Bool = false: Add the spanwise-flow viscous drag
