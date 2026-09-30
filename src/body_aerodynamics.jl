@@ -444,18 +444,19 @@ Returns: nothing
                               target::AbstractArray{T, 3}=body_aero.AIC) where {P, W, T}
     evaluation_point = model == VSM ? :control_point : :aero_center
 
-    # Allocate work vectors for this function (separate from those used by child functions)
     velocity_induced = zeros(MVector{3, T})
-    tempvel = zeros(MVector{3, T})
-    va_unit = zeros(MVector{3, T})
     U_2D = zeros(MVector{3, T})
+    # Slots 1-7 are the filament kernels' scratch; these two escape into them.
+    tempvel = body_aero.work_vectors[8]
+    va_unit = body_aero.work_vectors[9]
 
     # Python parity: one shared area-weighted wake vector for all panels.
-    panel_areas = [panel.chord * panel.width for panel in body_aero.panels]
-    va_vec_dist = zeros(T, length(body_aero.panels), 3)
-    @inbounds for i in 1:length(body_aero.panels), k in 1:3
-        va_vec_dist[i, k] = va_unit_dist[i, k] * va_dist[i]
+    panel_areas = body_aero.cache[5][va_dist]
+    for (i, panel) in enumerate(body_aero.panels)
+        panel_areas[i] = panel.chord * panel.width
     end
+    va_vec_dist = body_aero.cache[6][va_unit_dist]
+    va_vec_dist .= va_unit_dist .* va_dist
     wake_velocity = _compute_reference_velocity_from_distribution(
         va_vec_dist,
         length(body_aero.panels),

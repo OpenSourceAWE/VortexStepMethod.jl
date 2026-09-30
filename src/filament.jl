@@ -94,7 +94,7 @@ end
 
 Calculate the Biot–Savart velocity induced by a straight vortex segment at `XVP`.
 Inside the core radius `epsilon` the velocity is evaluated on the core boundary and
-scaled linearly with the distance to the axis.
+scaled linearly with the distance to the axis; on the axis, to rounding, it is zero.
 """
 @inline function velocity_3D_vortex_segment!(
     vel,
@@ -112,7 +112,10 @@ scaled linearly with the distance to the axis.
 
     cross3!(r1Xr0, r1, r0)
     nr1Xr0 = norm3(r1Xr0)
-    if nr1Xr0 / nr0 > epsilon
+    axis_distance = nr1Xr0 / nr0
+    if axis_distance < 1e-12 * max(epsilon, norm3(r1))
+        vel .= 0.0
+    elseif axis_distance > epsilon
         cross3!(r1Xr2, r1, r2)
         nr1 = norm3(r1)
         nr2 = norm3(r2)
@@ -124,8 +127,6 @@ scaled linearly with the distance to the axis.
         @inbounds for k in 1:3
             vel[k] = coeff * r1Xr2[k]
         end
-    elseif nr1Xr0 / nr0 < 1e-12 * epsilon
-        vel .= 0.0
     else
         nr0sq = nr0 * nr0
         d_r1_r0 = dot3(r1, r0)

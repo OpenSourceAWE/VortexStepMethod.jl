@@ -177,6 +177,23 @@ end
     end
 end
 
+@testset "LLT matrix is finite on a swept wing without vortex core" begin
+    wing = Wing(8)
+    for y in range(-2.0, 2.0, length=9)
+        leading_edge = [0.2abs(y), y, -0.5abs(y)]
+        add_section!(wing, leading_edge, leading_edge .+ [1.0, 0.0, 0.0], INVISCID)
+    end
+    refine!(wing)
+    body_aero = BodyAerodynamics([wing])
+    va_vec = 10.0 .* [cosd(5), 0.0, sind(5)]
+    set_va!(body_aero, va_vec)
+    n_panels = length(body_aero.panels)
+    calculate_AIC_matrices!(body_aero, LLT, 1e-20, fill(norm(va_vec), n_panels),
+        repeat(normalize(va_vec)', n_panels))
+
+    @test all(isfinite, body_aero.AIC)
+end
+
 
 @testset "Wing Geometry Creation" begin
     @testset "Origin Translation" begin

@@ -453,7 +453,7 @@ function calc_forces!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics;
     panel_moment_dist = solver.sol.panel_moment_dist
 
     # Calculate alpha corrections based on model type
-    if solver.correct_aoa && aerodynamic_model_type == VSM      # 64 bytes
+    if solver.correct_aoa && aerodynamic_model_type == VSM
         update_effective_angle_of_attack!(
             alpha_corrected,
             body_aero,
