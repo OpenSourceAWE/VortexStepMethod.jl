@@ -174,8 +174,8 @@ Solver configuration, used within [`VSMSettings`](@ref).
 - `calc_only_f_and_gamma`: Leave the analysis fields of [`VSMSolution`](@ref) (`lift`,
     `cl`, their distributions, span and centers of pressure) at their last values
     (default `false`)
-- `correct_aoa`: Perform angle of attack correction (VSM model only)
-    (default `false`)
+- `correct_aoa`: Turn each section force by the flow at its aerodynamic centre
+    rather than at its control point, VSM model only (default `true`)
 - `flow_curvature`: Add the thin-airfoil pitch-rate moment increment to each
     section (default `false`)
 - `is_with_viscous_drag_correction`: Add the spanwise-flow viscous drag and side
@@ -199,7 +199,7 @@ Solver configuration, used within [`VSMSettings`](@ref).
     core_radius_fraction::Float64 = 0.05
     mu::Float64 = 1.81e-5                   # dynamic viscosity [N·s/m²]
     calc_only_f_and_gamma::Bool=false       # skip the analysis fields of VSMSolution
-    correct_aoa::Bool=false                 # perform aoa correction
+    correct_aoa::Bool=true                  # force directions from the aero-centre flow
     flow_curvature::Bool=false              # thin-airfoil pitch-rate moment increment
     is_with_viscous_drag_correction::Bool=false # spanwise-flow viscous force (Gaunaa 2024)
     is_with_attached_trailed_force::Bool=false # chordwise bound-vortex force (Gaunaa 2026)

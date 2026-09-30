@@ -1,5 +1,7 @@
 using VortexStepMethod
-using VortexStepMethod: calculate_cl, calculate_cd_cm, calculate_projected_area, calculate_AIC_matrices!
+using VortexStepMethod: calculate_cl, calculate_cd_cm, calculate_projected_area,
+    calculate_AIC_matrices!, velocity_3D_bound_vortex!, velocity_3D_trailing_vortex!,
+    velocity_3D_trailing_vortex_semiinfinite!
 using LinearAlgebra
 using Test
 using Logging
@@ -22,6 +24,18 @@ function inviscid_wing(section_y; n_panels=length(section_y) - 1)
     end
     refine!(wing)
     return wing
+end
+
+"""
+    uniform_AIC!(body_aero, model, core_radius_fraction, va_vec)
+
+Write into `body_aero.AIC` the influence matrices of `model` under the uniform inflow
+`va_vec` [m/s].
+"""
+function uniform_AIC!(body_aero, model, core_radius_fraction, va_vec)
+    n_panels = length(body_aero.panels)
+    calculate_AIC_matrices!(body_aero, model, core_radius_fraction,
+        fill(norm(va_vec), n_panels), repeat(normalize(va_vec)', n_panels))
 end
 
 @testset "Induction Matrix Creation" begin
@@ -77,17 +91,7 @@ end
             LLT
         )
 
-        # Calculate new matrices
-        va_dist = fill(norm(va_vec), length(body_aero.panels))
-        va_unit_dist = repeat(reshape(va_vec ./ norm(va_vec), 1, 3),
-                              length(body_aero.panels))
-        calculate_AIC_matrices!(
-            body_aero,
-            LLT,
-            core_radius_fraction,
-            va_dist,
-            va_unit_dist
-        )
+        uniform_AIC!(body_aero, LLT, core_radius_fraction, va_vec)
         AIC_x, AIC_y, AIC_z = @views body_aero.AIC[:, :, 1], body_aero.AIC[:, :, 2], body_aero.AIC[:, :, 3]
 
         # Compare matrices
@@ -113,17 +117,7 @@ end
             VSM
         )
 
-        # Calculate new matrices
-        va_dist = fill(norm(va_vec), length(body_aero.panels))
-        va_unit_dist = repeat(reshape(va_vec ./ norm(va_vec), 1, 3),
-                              length(body_aero.panels))
-        calculate_AIC_matrices!(
-            body_aero,
-            VSM,
-            core_radius_fraction,
-            va_dist,
-            va_unit_dist
-        )
+        uniform_AIC!(body_aero, VSM, core_radius_fraction, va_vec)
         AIC_x, AIC_y, AIC_z = body_aero.AIC[:, :, 1], body_aero.AIC[:, :, 2], body_aero.AIC[:, :, 3]
 
         # Compare matrices with higher precision for VSM
@@ -131,6 +125,64 @@ end
         @test isapprox(MatrixV, -AIC_y, atol=1e-8)
         @test isapprox(MatrixW, AIC_z, atol=1e-8)
     end
+end
+
+@testset "LLT matrix leaves out only each panel's own bound filament" begin
+    radius = 4.0
+    wing = Wing(3)
+    for theta in range(-π / 4, π / 4, length=4)
+        section_point = [0.0, radius * sin(theta), radius * cos(theta)]
+        add_section!(wing, section_point, section_point .+ [1.0, 0.0, 0.0], INVISCID)
+    end
+    refine!(wing)
+    body_aero = BodyAerodynamics([wing])
+    va_vec = 10.0 .* [cosd(5), 0.0, sind(5)]
+    set_va!(body_aero, va_vec)
+    core_radius_fraction = 0.05
+    uniform_AIC!(body_aero, LLT, core_radius_fraction, va_vec)
+
+    work_vectors = body_aero.work_vectors
+    velocity = zeros(3)
+    panels = body_aero.panels
+    for (i, panel_i) in enumerate(panels), (j, panel_j) in enumerate(panels)
+        filaments = panel_j.filaments
+        expected = zeros(3)
+        for filament in filaments[2:3]
+            velocity_3D_trailing_vortex!(velocity, filament, panel_i.aero_center, 1.0,
+                norm(va_vec), work_vectors)
+            expected .+= velocity
+        end
+        for filament in filaments[4:5]
+            velocity_3D_trailing_vortex_semiinfinite!(velocity, filament, normalize(va_vec),
+                panel_i.aero_center, 1.0, norm(va_vec), work_vectors)
+            expected .+= velocity
+        end
+        if i != j
+            velocity_3D_bound_vortex!(velocity, filaments[1], panel_i.aero_center, 1.0,
+                core_radius_fraction, work_vectors)
+            @test norm(velocity) > 1e-3
+            expected .+= velocity
+        end
+        @test body_aero.AIC[i, j, :] ≈ expected atol = 1e-12
+    end
+end
+
+@testset "LLT matrix is finite on a swept wing without vortex core" begin
+    wing = Wing(8)
+    for y in range(-2.0, 2.0, length=9)
+        leading_edge = [0.2abs(y), y, -0.5abs(y)]
+        add_section!(wing, leading_edge, leading_edge .+ [1.0, 0.0, 0.0], INVISCID)
+    end
+    refine!(wing)
+    body_aero = BodyAerodynamics([wing])
+    va_vec = 10.0 .* [cosd(5), 0.0, sind(5)]
+    set_va!(body_aero, va_vec)
+    uniform_AIC!(body_aero, LLT, 1e-10, va_vec)
+    AIC_small_core = copy(body_aero.AIC)
+    uniform_AIC!(body_aero, LLT, 1e-20, va_vec)
+
+    @test all(isfinite, body_aero.AIC)
+    @test body_aero.AIC ≈ AIC_small_core
 end
 
 

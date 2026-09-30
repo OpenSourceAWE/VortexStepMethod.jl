@@ -49,15 +49,15 @@ function wing_from_coordinates(coordinates, aero_model, aero_data=nothing;
 end
 
 """
-    lift_drag_polar(wing, model, alphas; va, relaxation_factor)
+    lift_drag_polar(wing, model, alphas; va, relaxation_factor, correct_aoa=true)
 
 Wing `CL` and `CD` at each angle of attack in `alphas` [deg], solved with the
 settings of the Python verification cases.
 """
-function lift_drag_polar(wing, model, alphas; va, relaxation_factor)
+function lift_drag_polar(wing, model, alphas; va, relaxation_factor, correct_aoa=true)
     body_aero = BodyAerodynamics([wing])
     solver = Solver(wing.n_panels, wing.n_unrefined_sections; aerodynamic_model_type=model,
-                    relaxation_factor, core_radius_fraction=1e-20)
+                    relaxation_factor, core_radius_fraction=1e-20, correct_aoa)
     CL = zeros(length(alphas))
     CD = zeros(length(alphas))
     for (i, alpha) in enumerate(alphas)
@@ -103,6 +103,19 @@ max_error(actual, expected) = maximum(abs.(actual .- expected))
         @test max_error(CD_vsm, CD_theory) < 2e-3
         @test max_error(CL_llt, CL_vsm) < 1e-1
         @test max_error(CD_llt, CD_vsm) < 1e-2
+    end
+
+    @testset "elliptic AR 4 wing reaches Oswald efficiency 1 (Gaunaa et al. 2026)" begin
+        aspect_ratio = 4.0
+        span = aspect_ratio * π / 4
+        coordinates = generate_coordinates_el_wing(1.0, span, 41, "cos")
+        wing = wing_from_coordinates(coordinates, INVISCID)
+        oswald_efficiency(CL, CD) = only(CL)^2 / (π * aspect_ratio * only(CD))
+        polar(correct_aoa) = lift_drag_polar(wing, VSM, [10.0]; va=10.0,
+                                             relaxation_factor=0.05, correct_aoa)
+
+        @test oswald_efficiency(polar(true)...) ≈ 1 atol = 0.01
+        @test oswald_efficiency(polar(false)...) < 0.8
     end
 
     @testset "curved Clark Y wing matches RANS" begin

@@ -94,7 +94,8 @@ end
 
 Calculate the Biot–Savart velocity induced by a straight vortex segment at `XVP`.
 Inside the core radius `epsilon` the velocity is evaluated on the core boundary and
-scaled linearly with the distance to the axis.
+scaled linearly with the distance to the axis. Without a core, it is zero within
+1e-12 of the axis, relative to the distance from `x1`.
 """
 @inline function velocity_3D_vortex_segment!(
     vel,
@@ -104,15 +105,18 @@ scaled linearly with the distance to the axis.
     epsilon,
     work_vectors
 )
-    r1, r2, r1Xr2, r1Xr0, r1r2norm, r1_proj, r2_proj = work_vectors
+    r1, r2, r1Xr2, r1Xr0, r1r2norm = work_vectors
     r0 = filament.r0
     nr0 = filament.length
     r1 .= XVP .- filament.x1
     r2 .= XVP .- filament.x2
 
     cross3!(r1Xr0, r1, r0)
-    nr1Xr0 = norm3(r1Xr0)
-    if nr1Xr0 / nr0 > epsilon
+    axis_distance = norm3(r1Xr0) / nr0
+    rounding = 1e-12 * norm3(r1)
+    if epsilon <= rounding && axis_distance <= rounding
+        vel .= 0.0
+    elseif axis_distance > epsilon
         cross3!(r1Xr2, r1, r2)
         nr1 = norm3(r1)
         nr2 = norm3(r2)
@@ -124,35 +128,15 @@ scaled linearly with the distance to the axis.
         @inbounds for k in 1:3
             vel[k] = coeff * r1Xr2[k]
         end
-    elseif nr1Xr0 / nr0 < 1e-12 * epsilon
-        vel .= 0.0
     else
         nr0sq = nr0 * nr0
         d_r1_r0 = dot3(r1, r0)
         d_r2_r0 = dot3(r2, r0)
-        r_rad = r1Xr0
+        d_sum = d_r1_r0 / sqrt(d_r1_r0^2 / nr0sq + epsilon^2) -
+                d_r2_r0 / sqrt(d_r2_r0^2 / nr0sq + epsilon^2)
+        coeff = -(gamma / (4π)) * d_sum / (epsilon^2 * nr0sq)
         @inbounds for k in 1:3
-            r_rad[k] = r1[k] - d_r1_r0 * r0[k] / nr0sq
-        end
-        nr_rad = norm3(r_rad)
-        @inbounds for k in 1:3
-            r1_proj[k] = d_r1_r0 * r0[k] / nr0sq +
-                         epsilon * r_rad[k] / nr_rad
-            r2_proj[k] = d_r2_r0 * r0[k] / nr0sq +
-                         epsilon * r_rad[k] / nr_rad
-        end
-        cross3!(r1Xr2, r1_proj, r2_proj)
-        nr1_proj = norm3(r1_proj)
-        nr2_proj = norm3(r2_proj)
-        d_sum = 0.0
-        @inbounds for k in 1:3
-            d_sum += r0[k] * (r1_proj[k]/nr1_proj -
-                              r2_proj[k]/nr2_proj)
-        end
-        scale = nr1Xr0 / (nr0 * epsilon)
-        coeff = scale * (gamma / (4π)) / (norm3(r1Xr2)^2) * d_sum
-        @inbounds for k in 1:3
-            vel[k] = coeff * r1Xr2[k]
+            vel[k] = coeff * r1Xr0[k]
         end
     end
     nothing

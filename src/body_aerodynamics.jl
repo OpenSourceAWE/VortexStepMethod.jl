@@ -28,7 +28,7 @@ Main structure for calculating aerodynamic properties of bodies. Use the constru
                         influence coefficients, used only for the corrected angle of attack
 - `projected_area::Float64` = 1.0: The area projected onto the xy-plane of the KA body frame [m²]
 - `c_ref::Float64` = 1.0: Reference chord length (max panel chord) [m]
-- `cache::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}}` = [LazyBufferCache()]
+- `cache::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}}` = [LazyBufferCache() for _ in 1:3]
 """
 @with_kw mutable struct BodyAerodynamics{P, W<:AbstractWing, T, PN<:Panel{T}}
     panels::Vector{PN}
@@ -49,7 +49,7 @@ Main structure for calculating aerodynamic properties of bodies. Use the constru
     AIC_aero_center::Array{T, 3} = zeros(T, P, P, 3)
     projected_area::T = one(T)
     c_ref::T = one(T)
-    cache::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}} = [LazyBufferCache()]
+    cache::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}} = [LazyBufferCache() for _ in 1:3]
 end
 
 """
@@ -429,7 +429,9 @@ end
     calculate_AIC_matrices!(body_aero::BodyAerodynamics, model::Model, core_radius_fraction,
                             va_dist, va_unit_dist, target=body_aero.AIC)
 
-Calculate Aerodynamic Influence Coefficient matrices.
+Calculate the velocity each panel's unit-strength vortex ring induces at every control
+point (`VSM`, less the panel's own 2D bound vortex) or aerodynamic centre (`LLT`, less
+the panel's own bound filament).
 
 See also: [`BodyAerodynamics`](@ref), [`Model`](@ref)
 
@@ -440,22 +442,19 @@ Returns: nothing
                               va_dist::AbstractVector{T},
                               va_unit_dist::AbstractMatrix{T},
                               target::AbstractArray{T, 3}=body_aero.AIC) where {P, W, T}
-    # Determine evaluation point based on model
-    evaluation_point = model == VSM ? :control_point : :aero_center
-    evaluation_point_on_bound = model == LLT
-
-    # Allocate work vectors for this function (separate from those used by child functions)
-    velocity_induced = zeros(MVector{3, T})
-    tempvel = zeros(MVector{3, T})
-    va_unit = zeros(MVector{3, T})
-    U_2D = zeros(MVector{3, T})
+    # Slots 1-5 are the filament kernels' scratch.
+    velocity_induced = body_aero.work_vectors[6]
+    U_2D = body_aero.work_vectors[7]
+    tempvel = body_aero.work_vectors[8]
+    va_unit = body_aero.work_vectors[9]
 
     # Python parity: one shared area-weighted wake vector for all panels.
-    panel_areas = [panel.chord * panel.width for panel in body_aero.panels]
-    va_vec_dist = zeros(T, length(body_aero.panels), 3)
-    @inbounds for i in 1:length(body_aero.panels), k in 1:3
-        va_vec_dist[i, k] = va_unit_dist[i, k] * va_dist[i]
+    panel_areas = body_aero.cache[2][va_dist]
+    for (i, panel) in enumerate(body_aero.panels)
+        panel_areas[i] = panel.chord * panel.width
     end
+    va_vec_dist = body_aero.cache[3][va_unit_dist]
+    va_vec_dist .= va_unit_dist .* va_dist
     wake_velocity = _compute_reference_velocity_from_distribution(
         va_vec_dist,
         length(body_aero.panels),
@@ -472,14 +471,13 @@ Returns: nothing
         filaments = panel_jring.filaments
         for icp in eachindex(body_aero.panels)
             panel_icp = body_aero.panels[icp]
-            ep = evaluation_point == :control_point ? panel_icp.control_point :
-                 panel_icp.aero_center
+            ep = model == VSM ? panel_icp.control_point : panel_icp.aero_center
             calculate_velocity_induced_single_ring_semiinfinite!(
                 velocity_induced,
                 tempvel,
                 filaments,
                 ep,
-                evaluation_point_on_bound,
+                model == LLT && icp == jring,
                 va,
                 va_unit,
                 one(T),
@@ -487,7 +485,6 @@ Returns: nothing
                 body_aero.work_vectors
             )
                       
-            # Subtract 2D induced velocity for VSM
             if icp == jring && model == VSM
                 calculate_velocity_induced_bound_2D!(U_2D, panel_jring, ep, body_aero.work_vectors)
                 velocity_induced .-= U_2D
@@ -527,7 +524,8 @@ end
                                       va_unit_dist)
 
 Write each panel's [`inflow_angle`](@ref) at its aerodynamic centre into
-`alpha_corrected`, the induced velocity taken from `gamma` on the LLT influence matrix.
+`alpha_corrected`, the induced velocity taken from `gamma` without the panel's own bound
+filament.
 """
 function update_effective_angle_of_attack!(alpha_corrected,
     body_aero::BodyAerodynamics,
@@ -537,8 +535,7 @@ function update_effective_angle_of_attack!(alpha_corrected,
     va_dist,
     va_unit_dist)
 
-    # Its own buffer: `AIC` holds the control-point matrix the circulation was solved
-    # against, so overwriting it here would leave post-solve readers on the LLT one.
+    # Not `AIC`: that holds the control-point matrix post-solve readers expect.
     calculate_AIC_matrices!(body_aero, LLT, core_radius_fraction, va_dist,
                             va_unit_dist, body_aero.AIC_aero_center)
 

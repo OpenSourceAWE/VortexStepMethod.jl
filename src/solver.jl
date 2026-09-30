@@ -171,6 +171,8 @@ Main solver structure for the Vortex Step Method. See also: [`solve!`](@ref)
 - mu::Float64 = 1.81e-5: Dynamic viscosity [N·s/m²]
 - `is_only_f_and_gamma_output`::Bool = false: Whether `solve!` skips the fields of
   [`VSMSolution`](@ref) that only analysis reads, see [`SolverSettings`](@ref)
+- `correct_aoa`::Bool = true: Turn each section force by the flow at its aerodynamic
+    centre rather than at its control point, VSM model only
 - `flow_curvature`::Bool = false: Add the thin-airfoil pitch-rate moment
     increment `-(π/4) q̂` to each section, see: [`flow_curvature_cm`](@ref)
 - `is_with_viscous_drag_correction`::Bool = false: Add the spanwise-flow viscous drag
@@ -210,7 +212,7 @@ sol::VSMSolution = VSMSolution(): The result of calling [`solve!`](@ref)
     core_radius_fraction::T = T(0.05)
     mu::T = T(1.81e-5)
     is_only_f_and_gamma_output::Bool = false
-    correct_aoa::Bool = false
+    correct_aoa::Bool = true
     flow_curvature::Bool = false
     is_with_viscous_drag_correction::Bool = false
     is_with_attached_trailed_force::Bool = false
@@ -404,7 +406,7 @@ function calc_forces!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics;
     aerodynamic_model_type = solver.aerodynamic_model_type
 
     # Calculate coefficients for each panel
-    for (i, panel) in enumerate(panels)                                               # zero bytes
+    for (i, panel) in enumerate(panels)
         cl_dist[i] = calculate_cl(panel, alpha_dist[i])
         cd_dist[i], cm_dist[i] = calculate_cd_cm(panel, alpha_dist[i])
         if solver.flow_curvature
@@ -423,8 +425,7 @@ function calc_forces!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics;
     drag = solver.sol.drag_dist
     panel_moment_dist = solver.sol.panel_moment_dist
 
-    # Calculate alpha corrections based on model type
-    if solver.correct_aoa && aerodynamic_model_type == VSM      # 64 bytes
+    if solver.correct_aoa && aerodynamic_model_type == VSM
         update_effective_angle_of_attack!(
             alpha_corrected,
             body_aero,

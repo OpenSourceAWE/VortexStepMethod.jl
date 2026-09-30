@@ -81,7 +81,7 @@ end
 
     @testset "moments about the leading edge: stable trim" begin
         body_aero, solver = trimmable_wing(0.05)
-        trims = trim_angle(solver, body_aero, beta, va)
+        trims = trim_angle(solver, body_aero, beta, va; alpha_tol=1e-7)
         @test length(trims) == 1
         trim = only(trims)
         trim_coeffs = coeffs_at_angles(solver, body_aero, trim.alpha, beta, va)
@@ -93,7 +93,7 @@ end
 
     @testset "moments about the trailing edge: unstable trim" begin
         body_aero, solver = trimmable_wing(-0.05; reference_point=[1.0, 0.0, 0.0])
-        trim = only(trim_angle(solver, body_aero, beta, va))
+        trim = only(trim_angle(solver, body_aero, beta, va; alpha_tol=1e-7))
         trim_coeffs = coeffs_at_angles(solver, body_aero, trim.alpha, beta, va)
         @test abs(trim_coeffs[5]) < 1e-5
         @test trim.dCMy_dalpha > 0

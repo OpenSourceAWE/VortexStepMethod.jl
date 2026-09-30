@@ -1,5 +1,6 @@
 using VortexStepMethod: BoundFilament, velocity_3D_bound_vortex!,
     velocity_3D_trailing_vortex!, reinit!, ALPHA0, NU
+using ForwardDiff
 using LinearAlgebra
 using Test
 
@@ -24,6 +25,22 @@ function analytical_solution(control_point, gamma)
     
     return (gamma / (4π)) * (r1Xr2 / (norm_r1Xr2^2)) * 
            dot(r0, r1/norm(r1) - r2/norm(r2))
+end
+
+"""
+    off_axis_velocity(offset, gamma, core_radius_fraction)
+
+z velocity [m/s] induced by the unit filament from the origin along x at the point `offset`
+[m] off its axis, half a length beyond its end.
+"""
+function off_axis_velocity(offset, gamma, core_radius_fraction)
+    T = typeof(offset)
+    filament = BoundFilament{T}()
+    reinit!(filament, zeros(T, 3), T[1, 0, 0])
+    velocity = zeros(T, 3)
+    velocity_3D_bound_vortex!(velocity, filament, [1.5, offset, 0.0], gamma,
+        core_radius_fraction, ntuple(_ -> zeros(T, 3), 10))
+    return velocity[3]
 end
 
 @testset "BoundFilament Tests" begin
@@ -259,5 +276,13 @@ end
             @test isapprox(abs(v[3]), expected_mag; rtol=1e-3)
             @test v[3] > 0
         end
+    end
+
+    @testset "ForwardDiff sees the core's slope on the extended axis" begin
+        velocity_at(offset) = off_axis_velocity(offset, gamma, core_radius_fraction)
+        slope = ForwardDiff.derivative(velocity_at, 0.0)
+
+        @test slope != 0
+        @test slope ≈ velocity_at(1e-4) / 1e-4 rtol = 1e-9
     end
 end
