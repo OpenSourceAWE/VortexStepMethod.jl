@@ -16,6 +16,7 @@ include("kulfan.jl")
 include("deform.jl")
 include("shrink_wrap.jl")
 include("neuralfoil.jl")
+include("masure_regression.jl")
 include("poly.jl")
 include("airfoil_solvers/common.jl")
 include("airfoil_solvers/xfoil_solver.jl")
@@ -33,6 +34,7 @@ export ShrinkWrap, shrink_wrap
 export fit_kulfan_parameters, kulfan_to_coordinates
 export NeuralFoilModel, NeuralFoilResult, load_neuralfoil_model
 export neuralfoil_aero, neuralfoil_section
+export MasureModel, load_masure_model, masure_aero
 export KulfanBasis, deform_kulfan, control_point_deflection
 export chord_residual, chord_line
 export LivePolarSettings, LivePolars, panel_kulfan_parameters
