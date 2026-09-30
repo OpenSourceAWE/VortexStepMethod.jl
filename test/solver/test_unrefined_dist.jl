@@ -60,30 +60,14 @@ area_mean(values, panels, indices) =
                     expected_cd = area_mean(sol.cd_dist, panels, refined_panel_indices)
                     expected_cm = area_mean(sol.cm_dist, panels, refined_panel_indices)
 
-                    # Handle NaN values that can occur in INVISCID models
-                    if isnan(expected_cl)
-                        @test isnan(sol.cl_unrefined_dist[unrefined_idx])
-                    else
-                        @test isapprox(sol.cl_unrefined_dist[unrefined_idx], expected_cl, rtol=1e-10)
-                    end
-                    if isnan(expected_cd)
-                        @test isnan(sol.cd_unrefined_dist[unrefined_idx])
-                    else
-                        @test isapprox(sol.cd_unrefined_dist[unrefined_idx], expected_cd, rtol=1e-10)
-                    end
-                    if isnan(expected_cm)
-                        @test isnan(sol.cm_unrefined_dist[unrefined_idx])
-                    else
-                        @test isapprox(sol.cm_unrefined_dist[unrefined_idx], expected_cm, rtol=1e-10)
-                    end
+                    @test isapprox(sol.cl_unrefined_dist[unrefined_idx], expected_cl, rtol=1e-10)
+                    @test isapprox(sol.cd_unrefined_dist[unrefined_idx], expected_cd, rtol=1e-10)
+                    @test isapprox(sol.cm_unrefined_dist[unrefined_idx], expected_cm, rtol=1e-10)
                 end
             end
 
             # Test 4: Verify physical consistency (lift coefficients should be positive at positive AoA)
-            # Skip test if values are NaN
-            if !any(isnan.(sol.cl_unrefined_dist))
-                @test all(sol.cl_unrefined_dist .> 0.0)
-            end
+            @test all(sol.cl_unrefined_dist .> 0.0)
 
         finally
             rm(settings_file; force=true)
@@ -197,22 +181,9 @@ area_mean(values, panels, indices) =
                         expected_cd = area_mean(sol.cd_dist, panels, refined_panel_indices)
                         expected_cm = area_mean(sol.cm_dist, panels, refined_panel_indices)
 
-                        # Handle NaN for all coefficients
-                        if isnan(expected_cl)
-                            @test isnan(sol.cl_unrefined_dist[unrefined_idx])
-                        else
-                            @test isapprox(sol.cl_unrefined_dist[unrefined_idx], expected_cl, rtol=1e-10)
-                        end
-                        if isnan(expected_cd)
-                            @test isnan(sol.cd_unrefined_dist[unrefined_idx])
-                        else
-                            @test isapprox(sol.cd_unrefined_dist[unrefined_idx], expected_cd, rtol=1e-10)
-                        end
-                        if isnan(expected_cm)
-                            @test isnan(sol.cm_unrefined_dist[unrefined_idx])
-                        else
-                            @test isapprox(sol.cm_unrefined_dist[unrefined_idx], expected_cm, rtol=1e-10)
-                        end
+                        @test isapprox(sol.cl_unrefined_dist[unrefined_idx], expected_cl, rtol=1e-10)
+                        @test isapprox(sol.cd_unrefined_dist[unrefined_idx], expected_cd, rtol=1e-10)
+                        @test isapprox(sol.cm_unrefined_dist[unrefined_idx], expected_cm, rtol=1e-10)
                     end
                 end
 

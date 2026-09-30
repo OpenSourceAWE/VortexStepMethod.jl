@@ -529,8 +529,6 @@ function calc_forces!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics;
                     unrefined_count_dist[target_unrefined_idx] += 1
                 end
 
-                # Coefficients and alpha are area-weighted means, the chord is the
-                # section area over its width; width and the moments stay summed.
                 for target_unrefined_idx in section_range
                     if unrefined_count_dist[target_unrefined_idx] > 0
                         count = unrefined_count_dist[target_unrefined_idx]
@@ -663,9 +661,9 @@ Converge the circulation distribution and leave it in `solver.lr.gamma_new`, wit
 turning it into forces. Fills the solver's panel arrays, builds the AIC matrices,
 starts from `gamma_distribution` (or an elliptical/zero guess when it is `nothing` or
 `solver.use_gamma_prev` is false) and iterates; a `LOOP` solver that fails to converge
-retries with half the relaxation factor, warning each time, while the factor is above
-1e-3. The circulation half of [`solve!`](@ref), paired with [`calc_forces!`](@ref).
-Returns `nothing`.
+retries with half the relaxation factor while the factor is above 1e-3, and warns once
+with the factor it stopped at. The circulation half of [`solve!`](@ref), paired with
+[`calc_forces!`](@ref). Returns `nothing`.
 """
 function solve_base!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics, gamma_distribution=nothing;
                log=false) where {P, U, T}
@@ -733,11 +731,15 @@ function solve_base!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics, gamma
     solver.lr.gamma_new .= gamma_initial
     # Run main iteration loop
     gamma_loop!(solver, body_aero, panels, relaxation_factor; log)
+    initial_relaxation_factor = relaxation_factor
     while solver.solver_type == LOOP && !solver.lr.converged && relaxation_factor > 1e-3
         relaxation_factor /= 2
-        @warn "LOOP did not converge, retrying with relaxation_factor = $relaxation_factor"
         solver.lr.gamma_new .= gamma_initial
         gamma_loop!(solver, body_aero, panels, relaxation_factor; log)
+    end
+    if relaxation_factor < initial_relaxation_factor
+        @warn "LOOP halved relaxation_factor from $initial_relaxation_factor to " *
+            "$relaxation_factor, converged: $(solver.lr.converged)"
     end
 
     nothing
@@ -914,9 +916,8 @@ function panel_relaxation_factors!(panel_relaxation, relaxation_factor, AIC, z_a
 end
 
 """
-    gamma_loop!(solver::Solver, AIC_x::Matrix{Float64},
-              AIC_y::Matrix{Float64}, AIC_z::Matrix{Float64},
-              panels::AbstractVector{<:Panel}, relaxation_factor::Float64; log=true)
+    gamma_loop!(solver::Solver, body_aero::BodyAerodynamics,
+                panels::AbstractVector{<:Panel}, relaxation_factor; log=true)
 
 Main iteration loop for calculating circulation distribution.
 

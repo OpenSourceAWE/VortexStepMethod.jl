@@ -175,6 +175,18 @@ end
     end
 end
 
+@testset "LOOP caps only the panels stiffer than 1 / relaxation_factor" begin
+    AIC = zeros(2, 2, 3)
+    AIC[1, 1, 3] = -1 / π      # stiffness 1 + π * 1.0 * (1/π) = 2
+    AIC[2, 2, 3] = 99 / (2π)   # stiffness 1 + π * 2.0 * (99/2π) = 100
+    z_airf_dist = [0.0 0.0 1.0; 0.0 0.0 1.0]
+    chord_dist = [1.0, 2.0]
+    panel_relaxation = VortexStepMethod.panel_relaxation_factors!(zeros(2), 0.03, AIC,
+        z_airf_dist, chord_dist)
+    @test panel_relaxation[1] === 0.03
+    @test panel_relaxation[2] ≈ 1 / 100
+end
+
 calc_forces_allocs(solver, body_aero) =
     (calc_forces!(solver, body_aero); @allocated calc_forces!(solver, body_aero))
 

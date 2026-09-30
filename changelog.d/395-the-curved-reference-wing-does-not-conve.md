@@ -1,6 +1,6 @@
 ### Fixed
 
-- The `LOOP` solver caps each panel's relaxation at `1 / (1 + π c |z_airf ⋅ AIC_ii|)`, the diagonal step of its self-induced stiffness, so narrow panels (cosine-spaced tips) no longer make it diverge to NaN; the curved reference wing and finely refined wings now converge at the default `relaxation_factor`, with unchanged iteration counts on wings that already converged. A `LOOP` solve that still does not converge keeps halving `relaxation_factor`, warning each time, while it is above 1e-3, and each attempt stops at the first non-finite residual.
+- The `LOOP` solver caps each panel's relaxation at `1 / (1 + π c |z_airf ⋅ AIC_ii|)`, the diagonal step of its self-induced stiffness, so narrow panels (cosine-spaced tips) no longer make it diverge to NaN; the curved reference wing and finely refined wings now converge at the default `relaxation_factor`, with unchanged iteration counts on wings that already converged. A `LOOP` solve that still does not converge keeps halving `relaxation_factor` while it is above 1e-3 and warns once with the factor it stopped at, and each attempt stops at the first non-finite residual.
 
 ### Changed
 
