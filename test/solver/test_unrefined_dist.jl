@@ -2,6 +2,15 @@ using VortexStepMethod
 using LinearAlgebra
 using Test
 
+"""
+    area_weighted_mean(values, panels, indices)
+
+Mean of `values[indices]` weighted by the area of `panels[indices]`.
+"""
+area_weighted_mean(values, panels, indices) =
+    sum(values[i] * panels[i].chord * panels[i].width for i in indices) /
+    sum(panels[i].chord * panels[i].width for i in indices)
+
 @testset "Unrefined Arrays Tests" begin
     @testset "Unrefined section array aggregation" begin
         # Create a simple wing with unrefined sections
@@ -28,6 +37,7 @@ using Test
             va_vec = [10.0, 0.0, 0.0]
             set_va!(body_aero, va_vec)
             sol = solve!(solver, body_aero)
+            @test sol.solver_status == FEASIBLE
 
             # Test 1: Unrefined arrays exist and have correct size
             @test length(sol.cl_unrefined_dist) == wing.n_unrefined_sections
@@ -38,20 +48,18 @@ using Test
             @test !all(sol.cl_unrefined_dist .== 0.0)
             @test !all(sol.cd_unrefined_dist .== 0.0)
 
-            # Test 3: Verify unrefined coefficients are averaged from refined panels
+            # Test 3: Unrefined coefficients are area-weighted means of their refined panels
             # refined_panel_mapping maps each refined panel to its unrefined section index
             for unrefined_idx in 1:wing.n_unrefined_sections
                 # Find all refined panels that map to this unrefined section
                 refined_panel_indices = findall(x -> x == unrefined_idx, wing.refined_panel_mapping)
 
                 if !isempty(refined_panel_indices)
-                    # Calculate expected average from refined panel coefficients
-                    expected_cl = sum(sol.cl_dist[refined_panel_indices]) / length(refined_panel_indices)
-                    expected_cd = sum(sol.cd_dist[refined_panel_indices]) / length(refined_panel_indices)
-                    expected_cm = sum(sol.cm_dist[refined_panel_indices]) / length(refined_panel_indices)
+                                        expected_cl = area_weighted_mean(sol.cl_dist, body_aero.panels, refined_panel_indices)
+                    expected_cd = area_weighted_mean(sol.cd_dist, body_aero.panels, refined_panel_indices)
+                    expected_cm = area_weighted_mean(sol.cm_dist, body_aero.panels, refined_panel_indices)
 
-                    # Check if unrefined coefficients match expected averages
-                    # Handle NaN values that can occur in INVISCID models
+                                        # Handle NaN values that can occur in INVISCID models
                     if isnan(expected_cl)
                         @test isnan(sol.cl_unrefined_dist[unrefined_idx])
                     else
@@ -102,6 +110,7 @@ using Test
             va_vec = [10.0, 0.0, 0.0]
             set_va!(body_aero, va_vec)
             sol = solve!(solver, body_aero)
+            @test sol.solver_status == FEASIBLE
 
             panels = body_aero.panels
             for unrefined_idx in 1:wing.n_unrefined_sections
@@ -133,17 +142,9 @@ using Test
                     panels[i].width for i in pidxs)
                 @test w_u ≈ expected_width rtol=1e-12
 
-                # Force-like quantities should be approximately
-                # equal (not exact due to averaging)
-                if !isnan(cl_u)
-                    @test cl_u * c_u * w_u ≈ sum_cl_cw rtol=0.05
-                end
-                if !isnan(cd_u)
-                    @test cd_u * c_u * w_u ≈ sum_cd_cw rtol=0.05
-                end
-                if !isnan(cm_u)
-                    @test cm_u * c_u * w_u ≈ sum_cm_cw rtol=0.05
-                end
+                @test cl_u * c_u * w_u ≈ sum_cl_cw rtol=1e-12
+                @test cd_u * c_u * w_u ≈ sum_cd_cw rtol=1e-12
+                @test cm_u * c_u * w_u ≈ sum_cm_cw rtol=1e-12
             end
         finally
             rm(settings_file; force=true)
@@ -176,6 +177,7 @@ using Test
                 va_vec = [10.0, 0.0, 0.0]
                 set_va!(body_aero, va_vec)
                 sol = solve!(solver, body_aero)
+                @test sol.solver_status == FEASIBLE
 
                 # Verify arrays have correct size
                 @test length(sol.cl_unrefined_dist) == wing.n_unrefined_sections
@@ -187,9 +189,9 @@ using Test
                     refined_panel_indices = findall(x -> x == unrefined_idx, wing.refined_panel_mapping)
 
                     if !isempty(refined_panel_indices)
-                        expected_cl = sum(sol.cl_dist[refined_panel_indices]) / length(refined_panel_indices)
-                        expected_cd = sum(sol.cd_dist[refined_panel_indices]) / length(refined_panel_indices)
-                        expected_cm = sum(sol.cm_dist[refined_panel_indices]) / length(refined_panel_indices)
+                        expected_cl = area_weighted_mean(sol.cl_dist, body_aero.panels, refined_panel_indices)
+                        expected_cd = area_weighted_mean(sol.cd_dist, body_aero.panels, refined_panel_indices)
+                        expected_cm = area_weighted_mean(sol.cm_dist, body_aero.panels, refined_panel_indices)
 
                         # Handle NaN for all coefficients
                         if isnan(expected_cl)

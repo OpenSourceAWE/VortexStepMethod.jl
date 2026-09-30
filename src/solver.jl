@@ -27,11 +27,11 @@ Struct for storing the solution of the [`solve!`](@ref) function. Must contain a
 - `moment_dist`::Vector{Float64}: Pitching moments around the spanwise vector of each panel. [Nm]
 - `moment_coeff_dist`::Vector{Float64}: Pitching moment coefficient around the spanwise vector of each panel. [-]
 - `moment_unrefined_dist`::MVector{U, Float64}: Averaged moments for unrefined sections [Nm]
-- `cl_unrefined_dist`::MVector{U, Float64}: Averaged lift coefficients for unrefined sections [-]
-- `cd_unrefined_dist`::MVector{U, Float64}: Averaged drag coefficients for unrefined sections [-]
-- `cm_unrefined_dist`::MVector{U, Float64}: Averaged airfoil moment coefficients for unrefined sections [-]
+- `cl_unrefined_dist`::MVector{U, Float64}: Area-weighted mean lift coefficient of each unrefined section [-]
+- `cd_unrefined_dist`::MVector{U, Float64}: Area-weighted mean drag coefficient of each unrefined section [-]
+- `cm_unrefined_dist`::MVector{U, Float64}: Area-weighted mean airfoil moment coefficient of each unrefined section [-]
 - `moment_coeff_unrefined_dist`::MVector{U, Float64}: Summed `moment_frac`-referenced pitching-moment coefficient per unrefined section [-]
-- `alpha_unrefined_dist`::MVector{U, Float64}: Averaged angles of attack for unrefined sections [rad]
+- `alpha_unrefined_dist`::MVector{U, Float64}: Area-weighted mean angle of attack of each unrefined section [rad]
 - `solver_status`::SolverStatus: enum, see [`SolverStatus`](@ref)
 """
 @with_kw mutable struct VSMSolution{P, U, T}
@@ -181,7 +181,7 @@ sol::VSMSolution = VSMSolution(): The result of calling [`solve!`](@ref)
     # Intermediate results
     lr::LoopResult{P, T} = LoopResult{P, T}()
     br::BaseResult{P, T} = BaseResult{P, T}()
-    cache::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}} = [LazyBufferCache() for _ in 1:8]
+    cache::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}} = [LazyBufferCache() for _ in 1:10]
     cache_base::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}}  = [LazyBufferCache()]
     cache_lin::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}} = [LazyBufferCache() for _ in 1:4]
 
@@ -498,42 +498,44 @@ function calc_forces!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics;
                     original_section_idx = wing.refined_panel_mapping[local_panel_idx]
                     target_unrefined_idx = section_range[original_section_idx]
 
+                    area = panel.chord * panel.width
+
                     # Accumulate coefficients and moments
                     moment_unrefined_dist[target_unrefined_idx] += moment_dist[panel_idx]
-                    cl_unrefined_dist[target_unrefined_idx] += solver.sol.cl_dist[panel_idx]
-                    cd_unrefined_dist[target_unrefined_idx] += solver.sol.cd_dist[panel_idx]
-                    cm_unrefined_dist[target_unrefined_idx] += solver.sol.cm_dist[panel_idx]
+                    cl_unrefined_dist[target_unrefined_idx] += solver.sol.cl_dist[panel_idx] * area
+                    cd_unrefined_dist[target_unrefined_idx] += solver.sol.cd_dist[panel_idx] * area
+                    cm_unrefined_dist[target_unrefined_idx] += solver.sol.cm_dist[panel_idx] * area
                     moment_coeff_unrefined_dist[target_unrefined_idx] += solver.sol.moment_coeff_dist[panel_idx]
-                    alpha_unrefined_dist[target_unrefined_idx] += solver.sol.alpha_dist[panel_idx]
+                    alpha_unrefined_dist[target_unrefined_idx] += solver.sol.alpha_dist[panel_idx] * area
 
                     # Accumulate geometry
                     x_airf_unrefined_dist[target_unrefined_idx] .+= panel.x_airf
                     y_airf_unrefined_dist[target_unrefined_idx] .+= panel.y_airf
                     z_airf_unrefined_dist[target_unrefined_idx] .+= panel.z_airf
                     va_vec_unrefined_dist[target_unrefined_idx] .+= panel.va_vec
-                    chord_unrefined_dist[target_unrefined_idx] += panel.chord
+                    chord_unrefined_dist[target_unrefined_idx] += area
                     width_unrefined_dist[target_unrefined_idx] += panel.width
 
                     unrefined_count_dist[target_unrefined_idx] += 1
                 end
 
-                # Average coefficients and geometry. width and
-                # moment_coeff_unrefined_dist stay summed (extensive).
+                # Coefficients and alpha are area-weighted means, the chord is the
+                # section area over its width, width and moment_coeff stay summed.
                 for target_unrefined_idx in section_range
                     if unrefined_count_dist[target_unrefined_idx] > 0
                         count = unrefined_count_dist[target_unrefined_idx]
+                        area = chord_unrefined_dist[target_unrefined_idx]
                         moment_unrefined_dist[target_unrefined_idx] /= count
-                        cl_unrefined_dist[target_unrefined_idx] /= count
-                        cd_unrefined_dist[target_unrefined_idx] /= count
-                        cm_unrefined_dist[target_unrefined_idx] /= count
-                        alpha_unrefined_dist[target_unrefined_idx] /= count
+                        cl_unrefined_dist[target_unrefined_idx] /= area
+                        cd_unrefined_dist[target_unrefined_idx] /= area
+                        cm_unrefined_dist[target_unrefined_idx] /= area
+                        alpha_unrefined_dist[target_unrefined_idx] /= area
                         x_airf_unrefined_dist[target_unrefined_idx] ./= count
                         y_airf_unrefined_dist[target_unrefined_idx] ./= count
                         z_airf_unrefined_dist[target_unrefined_idx] ./= count
                         va_vec_unrefined_dist[target_unrefined_idx] ./= count
-                        chord_unrefined_dist[target_unrefined_idx] /= count
-                        # width_unrefined_dist is NOT averaged - it is the
-                        # sum of panel widths in the unrefined section
+                        chord_unrefined_dist[target_unrefined_idx] =
+                            area / width_unrefined_dist[target_unrefined_idx]
                     end
                 end
             end
@@ -884,6 +886,28 @@ function apply_artificial_viscosity!(gamma, panels, alpha_dist, laplacian, visco
 end
 
 """
+    panel_relaxation_factors!(panel_relaxation, stiffness, relaxation_factor, AIC,
+                              z_airf_dist, chord_dist)
+
+Fill `panel_relaxation` with the LOOP relaxation factor of each panel: `relaxation_factor`,
+scaled down by `median(stiffness) / stiffness[i]` on each panel whose self-induced
+stiffness `1 + π c_i |z_airf_i ⋅ AIC[i, i, :]|` exceeds the median. `stiffness` is work
+space of the same length.
+"""
+function panel_relaxation_factors!(panel_relaxation, stiffness, relaxation_factor, AIC,
+        z_airf_dist, chord_dist)
+    @inbounds for i in eachindex(panel_relaxation)
+        normal_self_induction = z_airf_dist[i, 1] * AIC[i, i, 1] +
+            z_airf_dist[i, 2] * AIC[i, i, 2] + z_airf_dist[i, 3] * AIC[i, i, 3]
+        panel_relaxation[i] = 1 + π * chord_dist[i] * abs(normal_self_induction)
+    end
+    stiffness .= panel_relaxation
+    reference = median!(stiffness)
+    @. panel_relaxation = relaxation_factor * min(1, reference / panel_relaxation)
+    return panel_relaxation
+end
+
+"""
     gamma_loop!(solver::Solver, AIC_x::Matrix{Float64},
               AIC_y::Matrix{Float64}, AIC_z::Matrix{Float64},
               panels::AbstractVector{<:Panel}, relaxation_factor::Float64; log=true)
@@ -926,6 +950,8 @@ function gamma_loop!(
     relative_velocity_crossz = solver.cache[6][va_vec_dist]
     v_acrossz_dist           = solver.cache[7][va_vec_dist]
     cl_dist                  = solver.cache[8][solver.lr.gamma_new]
+    panel_relaxation         = solver.cache[9][solver.lr.gamma_new]
+    stiffness_work           = solver.cache[10][solver.lr.gamma_new]
 
     AIC_x = @view body_aero.AIC[:, :, 1]
     AIC_y = @view body_aero.AIC[:, :, 2]
@@ -1043,6 +1069,8 @@ function gamma_loop!(
                 planform_area += panels[i].width * chord_dist[i]
             end
         end
+        panel_relaxation_factors!(panel_relaxation, stiffness_work, relaxation_factor,
+            body_aero.AIC, z_airf_dist, chord_dist)
 
         function f_loop!(gamma_new, gamma)
             gamma .= gamma_new
@@ -1078,7 +1106,7 @@ function gamma_loop!(
                 )
             end
 
-            @. gamma_new = (1 - relaxation_factor) * gamma + relaxation_factor * gamma_new
+            @. gamma_new = (1 - panel_relaxation) * gamma + panel_relaxation * gamma_new
             return nothing
         end
         iters = 0
@@ -1091,9 +1119,9 @@ function gamma_loop!(
             abs_gamma_new .= abs.(solver.lr.gamma_new)
             reference_error = maximum(abs_gamma_new)
             reference_error = max(reference_error, solver.tol_reference_error)
-            # The relaxed step is `relaxation_factor` times the fixed-point residual.
-            abs_gamma_new .= abs.(solver.lr.gamma_new .- gamma)
-            residual = maximum(abs_gamma_new) / relaxation_factor
+            # The relaxed step is `panel_relaxation` times the fixed-point residual.
+            abs_gamma_new .= abs.(solver.lr.gamma_new .- gamma) ./ panel_relaxation
+            residual = maximum(abs_gamma_new)
             normalized_error = residual / reference_error
 
             @debug "Iteration: $i, normalized_error: $normalized_error"
