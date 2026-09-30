@@ -177,9 +177,12 @@ end
     body_aero = BodyAerodynamics([wing])
     va_vec = 10.0 .* [cosd(5), 0.0, sind(5)]
     set_va!(body_aero, va_vec)
+    uniform_AIC!(body_aero, LLT, 1e-10, va_vec)
+    AIC_small_core = copy(body_aero.AIC)
     uniform_AIC!(body_aero, LLT, 1e-20, va_vec)
 
     @test all(isfinite, body_aero.AIC)
+    @test body_aero.AIC ≈ AIC_small_core
 end
 
 

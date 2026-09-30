@@ -442,9 +442,9 @@ Returns: nothing
                               va_dist::AbstractVector{T},
                               va_unit_dist::AbstractMatrix{T},
                               target::AbstractArray{T, 3}=body_aero.AIC) where {P, W, T}
-    velocity_induced = zeros(MVector{3, T})
-    U_2D = zeros(MVector{3, T})
-    # Slots 1-5 are the filament kernels' scratch; these two escape into them.
+    # Slots 1-5 are the filament kernels' scratch.
+    velocity_induced = body_aero.work_vectors[6]
+    U_2D = body_aero.work_vectors[7]
     tempvel = body_aero.work_vectors[8]
     va_unit = body_aero.work_vectors[9]
 

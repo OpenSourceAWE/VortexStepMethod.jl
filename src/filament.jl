@@ -94,7 +94,8 @@ end
 
 Calculate the Biot–Savart velocity induced by a straight vortex segment at `XVP`.
 Inside the core radius `epsilon` the velocity is evaluated on the core boundary and
-scaled linearly with the distance to the axis. Without a core, it is zero on the axis.
+scaled linearly with the distance to the axis. Without a core, it is zero within
+1e-12 of the axis, relative to the distance from `x1`.
 """
 @inline function velocity_3D_vortex_segment!(
     vel,
