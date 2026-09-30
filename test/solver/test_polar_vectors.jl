@@ -38,7 +38,7 @@ end
         sol = solve_three_panel_wing(POLAR_VECTORS,
             linear_polar(4π, 0.1, -0.02), linear_polar(2π, 0.05, -0.01))
         @test sol.solver_status == FEASIBLE
-        @test sol.cl_dist ≈ [4π, 3π, 2π] .* sol.alpha_dist
+        @test sol.cl_dist ≈ [4π, 3π, 2π] .* sol.alpha_uncorrected
         @test sol.cd_dist ≈ [0.1, 0.075, 0.05]
         @test sol.cm_dist ≈ [-0.02, -0.015, -0.01]
         @testset "the stronger +y side rolls the wing positive about x" begin
