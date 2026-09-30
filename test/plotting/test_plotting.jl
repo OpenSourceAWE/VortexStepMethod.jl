@@ -221,10 +221,11 @@ end
                 title="Saved then shown", data_type=".png", save_path=save_dir,
                 is_save=true, is_show=false)
             @test isfile(joinpath(save_dir, "Saved_then_shown.png"))
-            @test makie_ext.display_named(fig, "Saved then shown") === fig
+            makie_ext.display_named(fig, "Saved then shown")
+            @test fig.scene.current_screens == [makie_ext.SCREENS["Saved then shown"]]
         finally
-            foreach(close, values(makie_ext.SCREENS))
-            empty!(makie_ext.SCREENS)
+            screen = pop!(makie_ext.SCREENS, "Saved then shown", nothing)
+            isnothing(screen) || close(screen)
             CairoMakie.activate!()
         end
     end
