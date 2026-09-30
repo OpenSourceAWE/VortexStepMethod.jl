@@ -108,7 +108,6 @@ using LinearAlgebra
         gamma_new = zeros(n_panels)
         va_vec_dist = zeros(n_panels, 3)
         chord_dist = zeros(n_panels)
-        x_airf_dist = zeros(n_panels, 3)
         y_airf_dist = zeros(n_panels, 3)
         z_airf_dist = zeros(n_panels, 3)
         
@@ -116,7 +115,6 @@ using LinearAlgebra
         for (i, panel) in enumerate(body_aero.panels)
             va_vec_dist[i, :] .= panel.va_vec
             chord_dist[i] = panel.chord
-            x_airf_dist[i, :] .= panel.x_airf
             y_airf_dist[i, :] .= panel.y_airf
             z_airf_dist[i, :] .= panel.z_airf
         end
@@ -147,7 +145,6 @@ using LinearAlgebra
                 )
                 solver.sol.va_vec_dist .= va_vec_dist
                 solver.sol._chord_dist .= chord_dist
-                solver.sol._x_airf_dist .= x_airf_dist
                 solver.sol._y_airf_dist .= y_airf_dist
                 solver.sol._z_airf_dist .= z_airf_dist
                 result = @benchmark gamma_loop!(

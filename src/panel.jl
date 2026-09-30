@@ -480,16 +480,6 @@ function calculate_relative_alpha_and_relative_velocity(
 end
 
 """
-    calculate_relative_alpha_and_velocity(panel::Panel, induced_velocity)
-
-Calculate relative angle of attack and relative velocity of the panel.
-"""
-function calculate_relative_alpha_and_velocity(panel::Panel, induced_velocity)
-    flow = panel_inflow(panel_axes(panel), panel.va_vec, panel.va_vec, induced_velocity)
-    return flow.alpha, flow.v_eff
-end
-
-"""
     calculate_cl(panel::Panel, alpha)
     calculate_cl(panel::Panel, alpha, delta)
 
