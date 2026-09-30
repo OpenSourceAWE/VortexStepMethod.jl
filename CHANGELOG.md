@@ -10,6 +10,9 @@
   `area_all_panels`, `projected_area`, `wing_span`, `aspect_ratio_projected`,
   `center_of_pressure` and `panel_cp_locations`. `calc_only_f_and_gamma` skips the
   projections, span and centers of pressure.
+- `plot_geometry`, `plot_distribution`, `plot_combined_analysis`, `plot_section_polars`,
+  `plot_airfoil_fit` and `plot_airfoils` take `show_title=true`; with `false` the title
+  is not drawn, and still names the saved file and window.
 - The panel plots (`plot!(ax, panel)`, `plot!(ax, body)`, `plot(panel)`, `plot(body)`)
   take `border_color`, default `:black`, for the panel outlines.
 
