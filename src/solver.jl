@@ -181,7 +181,7 @@ sol::VSMSolution = VSMSolution(): The result of calling [`solve!`](@ref)
     # Intermediate results
     lr::LoopResult{P, T} = LoopResult{P, T}()
     br::BaseResult{P, T} = BaseResult{P, T}()
-    cache::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}} = [LazyBufferCache() for _ in 1:10]
+    cache::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}} = [LazyBufferCache() for _ in 1:9]
     cache_base::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}}  = [LazyBufferCache()]
     cache_lin::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}} = [LazyBufferCache() for _ in 1:4]
 
@@ -886,23 +886,24 @@ function apply_artificial_viscosity!(gamma, panels, alpha_dist, laplacian, visco
 end
 
 """
-    panel_relaxation_factors!(panel_relaxation, stiffness, relaxation_factor, AIC,
-                              z_airf_dist, chord_dist)
+    panel_relaxation_factors!(panel_relaxation, relaxation_factor, AIC, z_airf_dist,
+                              chord_dist)
 
 Fill `panel_relaxation` with the LOOP relaxation factor of each panel: `relaxation_factor`,
-scaled down by `median(stiffness) / stiffness[i]` on each panel whose self-induced
-stiffness `1 + π c_i |z_airf_i ⋅ AIC[i, i, :]|` exceeds the median. `stiffness` is work
-space of the same length.
+scaled by `reference / stiffness_i` on each panel whose self-induced stiffness
+`stiffness_i = 1 + π c_i |z_airf_i ⋅ AIC[i, i, :]|` exceeds `reference`, the geometric
+mean of the stiffness over all panels.
 """
-function panel_relaxation_factors!(panel_relaxation, stiffness, relaxation_factor, AIC,
-        z_airf_dist, chord_dist)
+function panel_relaxation_factors!(panel_relaxation, relaxation_factor, AIC, z_airf_dist,
+        chord_dist)
+    log_reference = zero(eltype(panel_relaxation))
     @inbounds for i in eachindex(panel_relaxation)
         normal_self_induction = z_airf_dist[i, 1] * AIC[i, i, 1] +
             z_airf_dist[i, 2] * AIC[i, i, 2] + z_airf_dist[i, 3] * AIC[i, i, 3]
         panel_relaxation[i] = 1 + π * chord_dist[i] * abs(normal_self_induction)
+        log_reference += log(panel_relaxation[i])
     end
-    stiffness .= panel_relaxation
-    reference = median!(stiffness)
+    reference = exp(log_reference / length(panel_relaxation))
     @. panel_relaxation = relaxation_factor * min(1, reference / panel_relaxation)
     return panel_relaxation
 end
@@ -915,9 +916,10 @@ end
 Main iteration loop for calculating circulation distribution.
 
 Both solvers converge on the fixed-point residual `F(gamma) - gamma`, measured
-relative to the largest circulation: the LOOP solver takes under-relaxed steps
-towards `F(gamma)` and stops at the first non-finite residual, the NONLIN solver a
-Newton step with a finite-difference Jacobian, backtracked until it reduces the residual.
+relative to the largest circulation: the LOOP solver steps towards `F(gamma)`, each
+panel under-relaxed by [`panel_relaxation_factors!`](@ref), and stops at the first
+non-finite residual; the NONLIN solver takes a Newton step with a finite-difference
+Jacobian, backtracked until it reduces the residual.
 
 When `solver.is_with_artificial_viscosity` is set, the LOOP solver replaces the
 explicit target `F(gamma)` with the implicit Li/Gaunaa solution
@@ -951,7 +953,6 @@ function gamma_loop!(
     v_acrossz_dist           = solver.cache[7][va_vec_dist]
     cl_dist                  = solver.cache[8][solver.lr.gamma_new]
     panel_relaxation         = solver.cache[9][solver.lr.gamma_new]
-    stiffness_work           = solver.cache[10][solver.lr.gamma_new]
 
     AIC_x = @view body_aero.AIC[:, :, 1]
     AIC_y = @view body_aero.AIC[:, :, 2]
@@ -1069,8 +1070,8 @@ function gamma_loop!(
                 planform_area += panels[i].width * chord_dist[i]
             end
         end
-        panel_relaxation_factors!(panel_relaxation, stiffness_work, relaxation_factor,
-            body_aero.AIC, z_airf_dist, chord_dist)
+        panel_relaxation_factors!(panel_relaxation, relaxation_factor, body_aero.AIC,
+            z_airf_dist, chord_dist)
 
         function f_loop!(gamma_new, gamma)
             gamma .= gamma_new
