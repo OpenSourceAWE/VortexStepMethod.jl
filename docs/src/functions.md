@@ -41,6 +41,8 @@ deform_section
 analyze_section
 analyze_sweep
 neuralfoil_aero
+masure_aero
+load_masure_model
 deform_kulfan
 chord_residual
 chord_line

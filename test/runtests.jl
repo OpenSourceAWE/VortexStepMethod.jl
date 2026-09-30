@@ -70,6 +70,7 @@ function include_selected_tests()
     should_run_test("yaml_geometry/test_yaml_geometry.jl") && include("yaml_geometry/test_yaml_geometry.jl")
     should_run_test("airfoil_aero/test_airfoil_aero.jl") && include("airfoil_aero/test_airfoil_aero.jl")
     should_run_test("airfoil_aero/test_live_polar.jl") && include("airfoil_aero/test_live_polar.jl")
+    should_run_test("airfoil_aero/test_masure_regression.jl") && include("airfoil_aero/test_masure_regression.jl")
     should_run_test("obj_adapter/test_obj_adapter.jl") && include("obj_adapter/test_obj_adapter.jl")
     should_run_test("surfplan/test_surfplan.jl") && include("surfplan/test_surfplan.jl")
     # bin/release is a bash script, so only the unix runners can run it.

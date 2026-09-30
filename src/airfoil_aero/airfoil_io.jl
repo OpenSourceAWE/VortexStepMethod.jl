@@ -16,15 +16,10 @@ end
 """
     write_polar(filepath, result::NeuralFoilResult)
 
-Write a NeuralFoil result to a `POLAR_VECTORS` table (`alpha, Cd, Cs, Cl, Cm`), CSV or
-Arrow as the suffix of `filepath` says (see [`write_node_rows`](@ref
-VortexStepMethod.write_node_rows)).
+Write a NeuralFoil result to a `POLAR_VECTORS` table.
 """
-function write_polar(filepath::String, result::NeuralFoilResult)
-    values = [result.CD zero(result.CD) result.CL result.CM]
-    return write_node_rows(filepath, deg2rad.(result.alpha), nothing, values;
-                           columns=["Cd", "Cs", "Cl", "Cm"])
-end
+write_polar(filepath::String, result::NeuralFoilResult) =
+    write_polar(filepath, deg2rad.(result.alpha), result.CL, result.CD, result.CM)
 
 """
     generate_polar_from_coordinates(x, y, output_path; Re, alpha_range=-180:1:180,
@@ -69,34 +64,40 @@ function generate_polar_from_coordinates(x::Vector, y::Vector, output_path::Stri
 end
 
 """
-    resolve_airfoil(type, info, out_dir, id; Re, alpha_range, table_format=:csv)
-        -> (new_type, new_info)
+    resolve_airfoil(type, info, out_dir, id; Re, alpha_range, table_format=:csv,
+                    ml_models_dir=nothing) -> (new_type, new_info)
 
 Resolve one awesIO `wing_airfoils` entry to a core-loadable form. `breukels_regression`
 `(t, kappa)` → `poly` coeffs (via [`lei_poly_coeffs`](@ref)); `neuralfoil`
-`(dat_file_path, …)` → a `polars` table `{id}.{table_format}` (`:csv` or `:arrow`, via
-[`generate_polar_from_dat`](@ref)) written under `out_dir`; `polars`/`poly`/`inviscid`
-pass through. `masure_regression` is not yet supported. `info` file paths should
-already be absolute.
+`(dat_file_path, …)` and `masure_regression` `(t, eta, kappa, delta, lambda, phi)` → a
+`polars` table `{id}.{table_format}` (`:csv` or `:arrow`) written under `out_dir`, the
+latter from the model in `ml_models_dir` (see [`load_masure_model`](@ref));
+`polars`/`poly`/`inviscid` pass through. `info` file paths should already be absolute.
 """
 function resolve_airfoil(type::AbstractString, info::AbstractDict, out_dir, id;
-                         Re, alpha_range, table_format::Symbol=:csv)
+                         Re, alpha_range, table_format::Symbol=:csv,
+                         ml_models_dir=nothing)
+    polar = joinpath(out_dir, "$(id).$(table_format)")
     if type == "breukels_regression"
         cl, cd, cm = lei_poly_coeffs(Float64(info["t"]), Float64(info["kappa"]))
         return "poly", Dict{String,Any}("cl_coeffs" => cl, "cd_coeffs" => cd,
                                         "cm_coeffs" => cm)
     elseif type == "neuralfoil"
-        polar = joinpath(out_dir, "$(id).$(table_format)")
         solver = NeuralFoilSolver(
             model_size=String(get(info, "model_size", "large")),
             n_crit=Float64(get(info, "n_crit", 9.0)))
         generate_polar_from_dat(String(info["dat_file_path"]), polar; Re,
             alpha_range=collect(alpha_range), solver)
         return "polars", Dict{String,Any}("polar_file_path" => polar)
+    elseif type == "masure_regression"
+        ml_models_dir === nothing &&
+            error("masure_regression airfoil $id needs ml_models_dir.")
+        alpha = collect(Float64, alpha_range)
+        cl, cd, cm = masure_aero(load_masure_model(Re, ml_models_dir), info, alpha)
+        write_polar(polar, deg2rad.(alpha), cl, cd, cm)
+        return "polars", Dict{String,Any}("polar_file_path" => polar)
     elseif type in ("polars", "poly", "inviscid")
         return String(type), info
-    elseif type == "masure_regression"
-        error("masure_regression airfoils are not yet supported by AirfoilAero.")
     else
         error("Unknown airfoil type: $type")
     end
