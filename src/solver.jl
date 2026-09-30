@@ -26,12 +26,17 @@ Struct for storing the solution of the [`solve!`](@ref) function. Must contain a
 - `moment_coeffs`::MVec3: Aerodynamic moment coefficients [CMx, CMy, CMz] [-]
 - `moment_dist`::Vector{Float64}: Pitching moments around the spanwise vector of each panel. [Nm]
 - `moment_coeff_dist`::Vector{Float64}: Pitching moment coefficient around the spanwise vector of each panel. [-]
-- `moment_unrefined_dist`::MVector{U, Float64}: Averaged moments for unrefined sections [Nm]
-- `cl_unrefined_dist`::MVector{U, Float64}: Area-weighted mean lift coefficient of each unrefined section [-]
-- `cd_unrefined_dist`::MVector{U, Float64}: Area-weighted mean drag coefficient of each unrefined section [-]
-- `cm_unrefined_dist`::MVector{U, Float64}: Area-weighted mean airfoil moment coefficient of each unrefined section [-]
+- `moment_unrefined_dist`::MVector{U, Float64}: Pitching moment per unrefined section,
+  summed over its panels [Nm]
+- `cl_unrefined_dist`::MVector{U, Float64}: Area-weighted mean lift coefficient
+  per unrefined section [-]
+- `cd_unrefined_dist`::MVector{U, Float64}: Area-weighted mean drag coefficient
+  per unrefined section [-]
+- `cm_unrefined_dist`::MVector{U, Float64}: Area-weighted mean airfoil moment coefficient
+  per unrefined section [-]
 - `moment_coeff_unrefined_dist`::MVector{U, Float64}: Summed `moment_frac`-referenced pitching-moment coefficient per unrefined section [-]
-- `alpha_unrefined_dist`::MVector{U, Float64}: Area-weighted mean angle of attack of each unrefined section [rad]
+- `alpha_unrefined_dist`::MVector{U, Float64}: Area-weighted mean angle of attack
+  per unrefined section [rad]
 - `solver_status`::SolverStatus: enum, see [`SolverStatus`](@ref)
 """
 @with_kw mutable struct VSMSolution{P, U, T}
@@ -181,7 +186,8 @@ sol::VSMSolution = VSMSolution(): The result of calling [`solve!`](@ref)
     # Intermediate results
     lr::LoopResult{P, T} = LoopResult{P, T}()
     br::BaseResult{P, T} = BaseResult{P, T}()
-    cache::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}} = [LazyBufferCache() for _ in 1:9]
+    cache::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}} =
+        [LazyBufferCache() for _ in 1:9]
     cache_base::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}}  = [LazyBufferCache()]
     cache_lin::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}} = [LazyBufferCache() for _ in 1:4]
 
@@ -502,11 +508,15 @@ function calc_forces!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics;
 
                     # Accumulate coefficients and moments
                     moment_unrefined_dist[target_unrefined_idx] += moment_dist[panel_idx]
-                    cl_unrefined_dist[target_unrefined_idx] += solver.sol.cl_dist[panel_idx] * area
-                    cd_unrefined_dist[target_unrefined_idx] += solver.sol.cd_dist[panel_idx] * area
-                    cm_unrefined_dist[target_unrefined_idx] += solver.sol.cm_dist[panel_idx] * area
+                    cl_unrefined_dist[target_unrefined_idx] +=
+                        solver.sol.cl_dist[panel_idx] * area
+                    cd_unrefined_dist[target_unrefined_idx] +=
+                        solver.sol.cd_dist[panel_idx] * area
+                    cm_unrefined_dist[target_unrefined_idx] +=
+                        solver.sol.cm_dist[panel_idx] * area
                     moment_coeff_unrefined_dist[target_unrefined_idx] += solver.sol.moment_coeff_dist[panel_idx]
-                    alpha_unrefined_dist[target_unrefined_idx] += solver.sol.alpha_dist[panel_idx] * area
+                    alpha_unrefined_dist[target_unrefined_idx] +=
+                        solver.sol.alpha_dist[panel_idx] * area
 
                     # Accumulate geometry
                     x_airf_unrefined_dist[target_unrefined_idx] .+= panel.x_airf
@@ -520,12 +530,11 @@ function calc_forces!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics;
                 end
 
                 # Coefficients and alpha are area-weighted means, the chord is the
-                # section area over its width, width and moment_coeff stay summed.
+                # section area over its width; width and the moments stay summed.
                 for target_unrefined_idx in section_range
                     if unrefined_count_dist[target_unrefined_idx] > 0
                         count = unrefined_count_dist[target_unrefined_idx]
                         area = chord_unrefined_dist[target_unrefined_idx]
-                        moment_unrefined_dist[target_unrefined_idx] /= count
                         cl_unrefined_dist[target_unrefined_idx] /= area
                         cd_unrefined_dist[target_unrefined_idx] /= area
                         cm_unrefined_dist[target_unrefined_idx] /= area

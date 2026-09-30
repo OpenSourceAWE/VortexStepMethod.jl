@@ -294,12 +294,13 @@ end
     end
 
     # CL from the NONLIN solve of the same wing
-    @testset "VSM LOOP converges on the curved wing at $(alpha_deg)°" for (alpha_deg, CL) in
-            ((5.7106, 0.422308), (10.0, 0.726321))
+    @testset "VSM LOOP converges on the curved wing at $(alpha_deg)°" for
+            (alpha_deg, CL) in ((5.7106, 0.422308), (10.0, 0.726321))
         body_aero, _, _, _ = create_geometry(wing_type=:curved)
         set_va!(body_aero, 20.0 .* [cosd(alpha_deg), 0.0, sind(alpha_deg)])
         wing = body_aero.wings[1]
-        solver = Solver(wing.n_panels, wing.n_unrefined_sections; aerodynamic_model_type=VSM)
+        solver = Solver(wing.n_panels, wing.n_unrefined_sections;
+            aerodynamic_model_type=VSM)
         sol = solve!(solver, body_aero)
         @test sol.solver_status == FEASIBLE
         @test sol.force_coeffs[3] ≈ CL rtol=1e-4

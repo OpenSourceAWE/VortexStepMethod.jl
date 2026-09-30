@@ -3,11 +3,11 @@ using LinearAlgebra
 using Test
 
 """
-    area_weighted_mean(values, panels, indices)
+    area_mean(values, panels, indices)
 
 Mean of `values[indices]` weighted by the area of `panels[indices]`.
 """
-area_weighted_mean(values, panels, indices) =
+area_mean(values, panels, indices) =
     sum(values[i] * panels[i].chord * panels[i].width for i in indices) /
     sum(panels[i].chord * panels[i].width for i in indices)
 
@@ -50,16 +50,17 @@ area_weighted_mean(values, panels, indices) =
 
             # Test 3: Unrefined coefficients are area-weighted means of their refined panels
             # refined_panel_mapping maps each refined panel to its unrefined section index
+            panels = body_aero.panels
             for unrefined_idx in 1:wing.n_unrefined_sections
                 # Find all refined panels that map to this unrefined section
                 refined_panel_indices = findall(x -> x == unrefined_idx, wing.refined_panel_mapping)
 
                 if !isempty(refined_panel_indices)
-                                        expected_cl = area_weighted_mean(sol.cl_dist, body_aero.panels, refined_panel_indices)
-                    expected_cd = area_weighted_mean(sol.cd_dist, body_aero.panels, refined_panel_indices)
-                    expected_cm = area_weighted_mean(sol.cm_dist, body_aero.panels, refined_panel_indices)
+                    expected_cl = area_mean(sol.cl_dist, panels, refined_panel_indices)
+                    expected_cd = area_mean(sol.cd_dist, panels, refined_panel_indices)
+                    expected_cm = area_mean(sol.cm_dist, panels, refined_panel_indices)
 
-                                        # Handle NaN values that can occur in INVISCID models
+                    # Handle NaN values that can occur in INVISCID models
                     if isnan(expected_cl)
                         @test isnan(sol.cl_unrefined_dist[unrefined_idx])
                     else
@@ -89,7 +90,7 @@ area_weighted_mean(values, panels, indices) =
         end
     end
 
-    @testset "Unrefined force consistency: coeff*width*chord" begin
+    @testset "Unrefined section loads equal the sums of their panel loads" begin
         # Verify that for each unrefined section:
         # coeff_unrefined * width_unrefined * chord_unrefined ≈
         #   sum(coeff_panel * width_panel * chord_panel) for all panels in section
@@ -145,6 +146,8 @@ area_weighted_mean(values, panels, indices) =
                 @test cl_u * c_u * w_u ≈ sum_cl_cw rtol=1e-12
                 @test cd_u * c_u * w_u ≈ sum_cd_cw rtol=1e-12
                 @test cm_u * c_u * w_u ≈ sum_cm_cw rtol=1e-12
+                @test sol.moment_unrefined_dist[unrefined_idx] ≈
+                    sum(sol.moment_dist[i] for i in pidxs) rtol=1e-12
             end
         finally
             rm(settings_file; force=true)
@@ -185,13 +188,14 @@ area_weighted_mean(values, panels, indices) =
                 @test length(sol.cm_unrefined_dist) == wing.n_unrefined_sections
 
                 # Verify unrefined coefficients are computed correctly using mapping
+                panels = body_aero.panels
                 for unrefined_idx in 1:wing.n_unrefined_sections
                     refined_panel_indices = findall(x -> x == unrefined_idx, wing.refined_panel_mapping)
 
                     if !isempty(refined_panel_indices)
-                        expected_cl = area_weighted_mean(sol.cl_dist, body_aero.panels, refined_panel_indices)
-                        expected_cd = area_weighted_mean(sol.cd_dist, body_aero.panels, refined_panel_indices)
-                        expected_cm = area_weighted_mean(sol.cm_dist, body_aero.panels, refined_panel_indices)
+                        expected_cl = area_mean(sol.cl_dist, panels, refined_panel_indices)
+                        expected_cd = area_mean(sol.cd_dist, panels, refined_panel_indices)
+                        expected_cm = area_mean(sol.cm_dist, panels, refined_panel_indices)
 
                         # Handle NaN for all coefficients
                         if isnan(expected_cl)
