@@ -652,8 +652,9 @@ Converge the circulation distribution and leave it in `solver.lr.gamma_new`, wit
 turning it into forces. Fills the solver's panel arrays, builds the AIC matrices,
 starts from `gamma_distribution` (or an elliptical/zero guess when it is `nothing` or
 `solver.use_gamma_prev` is false) and iterates; a `LOOP` solver that fails to converge
-retries once with half the relaxation factor. The circulation half of [`solve!`](@ref),
-paired with [`calc_forces!`](@ref). Returns `nothing`.
+retries with half the relaxation factor, warning each time, while the factor is above
+1e-3. The circulation half of [`solve!`](@ref), paired with [`calc_forces!`](@ref).
+Returns `nothing`.
 """
 function solve_base!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics, gamma_distribution=nothing;
                log=false) where {P, U, T}
@@ -721,11 +722,11 @@ function solve_base!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics, gamma
     solver.lr.gamma_new .= gamma_initial
     # Run main iteration loop
     gamma_loop!(solver, body_aero, panels, relaxation_factor; log)
-    # Try again with reduced relaxation factor if not converged
-    if solver.solver_type == LOOP && !solver.lr.converged && relaxation_factor > 1e-3
-        log && @warn "Running again with half the relaxation_factor = $(relaxation_factor/2)"
+    while solver.solver_type == LOOP && !solver.lr.converged && relaxation_factor > 1e-3
+        relaxation_factor /= 2
+        @warn "LOOP did not converge, retrying with relaxation_factor = $relaxation_factor"
         solver.lr.gamma_new .= gamma_initial
-        gamma_loop!(solver, body_aero, panels, relaxation_factor/2; log)
+        gamma_loop!(solver, body_aero, panels, relaxation_factor; log)
     end
 
     nothing
@@ -891,8 +892,8 @@ Main iteration loop for calculating circulation distribution.
 
 Both solvers converge on the fixed-point residual `F(gamma) - gamma`, measured
 relative to the largest circulation: the LOOP solver takes under-relaxed steps
-towards `F(gamma)`, the NONLIN solver a Newton step with a finite-difference
-Jacobian, backtracked until it reduces the residual.
+towards `F(gamma)` and stops at the first non-finite residual, the NONLIN solver a
+Newton step with a finite-difference Jacobian, backtracked until it reduces the residual.
 
 When `solver.is_with_artificial_viscosity` is set, the LOOP solver replaces the
 explicit target `F(gamma)` with the implicit Li/Gaunaa solution
@@ -1096,6 +1097,7 @@ function gamma_loop!(
             normalized_error = residual / reference_error
 
             @debug "Iteration: $i, normalized_error: $normalized_error"
+            isfinite(normalized_error) || break
 
             if normalized_error < solver.rtol
                 solver.lr.converged = true
