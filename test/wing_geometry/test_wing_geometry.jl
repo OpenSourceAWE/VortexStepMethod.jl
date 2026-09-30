@@ -624,6 +624,16 @@ end
             end
         end
 
+
+        @testset "a panel midway between two sections maps outboard" begin
+            wing = Wing(10; spanwise_distribution=LINEAR)
+            add_section!(wing, [0.0, 1.0, 0.0], [1.0, 1.0, 0.0], INVISCID)
+            add_section!(wing, [0.0, 0.0, 0.0], [1.0, 0.0, 0.0], INVISCID)
+            add_section!(wing, [0.0, -1.0, 0.0], [1.0, -1.0, 0.0], INVISCID)
+            refine!(wing)
+            # panels 3 and 8 are centred at y = ±0.5, midway between two sections
+            @test wing.refined_panel_mapping == Int16[1, 1, 1, 2, 2, 2, 2, 3, 3, 3]
+        end
     end
 
     @testset "UNCHANGED preserves sections exactly" begin

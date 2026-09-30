@@ -1014,12 +1014,36 @@ end
 
 
 """
+    section_centre_dist2(section, x, y, z)
+
+Squared distance from the centre of `section` (the midpoint of its LE and TE) to
+`(x, y, z)`.
+"""
+function section_centre_dist2(section, x, y, z)
+    d1 = (section.LE_point[1] + section.TE_point[1]) * 0.5 - x
+    d2 = (section.LE_point[2] + section.TE_point[2]) * 0.5 - y
+    d3 = (section.LE_point[3] + section.TE_point[3]) * 0.5 - z
+    return d1 * d1 + d2 * d2 + d3 * d3
+end
+
+"""
+    section_span_position(wing, section)
+
+Position of the centre of `section` along `wing.spanwise_direction`.
+"""
+section_span_position(wing, section) =
+    sum(wing.spanwise_direction[k] * (section.LE_point[k] + section.TE_point[k]) * 0.5
+        for k in 1:3)
+
+"""
     compute_refined_panel_mapping!(wing::AbstractWing)
 
 Compute the mapping from refined panels to unrefined sections by finding
 the closest unrefined section for each refined panel (based on section center distance).
 Maps each refined panel index to its corresponding unrefined section index
-(1 to n_unrefined_sections).
+(1 to n_unrefined_sections). Sections within `1e-9` of the closest distance, relative,
+tie, and a tie goes to the one farther along `spanwise_direction` from the middle of
+the span, so a mirror-symmetric wing maps mirror panels to mirror sections.
 Works after refinement is complete.
 """
 function compute_refined_panel_mapping!(wing::AbstractWing)
@@ -1039,6 +1063,8 @@ function compute_refined_panel_mapping!(wing::AbstractWing)
         return nothing
     end
 
+    span_middle = 0.5 * sum(extrema(section_span_position(wing, u)
+                                    for u in wing.unrefined_sections))
     # For each refined panel, find closest unrefined section
     # using scalar arithmetic to avoid MVec3 allocations
     for pi in 1:n_panels
@@ -1052,16 +1078,17 @@ function compute_refined_panel_mapping!(wing::AbstractWing)
                r2.LE_point[3] + r2.TE_point[3]) * 0.25
 
         min_dist = Inf
+        for u in wing.unrefined_sections
+            min_dist = min(min_dist, section_centre_dist2(u, rc1, rc2, rc3))
+        end
         closest = Int16(1)
+        outboard = -Inf
         for ui in 1:n_unref
             u = wing.unrefined_sections[ui]
-            uc1 = (u.LE_point[1] + u.TE_point[1]) * 0.5
-            uc2 = (u.LE_point[2] + u.TE_point[2]) * 0.5
-            uc3 = (u.LE_point[3] + u.TE_point[3]) * 0.5
-            d1 = rc1 - uc1; d2 = rc2 - uc2; d3 = rc3 - uc3
-            dist = d1 * d1 + d2 * d2 + d3 * d3
-            if dist < min_dist
-                min_dist = dist
+            section_centre_dist2(u, rc1, rc2, rc3) <= min_dist * (1 + 1e-9) || continue
+            offset = abs(section_span_position(wing, u) - span_middle)
+            if offset > outboard
+                outboard = offset
                 closest = Int16(ui)
             end
         end

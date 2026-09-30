@@ -12,6 +12,10 @@
 
 ### Fixed
 
+- A refined panel exactly between two unrefined sections maps to the one farther from
+  the middle of the span, so a mirror-symmetric wing maps mirror panels to mirror
+  sections; the first section in order used to win, which puts both midway panels of a
+  three-section wing on the same side.
 - The docs define the body frame as KiteUtils' `KA` frame: x from LE to TE, y towards
   the right tip, z = x × y up. The separate `KB` definition, whose `Z = Y × X` pointed
   down, is gone; the solver's frame is unchanged. CL, CD and CS are documented as
