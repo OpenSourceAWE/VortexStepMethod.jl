@@ -442,7 +442,6 @@ Returns: nothing
                               va_dist::AbstractVector{T},
                               va_unit_dist::AbstractMatrix{T},
                               target::AbstractArray{T, 3}=body_aero.AIC) where {P, W, T}
-    # Determine evaluation point based on model
     evaluation_point = model == VSM ? :control_point : :aero_center
 
     # Allocate work vectors for this function (separate from those used by child functions)
@@ -527,10 +526,9 @@ end
                                       core_radius_fraction, z_airf_dist, x_airf_dist,
                                       va_vec_dist, va_dist, va_unit_dist)
 
-Update angle of attack at aerodynamic center for VSM method.
-
-Returns:
-    nothing
+Write into `alpha_corrected` [rad] the angle of attack at each panel's aerodynamic centre,
+from the inflow plus the velocity `gamma` induces there without the panel's own bound
+filament.
 """
 function update_effective_angle_of_attack!(alpha_corrected,
     body_aero::BodyAerodynamics, 

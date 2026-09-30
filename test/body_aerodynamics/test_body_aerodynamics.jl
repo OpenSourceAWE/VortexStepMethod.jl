@@ -1,6 +1,6 @@
 using VortexStepMethod
-using VortexStepMethod: calculate_cl, calculate_cd_cm, calculate_projected_area, calculate_AIC_matrices!,
-    velocity_3D_bound_vortex!, velocity_3D_trailing_vortex!,
+using VortexStepMethod: calculate_cl, calculate_cd_cm, calculate_projected_area,
+    calculate_AIC_matrices!, velocity_3D_bound_vortex!, velocity_3D_trailing_vortex!,
     velocity_3D_trailing_vortex_semiinfinite!
 using LinearAlgebra
 using Test
@@ -153,7 +153,8 @@ end
 
     work_vectors = body_aero.work_vectors
     velocity = zeros(3)
-    for (i, panel_i) in enumerate(body_aero.panels), (j, panel_j) in enumerate(body_aero.panels)
+    panels = body_aero.panels
+    for (i, panel_i) in enumerate(panels), (j, panel_j) in enumerate(panels)
         filaments = panel_j.filaments
         expected = zeros(3)
         for filament in filaments[2:3]
