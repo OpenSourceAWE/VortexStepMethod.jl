@@ -173,10 +173,13 @@ function reinit!(filament::SemiInfiniteFilament{T}, x1::AbstractVector,
 end
 
 """
-    velocity_3D_trailing_vortex_semiinfinite(filament::SemiInfiniteFilament, 
-                                             Vf, XVP, GAMMA, va, work_vectors)
+    velocity_3D_trailing_vortex_semiinfinite!(vel, filament::SemiInfiniteFilament,
+                                              Vf, XVP, GAMMA, va, work_vectors)
 
-Calculate induced velocity by a semi-infinite trailing vortex filament.
+Calculate the velocity induced at `XVP` by a semi-infinite trailing vortex filament along
+`Vf`, with a Lamb–Oseen core radius grown over the axial distance of `XVP` from `x1`.
+Inside the core the velocity is scaled linearly with the distance to the axis. Without a
+core, it is zero within 1e-12 of the axis, relative to the distance from `x1`.
 """
 function velocity_3D_trailing_vortex_semiinfinite!(
     vel,
@@ -192,51 +195,37 @@ function velocity_3D_trailing_vortex_semiinfinite!(
     GAMMA = -GAMMA * filament.filament_direction
     r1 .= XVP .- filament.x1
 
-    # Core radius, grown with the axial distance of `XVP` along `Vf`.
     d_r1_Vf = dot3(r1, Vf)
     nVf = norm3(Vf)
     epsilon = sqrt(4 * ALPHA0 * NU * abs(d_r1_Vf) * nVf / va)
 
     cross3!(r1XVf, r1, Vf)
-
     nr1XVf = norm3(r1XVf)
+    axis_distance = nr1XVf / nVf
     nr1 = norm3(r1)
-    if nr1XVf / nVf > epsilon
-        K = GAMMA / (4π) / (nr1XVf^2) * (1 + d_r1_Vf / nr1)
-        @inbounds for k in 1:3
-            vel[k] = K * r1XVf[k]
-        end
-    elseif nr1XVf / nVf < 1e-12 * epsilon
+    rounding = 1e-12 * nr1
+    if epsilon <= rounding && axis_distance <= rounding
         vel .= 0.0
+        return nothing
+    elseif axis_distance > epsilon
+        K = GAMMA / (4π) / (nr1XVf^2) * (1 + d_r1_Vf / nr1)
     else
-        r1_proj = work_vectors[4]
-        cross_tmp = work_vectors[5]
-        nVfsq = nVf * nVf
-        @inbounds for k in 1:3
-            cross_tmp[k] = r1[k] - d_r1_Vf * Vf[k] / nVfsq
-        end
-        n_tmp = norm3(cross_tmp)
-        @inbounds for k in 1:3
-            r1_proj[k] = d_r1_Vf * Vf[k] / nVfsq +
-                         epsilon * cross_tmp[k] / n_tmp
-        end
-        cross3!(cross_tmp, r1_proj, Vf)
-        K = GAMMA / (4π) / (norm3(cross_tmp)^2) *
-            (1 + dot3(r1_proj, Vf) / norm3(r1_proj))
-        @inbounds for k in 1:3
-            vel[k] = K * cross_tmp[k]
-        end
+        K = GAMMA / (4π) / (nVf * epsilon)^2 *
+            (1 + d_r1_Vf / sqrt(d_r1_Vf^2 / nVf^2 + epsilon^2))
+    end
+    @inbounds for k in 1:3
+        vel[k] = K * r1XVf[k]
     end
     nothing
 end
-
 
 """
     cross3!(result::AbstractVector{T}, a::AbstractVector{T}, b::AbstractVector{T}) where T
 
 Compute cross product of 3D vectors in-place.
 """
-@inline function cross3!(result::AbstractVector{T}, a::AbstractVector{T}, b::AbstractVector{T}) where T
+@inline function cross3!(result::AbstractVector{T}, a::AbstractVector{T},
+                         b::AbstractVector{T}) where T
     x = a[2]*b[3] - a[3]*b[2]
     y = a[3]*b[1] - a[1]*b[3]
     z = a[1]*b[2] - a[2]*b[1]

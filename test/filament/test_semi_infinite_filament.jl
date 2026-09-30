@@ -1,7 +1,8 @@
-using VortexStepMethod: SemiInfiniteFilament, velocity_3D_trailing_vortex_semiinfinite!, reinit!
+using VortexStepMethod: SemiInfiniteFilament, velocity_3D_trailing_vortex_semiinfinite!,
+    reinit!, ALPHA0, NU
+using ForwardDiff
 using LinearAlgebra
 using Test
-# using BenchmarkTools
 
 function create_test_filament2()
     x1 = [0.0, 0.0, 0.0]
@@ -13,28 +14,36 @@ function create_test_filament2()
     return filament
 end
 
-function analytical_solution(control_point, gamma, x1, direction, filament_direction, va)
+function analytical_solution(control_point, gamma, x1, direction, filament_direction)
     gamma = -gamma  # Sign convention difference
     r1 = control_point - x1
     r1_cross_direction = cross(r1, direction)
-    r_perp = dot(r1, direction) * direction
-    
-    alpha0 = 1.25643
-    nu = 1.48e-5
-    epsilon = sqrt(4 * alpha0 * nu * norm(r_perp) / va)
+    K = (gamma / (4π * norm(r1_cross_direction)^2)) * (1 + dot(r1, direction) / norm(r1))
+    return K * r1_cross_direction * filament_direction
+end
 
-    if norm(r1_cross_direction) > epsilon
-        K = (gamma / (4π * norm(r1_cross_direction)^2)) * 
-            (1 + dot(r1, direction) / norm(r1))
-        return K * r1_cross_direction * filament_direction
-    else
-        r1_proj = dot(r1, direction) * direction + epsilon * 
-                  (r1/norm(r1) - direction) / norm(r1/norm(r1) - direction)
-        r1_cross_direction_proj = cross(r1_proj, direction)
-        K_proj = (gamma / (4π * norm(r1_cross_direction_proj)^2)) * 
-                 (1 + dot(r1_proj, direction) / norm(r1_proj))
-        return K_proj * r1_cross_direction_proj * filament_direction
-    end
+"""
+    core_radius(axial_distance, va)
+
+Lamb–Oseen core radius [m] of a trailing vortex `axial_distance` [m] downstream of its
+start.
+"""
+core_radius(axial_distance, va) = sqrt(4 * ALPHA0 * NU * axial_distance / va)
+
+"""
+    off_axis_velocity(offset, gamma)
+
+z velocity [m/s] induced by the unit-speed trailing filament from the origin along x at
+the point `offset` [m] off its axis, half a metre downstream.
+"""
+function off_axis_velocity(offset, gamma)
+    T = typeof(offset)
+    filament = SemiInfiniteFilament{T}()
+    reinit!(filament, zeros(T, 3), T[1, 0, 0], one(T), 1)
+    velocity = zeros(T, 3)
+    velocity_3D_trailing_vortex_semiinfinite!(velocity, filament, filament.direction,
+        [0.5, offset, 0.0], gamma, filament.va, ntuple(_ -> zeros(T, 3), 10))
+    return velocity[3]
 end
 
 @testset "SemiInfiniteFilament Tests" begin
@@ -58,7 +67,7 @@ end
         
         analytical = analytical_solution(
             control_point, gamma, filament.x1, filament.direction,
-            filament.filament_direction, filament.va  
+            filament.filament_direction
         )
         
         @test isapprox(induced_velocity, analytical, rtol=1e-6)
@@ -73,7 +82,6 @@ end
         ]
         induced_velocity = zeros(3)
 
-        # Filament start point is singular in the current implementation.
         velocity_3D_trailing_vortex_semiinfinite!(
             induced_velocity,
             filament,
@@ -83,7 +91,7 @@ end
             filament.va,
             work_vectors
         )
-        @test all(isnan.(induced_velocity))
+        @test induced_velocity == zeros(3)
 
         for point in test_points
             velocity_3D_trailing_vortex_semiinfinite!(
@@ -177,5 +185,30 @@ end
             [0.5, 2 * d_inside, 0.0], gamma, va, work_vectors)
 
         @test isapprox(normalize(v2), normalize(v1); atol=1e-8)
+    end
+
+    @testset "Velocity scales linearly with distance inside core" begin
+        epsilon = core_radius(0.5, 1.0)
+        v_half = off_axis_velocity(0.5 * epsilon, gamma)
+        v_quarter = off_axis_velocity(0.25 * epsilon, gamma)
+
+        @test v_quarter ≈ 0.5 * v_half rtol = 1e-12
+        @test off_axis_velocity(-0.25 * epsilon, gamma) ≈ -v_quarter rtol = 1e-12
+    end
+
+    @testset "Velocity is continuous at the core boundary" begin
+        epsilon = core_radius(0.5, 1.0)
+        v_inside = off_axis_velocity(epsilon * (1 - 1e-9), gamma)
+        v_outside = off_axis_velocity(epsilon * (1 + 1e-9), gamma)
+
+        @test v_inside ≈ v_outside rtol = 1e-6
+    end
+
+    @testset "ForwardDiff sees the core's slope on the axis" begin
+        velocity_at(offset) = off_axis_velocity(offset, gamma)
+        slope = ForwardDiff.derivative(velocity_at, 0.0)
+
+        @test slope != 0
+        @test slope ≈ velocity_at(1e-5) / 1e-5 rtol = 1e-9
     end
 end
