@@ -99,6 +99,8 @@ unrefined_section_range
 panel_range
 deform!
 compute_refined_panel_mapping!
+section_centre_dist2
+section_span_position
 compute_refined_section_interpolation!
 copy_sections
 copy_sections_to_refined!
