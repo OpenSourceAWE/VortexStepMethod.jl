@@ -4,6 +4,7 @@
 
 ### Added
 
+- `masure_regression` airfoils `{t, eta, kappa, delta, lambda, phi}` resolve to polars: `resolve_aero_geometry(...; ml_models_dir)` evaluates the Masure Extra-Trees regression (`masure_aero`, `load_masure_model`) in pure Julia, from models converted once with `scripts/export_masure_models.py`.
 - `plot_geometry`, `plot_distribution`, `plot_combined_analysis`, `plot_section_polars`,
   `plot_airfoil_fit` and `plot_airfoils` take `show_title=true`; with `false` the title
   is not drawn, and still names the saved file and window.

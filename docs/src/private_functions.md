@@ -230,6 +230,15 @@ swish
 sigmoid
 ```
 
+### Masure regression
+```@docs
+MASURE_PARAMETERS
+MASURE_REYNOLDS
+forest_predict
+one_based
+scale_input
+```
+
 ### Polars and airfoil IO
 ```@docs
 create_2d_polars

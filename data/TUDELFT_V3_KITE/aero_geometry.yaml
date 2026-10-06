@@ -75,7 +75,7 @@ wing_airfoils:
   #   - polars:
   #       polar_file_path: Path to polar CSV file (columns: alpha [rad], cl, cd, cm)
   #   - masure_regression:
-  #       t, eta, kappa, delta, lamba, phi: Regression parameters
+  #       t, eta, kappa, delta, lambda, phi: Regression parameters
   #   - inviscid:
   #       no further data is required 
   # ---------------------------------------------------------------
