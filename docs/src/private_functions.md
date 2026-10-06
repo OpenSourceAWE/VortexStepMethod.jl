@@ -17,6 +17,7 @@ solver_kwargs
 check_dimensions
 calculate_AIC_matrices!
 gamma_loop!
+panel_relaxation_factors!
 build_spanwise_laplacian!
 local_lift_slope!
 apply_artificial_viscosity!
