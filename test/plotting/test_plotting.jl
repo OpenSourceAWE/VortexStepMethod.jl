@@ -214,6 +214,22 @@ end
         @test isfile(joinpath(save_dir, "Hidden_combined.png"))
     end
 
+    @testset "a plot saved under GLMakie can then be shown" begin
+        MakieControlPlots.GLMakie.activate!()
+        try
+            fig = plot_distribution([y_coordinates], [results_vsm], ["VSM"];
+                title="Saved then shown", data_type=".png", save_path=save_dir,
+                is_save=true, is_show=false)
+            @test isfile(joinpath(save_dir, "Saved_then_shown.png"))
+            makie_ext.display_named(fig, "Saved then shown")
+            @test fig.scene.current_screens == [makie_ext.SCREENS["Saved then shown"]]
+        finally
+            screen = pop!(makie_ext.SCREENS, "Saved then shown", nothing)
+            isnothing(screen) || close(screen)
+            CairoMakie.activate!()
+        end
+    end
+
     @testset "round-off CS plots flat, a varying CS keeps its autoscale" begin
         fig = Figure()
         ax_noise = Axis(fig[1, 1])

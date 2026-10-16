@@ -486,6 +486,7 @@ function VortexStepMethod.save_plot(fig::Makie.Figure, save_path, title; data_ty
     @debug "Attempting to save figure to: $full_path"
     @debug "Current working directory: $(pwd())"
 
+    screens_before_save = copy(fig.scene.current_screens)
     try
         save(full_path, fig)
         @debug "Figure saved as $data_type"
@@ -508,6 +509,9 @@ function VortexStepMethod.save_plot(fig::Makie.Figure, save_path, title; data_ty
         @error "Error saving figure: $e"
         @error "Error type: $(typeof(e))"
         rethrow(e)
+    finally
+        # GLMakie refuses to show a figure still held by the hidden screen `save` opened.
+        foreach(close, setdiff(fig.scene.current_screens, screens_before_save))
     end
 end
 
