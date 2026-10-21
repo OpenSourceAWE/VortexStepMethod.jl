@@ -222,6 +222,9 @@ instantiate_main_with_fallback() {
     return 1
 }
 
+# Pkg.resolve() does not update the registry, but needs the versions of the default manifest
+$_julia_cmd -e 'using Pkg; Pkg.Registry.update()'
+
 echo
 echo "Preparing main manifest for Julia ${_julia_major}..."
 
