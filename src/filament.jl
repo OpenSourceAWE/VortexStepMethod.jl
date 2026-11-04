@@ -62,7 +62,8 @@ end
                                  XVP, gamma, va, work_vectors)
 
 Calculate induced velocity by a trailing vortex filament, with a Lamb–Oseen core
-radius grown over the axial distance of `XVP` from the filament start.
+radius grown over the distance of `XVP` from the filament's line. A point on that line
+gets no velocity.
 
 # Arguments
 - `XVP`: Control point coordinates
@@ -82,9 +83,15 @@ as implemented in KiteAeroDyn".
     work_vectors
 )
     r1 = work_vectors[1]
+    r1Xr0 = work_vectors[4]
     r1 .= XVP .- filament.x1
-    axial_distance = abs(dot3(r1, filament.r0)) / filament.length
-    epsilon = sqrt(4 * ALPHA0 * NU * axial_distance / va)
+    cross3!(r1Xr0, r1, filament.r0)
+    distance = norm3(r1Xr0) / filament.length
+    if distance <= 1e-10 * max(norm3(r1), filament.length)
+        vel .= 0.0
+        return nothing
+    end
+    epsilon = sqrt(4 * ALPHA0 * NU * distance / va)
     velocity_3D_vortex_segment!(vel, filament, XVP, gamma, epsilon, work_vectors)
 end
 
@@ -208,21 +215,25 @@ function velocity_3D_trailing_vortex_semiinfinite!(
     GAMMA = -GAMMA * filament.filament_direction
     r1 .= XVP .- filament.x1
 
-    # Core radius, grown with the axial distance of `XVP` along `Vf`.
     d_r1_Vf = dot3(r1, Vf)
     nVf = norm3(Vf)
-    epsilon = sqrt(4 * ALPHA0 * NU * abs(d_r1_Vf) * nVf / va)
-
     cross3!(r1XVf, r1, Vf)
-
     nr1XVf = norm3(r1XVf)
     nr1 = norm3(r1)
-    if nr1XVf / nVf > epsilon
+    distance = nr1XVf / nVf
+    if distance < 1e-16
+        vel .= 0.0
+        return nothing
+    end
+    # Core radius, grown with the distance of `XVP` from the filament's line.
+    epsilon = sqrt(4 * ALPHA0 * NU * distance / va)
+
+    if distance > epsilon
         K = GAMMA / (4π) / (nr1XVf^2) * (1 + d_r1_Vf / nr1)
         @inbounds for k in 1:3
             vel[k] = K * r1XVf[k]
         end
-    elseif nr1XVf / nVf < 1e-12 * epsilon
+    elseif distance < 1e-12 * epsilon
         vel .= 0.0
     else
         r1_proj = work_vectors[4]

@@ -24,6 +24,10 @@ Main structure for calculating aerodynamic properties of bodies. Use the constru
 - `AIC::Array{Float64, 3}` = zeros(P, P, 3): control-point influence coefficients, the
                         matrix the circulation is solved against; component last so that
                         each `AIC[:, :, k]` slice is a contiguous BLAS matrix
+- `AIC_curved_correction::Array{Float64, 3}` = zeros(P, P, 3): stored
+    [`curved_bound_correction!`](@ref)
+- `curved_correction_core_radius` = NaN: core radius fraction `AIC_curved_correction` was
+    built for, `NaN` until built for the current shape
 - `AIC_aero_center::Array{Float64, 3}` = zeros(P, P, 3): aerodynamic-centre (LLT)
                         influence coefficients, used only for the corrected angle of attack
 - `projected_area::Float64` = 1.0: The area projected onto the xy-plane of the KA body frame [m²]
@@ -47,6 +51,8 @@ Main structure for calculating aerodynamic properties of bodies. Use the constru
     work_vectors::NTuple{10, MVector{3, T}} = ntuple(_ -> zeros(MVector{3, T}), 10)
     AIC::Array{T, 3} = zeros(T, P, P, 3)
     AIC_aero_center::Array{T, 3} = zeros(T, P, P, 3)
+    AIC_curved_correction::Array{T, 3} = zeros(T, P, P, 3)
+    curved_correction_core_radius::T = T(NaN)
     projected_area::T = one(T)
     c_ref::T = one(T)
     cache::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}} = [LazyBufferCache()]
@@ -360,6 +366,7 @@ function reinit!(body_aero::BodyAerodynamics{P, W, T};
     body_aero.alpha_dist .= 0.0
     body_aero.v_rel_dist .= 0.0
     body_aero.AIC .= 0.0
+    body_aero.curved_correction_core_radius = T(NaN)
     set_va!(body_aero, va_vec, omega)
     return nothing
 end
@@ -450,26 +457,14 @@ Returns: nothing
     va_unit = zeros(MVector{3, T})
     U_2D = zeros(MVector{3, T})
 
-    # Python parity: one shared area-weighted wake vector for all panels.
-    panel_areas = [panel.chord * panel.width for panel in body_aero.panels]
-    va_vec_dist = zeros(T, length(body_aero.panels), 3)
-    @inbounds for i in 1:length(body_aero.panels), k in 1:3
-        va_vec_dist[i, k] = va_unit_dist[i, k] * va_dist[i]
-    end
-    wake_velocity = _compute_reference_velocity_from_distribution(
-        va_vec_dist,
-        length(body_aero.panels),
-        panel_areas
-    )
-    wake_speed = norm(wake_velocity)
-    wake_speed > 0.0 || throw(ArgumentError("Wake reference speed must be positive."))
-    va_unit .= wake_velocity ./ wake_speed
-    va = wake_speed
-    
+    all(>(0), va_dist) || throw(ArgumentError(
+        "Wake reference speed must be positive on every panel."))
+
     # Calculate influence coefficients
     for jring in eachindex(body_aero.panels)
         panel_jring = body_aero.panels[jring]
         filaments = panel_jring.filaments
+        va_unit .= matrix_row(va_unit_dist, jring)
         for icp in eachindex(body_aero.panels)
             panel_icp = body_aero.panels[icp]
             ep = evaluation_point == :control_point ? panel_icp.control_point :
@@ -480,7 +475,7 @@ Returns: nothing
                 filaments,
                 ep,
                 evaluation_point_on_bound,
-                va,
+                va_dist[jring],
                 va_unit,
                 one(T),
                 core_radius_fraction,
@@ -522,12 +517,155 @@ function calculate_circulation_distribution_elliptical_wing(gamma_i,
 end
 
 """
+    thin_airfoil_strips(n_strips=24)
+
+Chordwise stations `x/c` and weights of the flat-plate bound vorticity
+`gamma(x) ~ sqrt((c - x) / x)`. The weights sum to one with their centroid at the quarter
+chord.
+"""
+function thin_airfoil_strips(n_strips=24)
+    phi = ((1:n_strips) .- 0.5) .* (π / 2) ./ n_strips
+    weights = cos.(phi) .^ 2
+    return sin.(phi) .^ 2, weights ./ sum(weights)
+end
+
+"""Velocity at `point` of unit circulation on a trailing filament from `x1` to `x2`."""
+function unit_trailing_velocity(filament::BoundFilament{T}, x1, x2, point, va,
+        work_vectors) where {T}
+    reinit!(filament, x1, x2)
+    velocity = work_vectors[8]
+    velocity_3D_trailing_vortex!(velocity, filament, point, one(T), va, work_vectors)
+    return SVector{3, T}(velocity)
+end
+
+"""Velocity at `point` of unit circulation on a bound filament from `x1` to `x2`."""
+function unit_bound_velocity(filament::BoundFilament{T}, x1, x2, point,
+        core_radius_fraction, work_vectors) where {T}
+    reinit!(filament, x1, x2)
+    velocity = work_vectors[8]
+    velocity_3D_bound_vortex!(velocity, filament, point, one(T), core_radius_fraction,
+        work_vectors)
+    return SVector{3, T}(velocity)
+end
+
+"""
+    unrolled_ring_difference(filament, work_vectors, point, panel, unrolled_1, unrolled_2,
+                             chord_leg, stations, weights, core_radius_fraction, va)
+
+Velocity at `point` induced by unit circulation on the horseshoe of `panel` less the same
+horseshoe unrolled to the bound points `unrolled_1` and `unrolled_2`, whose legs are
+`chord_leg`. Both are spread along the chord over the [`thin_airfoil_strips`](@ref)
+`stations` and `weights`. `filament` is scratch.
+"""
+function unrolled_ring_difference(filament::BoundFilament{T}, work_vectors, point, panel,
+        unrolled_1, unrolled_2, chord_leg, stations, weights, core_radius_fraction,
+        va) where {T}
+    bound_1 = SVector{3, T}(panel.bound_point_1)
+    bound_2 = SVector{3, T}(panel.bound_point_2)
+    te_1 = SVector{3, T}(panel.TE_point_1)
+    te_2 = SVector{3, T}(panel.TE_point_2)
+    unrolled_te_1 = unrolled_1 + chord_leg
+    unrolled_te_2 = unrolled_2 + chord_leg
+    velocity = zero(SVector{3, T})
+    # Each pair below reads (from, to, sign), legs of the two systems first.
+    for (x1, x2, sign) in ((unrolled_1, unrolled_te_1, 1), (unrolled_te_2, unrolled_2, 1),
+                           (bound_1, te_1, -1), (te_2, bound_2, -1))
+        velocity += sign * unit_trailing_velocity(filament, x1, x2, point, va, work_vectors)
+    end
+    for (station, weight) in zip(stations, weights)
+        along_leg = (station - 0.25) / 0.75
+        node_1 = bound_1 + along_leg * (te_1 - bound_1)
+        node_2 = bound_2 + along_leg * (te_2 - bound_2)
+        unrolled_node_1 = unrolled_1 + along_leg * chord_leg
+        unrolled_node_2 = unrolled_2 + along_leg * chord_leg
+        strip = unit_bound_velocity(filament, node_2, node_1, point, core_radius_fraction,
+            work_vectors) - unit_bound_velocity(filament, unrolled_node_2, unrolled_node_1,
+            point, core_radius_fraction, work_vectors)
+        for (x1, x2, sign) in ((node_1, te_1, 1), (te_2, node_2, 1),
+                               (unrolled_node_1, unrolled_te_1, -1),
+                               (unrolled_te_2, unrolled_node_2, -1))
+            strip += sign * unit_trailing_velocity(filament, x1, x2, point, va,
+                work_vectors)
+        end
+        velocity += weight * strip
+    end
+    return velocity
+end
+
+"""
+    curved_bound_correction!(correction, body_aero::BodyAerodynamics, core_radius_fraction,
+                             va_dist)
+
+Write into `correction` the `(i, j, k)` influence, per unit circulation of panel `j`, of
+the curvature, sweep and rib skew of a wing at the aerodynamic centre of its panel `i`:
+the actual vortex system less the one unrolled onto the tangent of panel `i`, with the
+bound vortex spread over the chord. Zero on a straight wing with perpendicular legs, and
+between panels of different wings.
+"""
+function curved_bound_correction!(correction, body_aero::BodyAerodynamics{P, W, T},
+        core_radius_fraction, va_dist) where {P, W, T}
+    correction .= 0
+    stations, weights = thin_airfoil_strips()
+    filament = BoundFilament{T}()
+    panels = body_aero.panels
+    for wing_idx in eachindex(body_aero.wings)
+        wing_panels = panel_range(body_aero, wing_idx)
+        node_position = cumsum([zero(T); [panels[j].width for j in wing_panels]])
+        next_panel = panels[min(first(wing_panels) + 1, last(wing_panels))]
+        is_forward = norm(panels[first(wing_panels)].bound_point_1 - next_panel.bound_point_2) <
+            norm(panels[first(wing_panels)].bound_point_2 - next_panel.bound_point_1)
+        sequence = is_forward ? one(T) : -one(T)
+        for (local_i, i) in enumerate(wing_panels)
+            centre = SVector{3, T}(panels[i].aero_center)
+            tangent = SVector{3, T}(panels[i].bound_point_1 - panels[i].bound_point_2) /
+                panels[i].width
+            position_i = (node_position[local_i] + node_position[local_i + 1]) / 2
+            for (local_j, j) in enumerate(wing_panels)
+                node_low = centre + sequence * (node_position[local_j] - position_i) * tangent
+                node_high = centre +
+                    sequence * (node_position[local_j + 1] - position_i) * tangent
+                unrolled_1, unrolled_2 = is_forward ? (node_high, node_low) :
+                    (node_low, node_high)
+                chord_leg = 0.75 * panels[j].chord * SVector{3, T}(panels[i].x_airf)
+                velocity = unrolled_ring_difference(filament, body_aero.work_vectors, centre,
+                    panels[j], unrolled_1, unrolled_2, chord_leg, stations, weights,
+                    core_radius_fraction, va_dist[i])
+                correction[i, j, :] .= velocity
+            end
+        end
+    end
+    return nothing
+end
+
+"""
+    quarter_chord_AIC!(target, body_aero::BodyAerodynamics, core_radius_fraction, va_dist,
+                       va_unit_dist)
+
+Write into `target` the influence matrices of the flow at the aerodynamic centres that
+turns the panel forces: the [`LLT`](@ref Model) matrices plus
+[`curved_bound_correction!`](@ref), kept in `body_aero` for one shape and core radius.
+"""
+function quarter_chord_AIC!(target, body_aero::BodyAerodynamics, core_radius_fraction,
+        va_dist, va_unit_dist)
+    calculate_AIC_matrices!(body_aero, LLT, core_radius_fraction, va_dist, va_unit_dist,
+        target)
+    if body_aero.curved_correction_core_radius != core_radius_fraction
+        curved_bound_correction!(body_aero.AIC_curved_correction, body_aero,
+            core_radius_fraction, va_dist)
+        body_aero.curved_correction_core_radius = core_radius_fraction
+    end
+    target .+= body_aero.AIC_curved_correction
+    return nothing
+end
+
+"""
     update_effective_angle_of_attack!(alpha_corrected, body_aero::BodyAerodynamics, gamma,
                                       core_radius_fraction, va_vec_dist, va_dist,
                                       va_unit_dist)
 
 Write each panel's [`inflow_angle`](@ref) at its aerodynamic centre into
-`alpha_corrected`, the induced velocity taken from `gamma` on the LLT influence matrix.
+`alpha_corrected`, the induced velocity taken from `gamma` on the
+[`quarter_chord_AIC!`](@ref) matrices.
 """
 function update_effective_angle_of_attack!(alpha_corrected,
     body_aero::BodyAerodynamics,
@@ -538,9 +676,9 @@ function update_effective_angle_of_attack!(alpha_corrected,
     va_unit_dist)
 
     # Its own buffer: `AIC` holds the control-point matrix the circulation was solved
-    # against, so overwriting it here would leave post-solve readers on the LLT one.
-    calculate_AIC_matrices!(body_aero, LLT, core_radius_fraction, va_dist,
-                            va_unit_dist, body_aero.AIC_aero_center)
+    # against, so overwriting it here would leave post-solve readers on the other one.
+    quarter_chord_AIC!(body_aero.AIC_aero_center, body_aero, core_radius_fraction, va_dist,
+        va_unit_dist)
 
     induced_velocity = body_aero.cache[1][va_vec_dist]
     for k in 1:3
@@ -577,57 +715,51 @@ function induced_velocity_at(body_aero::BodyAerodynamics{P, W, T}, point, gamma,
 end
 
 """
-    attached_trailed_loads(body_aero::BodyAerodynamics, i, gamma, density,
-                           core_radius_fraction, reference_point)
+    attached_trailed_loads!(panel_forces, m_body_3D, body_aero::BodyAerodynamics, gamma,
+                            density, core_radius_fraction, reference_point)
 
-Kutta–Joukowski force [N] on the two chordwise trailed vortex segments of panel `i`,
-from its quarter-chord bound points to its trailing edge, and its moment [N·m] about
-`reference_point`, as `(; force, moment)`. Each segment carries `gamma[i]` and sees, at
-its three-quarter-chord point, the inflow turned by `body_aero.omega` plus the
-[`induced_velocity_at`](@ref) that point.
+Write into the `3×n` matrix `panel_forces` [N] the Kutta–Joukowski force on the chordwise
+trailed vortex legs between bound vortex and trailing edge, and add its moment [N·m] about
+`reference_point` to `m_body_3D`. Each section boundary carries the net circulation of its
+two panels and sees, at its three-quarter-chord point, their mean inflow plus the
+[`induced_velocity_at`](@ref) that point; its load goes half to each panel, or whole to a
+tip panel.
 """
-function attached_trailed_loads(body_aero::BodyAerodynamics{P, W, T}, i, gamma, density,
-        core_radius_fraction, reference_point) where {P, W, T}
-    panel = body_aero.panels[i]
+function attached_trailed_loads!(panel_forces, m_body_3D,
+        body_aero::BodyAerodynamics{P, W, T}, gamma, density, core_radius_fraction,
+        reference_point) where {P, W, T}
+    panel_forces .= 0
     three_quarter_chord = (0.75 - 0.25) / (1 - 0.25)
-    force = zero(SVector{3, T})
-    moment = zero(SVector{3, T})
-    segments = ((panel.bound_point_1, panel.TE_point_1, 1),
-                (panel.bound_point_2, panel.TE_point_2, -1))
-    for (bound_point, te_point, orientation) in segments
-        chordwise = SVector{3, T}(te_point) - SVector{3, T}(bound_point)
-        point = SVector{3, T}(bound_point) + three_quarter_chord * chordwise
-        arm = point - SVector{3, T}(panel.control_point)
-        inflow = SVector{3, T}(panel.va_vec) - cross(SVector{3, T}(body_aero.omega), arm)
-        velocity = inflow +
-            induced_velocity_at(body_aero, point, gamma, core_radius_fraction)
-        segment_force = (density * orientation * gamma[i]) * cross(velocity, chordwise)
-        force += segment_force
-        moment += cross(point - SVector{3, T}(reference_point), segment_force)
+    panels = body_aero.panels
+    for wing_idx in eachindex(body_aero.wings)
+        wing_panels = panel_range(body_aero, wing_idx)
+        for boundary in first(wing_panels):(last(wing_panels) + 1)
+            is_first = boundary == first(wing_panels)
+            is_last = boundary == last(wing_panels) + 1
+            before = is_first ? boundary : boundary - 1
+            after = is_last ? before : boundary
+            bound_point = is_last ? panels[after].bound_point_2 : panels[after].bound_point_1
+            te_point = is_last ? panels[after].TE_point_2 : panels[after].TE_point_1
+            leg = SVector{3, T}(te_point) - SVector{3, T}(bound_point)
+            point = SVector{3, T}(bound_point) + three_quarter_chord * leg
+            velocity = (SVector{3, T}(panels[before].va_vec) +
+                        SVector{3, T}(panels[after].va_vec)) / 2 +
+                induced_velocity_at(body_aero, point, gamma, core_radius_fraction)
+            net_gamma = (is_last ? zero(T) : gamma[after]) -
+                (is_first ? zero(T) : gamma[before])
+            force = (density * net_gamma) * cross(velocity, leg)
+            moment = cross(point - SVector{3, T}(reference_point), force)
+            share = before == after ? one(T) : T(0.5)
+            @inbounds for k in 1:3
+                panel_forces[k, before] += share * force[k]
+                m_body_3D[k, before] += share * moment[k]
+                before == after && continue
+                panel_forces[k, after] += share * force[k]
+                m_body_3D[k, after] += share * moment[k]
+            end
+        end
     end
-    return (; force, moment)
-end
-
-"""
-    panel_force_moment(body_aero::BodyAerodynamics, i, loads, y_airf, gamma, density,
-                       core_radius_fraction, reference_point,
-                       is_with_attached_trailed_force)
-
-Force [N] and moment [N·m] about `reference_point` of panel `i`: its section `loads`
-from [`panel_loads`](@ref) acting at the aerodynamic centre, plus
-[`attached_trailed_loads`](@ref) when `is_with_attached_trailed_force`.
-Returns `(; force, moment)`.
-"""
-function panel_force_moment(body_aero::BodyAerodynamics{P, W, T}, i, loads, y_airf, gamma,
-        density, core_radius_fraction, reference_point,
-        is_with_attached_trailed_force) where {P, W, T}
-    arm = SVector{3, T}(body_aero.panels[i].aero_center) - SVector{3, T}(reference_point)
-    force = loads.force
-    moment = loads.pitching_moment .* y_airf .+ cross(arm, force)
-    is_with_attached_trailed_force || return (; force, moment)
-    attached = attached_trailed_loads(body_aero, i, gamma, density, core_radius_fraction,
-        reference_point)
-    return (; force=force + attached.force, moment=moment + attached.moment)
+    return nothing
 end
 
 @inline function intersect_line_with_plane(
