@@ -28,12 +28,11 @@ Represents a bound vortex filament defined by two points.
     initialized::Bool   = false
 end
 
-function reinit!(filament::BoundFilament{T}, x1, x2, vec=zeros(MVector{3, T})) where {T}
+function reinit!(filament::BoundFilament, x1, x2)
     filament.x1 .= x1
     filament.x2 .= x2
-    vec .= x2 .- x1
-    filament.length = norm(vec)
     filament.r0 .= x2 .- x1
+    filament.length = norm(filament.r0)
     filament.initialized = true
     return nothing
 end
@@ -58,11 +57,20 @@ function velocity_3D_bound_vortex!(
 end
 
 """
+    on_vortex_line(distance, length_scale)
+
+Whether a point `distance` from a vortex line is on it, to the rounding of coordinates
+of size `length_scale`.
+"""
+on_vortex_line(distance, length_scale) = distance <= 1e-10 * length_scale
+
+"""
     velocity_3D_trailing_vortex!(vel, filament::BoundFilament,
                                  XVP, gamma, va, work_vectors)
 
 Calculate induced velocity by a trailing vortex filament, with a Lamb–Oseen core
-radius grown over the axial distance of `XVP` from the filament start.
+radius grown over the distance of `XVP` from the filament's line. A point on that line
+gets no velocity.
 
 # Arguments
 - `XVP`: Control point coordinates
@@ -82,9 +90,15 @@ as implemented in KiteAeroDyn".
     work_vectors
 )
     r1 = work_vectors[1]
+    r1Xr0 = work_vectors[4]
     r1 .= XVP .- filament.x1
-    axial_distance = abs(dot3(r1, filament.r0)) / filament.length
-    epsilon = sqrt(4 * ALPHA0 * NU * axial_distance / va)
+    cross3!(r1Xr0, r1, filament.r0)
+    distance = norm3(r1Xr0) / filament.length
+    if on_vortex_line(distance, max(norm3(r1), filament.length))
+        vel .= 0.0
+        return nothing
+    end
+    epsilon = sqrt(4 * ALPHA0 * NU * distance / va)
     velocity_3D_vortex_segment!(vel, filament, XVP, gamma, epsilon, work_vectors)
 end
 
@@ -189,10 +203,13 @@ function reinit!(filament::SemiInfiniteFilament{T}, x1::AbstractVector,
 end
 
 """
-    velocity_3D_trailing_vortex_semiinfinite(filament::SemiInfiniteFilament, 
-                                             Vf, XVP, GAMMA, va, work_vectors)
+    velocity_3D_trailing_vortex_semiinfinite!(vel, filament::SemiInfiniteFilament,
+                                              Vf, XVP, GAMMA, va, work_vectors)
 
-Calculate induced velocity by a semi-infinite trailing vortex filament.
+Calculate induced velocity by a semi-infinite trailing vortex filament at `XVP`, for an
+inflow speed `va` > 0 [m/s]. Inside the core radius, grown over the distance from the
+filament's line, the velocity is that on the core boundary, with no upper limit as
+`XVP` nears the line. A point on the line gets no velocity.
 """
 function velocity_3D_trailing_vortex_semiinfinite!(
     vel,
@@ -208,22 +225,24 @@ function velocity_3D_trailing_vortex_semiinfinite!(
     GAMMA = -GAMMA * filament.filament_direction
     r1 .= XVP .- filament.x1
 
-    # Core radius, grown with the axial distance of `XVP` along `Vf`.
     d_r1_Vf = dot3(r1, Vf)
     nVf = norm3(Vf)
-    epsilon = sqrt(4 * ALPHA0 * NU * abs(d_r1_Vf) * nVf / va)
-
     cross3!(r1XVf, r1, Vf)
-
     nr1XVf = norm3(r1XVf)
     nr1 = norm3(r1)
-    if nr1XVf / nVf > epsilon
+    distance = nr1XVf / nVf
+    if on_vortex_line(distance, nr1)
+        vel .= 0.0
+        return nothing
+    end
+    # Core radius, grown with the distance of `XVP` from the filament's line.
+    epsilon = sqrt(4 * ALPHA0 * NU * distance / va)
+
+    if distance > epsilon
         K = GAMMA / (4π) / (nr1XVf^2) * (1 + d_r1_Vf / nr1)
         @inbounds for k in 1:3
             vel[k] = K * r1XVf[k]
         end
-    elseif nr1XVf / nVf < 1e-12 * epsilon
-        vel .= 0.0
     else
         r1_proj = work_vectors[4]
         cross_tmp = work_vectors[5]

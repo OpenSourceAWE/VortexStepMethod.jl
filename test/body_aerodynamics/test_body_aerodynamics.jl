@@ -225,15 +225,23 @@ end
                 end
 
                 @test isapprox(evaluation_point, expected_controlpoints[i]["coordinates"], atol=1e-4)
-                @test isapprox(panel.chord, expected_controlpoints[i]["chord"], atol=1e-4)
-                @test isapprox(panel.z_airf, expected_controlpoints[i]["normal"], atol=1e-4)
-                @test isapprox(panel.x_airf, expected_controlpoints[i]["tangential"], atol=1e-4)
+                # Panels take the part of the thesis chord line square to the bound vortex.
+                span_axis = expected_controlpoints[i]["airf_coord"][:, 3]
+                raw_tangential = expected_controlpoints[i]["tangential"]
+                along_span = dot(raw_tangential, span_axis)
+                tangential = normalize(raw_tangential .- along_span .* span_axis)
+                normal = cross(tangential, span_axis)
+                chord = expected_controlpoints[i]["chord"] *
+                    sqrt(max(0.0, 1 - along_span^2))
+                @test isapprox(panel.chord, chord, atol=1e-4)
+                @test isapprox(panel.z_airf, normal, atol=1e-4)
+                @test isapprox(panel.x_airf, tangential, atol=1e-4)
                 @test isapprox(
                     hcat(panel.z_airf, panel.x_airf, panel.y_airf),
-                    expected_controlpoints[i]["airf_coord"],
+                    hcat(normal, tangential, span_axis),
                     atol=1e-4
                 )
-                
+
                 if model === VSM
                     @test isapprox(
                         panel.aero_center,
@@ -332,6 +340,7 @@ end
         core_radius_fraction=core_radius_fraction,
         solver_type=LOOP,
         correct_aoa=true,
+        is_with_attached_trailed_force=false,
         atol=1e-8,
         rtol=1e-8
     )
@@ -340,6 +349,7 @@ end
         core_radius_fraction=core_radius_fraction,
         solver_type=NONLIN,
         correct_aoa=true,
+        is_with_attached_trailed_force=false,
         atol=1e-8,
         rtol=1e-8
     )
@@ -350,20 +360,20 @@ end
 
         @test all(isapprox.(nonlin_sol.gamma_distribution, loop_sol.gamma_distribution; atol=1e-4))
 
-        @test loop_sol.force.x ≈ -117.96518414816444 atol=1e-4
+        @test loop_sol.force.x ≈ -117.83764441623495 atol=1e-4
         @test loop_sol.force.y ≈ 0.0 atol=1e-10
         @test loop_sol.force.z ≈ 1481.996390329679 atol=1e-4 rtol= 1e-4
 
         @test loop_sol.moment.x ≈ -1481.996390329678 atol=1e-4 rtol= 1e-4
         @test loop_sol.moment.y ≈ 0.0 atol=1e-10
-        @test loop_sol.moment.z ≈ -117.9651841481644 atol=1e-4
+        @test loop_sol.moment.z ≈ -117.83764441623481 atol=1e-4
 
-        @test loop_sol.force_coeffs[1] ≈ -0.039050322560956294 atol=1e-4 # CFx
+        @test loop_sol.force_coeffs[1] ≈ -0.03902510692709789 atol=1e-4 # CFx
         @test loop_sol.force_coeffs[2] ≈ 0.0                   atol=1e-4 # CFy
-        @test loop_sol.force_coeffs[3] ≈ 0.49055973654418716   atol=3e-4 # CFz
+        @test loop_sol.force_coeffs[3] ≈ 0.49078952972488543   atol=1e-4 # CFz
         @test loop_sol.force_coeffs[3] / loop_sol.force_coeffs[1] ≈ loop_sol.force[3] / loop_sol.force[1]
-        @test loop_sol.moment_dist[1] ≈ -0.0006683569356186426 atol=1e-8
-        @test loop_sol.moment_coeff_dist[1] ≈ -2.212405554436003e-7 atol=1e-9
+        @test loop_sol.moment_dist[1] ≈ -0.0006766862950545562 atol=1e-8
+        @test loop_sol.moment_coeff_dist[1] ≈ -2.2428476412484825e-7 atol=1e-9
         @test loop_sol.moment_dist[1] / loop_sol.moment_dist[2] ≈ loop_sol.moment_coeff_dist[1] / loop_sol.moment_coeff_dist[2]
 
         @test loop_sol.solver_status == FEASIBLE

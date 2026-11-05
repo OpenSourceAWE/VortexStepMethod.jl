@@ -118,9 +118,9 @@ function init_pos!(
     panel.corner_points[:, 4] = panel.LE_point_2
     vec .= bound_point_2 .- bound_point_1
     panel.width = smooth_norm(vec)
-    reinit!(panel.filaments[1], bound_point_2, bound_point_1, vec)
-    reinit!(panel.filaments[2], bound_point_1, panel.TE_point_1, vec)
-    reinit!(panel.filaments[3], panel.TE_point_2, bound_point_2, vec)
+    reinit!(panel.filaments[1], bound_point_2, bound_point_1)
+    reinit!(panel.filaments[2], bound_point_1, panel.TE_point_1)
+    reinit!(panel.filaments[3], panel.TE_point_2, bound_point_2)
 
     panel.bound_point_1 .= bound_point_1
     panel.bound_point_2 .= bound_point_2
@@ -201,7 +201,7 @@ function build_interps(section_1::Section, section_2::Section, remove_nan)
             cm = Vector{Float64}((aero_1[4] .+ aero_2[4]) ./ 2)
             knots = polar_knots(alphas)
             cl_i = linear_interpolation(knots, cl; extrapolation_bc=extrap_flat)
-            cd_i = linear_interpolation(knots, cd; extrapolation_bc=extrap_line)
+            cd_i = linear_interpolation(knots, cd; extrapolation_bc=extrap_flat)
             cm_i = linear_interpolation(knots, cm; extrapolation_bc=extrap_flat)
         else
             (aero_1 isa Tuple{Vector{Float64}, Vector{Float64}, Matrix{Float64}, Matrix{Float64}, Matrix{Float64}} &&

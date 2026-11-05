@@ -83,7 +83,7 @@ end
             filament.va,
             work_vectors
         )
-        @test all(isnan.(induced_velocity))
+        @test iszero(induced_velocity)
 
         for point in test_points
             velocity_3D_trailing_vortex_semiinfinite!(
@@ -96,6 +96,14 @@ end
                 work_vectors
             )
             @test all(isapprox.(induced_velocity, zeros(3), atol=1e-5))
+        end
+
+        @testset "coordinate rounding off the line at $along m stays on the line" for
+                along in (0.5, 5.0, 500.0)
+            velocity_3D_trailing_vortex_semiinfinite!(induced_velocity, filament,
+                filament.direction, [along, 0.0, 1e-11 * along], gamma, filament.va,
+                work_vectors)
+            @test iszero(induced_velocity)
         end
     end
 
