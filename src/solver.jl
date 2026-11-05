@@ -47,12 +47,17 @@ Struct for storing the solution of the [`solve!`](@ref) function. Must contain a
 - `panel_cp_locations`¹::Vector{MVec3}: Center of pressure of each panel [m]
 - `moment_dist`::Vector{Float64}: Pitching moments around the spanwise vector of each panel. [Nm]
 - `moment_coeff_dist`::Vector{Float64}: Pitching moment coefficient around the spanwise vector of each panel. [-]
-- `moment_unrefined_dist`::MVector{U, Float64}: Averaged moments for unrefined sections [Nm]
-- `cl_unrefined_dist`::MVector{U, Float64}: Averaged lift coefficients for unrefined sections [-]
-- `cd_unrefined_dist`::MVector{U, Float64}: Averaged drag coefficients for unrefined sections [-]
-- `cm_unrefined_dist`::MVector{U, Float64}: Averaged airfoil moment coefficients for unrefined sections [-]
+- `moment_unrefined_dist`::MVector{U, Float64}: Pitching moment per unrefined section,
+  summed over its panels [Nm]
+- `cl_unrefined_dist`::MVector{U, Float64}: Area-weighted mean lift coefficient
+  per unrefined section [-]
+- `cd_unrefined_dist`::MVector{U, Float64}: Area-weighted mean drag coefficient
+  per unrefined section [-]
+- `cm_unrefined_dist`::MVector{U, Float64}: Area-weighted mean airfoil moment coefficient
+  per unrefined section [-]
 - `moment_coeff_unrefined_dist`::MVector{U, Float64}: Summed `moment_frac`-referenced pitching-moment coefficient per unrefined section [-]
-- `alpha_unrefined_dist`::MVector{U, Float64}: Averaged angles of attack for unrefined sections [rad]
+- `alpha_unrefined_dist`::MVector{U, Float64}: Area-weighted mean angle of attack
+  per unrefined section [rad]
 - `solver_status`::SolverStatus: enum, see [`SolverStatus`](@ref)
 
 ¹ Kept at its last value when the solver's `calc_only_f_and_gamma` is set.
@@ -548,42 +553,45 @@ function calc_forces!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics;
                     original_section_idx = wing.refined_panel_mapping[local_panel_idx]
                     target_unrefined_idx = section_range[original_section_idx]
 
+                    area = panel.chord * panel.width
+
                     # Accumulate coefficients and moments
                     moment_unrefined_dist[target_unrefined_idx] += moment_dist[panel_idx]
-                    cl_unrefined_dist[target_unrefined_idx] += solver.sol.cl_dist[panel_idx]
-                    cd_unrefined_dist[target_unrefined_idx] += solver.sol.cd_dist[panel_idx]
-                    cm_unrefined_dist[target_unrefined_idx] += solver.sol.cm_dist[panel_idx]
+                    cl_unrefined_dist[target_unrefined_idx] +=
+                        solver.sol.cl_dist[panel_idx] * area
+                    cd_unrefined_dist[target_unrefined_idx] +=
+                        solver.sol.cd_dist[panel_idx] * area
+                    cm_unrefined_dist[target_unrefined_idx] +=
+                        solver.sol.cm_dist[panel_idx] * area
                     moment_coeff_unrefined_dist[target_unrefined_idx] += solver.sol.moment_coeff_dist[panel_idx]
-                    alpha_unrefined_dist[target_unrefined_idx] += solver.sol.alpha_dist[panel_idx]
+                    alpha_unrefined_dist[target_unrefined_idx] +=
+                        solver.sol.alpha_dist[panel_idx] * area
 
                     # Accumulate geometry
                     x_airf_unrefined_dist[target_unrefined_idx] .+= panel.x_airf
                     y_airf_unrefined_dist[target_unrefined_idx] .+= panel.y_airf
                     z_airf_unrefined_dist[target_unrefined_idx] .+= panel.z_airf
                     va_vec_unrefined_dist[target_unrefined_idx] .+= panel.va_vec
-                    chord_unrefined_dist[target_unrefined_idx] += panel.chord
+                    chord_unrefined_dist[target_unrefined_idx] += area
                     width_unrefined_dist[target_unrefined_idx] += panel.width
 
                     unrefined_count_dist[target_unrefined_idx] += 1
                 end
 
-                # Average coefficients and geometry. width and
-                # moment_coeff_unrefined_dist stay summed (extensive).
                 for target_unrefined_idx in section_range
                     if unrefined_count_dist[target_unrefined_idx] > 0
                         count = unrefined_count_dist[target_unrefined_idx]
-                        moment_unrefined_dist[target_unrefined_idx] /= count
-                        cl_unrefined_dist[target_unrefined_idx] /= count
-                        cd_unrefined_dist[target_unrefined_idx] /= count
-                        cm_unrefined_dist[target_unrefined_idx] /= count
-                        alpha_unrefined_dist[target_unrefined_idx] /= count
+                        area = chord_unrefined_dist[target_unrefined_idx]
+                        cl_unrefined_dist[target_unrefined_idx] /= area
+                        cd_unrefined_dist[target_unrefined_idx] /= area
+                        cm_unrefined_dist[target_unrefined_idx] /= area
+                        alpha_unrefined_dist[target_unrefined_idx] /= area
                         x_airf_unrefined_dist[target_unrefined_idx] ./= count
                         y_airf_unrefined_dist[target_unrefined_idx] ./= count
                         z_airf_unrefined_dist[target_unrefined_idx] ./= count
                         va_vec_unrefined_dist[target_unrefined_idx] ./= count
-                        chord_unrefined_dist[target_unrefined_idx] /= count
-                        # width_unrefined_dist is NOT averaged - it is the
-                        # sum of panel widths in the unrefined section
+                        chord_unrefined_dist[target_unrefined_idx] =
+                            area / width_unrefined_dist[target_unrefined_idx]
                     end
                 end
             end

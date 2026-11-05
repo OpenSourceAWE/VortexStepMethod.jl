@@ -1,5 +1,3 @@
-# SPDX-FileCopyrightText: 2026 OpenSourceAWE contributors
-# SPDX-License-Identifier: MPL-2.0
 """Write reference.yaml: inputs and results of the Python VSM v2.3.0 (awegroup/Vortex-Step-Method
 at a2a91cb), read by test/verification/test_python_reference.jl.
 

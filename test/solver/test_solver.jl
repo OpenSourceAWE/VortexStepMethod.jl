@@ -218,7 +218,7 @@ end
 
 @testset "solve! fills the reference inflow and the centers of pressure" begin
     body_aero = inviscid_plates_aero([(4.0, -4.0)])
-    solver = Solver(length(body_aero.panels), 2)
+    solver = Solver(length(body_aero.panels), 2; is_with_attached_trailed_force=false)
     sol = solve!(solver, body_aero)
     @test sol.va_ref_vec ≈ 12.0 .* [cosd(5), 0.0, sind(5)]
     @test sol.q_ref ≈ 0.5 * solver.density * 12.0^2

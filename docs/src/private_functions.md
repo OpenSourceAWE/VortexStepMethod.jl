@@ -33,9 +33,15 @@ nose_down
 bisect_sign_change
 calculate_relative_alpha_and_relative_velocity
 update_effective_angle_of_attack!
+quarter_chord_AIC!
+curved_bound_correction!
+unrolled_ring_difference
+unit_bound_velocity
+unit_trailing_velocity
+thin_airfoil_strips
+relaxation_factor_limit
 induced_velocity_at
-attached_trailed_loads
-panel_force_moment
+attached_trailed_loads!
 calculate_stall_angle_list
 wing_span_flip
 spanwise_extent
@@ -64,6 +70,8 @@ dynamic_pressure
 flow_curvature_cm
 spanwise_flow_drag
 panel_force_directions
+panel_chord
+perpendicular_part
 prescribed_va_directions
 analysis_fields!
 find_center_of_pressure!

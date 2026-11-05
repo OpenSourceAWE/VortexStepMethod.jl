@@ -15,9 +15,24 @@
   is not drawn, and still names the saved file and window.
 - The panel plots (`plot!(ax, panel)`, `plot!(ax, body)`, `plot(panel)`, `plot(body)`)
   take `border_color`, default `:black`, for the panel outlines.
+- `relaxation_factor_limit` gives the largest stable relaxation factor of the `LOOP` solver,
+  and `VSMSolution.f_attached_trailed` the attached trailed part of each panel's force.
 
 ### Changed
 
+- Default results now agree with the Python VSM v2.3.0, most visibly on swept and curved
+  wings: the circulation is `0.5 |V_eff| c Cl`; the panel chord and chordwise axis are
+  square to the bound vortex; `correct_aoa` and `is_with_attached_trailed_force` default to
+  `true`; the flow turning the forces includes a curved bound vortex correction; drag acts
+  along that flow; each wake ring follows its own panel's inflow; trailing vortex cores grow
+  with the distance from their line; `q_ref` and the reference directions leave out body
+  rates; attached trailed forces are shared per section boundary; `cd` beyond a
+  `POLAR_VECTORS` table is held, not extrapolated. V3 kite at 8°: `cl` 1.051 → 1.099, `cd`
+  0.491 → 0.458.
+- `max_iterations` defaults to 5000 and `relaxation_factor` to `nothing`, meaning 0.8 of
+  `relaxation_factor_limit`, which is lower than the old 0.03 on narrow or high-slope panels.
+- `*_unrefined_dist` coefficients and angles are area-weighted means of their panels.
+- `velocity_3D_trailing_vortex_semiinfinite!` returns zero on its own axis, not `NaN`.
 - BREAKING: `solve` and `calculate_results` are removed; use `solve!`, which returns the
   solver's `VSMSolution`, and `solve!(solver, body_aero, nothing)` to start from a fresh
   circulation as `solve` did. Keys that became other fields: `Fx`/`Fy`/`Fz` → `force`,

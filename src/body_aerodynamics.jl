@@ -48,7 +48,7 @@ Main structure for calculating aerodynamic properties of bodies. Use the constru
     alpha_dist::MVector{P, T} = zeros(MVector{P, T})
     v_rel_dist::MVector{P, T} = zeros(MVector{P, T})
     pitch_rate_dist::MVector{P, T} = zeros(MVector{P, T})
-    work_vectors::NTuple{10, MVector{3, T}} = ntuple(_ -> zeros(MVector{3, T}), 10)
+    work_vectors::NTuple{11, MVector{3, T}} = ntuple(_ -> zeros(MVector{3, T}), 11)
     AIC::Array{T, 3} = zeros(T, P, P, 3)
     AIC_aero_center::Array{T, 3} = zeros(T, P, P, 3)
     AIC_curved_correction::Array{T, 3} = zeros(T, P, P, 3)
@@ -451,11 +451,9 @@ Returns: nothing
     evaluation_point = model == VSM ? :control_point : :aero_center
     evaluation_point_on_bound = model == LLT
 
-    # Allocate work vectors for this function (separate from those used by child functions)
-    velocity_induced = zeros(MVector{3, T})
-    tempvel = zeros(MVector{3, T})
-    va_unit = zeros(MVector{3, T})
-    U_2D = zeros(MVector{3, T})
+    # Scratch separate from the vectors the filament kernels use
+    work = body_aero.work_vectors
+    velocity_induced, tempvel, va_unit, U_2D = work[8], work[9], work[10], work[11]
 
     all(>(0), va_dist) || throw(ArgumentError(
         "Wake reference speed must be positive on every panel."))
@@ -567,7 +565,6 @@ function unrolled_ring_difference(filament::BoundFilament{T}, work_vectors, poin
     unrolled_te_1 = unrolled_1 + chord_leg
     unrolled_te_2 = unrolled_2 + chord_leg
     velocity = zero(SVector{3, T})
-    # Each pair below reads (from, to, sign), legs of the two systems first.
     for (x1, x2, sign) in ((unrolled_1, unrolled_te_1, 1), (unrolled_te_2, unrolled_2, 1),
                            (bound_1, te_1, -1), (te_2, bound_2, -1))
         velocity += sign * unit_trailing_velocity(filament, x1, x2, point, va, work_vectors)
