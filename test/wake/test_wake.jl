@@ -32,5 +32,15 @@ using VortexStepMethod
                 @test wake.direction ≈ normalize(va_vec_dist[i, :])
             end
         end
+        @testset "a panel in still air keeps its last wake" begin
+            still_panel = body_aero.panels[1]
+            still_wake = still_panel.filaments[4]
+            speed_before, direction_before = still_wake.va, copy(still_wake.direction)
+            va_vec_dist[1, :] .= 0.0
+            VortexStepMethod.frozen_wake!(body_aero, va_vec_dist)
+            @test still_wake.va == speed_before
+            @test still_wake.direction == direction_before
+            @test body_aero.panels[2].filaments[4].va ≈ norm(va_vec_dist[2, :])
+        end
     end
 end

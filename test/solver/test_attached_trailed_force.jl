@@ -76,9 +76,15 @@ end
         solver_on = Solver(wing.n_panels, wing.n_unrefined_sections; use_gamma_prev=false,
             reference_point, is_with_attached_trailed_force=true)
         force_off = copy(solve!(solver_off, body_aero).f_body_3D)
+        moment_off = copy(solver_off.sol.m_body_3D)
         @test iszero(solver_off.sol.f_attached_trailed)
         solve!(solver_on, body_aero)
         @test solver_on.sol.f_body_3D ≈ force_off .+ solver_on.sol.f_attached_trailed
+        leg_moments = zeros(size(moment_off))
+        VortexStepMethod.attached_trailed_loads!(zeros(size(moment_off)), leg_moments,
+            body_aero, solver_on.sol.gamma_distribution, solver_on.density,
+            solver_on.core_radius_fraction, reference_point)
+        @test solver_on.sol.m_body_3D ≈ moment_off .+ leg_moments
         @test !iszero(solver_on.sol.f_attached_trailed)
         @test (@allocated calc_forces!(solver_on, body_aero)) == 0
     end

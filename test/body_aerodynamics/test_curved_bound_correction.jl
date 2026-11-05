@@ -58,6 +58,31 @@ arc_points(radius=4.0, half_angle=55.0, n_sections=21) = [
         @test maximum(abs, body_aero.AIC_curved_correction) > 1e-3
     end
 
+    @testset "a new inflow on the same shape reuses it, as a fresh body agrees" begin
+        wing = wing_through(arc_points(), n_panels)
+        body_aero = BodyAerodynamics([wing])
+        solver = Solver(n_panels, wing.n_unrefined_sections)
+        set_va!(body_aero, [10.0, 0.0, 1.0])
+        solve!(solver, body_aero, nothing)
+        kept = copy(body_aero.AIC_curved_correction)
+
+        second_inflow = [20.0, 2.0, 2.0]
+        body_aero.AIC_curved_correction .= 2 .* kept
+        set_va!(body_aero, second_inflow)
+        solve!(solver, body_aero, nothing)
+        @test body_aero.AIC_curved_correction == 2 .* kept
+
+        body_aero.AIC_curved_correction .= kept
+        sol = solve!(solver, body_aero, nothing)
+        fresh_wing = wing_through(arc_points(), n_panels)
+        fresh_body = BodyAerodynamics([fresh_wing])
+        set_va!(fresh_body, second_inflow)
+        fresh_solver = Solver(n_panels, fresh_wing.n_unrefined_sections)
+        fresh = solve!(fresh_solver, fresh_body, nothing)
+        @test sol.cl ≈ fresh.cl rtol = 1e-12
+        @test sol.cd ≈ fresh.cd rtol = 1e-12
+    end
+
     @testset "rebuilding it allocates a small setup, not a vector per filament" begin
         arc = wing_through(arc_points(), n_panels)
         body_aero = BodyAerodynamics([arc])

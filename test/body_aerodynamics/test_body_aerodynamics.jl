@@ -368,9 +368,9 @@ end
         @test loop_sol.moment.y ≈ 0.0 atol=1e-10
         @test loop_sol.moment.z ≈ -117.83764441623481 atol=1e-4
 
-        @test loop_sol.force_coeffs[1] ≈ -0.039050322560956294 atol=1e-4 # CFx
+        @test loop_sol.force_coeffs[1] ≈ -0.03902510692709789 atol=1e-4 # CFx
         @test loop_sol.force_coeffs[2] ≈ 0.0                   atol=1e-4 # CFy
-        @test loop_sol.force_coeffs[3] ≈ 0.49055973654418716   atol=3e-4 # CFz
+        @test loop_sol.force_coeffs[3] ≈ 0.49078952972488543   atol=1e-4 # CFz
         @test loop_sol.force_coeffs[3] / loop_sol.force_coeffs[1] ≈ loop_sol.force[3] / loop_sol.force[1]
         @test loop_sol.moment_dist[1] ≈ -0.0006766862950545562 atol=1e-8
         @test loop_sol.moment_coeff_dist[1] ≈ -2.2428476412484825e-7 atol=1e-9

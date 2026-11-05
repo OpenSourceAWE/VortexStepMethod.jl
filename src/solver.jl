@@ -861,21 +861,33 @@ Pirrung & Lønbæk, TORQUE 2026, Eqs. 10-11), from the steepest positive lift sl
 chord-to-width ratio over `panels`, halved for `VSM` and clipped to `[1e-3, 1]`.
 """
 function relaxation_factor_limit(panels, model::Model)
-    step = deg2rad(1.0)
     ratio = zero(first(panels).chord)
     for panel in panels
-        steepest = zero(ratio)
-        cl_low = calculate_cl(panel, deg2rad(-40.0))
-        for alpha in deg2rad(-40.0):step:deg2rad(50.0)
-            cl_high = calculate_cl(panel, alpha + step)
-            slope = (cl_high - cl_low) / step
-            isfinite(slope) && (steepest = max(steepest, slope))
-            cl_low = cl_high
-        end
-        ratio = max(ratio, panel.chord / panel.width * steepest)
+        ratio = max(ratio, panel.chord / panel.width * steepest_lift_slope(panel))
     end
     limit = 2 / (1 + 0.25 * ratio)
     return clamp(model == VSM ? limit / 2 : limit, 1e-3, 1.0)
+end
+
+"""
+    steepest_lift_slope(panel)
+
+Steepest positive [`lift_slope`](@ref) of `panel`, sampled at the angles of its table for
+`POLAR_VECTORS` and every degree from -40° to 50° for other polars.
+"""
+function steepest_lift_slope(panel)
+    panel.aero_model == POLAR_VECTORS &&
+        return steepest_lift_slope(panel, panel.cl_interp.itp.knots[1])
+    return steepest_lift_slope(panel, deg2rad(-40.0):deg2rad(1.0):deg2rad(50.0))
+end
+
+function steepest_lift_slope(panel, angles)
+    steepest = zero(panel.chord)
+    for alpha in angles
+        slope = lift_slope(panel, alpha)
+        isfinite(slope) && (steepest = max(steepest, slope))
+    end
+    return steepest
 end
 
 """
@@ -913,14 +925,20 @@ slope turns negative in post-stall, which is what activates the
 artificial-viscosity regularization in [`gamma_loop!`](@ref).
 """
 function local_lift_slope!(slopes, panels, alpha_dist, delta=deg2rad(0.5))
-    inv_2delta = 1.0 / (2delta)
     @inbounds for i in eachindex(panels)
-        cl_plus  = calculate_cl(panels[i], alpha_dist[i] + delta)
-        cl_minus = calculate_cl(panels[i], alpha_dist[i] - delta)
-        slopes[i] = (cl_plus - cl_minus) * inv_2delta
+        slopes[i] = lift_slope(panels[i], alpha_dist[i], delta)
     end
     return slopes
 end
+
+"""
+    lift_slope(panel, alpha, delta=deg2rad(0.5))
+
+Lift-curve slope `dCl/dalpha` [1/rad] of `panel`'s polar at `alpha`, by central differences
+over `delta` [rad].
+"""
+lift_slope(panel, alpha, delta=deg2rad(0.5)) =
+    (calculate_cl(panel, alpha + delta) - calculate_cl(panel, alpha - delta)) / (2delta)
 
 """
     apply_artificial_viscosity!(gamma, panels, alpha_dist, laplacian, viscosity_matrix,
