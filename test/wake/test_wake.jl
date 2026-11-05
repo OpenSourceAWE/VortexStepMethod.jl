@@ -22,5 +22,15 @@ using VortexStepMethod
         # Test that the function accepts the right number of velocity vectors
         @test size(va_vec_dist, 1) == length(body_aero.panels)
         @test size(va_vec_dist, 2) == 3  # 3D velocity vectors
+
+        va_vec_dist[:, 2] .= range(-3.0, 3.0; length=n_panels)
+        VortexStepMethod.frozen_wake!(body_aero, va_vec_dist)
+        @testset "each panel's wake follows its own inflow" begin
+            for (i, panel) in enumerate(body_aero.panels), filament_idx in (4, 5)
+                wake = panel.filaments[filament_idx]
+                @test wake.va ≈ norm(va_vec_dist[i, :])
+                @test wake.direction ≈ normalize(va_vec_dist[i, :])
+            end
+        end
     end
 end

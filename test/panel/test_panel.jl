@@ -207,9 +207,23 @@ end
         @test abs(dot(axes.z_airf, axes.x_airf)) < 1e-12
     end
 
-    @testset "the frame closes as z = x cross y" begin
-        closure = cross(axes.x_airf, axes.y_airf)
-        @test isapprox(closure ./ norm(closure), axes.z_airf; atol=1e-12)
+    @testset "the frame is orthonormal with z = x cross y" begin
+        @test abs(dot(axes.x_airf, axes.y_airf)) < 1e-12
+        @test isapprox(cross(axes.x_airf, axes.y_airf), axes.z_airf; atol=1e-12)
+    end
+
+    @testset "the chord is the section chords' mean square to the bound vortex" begin
+        y_airf = span_vec ./ norm(span_vec)
+        square_chord(le, te) = norm((te .- le) .- dot(te .- le, y_airf) .* y_airf)
+        @test axes.chord ≈ (square_chord(le_1, te_1) + square_chord(le_2, te_2)) / 2
+        @test axes.chord < (norm(te_1 .- le_1) + norm(te_2 .- le_2)) / 2
+    end
+
+    @testset "drag runs along the flow and square to the lift" begin
+        alpha = deg2rad(9)
+        dirs = panel_force_directions(axes, alpha)
+        @test dirs.dir_drag ≈ cos(alpha) .* axes.x_airf .+ sin(alpha) .* axes.z_airf
+        @test abs(dot(dirs.dir_lift, dirs.dir_drag)) < 1e-12
     end
 
     @testset "orient flips y and z together" begin
@@ -227,7 +241,7 @@ end
             @test alpha ≈ crossflow_alpha(v_eff, x_airf, y_airf, z_airf)
             along_span = v_eff .+ 2.0 .* y_airf
             @test panel_inflow(oriented, along_span, along_span, zeros(3)).alpha ≈ alpha
-            dir_lift = panel_force_directions(oriented, alpha, y_airf).dir_lift
+            dir_lift = panel_force_directions(oriented, alpha).dir_lift
             v_crossflow = v_eff .- dot(v_eff, y_airf) .* y_airf
             @test abs(dot(dir_lift, v_crossflow)) < 1e-12
             @test abs(dot(dir_lift, y_airf)) < 1e-12

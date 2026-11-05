@@ -1,5 +1,5 @@
 using VortexStepMethod
-using VortexStepMethod: attached_trailed_loads, calc_forces!, solver_kwargs
+using VortexStepMethod: calc_forces!, solver_kwargs
 using DifferentiationInterface
 using LinearAlgebra
 using Test
@@ -42,11 +42,11 @@ function lift_and_oswald(wing, aspect_ratio, model, is_with_attached_trailed_for
 end
 
 @testset "Attached trailed vortex force" begin
-    @testset "defaults to off and follows the solver settings" begin
-        @test VortexStepMethod.SolverSettings().is_with_attached_trailed_force == false
-        @test Solver(4, 2).is_with_attached_trailed_force == false
-        settings = VortexStepMethod.SolverSettings(is_with_attached_trailed_force=true)
-        @test solver_kwargs(settings).is_with_attached_trailed_force
+    @testset "defaults to on and follows the solver settings" begin
+        @test VortexStepMethod.SolverSettings().is_with_attached_trailed_force
+        @test Solver(4, 2).is_with_attached_trailed_force
+        settings = VortexStepMethod.SolverSettings(is_with_attached_trailed_force=false)
+        @test !solver_kwargs(settings).is_with_attached_trailed_force
     end
 
     # Gaunaa, Li & Pirrung 2026 §5: without the force CL is ~2 % high on the curved wing.
@@ -67,23 +67,19 @@ end
     wing, _ = curved_elliptic_wing(; sweep=0.1, anhedral=0.25, n_sections=21)
     va_vec = 20.0 .* [cosd(10), 0.0, sind(10)]
 
-    @testset "adds attached_trailed_loads to every panel in solve! and solve" begin
+    @testset "adds the leg forces to the panels in solve!" begin
         body_aero = BodyAerodynamics([wing])
         set_va!(body_aero, va_vec)
         reference_point = [0.1, 0.0, -0.2]
         solver_off = Solver(wing.n_panels, wing.n_unrefined_sections; use_gamma_prev=false,
-            reference_point)
+            reference_point, is_with_attached_trailed_force=false)
         solver_on = Solver(wing.n_panels, wing.n_unrefined_sections; use_gamma_prev=false,
             reference_point, is_with_attached_trailed_force=true)
         force_off = copy(solve!(solver_off, body_aero).f_body_3D)
-        moment_off = copy(solver_off.sol.m_body_3D)
+        @test iszero(solver_off.sol.f_attached_trailed)
         solve!(solver_on, body_aero)
-        for i in eachindex(body_aero.panels)
-            attached = attached_trailed_loads(body_aero, i, solver_on.lr.gamma_new,
-                solver_on.density, solver_on.core_radius_fraction, reference_point)
-            @test solver_on.sol.f_body_3D[:, i] ≈ force_off[:, i] .+ attached.force
-            @test solver_on.sol.m_body_3D[:, i] ≈ moment_off[:, i] .+ attached.moment
-        end
+        @test solver_on.sol.f_body_3D ≈ force_off .+ solver_on.sol.f_attached_trailed
+        @test !iszero(solver_on.sol.f_attached_trailed)
         @test (@allocated calc_forces!(solver_on, body_aero)) == 0
     end
 

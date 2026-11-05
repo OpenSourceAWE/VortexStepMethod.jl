@@ -83,7 +83,7 @@ end
             filament.va,
             work_vectors
         )
-        @test all(isnan.(induced_velocity))
+        @test iszero(induced_velocity)
 
         for point in test_points
             velocity_3D_trailing_vortex_semiinfinite!(

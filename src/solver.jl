@@ -1015,8 +1015,8 @@ function gamma_loop!(
             AIC_x, AIC_y, AIC_z,
             velocity_view_x, velocity_view_y, velocity_view_z,
             va_vec_dist, induced_velocity_all, relative_velocity_dist,
-            y_airf_dist, relative_velocity_crossz, v_acrossz_dist,
-            z_airf_dist, va_magw_dist, cl_dist, chord_dist,
+            y_airf_dist, relative_velocity_crossz,
+            z_airf_dist, cl_dist, chord_dist,
         )
         @inbounds for i in 1:n_panels
             residual[i] -= gamma_iter[i]
@@ -1035,8 +1035,8 @@ function gamma_loop!(
                     AIC_x, AIC_y, AIC_z,
                     velocity_view_x, velocity_view_y, velocity_view_z,
                     va_vec_dist, induced_velocity_all, relative_velocity_dist,
-                    y_airf_dist, relative_velocity_crossz, v_acrossz_dist,
-                    z_airf_dist, va_magw_dist, cl_dist, chord_dist,
+                    y_airf_dist, relative_velocity_crossz,
+                    z_airf_dist, cl_dist, chord_dist,
                 )
                 inv_step = 1.0 / step
                 for i in 1:n_panels
@@ -1062,8 +1062,8 @@ function gamma_loop!(
                     AIC_x, AIC_y, AIC_z,
                     velocity_view_x, velocity_view_y, velocity_view_z,
                     va_vec_dist, induced_velocity_all, relative_velocity_dist,
-                    y_airf_dist, relative_velocity_crossz, v_acrossz_dist,
-                    z_airf_dist, va_magw_dist, cl_dist, chord_dist,
+                    y_airf_dist, relative_velocity_crossz,
+                    z_airf_dist, cl_dist, chord_dist,
                 )
                 @inbounds for i in 1:n_panels
                     residual_perturbed[i] -= gamma_perturbed[i]
@@ -1240,7 +1240,8 @@ function make_dual_shadow(solver::Solver{P, U, Float64},
         max_iterations = solver.max_iterations,
         rtol = TD(solver.rtol),
         tol_reference_error = TD(solver.tol_reference_error),
-        relaxation_factor = TD(solver.relaxation_factor),
+        relaxation_factor = isnothing(solver.relaxation_factor) ? nothing :
+            TD(solver.relaxation_factor),
         atol = TD(solver.atol),
         is_with_artificial_viscosity = solver.is_with_artificial_viscosity,
         artificial_viscosity_factor = TD(solver.artificial_viscosity_factor),
