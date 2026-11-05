@@ -19,7 +19,7 @@ arc_points(radius=4.0, half_angle=55.0, n_sections=21) = [
     for angle in range(half_angle, -half_angle; length=n_sections)]
 
 @testset "Curved bound vortex correction" begin
-    @testset "the strips hold the thin-airfoil load with its centroid at a quarter chord" begin
+    @testset "the strips hold a thin-airfoil load centred on the quarter chord" begin
         stations, weights = thin_airfoil_strips()
         @test length(stations) == 24
         @test sum(weights) ≈ 1
@@ -31,7 +31,8 @@ arc_points(radius=4.0, half_angle=55.0, n_sections=21) = [
     va_dist = fill(15.0, n_panels)
 
     @testset "it vanishes on a straight wing" begin
-        body_aero = BodyAerodynamics([wing_through([[0.0, 4.0, 0.0], [0.0, -4.0, 0.0]], n_panels)])
+        straight = wing_through([[0.0, 4.0, 0.0], [0.0, -4.0, 0.0]], n_panels)
+        body_aero = BodyAerodynamics([straight])
         correction = zeros(n_panels, n_panels, 3)
         curved_bound_correction!(correction, body_aero, 0.05, va_dist)
         @test maximum(abs, correction) < 1e-10

@@ -109,7 +109,8 @@ reference_order(matrices) = [matrices[k][i][j] for i in eachindex(matrices[1]),
             @test sol.moment ≈ Float64.(case["moment"]) atol = 1e-6 * moment_scale
             @test [sol.lift, sol.drag, sol.side] ≈ Float64.(case["lift_drag_side"]) atol =
                 1e-6 * force_scale
-            @test [sol.cl, sol.cd, sol.cs] ≈ Float64.(case["force_coefficients"]) atol = 1e-6
+            @test [sol.cl, sol.cd, sol.cs] ≈ Float64.(case["force_coefficients"]) atol =
+                1e-6
             @test sol.moment_coeffs ≈ Float64.(case["moment_coefficients"]) atol = 1e-5
             @test sol.q_ref ≈ case["q_ref"] rtol = 1e-12
             @test sol.projected_area ≈ case["projected_area"] rtol = 1e-12

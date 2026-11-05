@@ -609,8 +609,9 @@ function curved_bound_correction!(correction, body_aero::BodyAerodynamics{P, W, 
         wing_panels = panel_range(body_aero, wing_idx)
         node_position = cumsum([zero(T); [panels[j].width for j in wing_panels]])
         next_panel = panels[min(first(wing_panels) + 1, last(wing_panels))]
-        is_forward = norm(panels[first(wing_panels)].bound_point_1 - next_panel.bound_point_2) <
-            norm(panels[first(wing_panels)].bound_point_2 - next_panel.bound_point_1)
+        first_panel = panels[first(wing_panels)]
+        is_forward = norm(first_panel.bound_point_1 - next_panel.bound_point_2) <
+            norm(first_panel.bound_point_2 - next_panel.bound_point_1)
         sequence = is_forward ? one(T) : -one(T)
         for (local_i, i) in enumerate(wing_panels)
             centre = SVector{3, T}(panels[i].aero_center)
@@ -618,14 +619,15 @@ function curved_bound_correction!(correction, body_aero::BodyAerodynamics{P, W, 
                 panels[i].width
             position_i = (node_position[local_i] + node_position[local_i + 1]) / 2
             for (local_j, j) in enumerate(wing_panels)
-                node_low = centre + sequence * (node_position[local_j] - position_i) * tangent
+                node_low = centre +
+                    sequence * (node_position[local_j] - position_i) * tangent
                 node_high = centre +
                     sequence * (node_position[local_j + 1] - position_i) * tangent
                 unrolled_1, unrolled_2 = is_forward ? (node_high, node_low) :
                     (node_low, node_high)
                 chord_leg = 0.75 * panels[j].chord * SVector{3, T}(panels[i].x_airf)
-                velocity = unrolled_ring_difference(filament, body_aero.work_vectors, centre,
-                    panels[j], unrolled_1, unrolled_2, chord_leg, stations, weights,
+                velocity = unrolled_ring_difference(filament, body_aero.work_vectors,
+                    centre, panels[j], unrolled_1, unrolled_2, chord_leg, stations, weights,
                     core_radius_fraction, va_dist[i])
                 correction[i, j, :] .= velocity
             end
@@ -735,8 +737,9 @@ function attached_trailed_loads!(panel_forces, m_body_3D,
             is_last = boundary == last(wing_panels) + 1
             before = is_first ? boundary : boundary - 1
             after = is_last ? before : boundary
-            bound_point = is_last ? panels[after].bound_point_2 : panels[after].bound_point_1
-            te_point = is_last ? panels[after].TE_point_2 : panels[after].TE_point_1
+            panel = panels[after]
+            bound_point = is_last ? panel.bound_point_2 : panel.bound_point_1
+            te_point = is_last ? panel.TE_point_2 : panel.TE_point_1
             leg = SVector{3, T}(te_point) - SVector{3, T}(bound_point)
             point = SVector{3, T}(bound_point) + three_quarter_chord * leg
             velocity = (SVector{3, T}(panels[before].va_vec) +

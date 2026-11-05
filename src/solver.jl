@@ -650,8 +650,8 @@ function analysis_fields!(sol::VSMSolution, body_aero::BodyAerodynamics, density
     for (wing_idx, wing) in enumerate(body_aero.wings)
         spanwise_unit = SVector{3}(wing.spanwise_direction)
         for i in panel_range(body_aero, wing_idx)
-            attached = SVector{3}(sol.f_attached_trailed[1, i], sol.f_attached_trailed[2, i],
-                sol.f_attached_trailed[3, i])
+            attached = SVector{3}(sol.f_attached_trailed[1, i],
+                sol.f_attached_trailed[2, i], sol.f_attached_trailed[3, i])
             force = SVector{3}(sol.f_body_3D[1, i], sol.f_body_3D[2, i],
                 sol.f_body_3D[3, i]) - attached
             panel_va = SVector{3}(sol.va_vec_dist[i, 1], sol.va_vec_dist[i, 2],
