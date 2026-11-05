@@ -19,15 +19,18 @@
 
 ### Changed
 
-- BREAKING: default results now agree with the Python VSM v2.3.0, most visibly on swept and
-  curved wings: the circulation is `0.5 |V_eff| c Cl`; the panel chord and chordwise axis are
-  square to the bound vortex; `correct_aoa` and `is_with_attached_trailed_force` default to
-  `true`; the flow turning the forces includes a curved bound vortex correction; drag acts
-  along that flow; each wake ring follows its own panel's inflow; trailing vortex cores grow
-  with the distance from their line; `q_ref` and the reference directions leave out body
-  rates; attached trailed forces are shared per section boundary; `cd` beyond a
-  `POLAR_VECTORS` table is held, not extrapolated. V3 kite at 8°: `cl` 1.051 → 1.099, `cd`
-  0.491 → 0.458.
+- BREAKING: the solver is changed to agree with the Python VSM v2.3.0 and Gaunaa, Li &
+  Pirrung 2026, and default results now agree with Python v2.3.0 within 1e-5 on nine
+  reference cases. The circulation is `0.5 |V_eff| c Cl`; the panel chord and chordwise axis
+  are square to the bound vortex; `correct_aoa` and `is_with_attached_trailed_force` default
+  to `true`; the flow turning the forces includes a curved bound vortex correction; drag
+  acts along that flow; each wake ring follows its own panel's inflow; trailing vortex cores
+  grow with the distance from their line; `q_ref` and the reference directions leave out
+  body rates; attached trailed forces are shared per section boundary; `cd` beyond a
+  `POLAR_VECTORS` table is held, not extrapolated. Swept and curved wings move most: the V3
+  kite at 8° goes from `cl` 1.051, `cd` 0.491 to Python's 1.099, 0.458. The paper's elliptic
+  wing of aspect ratio 4 reaches Oswald efficiency 0.9947; swept wings still differ from the
+  paper (#416).
 - BREAKING: `max_iterations` defaults to 5000 and `relaxation_factor` to `nothing`, meaning
   0.8 of the largest stable factor, which is lower than the old 0.03 on narrow or high-slope
   panels.
