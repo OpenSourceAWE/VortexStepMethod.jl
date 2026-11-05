@@ -196,10 +196,13 @@ function reinit!(filament::SemiInfiniteFilament{T}, x1::AbstractVector,
 end
 
 """
-    velocity_3D_trailing_vortex_semiinfinite(filament::SemiInfiniteFilament, 
-                                             Vf, XVP, GAMMA, va, work_vectors)
+    velocity_3D_trailing_vortex_semiinfinite!(vel, filament::SemiInfiniteFilament,
+                                              Vf, XVP, GAMMA, va, work_vectors)
 
-Calculate induced velocity by a semi-infinite trailing vortex filament.
+Calculate induced velocity by a semi-infinite trailing vortex filament at `XVP`, for an
+inflow speed `va` > 0 [m/s]. Inside the core radius, grown over the distance from the
+filament's line, the velocity is that on the core boundary, with no upper limit as
+`XVP` nears the line. A point on the line gets no velocity.
 """
 function velocity_3D_trailing_vortex_semiinfinite!(
     vel,
@@ -233,8 +236,6 @@ function velocity_3D_trailing_vortex_semiinfinite!(
         @inbounds for k in 1:3
             vel[k] = K * r1XVf[k]
         end
-    elseif distance < 1e-12 * epsilon
-        vel .= 0.0
     else
         r1_proj = work_vectors[4]
         cross_tmp = work_vectors[5]
