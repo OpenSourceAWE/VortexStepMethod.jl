@@ -40,6 +40,7 @@ unit_bound_velocity
 unit_trailing_velocity
 thin_airfoil_strips
 relaxation_factor_limit
+on_vortex_line
 induced_velocity_at
 attached_trailed_loads!
 calculate_stall_angle_list

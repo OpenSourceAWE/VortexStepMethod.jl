@@ -15,8 +15,7 @@
   is not drawn, and still names the saved file and window.
 - The panel plots (`plot!(ax, panel)`, `plot!(ax, body)`, `plot(panel)`, `plot(body)`)
   take `border_color`, default `:black`, for the panel outlines.
-- `relaxation_factor_limit` gives the largest stable relaxation factor of the `LOOP` solver,
-  and `VSMSolution.f_attached_trailed` the attached trailed part of each panel's force.
+- `VSMSolution.f_attached_trailed` gives the attached trailed part of each panel's force.
 
 ### Changed
 
@@ -30,8 +29,11 @@
   `POLAR_VECTORS` table is held, not extrapolated. V3 kite at 8°: `cl` 1.051 → 1.099, `cd`
   0.491 → 0.458.
 - `max_iterations` defaults to 5000 and `relaxation_factor` to `nothing`, meaning 0.8 of
-  `relaxation_factor_limit`, which is lower than the old 0.03 on narrow or high-slope panels.
-- `*_unrefined_dist` coefficients and angles are area-weighted means of their panels.
+  the largest stable factor, which is lower than the old 0.03 on narrow or high-slope panels.
+- `*_unrefined_dist` coefficients and angles are area-weighted means of their panels, and
+  `chord_unrefined_dist` is area over width.
+- `moment_unrefined_dist` is the sum of its panels' moments, not their mean, so it and the
+  `linearize` outputs and Jacobian rows taken from it grow with the panels per section.
 - `velocity_3D_trailing_vortex_semiinfinite!` returns zero on its own axis, not `NaN`.
 - BREAKING: `solve` and `calculate_results` are removed; use `solve!`, which returns the
   solver's `VSMSolution`, and `solve!(solver, body_aero, nothing)` to start from a fresh

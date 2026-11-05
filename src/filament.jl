@@ -57,6 +57,14 @@ function velocity_3D_bound_vortex!(
 end
 
 """
+    on_vortex_line(distance, length_scale)
+
+Whether a point `distance` from a vortex line is on it, to the rounding of coordinates
+of size `length_scale`.
+"""
+on_vortex_line(distance, length_scale) = distance <= 1e-10 * length_scale
+
+"""
     velocity_3D_trailing_vortex!(vel, filament::BoundFilament,
                                  XVP, gamma, va, work_vectors)
 
@@ -86,7 +94,7 @@ as implemented in KiteAeroDyn".
     r1 .= XVP .- filament.x1
     cross3!(r1Xr0, r1, filament.r0)
     distance = norm3(r1Xr0) / filament.length
-    if distance <= 1e-10 * max(norm3(r1), filament.length)
+    if on_vortex_line(distance, max(norm3(r1), filament.length))
         vel .= 0.0
         return nothing
     end
@@ -223,7 +231,7 @@ function velocity_3D_trailing_vortex_semiinfinite!(
     nr1XVf = norm3(r1XVf)
     nr1 = norm3(r1)
     distance = nr1XVf / nVf
-    if distance < 1e-16
+    if on_vortex_line(distance, nr1)
         vel .= 0.0
         return nothing
     end

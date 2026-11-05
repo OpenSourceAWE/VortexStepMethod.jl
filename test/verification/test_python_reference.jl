@@ -116,6 +116,14 @@ reference_order(matrices) = [matrices[k][i][j] for i in eachindex(matrices[1]),
             @test sol.projected_area ≈ case["projected_area"] rtol = 1e-12
             @test sol.area_all_panels ≈ case["area_all_panels"] rtol = 1e-12
         end
+        @testset "the default stop is within 1e-5 of the converged result" begin
+            solver.rtol = Solver(length(panels), length(case["sections"])).rtol
+            sol = solve!(solver, body_aero, nothing)
+            @test sol.gamma_distribution ≈ Float64.(case["gamma"]) rtol = 1e-5
+            @test sol.alpha_dist ≈ Float64.(case["alpha_at_ac"]) rtol = 1e-5
+            @test [sol.cl, sol.cd, sol.cs] ≈ Float64.(case["force_coefficients"]) atol =
+                1e-5
+        end
         if case["name"] != "v3"
             @testset "relaxation is 0.8 of the stability limit" begin
                 @test 0.8 * relaxation_factor_limit(panels, model) ≈

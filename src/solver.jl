@@ -727,8 +727,9 @@ function solve_base!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics, gamma
     # Initialize variables
     panels = body_aero.panels
     n_panels = length(panels)
-    relaxation_factor = something(solver.relaxation_factor,
-        0.8 * relaxation_factor_limit(panels, solver.aerodynamic_model_type))
+    relaxation_factor = isnothing(solver.relaxation_factor) ?
+        0.8 * relaxation_factor_limit(panels, solver.aerodynamic_model_type) :
+        solver.relaxation_factor
     
     # Clear arrays
     solver.sol._y_airf_dist .= 0
@@ -861,9 +862,9 @@ chord-to-width ratio over `panels`, halved for `VSM` and clipped to `[1e-3, 1]`.
 """
 function relaxation_factor_limit(panels, model::Model)
     step = deg2rad(1.0)
-    ratio = 0.0
+    ratio = zero(first(panels).chord)
     for panel in panels
-        steepest = 0.0
+        steepest = zero(ratio)
         cl_low = calculate_cl(panel, deg2rad(-40.0))
         for alpha in deg2rad(-40.0):step:deg2rad(50.0)
             cl_high = calculate_cl(panel, alpha + step)

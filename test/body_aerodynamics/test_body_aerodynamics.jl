@@ -225,14 +225,14 @@ end
                 end
 
                 @test isapprox(evaluation_point, expected_controlpoints[i]["coordinates"], atol=1e-4)
-                # The thesis chord line is the raw leading-to-trailing-edge direction;
-                # panels take its part square to the bound vortex.
+                # Panels take the part of the thesis chord line square to the bound vortex.
                 span_axis = expected_controlpoints[i]["airf_coord"][:, 3]
                 raw_tangential = expected_controlpoints[i]["tangential"]
                 along_span = dot(raw_tangential, span_axis)
                 tangential = normalize(raw_tangential .- along_span .* span_axis)
                 normal = cross(tangential, span_axis)
-                chord = expected_controlpoints[i]["chord"] * sqrt(max(0.0, 1 - along_span^2))
+                chord = expected_controlpoints[i]["chord"] *
+                    sqrt(max(0.0, 1 - along_span^2))
                 @test isapprox(panel.chord, chord, atol=1e-4)
                 @test isapprox(panel.z_airf, normal, atol=1e-4)
                 @test isapprox(panel.x_airf, tangential, atol=1e-4)
