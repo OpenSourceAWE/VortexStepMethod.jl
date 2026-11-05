@@ -58,6 +58,15 @@ arc_points(radius=4.0, half_angle=55.0, n_sections=21) = [
         @test maximum(abs, body_aero.AIC_curved_correction) > 1e-3
     end
 
+    @testset "rebuilding it allocates a small fixed setup, not one vector per filament" begin
+        arc = wing_through(arc_points(), n_panels)
+        body_aero = BodyAerodynamics([arc])
+        correction = zeros(n_panels, n_panels, 3)
+        rebuild() = @allocated curved_bound_correction!(correction, body_aero, 0.05, va_dist)
+        rebuild()
+        @test rebuild() < 2_000
+    end
+
     @testset "a second wing does not enter another wing's correction" begin
         low = wing_through([point .+ [0.0, 0.0, -6.0] for point in arc_points()], 10)
         high = wing_through(arc_points(), 10)
