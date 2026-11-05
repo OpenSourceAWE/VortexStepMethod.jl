@@ -19,8 +19,8 @@
 
 ### Changed
 
-- Default results now agree with the Python VSM v2.3.0, most visibly on swept and curved
-  wings: the circulation is `0.5 |V_eff| c Cl`; the panel chord and chordwise axis are
+- BREAKING: default results now agree with the Python VSM v2.3.0, most visibly on swept and
+  curved wings: the circulation is `0.5 |V_eff| c Cl`; the panel chord and chordwise axis are
   square to the bound vortex; `correct_aoa` and `is_with_attached_trailed_force` default to
   `true`; the flow turning the forces includes a curved bound vortex correction; drag acts
   along that flow; each wake ring follows its own panel's inflow; trailing vortex cores grow
@@ -28,12 +28,14 @@
   rates; attached trailed forces are shared per section boundary; `cd` beyond a
   `POLAR_VECTORS` table is held, not extrapolated. V3 kite at 8°: `cl` 1.051 → 1.099, `cd`
   0.491 → 0.458.
-- `max_iterations` defaults to 5000 and `relaxation_factor` to `nothing`, meaning 0.8 of
-  the largest stable factor, which is lower than the old 0.03 on narrow or high-slope panels.
-- `*_unrefined_dist` coefficients and angles are area-weighted means of their panels, and
-  `chord_unrefined_dist` is area over width.
-- `moment_unrefined_dist` is the sum of its panels' moments, not their mean, so it and the
-  `linearize` outputs and Jacobian rows taken from it grow with the panels per section.
+- BREAKING: `max_iterations` defaults to 5000 and `relaxation_factor` to `nothing`, meaning
+  0.8 of the largest stable factor, which is lower than the old 0.03 on narrow or high-slope
+  panels.
+- BREAKING: `*_unrefined_dist` coefficients and angles are area-weighted means of their
+  panels, and `chord_unrefined_dist` is area over width.
+- BREAKING: `moment_unrefined_dist` is the sum of its panels' moments, not their mean, so it
+  and the `linearize` outputs and Jacobian rows taken from it grow with the panels per
+  section.
 - `velocity_3D_trailing_vortex_semiinfinite!` returns zero on its own axis, not `NaN`.
 - BREAKING: `solve` and `calculate_results` are removed; use `solve!`, which returns the
   solver's `VSMSolution`, and `solve!(solver, body_aero, nothing)` to start from a fresh
@@ -44,8 +46,8 @@
 - BREAKING: `plot_distribution` and `plot_combined_analysis` take `VSMSolution`s instead of
   dictionaries. `plot_combined_analysis`, `plot_polars` and `generate_polar_data` solve
   through `solve!`, so they leave `solver.sol` at their last angle.
-- `correct_aoa` applies to the VSM model only. With LLT, results that came from `solve`
-  move by up to 0.34 % in `cl`, 0.43 % in `cd` and 4.5 % in `cmx`.
+- BREAKING: `correct_aoa` applies to the VSM model only. With LLT, results that came from
+  `solve` move by up to 0.34 % in `cl`, 0.43 % in `cd` and 4.5 % in `cmx`.
 - `center_of_pressure` is `NaN` where the line of action crosses no panel, instead of
   `nothing` with a warning.
 
