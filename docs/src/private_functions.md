@@ -43,6 +43,7 @@ relaxation_factor_limit
 steepest_lift_slope
 lift_slope
 on_vortex_line
+lamb_oseen_core_radius
 induced_velocity_at
 attached_trailed_loads!
 calculate_stall_angle_list

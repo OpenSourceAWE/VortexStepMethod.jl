@@ -65,6 +65,14 @@ of size `length_scale`.
 on_vortex_line(distance, length_scale) = distance <= 1e-10 * length_scale
 
 """
+    lamb_oseen_core_radius(distance, va)
+
+Lamb-Oseen core radius [m] of a vortex, grown with the `distance` [m] of the evaluation
+point from the vortex line at inflow speed `va` [m/s].
+"""
+lamb_oseen_core_radius(distance, va) = sqrt(4 * ALPHA0 * NU * distance / va)
+
+"""
     velocity_3D_trailing_vortex!(vel, filament::BoundFilament,
                                  XVP, gamma, va, work_vectors)
 
@@ -98,7 +106,7 @@ as implemented in KiteAeroDyn".
         vel .= 0.0
         return nothing
     end
-    epsilon = sqrt(4 * ALPHA0 * NU * distance / va)
+    epsilon = lamb_oseen_core_radius(distance, va)
     velocity_3D_vortex_segment!(vel, filament, XVP, gamma, epsilon, work_vectors)
 end
 
@@ -235,8 +243,7 @@ function velocity_3D_trailing_vortex_semiinfinite!(
         vel .= 0.0
         return nothing
     end
-    # Core radius, grown with the distance of `XVP` from the filament's line.
-    epsilon = sqrt(4 * ALPHA0 * NU * distance / va)
+    epsilon = lamb_oseen_core_radius(distance, va)
 
     if distance > epsilon
         K = GAMMA / (4π) / (nr1XVf^2) * (1 + d_r1_Vf / nr1)
@@ -271,7 +278,8 @@ end
 
 Compute cross product of 3D vectors in-place.
 """
-@inline function cross3!(result::AbstractVector{T}, a::AbstractVector{T}, b::AbstractVector{T}) where T
+@inline function cross3!(result::AbstractVector{T}, a::AbstractVector{T},
+        b::AbstractVector{T}) where T
     x = a[2]*b[3] - a[3]*b[2]
     y = a[3]*b[1] - a[1]*b[3]
     z = a[1]*b[2] - a[2]*b[1]
