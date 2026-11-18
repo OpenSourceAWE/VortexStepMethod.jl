@@ -1,5 +1,7 @@
 using VortexStepMethod
+using VortexStepMethod: make_dual_shadow, relaxation_factor_limit
 using DifferentiationInterface
+using ForwardDiff
 using LinearAlgebra
 using Test
 
@@ -46,6 +48,15 @@ relative_error(jac, reference) = maximum(abs.(jac .- reference)) / maximum(abs, 
 
         @info "INVISCID jacobian norms" norm_fwd=norm(jac_fwd) norm_fd=norm(jac_fd)
         @test relative_error(jac_fd, jac_fwd) < 1e-3
+    end
+
+    @testset "the stability limit is type-stable on Dual panels" begin
+        set_va!(body_aero, va_vec)
+        solver = Solver(wing.n_panels, wing.n_unrefined_sections)
+        shadow_body, _ = make_dual_shadow(solver, body_aero,
+            ForwardDiff.Dual{Nothing, Float64, 2})
+        limit = @inferred relaxation_factor_limit(shadow_body.panels, VSM)
+        @test limit isa ForwardDiff.Dual
     end
 
     @testset "NONLIN+ForwardDiff is rejected" begin

@@ -1,4 +1,5 @@
 using VortexStepMethod
+using VortexStepMethod: relaxation_factor_limit
 using VortexStepMethod.AirfoilAero: lei_poly_coeffs
 using ForwardDiff
 using LinearAlgebra
@@ -218,7 +219,7 @@ end
 
 @testset "solve! fills the reference inflow and the centers of pressure" begin
     body_aero = inviscid_plates_aero([(4.0, -4.0)])
-    solver = Solver(length(body_aero.panels), 2)
+    solver = Solver(length(body_aero.panels), 2; is_with_attached_trailed_force=false)
     sol = solve!(solver, body_aero)
     @test sol.va_ref_vec ≈ 12.0 .* [cosd(5), 0.0, sind(5)]
     @test sol.q_ref ≈ 0.5 * solver.density * 12.0^2
@@ -244,6 +245,26 @@ end
     gapped = inviscid_plates_aero([(6.0, 2.0), (-2.0, -6.0)])
     solver = Solver(length(gapped.panels), 4)
     @test all(isnan, solve!(solver, gapped).center_of_pressure)
+end
+
+@testset "the default relaxation follows the stability limit of Li et al. 2026" begin
+    body_aero = inviscid_plates_aero([(2.0, -2.0)])
+    panels = body_aero.panels
+    slope = VortexStepMethod.steepest_lift_slope(first(panels))
+    @test slope ≈ 2π rtol = 1e-12
+    bound = 2 / (1 + 0.25 * length(panels) / 4.0 * slope)
+    @test relaxation_factor_limit(panels, LLT) ≈ bound rtol = 1e-12
+    @test relaxation_factor_limit(panels, VSM) ≈ bound / 2 rtol = 1e-12
+
+    n_panels = length(panels)
+    default_gamma = copy(solve!(Solver(n_panels, 2), body_aero).gamma_distribution)
+    named = Solver(n_panels, 2; relaxation_factor=0.02)
+    @test solve!(named, body_aero).gamma_distribution ≈ default_gamma rtol = 1e-4
+    one_step(factor) = begin
+        solver = Solver(n_panels, 2; relaxation_factor=factor, max_iterations=1)
+        copy(solve!(solver, body_aero, nothing).gamma_distribution)
+    end
+    @test one_step(0.01) ≈ one_step(0.02) ./ 2 rtol = 1e-3
 end
 
 @testset "Spanwise Laplacian tip closures" begin

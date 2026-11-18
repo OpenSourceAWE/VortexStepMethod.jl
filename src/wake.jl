@@ -3,7 +3,7 @@
     frozen_wake(body_aero::BodyAerodynamics, va_vec_dist)
 
 Update the filaments of the panels with frozen wake model.
-Uses one shared wake vector computed from area-weighted distributed inflow.
+Each panel's wake follows its own row of `va_vec_dist`.
 
 Replaces older filaments if present by checking length of filaments.
 
@@ -20,34 +20,14 @@ function frozen_wake!(body_aero::BodyAerodynamics, va_vec_dist)
         throw(ArgumentError(
             "va_vec_dist must be shape ($(n_panels), 3), got $(size(va_vec_dist))"))
 
-    panel_areas = [panel.chord * panel.width for panel in body_aero.panels]
-    wake_velocity = _compute_reference_velocity_from_distribution(
-        va_vec_dist,
-        n_panels,
-        panel_areas
-    )
-    wake_speed = norm(wake_velocity)
-    if wake_speed <= 0.0
+    for (i, panel) in enumerate(body_aero.panels)
+        wake_velocity = matrix_row(va_vec_dist, i)
+        wake_speed = norm(wake_velocity)
         # Zero apparent flow: keep existing wake state and avoid NaN/Inf updates.
-        return nothing
-    end
-    wake_direction = wake_velocity / wake_speed
-
-    for panel in body_aero.panels
-        reinit!(
-            panel.filaments[4],
-            panel.TE_point_1, 
-            wake_direction, 
-            wake_speed, 
-            1
-        )
-        reinit!(
-            panel.filaments[5], 
-            panel.TE_point_2, 
-            wake_direction, 
-            wake_speed, 
-            -1
-        )
+        wake_speed <= 0.0 && continue
+        wake_direction = wake_velocity / wake_speed
+        reinit!(panel.filaments[4], panel.TE_point_1, wake_direction, wake_speed, 1)
+        reinit!(panel.filaments[5], panel.TE_point_2, wake_direction, wake_speed, -1)
     end
     return nothing
 end

@@ -19,6 +19,8 @@ Struct for storing the solution of the [`solve!`](@ref) function. Must contain a
 - panel_moment_dist::Vector{Float64}: Pitching moment per unit span about y_airf [Nm/m]
 - `f_body_3D`::Matrix{Float64}: Matrix of the aerodynamic forces (x, y, z vectors) [N]
 - `m_body_3D`::Matrix{Float64}: Matrix of the aerodynamic moments [Nm]
+- `f_attached_trailed`::Matrix{Float64}: Part of `f_body_3D` from
+    [`attached_trailed_loads!`](@ref) [N]
 - `gamma_distribution`::Union{Nothing, Vector{Float64}}: Vector containing the panel circulations.
 - force::MVec3: Aerodynamic force vector in the KA frame [N]
 - moment::MVec3: Aerodynamic moments [Mx, My, Mz] around the reference point [Nm]
@@ -45,12 +47,17 @@ Struct for storing the solution of the [`solve!`](@ref) function. Must contain a
 - `panel_cp_locations`¹::Vector{MVec3}: Center of pressure of each panel [m]
 - `moment_dist`::Vector{Float64}: Pitching moments around the spanwise vector of each panel. [Nm]
 - `moment_coeff_dist`::Vector{Float64}: Pitching moment coefficient around the spanwise vector of each panel. [-]
-- `moment_unrefined_dist`::MVector{U, Float64}: Averaged moments for unrefined sections [Nm]
-- `cl_unrefined_dist`::MVector{U, Float64}: Averaged lift coefficients for unrefined sections [-]
-- `cd_unrefined_dist`::MVector{U, Float64}: Averaged drag coefficients for unrefined sections [-]
-- `cm_unrefined_dist`::MVector{U, Float64}: Averaged airfoil moment coefficients for unrefined sections [-]
+- `moment_unrefined_dist`::MVector{U, Float64}: Pitching moment per unrefined section,
+  summed over its panels [Nm]
+- `cl_unrefined_dist`::MVector{U, Float64}: Area-weighted mean lift coefficient
+  per unrefined section [-]
+- `cd_unrefined_dist`::MVector{U, Float64}: Area-weighted mean drag coefficient
+  per unrefined section [-]
+- `cm_unrefined_dist`::MVector{U, Float64}: Area-weighted mean airfoil moment coefficient
+  per unrefined section [-]
 - `moment_coeff_unrefined_dist`::MVector{U, Float64}: Summed `moment_frac`-referenced pitching-moment coefficient per unrefined section [-]
-- `alpha_unrefined_dist`::MVector{U, Float64}: Averaged angles of attack for unrefined sections [rad]
+- `alpha_unrefined_dist`::MVector{U, Float64}: Area-weighted mean angle of attack
+  per unrefined section [rad]
 - `solver_status`::SolverStatus: enum, see [`SolverStatus`](@ref)
 
 ¹ Kept at its last value when the solver's `calc_only_f_and_gamma` is set.
@@ -74,6 +81,7 @@ Struct for storing the solution of the [`solve!`](@ref) function. Must contain a
     panel_moment_dist::Vector{T} = zeros(T, P)
     f_body_3D::Matrix{T} = zeros(T, 3, P)
     m_body_3D::Matrix{T} = zeros(T, 3, P)
+    f_attached_trailed::Matrix{T} = zeros(T, 3, P)
     gamma_distribution::Union{Nothing, Vector{T}} = nothing
     force::MVector{3, T} = zeros(MVector{3, T})
     moment::MVector{3, T} = zeros(MVector{3, T})
@@ -152,10 +160,11 @@ Main solver structure for the Vortex Step Method. See also: [`solve!`](@ref)
 ## General settings
 - `aerodynamic_model_type`::Model = VSM: The model type, see: [`Model`](@ref)
 - density::Float64 = 1.225: Air density [kg/m³] 
-- `max_iterations`::Int64 = 1500
+- `max_iterations`::Int64 = 5000
 - `rtol`::Float64 = 1e-5: Relative tolerance on the fixed-point residual
 - `tol_reference_error`::Float64 = 0.001
-- `relaxation_factor`::Float64 = 0.03: Relaxation factor for convergence 
+- `relaxation_factor`::Union{Nothing, Float64} = nothing: Relaxation factor for convergence,
+    `nothing` for 0.8 of [`relaxation_factor_limit`](@ref)
 
 ## Artificial viscosity settings
 - `is_with_artificial_viscosity`::Bool = false: Enable the Li/Gaunaa spanwise artificial
@@ -175,8 +184,8 @@ Main solver structure for the Vortex Step Method. See also: [`solve!`](@ref)
     increment `-(π/4) q̂` to each section, see: [`flow_curvature_cm`](@ref)
 - `is_with_viscous_drag_correction`::Bool = false: Add the spanwise-flow viscous drag
     and side force to each section, see: [`spanwise_flow_drag`](@ref)
-- `is_with_attached_trailed_force`::Bool = false: Add the force on the chordwise trailed
-    vortex segments bound to each panel, see: [`attached_trailed_loads`](@ref)
+- `is_with_attached_trailed_force`::Bool = true: Add the force on the chordwise trailed
+    vortex segments bound to each panel, see: [`attached_trailed_loads!`](@ref)
 - `reference_point`::MVec3 = [0.0, 0.0, 0.0]: Moment reference point in body frame
 
 ## Solution
@@ -187,10 +196,10 @@ sol::VSMSolution = VSMSolution(): The result of calling [`solve!`](@ref)
     solver_type::SolverType = LOOP
     aerodynamic_model_type::Model = VSM
     density::T = T(1.225)
-    max_iterations::Int64 = 1500
+    max_iterations::Int64 = 5000
     rtol::T = T(1e-5)
     tol_reference_error::T = T(0.001)
-    relaxation_factor::T = T(0.03)
+    relaxation_factor::Union{Nothing, T} = nothing
 
     # Nonlin solver fields
     atol::T = T(1e-5)
@@ -210,16 +219,16 @@ sol::VSMSolution = VSMSolution(): The result of calling [`solve!`](@ref)
     core_radius_fraction::T = T(0.05)
     mu::T = T(1.81e-5)
     is_only_f_and_gamma_output::Bool = false
-    correct_aoa::Bool = false
+    correct_aoa::Bool = true
     flow_curvature::Bool = false
     is_with_viscous_drag_correction::Bool = false
-    is_with_attached_trailed_force::Bool = false
+    is_with_attached_trailed_force::Bool = true
     reference_point::MVector{3, T} = zeros(MVector{3, T})
 
     # Intermediate results
     lr::LoopResult{P, T} = LoopResult{P, T}()
     br::BaseResult{P, T} = BaseResult{P, T}()
-    cache::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}} = [LazyBufferCache() for _ in 1:8]
+    cache::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}} = [LazyBufferCache() for _ in 1:6]
     cache_base::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}}  = [LazyBufferCache()]
     cache_lin::Vector{PreallocationTools.LazyBufferCache{typeof(identity), typeof(identity)}} = [LazyBufferCache() for _ in 1:4]
 
@@ -445,50 +454,56 @@ function calc_forces!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics;
     projected_area = body_aero.projected_area
     c_ref = body_aero.c_ref
 
-    for (wing_idx, wing) in enumerate(body_aero.wings)
-        spanwise_unit = SVector{3, T}(wing.spanwise_direction)
-        for i in panel_range(body_aero, wing_idx)
-            panel = panels[i]
-            panel_area = panel.chord * panel.width
-            area_all_panels += panel_area
-            panel_areas[i] = panel_area
+    for (i, panel) in enumerate(panels)
+        panel_area = panel.chord * panel.width
+        area_all_panels += panel_area
+        panel_areas[i] = panel_area
 
-            axes = panel_axes(panel)
-            dirs = panel_force_directions(axes, alpha_corrected[i], spanwise_unit)
-            c_span = zero(T)
-            if solver.is_with_viscous_drag_correction
-                viscous = spanwise_flow_drag(v_rel_dist[i], solver.lr.v_span_dist[i],
-                    panel.chord, density, solver.mu)
-                cd_dist[i] += viscous.delta_cd
-                c_span = viscous.c_span
-            end
-            loads = panel_loads(axes, dirs,
-                dynamic_pressure(density, density, v_rel_dist[i]),
-                cl_dist[i], cd_dist[i], cm_dist[i]; c_span)
-            lift[i] = loads.lift
-            drag[i] = loads.drag
-            panel_moment_dist[i] = loads.moment
-
-            (; force, moment) = panel_force_moment(body_aero, i, loads, axes.y_airf,
-                gamma_new, density, solver.core_radius_fraction, reference_point,
-                solver.is_with_attached_trailed_force)
-            @inbounds for k in 1:3
-                solver.sol.f_body_3D[k, i] = force[k]
-                solver.sol.m_body_3D[k, i] = moment[k]
-            end
-
-            arm = (moment_frac - 0.25) * panel.chord
-            moment_dist[i] = dot(loads.force, axes.z_airf) * arm + loads.pitching_moment
+        axes = panel_axes(panel)
+        dirs = panel_force_directions(axes, alpha_corrected[i])
+        c_span = zero(T)
+        if solver.is_with_viscous_drag_correction
+            viscous = spanwise_flow_drag(v_rel_dist[i], solver.lr.v_span_dist[i],
+                panel.chord, density, solver.mu)
+            cd_dist[i] += viscous.delta_cd
+            c_span = viscous.c_span
         end
+        loads = panel_loads(axes, dirs,
+            dynamic_pressure(density, density, v_rel_dist[i]),
+            cl_dist[i], cd_dist[i], cm_dist[i]; c_span)
+        lift[i] = loads.lift
+        drag[i] = loads.drag
+        panel_moment_dist[i] = loads.moment
+
+        arm_to_panel = SVector{3, T}(panel.aero_center) - SVector{3, T}(reference_point)
+        moment = loads.pitching_moment .* axes.y_airf .+ cross(arm_to_panel, loads.force)
+        @inbounds for k in 1:3
+            solver.sol.f_body_3D[k, i] = loads.force[k]
+            solver.sol.m_body_3D[k, i] = moment[k]
+        end
+
+        arm = (moment_frac - 0.25) * panel.chord
+        moment_dist[i] = dot(loads.force, axes.z_airf) * arm + loads.pitching_moment
+    end
+    if solver.is_with_attached_trailed_force
+        attached_trailed_loads!(solver.sol.f_attached_trailed, solver.sol.m_body_3D,
+            body_aero, gamma_new, density, solver.core_radius_fraction, reference_point)
+        solver.sol.f_body_3D .+= solver.sol.f_attached_trailed
+    else
+        solver.sol.f_attached_trailed .= 0
     end
 
-    # Python parity: normalize with area-weighted reference velocity for distributed inflow.
+    # The inflow as handed in, without the turn rate: area-weighted when it is distributed.
     va_ref_vec = solver.sol.va_ref_vec
-    va_ref_vec .= _compute_reference_velocity_from_distribution(
-        solver.sol.va_vec_dist,
-        length(panels),
-        panel_areas
-    )
+    if body_aero.has_distributed_va
+        va_ref_vec .= _compute_reference_velocity_from_distribution(
+            solver.sol.va_vec_dist,
+            length(panels),
+            panel_areas
+        )
+    else
+        va_ref_vec .= body_aero.va_vec
+    end
     va_ref = norm(va_ref_vec)
     va_ref > 0.0 || throw(ArgumentError("Reference freestream magnitude must be positive."))
     q_ref = 0.5 * density * va_ref^2
@@ -538,42 +553,45 @@ function calc_forces!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics;
                     original_section_idx = wing.refined_panel_mapping[local_panel_idx]
                     target_unrefined_idx = section_range[original_section_idx]
 
+                    area = panel.chord * panel.width
+
                     # Accumulate coefficients and moments
                     moment_unrefined_dist[target_unrefined_idx] += moment_dist[panel_idx]
-                    cl_unrefined_dist[target_unrefined_idx] += solver.sol.cl_dist[panel_idx]
-                    cd_unrefined_dist[target_unrefined_idx] += solver.sol.cd_dist[panel_idx]
-                    cm_unrefined_dist[target_unrefined_idx] += solver.sol.cm_dist[panel_idx]
+                    cl_unrefined_dist[target_unrefined_idx] +=
+                        solver.sol.cl_dist[panel_idx] * area
+                    cd_unrefined_dist[target_unrefined_idx] +=
+                        solver.sol.cd_dist[panel_idx] * area
+                    cm_unrefined_dist[target_unrefined_idx] +=
+                        solver.sol.cm_dist[panel_idx] * area
                     moment_coeff_unrefined_dist[target_unrefined_idx] += solver.sol.moment_coeff_dist[panel_idx]
-                    alpha_unrefined_dist[target_unrefined_idx] += solver.sol.alpha_dist[panel_idx]
+                    alpha_unrefined_dist[target_unrefined_idx] +=
+                        solver.sol.alpha_dist[panel_idx] * area
 
                     # Accumulate geometry
                     x_airf_unrefined_dist[target_unrefined_idx] .+= panel.x_airf
                     y_airf_unrefined_dist[target_unrefined_idx] .+= panel.y_airf
                     z_airf_unrefined_dist[target_unrefined_idx] .+= panel.z_airf
                     va_vec_unrefined_dist[target_unrefined_idx] .+= panel.va_vec
-                    chord_unrefined_dist[target_unrefined_idx] += panel.chord
+                    chord_unrefined_dist[target_unrefined_idx] += area
                     width_unrefined_dist[target_unrefined_idx] += panel.width
 
                     unrefined_count_dist[target_unrefined_idx] += 1
                 end
 
-                # Average coefficients and geometry. width and
-                # moment_coeff_unrefined_dist stay summed (extensive).
                 for target_unrefined_idx in section_range
                     if unrefined_count_dist[target_unrefined_idx] > 0
                         count = unrefined_count_dist[target_unrefined_idx]
-                        moment_unrefined_dist[target_unrefined_idx] /= count
-                        cl_unrefined_dist[target_unrefined_idx] /= count
-                        cd_unrefined_dist[target_unrefined_idx] /= count
-                        cm_unrefined_dist[target_unrefined_idx] /= count
-                        alpha_unrefined_dist[target_unrefined_idx] /= count
+                        area = chord_unrefined_dist[target_unrefined_idx]
+                        cl_unrefined_dist[target_unrefined_idx] /= area
+                        cd_unrefined_dist[target_unrefined_idx] /= area
+                        cm_unrefined_dist[target_unrefined_idx] /= area
+                        alpha_unrefined_dist[target_unrefined_idx] /= area
                         x_airf_unrefined_dist[target_unrefined_idx] ./= count
                         y_airf_unrefined_dist[target_unrefined_idx] ./= count
                         z_airf_unrefined_dist[target_unrefined_idx] ./= count
                         va_vec_unrefined_dist[target_unrefined_idx] ./= count
-                        chord_unrefined_dist[target_unrefined_idx] /= count
-                        # width_unrefined_dist is NOT averaged - it is the
-                        # sum of panel widths in the unrefined section
+                        chord_unrefined_dist[target_unrefined_idx] =
+                            area / width_unrefined_dist[target_unrefined_idx]
                     end
                 end
             end
@@ -632,8 +650,10 @@ function analysis_fields!(sol::VSMSolution, body_aero::BodyAerodynamics, density
     for (wing_idx, wing) in enumerate(body_aero.wings)
         spanwise_unit = SVector{3}(wing.spanwise_direction)
         for i in panel_range(body_aero, wing_idx)
+            attached = SVector{3}(sol.f_attached_trailed[1, i],
+                sol.f_attached_trailed[2, i], sol.f_attached_trailed[3, i])
             force = SVector{3}(sol.f_body_3D[1, i], sol.f_body_3D[2, i],
-                sol.f_body_3D[3, i])
+                sol.f_body_3D[3, i]) - attached
             panel_va = SVector{3}(sol.va_vec_dist[i, 1], sol.va_vec_dist[i, 2],
                 sol.va_vec_dist[i, 3])
             va_panel = norm(panel_va)
@@ -642,10 +662,13 @@ function analysis_fields!(sol::VSMSolution, body_aero::BodyAerodynamics, density
             body_dirs = prescribed_va_directions(panel_va, reference_spanwise)
 
             lift += dot(force, body_dirs.dir_lift) *
-                dot(body_dirs.dir_lift, reference_dirs.dir_lift)
-            drag += panel_drag * dot(panel_va, va_ref_unit) / va_panel
+                dot(body_dirs.dir_lift, reference_dirs.dir_lift) +
+                dot(attached, reference_dirs.dir_lift)
+            drag += panel_drag * dot(panel_va, va_ref_unit) / va_panel +
+                dot(attached, va_ref_unit)
             side += dot(force, body_dirs.dir_side) *
-                dot(body_dirs.dir_side, reference_dirs.dir_side)
+                dot(body_dirs.dir_side, reference_dirs.dir_side) +
+                dot(attached, reference_dirs.dir_side)
 
             q_area = dynamic_pressure(density, density, va_panel) * sol.panel_area_dist[i]
             sol.cl_distribution[i] = dot(force, wing_dirs.dir_lift) / q_area
@@ -704,7 +727,9 @@ function solve_base!(solver::Solver{P, U, T}, body_aero::BodyAerodynamics, gamma
     # Initialize variables
     panels = body_aero.panels
     n_panels = length(panels)
-    relaxation_factor = solver.relaxation_factor
+    relaxation_factor = isnothing(solver.relaxation_factor) ?
+        0.8 * relaxation_factor_limit(panels, solver.aerodynamic_model_type) :
+        solver.relaxation_factor
     
     # Clear arrays
     solver.sol._y_airf_dist .= 0
@@ -786,9 +811,7 @@ end
     relative_velocity_dist,
     y_airf_dist,
     relative_velocity_crossz,
-    v_acrossz_dist,
     z_airf_dist,
-    va_magw_dist,
     cl_dist,
     chord_dist,
 )
@@ -807,12 +830,6 @@ end
         relative_velocity_crossz[i,1] = ay*bz - az*by
         relative_velocity_crossz[i,2] = az*bx - ax*bz
         relative_velocity_crossz[i,3] = ax*by - ay*bx
-        ax = va_vec_dist[i,1]
-        ay = va_vec_dist[i,2]
-        az = va_vec_dist[i,3]
-        v_acrossz_dist[i,1] = ay*bz - az*by
-        v_acrossz_dist[i,2] = az*bx - ax*bz
-        v_acrossz_dist[i,3] = ax*by - ay*bx
     end
 
     @inbounds for i in 1:n_panels
@@ -827,17 +844,50 @@ end
             relative_velocity_crossz[i,1]^2 +
             relative_velocity_crossz[i,2]^2 +
             relative_velocity_crossz[i,3]^2)
-        va_magw_dist[i] = smooth_sqrt(
-            v_acrossz_dist[i,1]^2 +
-            v_acrossz_dist[i,2]^2 +
-            v_acrossz_dist[i,3]^2)
     end
 
     for (i, (panel, alpha)) in enumerate(zip(panels, solver.lr.alpha_dist))
         cl_dist[i] = calculate_cl(panel, alpha)
     end
-    gamma_out .= 0.5 .* solver.lr.v_rel_dist.^2 ./ va_magw_dist .* cl_dist .* chord_dist
+    gamma_out .= 0.5 .* solver.lr.v_rel_dist .* cl_dist .* chord_dist
     return nothing
+end
+
+"""
+    relaxation_factor_limit(panels, model::Model)
+
+Largest relaxation factor the `LOOP` solver is stable at in attached flow (Li, Gaunaa,
+Pirrung & Lønbæk, TORQUE 2026, Eqs. 10-11), from the steepest positive lift slope and
+chord-to-width ratio over `panels`, halved for `VSM` and clipped to `[1e-3, 1]`.
+"""
+function relaxation_factor_limit(panels, model::Model)
+    ratio = zero(first(panels).chord)
+    for panel in panels
+        ratio = max(ratio, panel.chord / panel.width * steepest_lift_slope(panel))
+    end
+    limit = 2 / (1 + 0.25 * ratio)
+    return clamp(model == VSM ? limit / 2 : limit, 1e-3, 1.0)
+end
+
+"""
+    steepest_lift_slope(panel)
+
+Steepest positive [`lift_slope`](@ref) of `panel`, sampled at the angles of its table for
+`POLAR_VECTORS` and every degree from -40° to 50° for other polars.
+"""
+function steepest_lift_slope(panel)
+    panel.aero_model == POLAR_VECTORS &&
+        return steepest_lift_slope(panel, panel.cl_interp.itp.knots[1])
+    return steepest_lift_slope(panel, deg2rad(-40.0):deg2rad(1.0):deg2rad(50.0))
+end
+
+function steepest_lift_slope(panel, angles)
+    steepest = zero(panel.chord)
+    for alpha in angles
+        slope = lift_slope(panel, alpha)
+        isfinite(slope) && (steepest = max(steepest, slope))
+    end
+    return steepest
 end
 
 """
@@ -875,14 +925,20 @@ slope turns negative in post-stall, which is what activates the
 artificial-viscosity regularization in [`gamma_loop!`](@ref).
 """
 function local_lift_slope!(slopes, panels, alpha_dist, delta=deg2rad(0.5))
-    inv_2delta = 1.0 / (2delta)
     @inbounds for i in eachindex(panels)
-        cl_plus  = calculate_cl(panels[i], alpha_dist[i] + delta)
-        cl_minus = calculate_cl(panels[i], alpha_dist[i] - delta)
-        slopes[i] = (cl_plus - cl_minus) * inv_2delta
+        slopes[i] = lift_slope(panels[i], alpha_dist[i], delta)
     end
     return slopes
 end
+
+"""
+    lift_slope(panel, alpha, delta=deg2rad(0.5))
+
+Lift-curve slope `dCl/dalpha` [1/rad] of `panel`'s polar at `alpha`, by central differences
+over `delta` [rad].
+"""
+lift_slope(panel, alpha, delta=deg2rad(0.5)) =
+    (calculate_cl(panel, alpha + delta) - calculate_cl(panel, alpha - delta)) / (2delta)
 
 """
     apply_artificial_viscosity!(gamma, panels, alpha_dist, laplacian, viscosity_matrix,
@@ -953,14 +1009,12 @@ function gamma_loop!(
     solver.lr.alpha_dist .= body_aero.alpha_dist
     solver.lr.v_rel_dist .= body_aero.v_rel_dist
     
-    va_magw_dist             = solver.cache[1][solver.lr.v_rel_dist]
-    gamma                    = solver.cache[2][solver.lr.gamma_new]
-    abs_gamma_new            = solver.cache[3][solver.lr.gamma_new]
-    induced_velocity_all     = solver.cache[4][va_vec_dist]
-    relative_velocity_dist   = solver.cache[5][va_vec_dist]
-    relative_velocity_crossz = solver.cache[6][va_vec_dist]
-    v_acrossz_dist           = solver.cache[7][va_vec_dist]
-    cl_dist                  = solver.cache[8][solver.lr.gamma_new]
+    gamma                    = solver.cache[1][solver.lr.gamma_new]
+    abs_gamma_new            = solver.cache[2][solver.lr.gamma_new]
+    induced_velocity_all     = solver.cache[3][va_vec_dist]
+    relative_velocity_dist   = solver.cache[4][va_vec_dist]
+    relative_velocity_crossz = solver.cache[5][va_vec_dist]
+    cl_dist                  = solver.cache[6][solver.lr.gamma_new]
 
     AIC_x = @view body_aero.AIC[:, :, 1]
     AIC_y = @view body_aero.AIC[:, :, 2]
@@ -988,8 +1042,8 @@ function gamma_loop!(
             AIC_x, AIC_y, AIC_z,
             velocity_view_x, velocity_view_y, velocity_view_z,
             va_vec_dist, induced_velocity_all, relative_velocity_dist,
-            y_airf_dist, relative_velocity_crossz, v_acrossz_dist,
-            z_airf_dist, va_magw_dist, cl_dist, chord_dist,
+            y_airf_dist, relative_velocity_crossz,
+            z_airf_dist, cl_dist, chord_dist,
         )
         @inbounds for i in 1:n_panels
             residual[i] -= gamma_iter[i]
@@ -1008,8 +1062,8 @@ function gamma_loop!(
                     AIC_x, AIC_y, AIC_z,
                     velocity_view_x, velocity_view_y, velocity_view_z,
                     va_vec_dist, induced_velocity_all, relative_velocity_dist,
-                    y_airf_dist, relative_velocity_crossz, v_acrossz_dist,
-                    z_airf_dist, va_magw_dist, cl_dist, chord_dist,
+                    y_airf_dist, relative_velocity_crossz,
+                    z_airf_dist, cl_dist, chord_dist,
                 )
                 inv_step = 1.0 / step
                 for i in 1:n_panels
@@ -1035,8 +1089,8 @@ function gamma_loop!(
                     AIC_x, AIC_y, AIC_z,
                     velocity_view_x, velocity_view_y, velocity_view_z,
                     va_vec_dist, induced_velocity_all, relative_velocity_dist,
-                    y_airf_dist, relative_velocity_crossz, v_acrossz_dist,
-                    z_airf_dist, va_magw_dist, cl_dist, chord_dist,
+                    y_airf_dist, relative_velocity_crossz,
+                    z_airf_dist, cl_dist, chord_dist,
                 )
                 @inbounds for i in 1:n_panels
                     residual_perturbed[i] -= gamma_perturbed[i]
@@ -1098,9 +1152,7 @@ function gamma_loop!(
                 relative_velocity_dist,
                 y_airf_dist,
                 relative_velocity_crossz,
-                v_acrossz_dist,
                 z_airf_dist,
-                va_magw_dist,
                 cl_dist,
                 chord_dist,
             )
@@ -1215,7 +1267,8 @@ function make_dual_shadow(solver::Solver{P, U, Float64},
         max_iterations = solver.max_iterations,
         rtol = TD(solver.rtol),
         tol_reference_error = TD(solver.tol_reference_error),
-        relaxation_factor = TD(solver.relaxation_factor),
+        relaxation_factor = isnothing(solver.relaxation_factor) ? nothing :
+            TD(solver.relaxation_factor),
         atol = TD(solver.atol),
         is_with_artificial_viscosity = solver.is_with_artificial_viscosity,
         artificial_viscosity_factor = TD(solver.artificial_viscosity_factor),

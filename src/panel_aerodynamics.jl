@@ -19,8 +19,21 @@ length the span width.
 @inline panel_span_vector(le_1, te_1, le_2, te_2) =
     (0.75 .* le_1 .+ 0.25 .* te_1) .- (0.75 .* le_2 .+ 0.25 .* te_2)
 
-@inline panel_chord(le_1, te_1, le_2, te_2) =
-    0.5 * (smooth_norm(te_1 .- le_1) + smooth_norm(te_2 .- le_2))
+"""
+    panel_chord(le_1, te_1, le_2, te_2)
+
+Mean length of the two section chords, each with its component along the quarter-chord
+line removed.
+"""
+@inline function panel_chord(le_1, te_1, le_2, te_2)
+    span_vec = panel_span_vector(le_1, te_1, le_2, te_2)
+    span_unit = span_vec ./ smooth_norm(span_vec)
+    return 0.5 * (smooth_norm(perpendicular_part(te_1 .- le_1, span_unit)) +
+                  smooth_norm(perpendicular_part(te_2 .- le_2, span_unit)))
+end
+
+"""Part of `vec` perpendicular to the unit vector `unit`."""
+@inline perpendicular_part(vec, unit) = vec .- dot(vec, unit) .* unit
 
 """
     panel_chord_weight(width_prev, width_own, width_next)
@@ -47,9 +60,9 @@ end
     panel_axes(le_1, te_1, le_2, te_2, chord_weight=0.5, orient=1)
 
 Airfoil frame and size of the panel between two sections, as
-`(; x_airf, y_airf, z_airf, chord, width)`. `x_airf` is chordwise, `y_airf` runs
-along the quarter-chord line the bound vortex sits on — not square to `x_airf` on
-a swept panel — and `z_airf` is `x_airf × y_airf` normalised. `chord_weight`
+`(; x_airf, y_airf, z_airf, chord, width)`, an orthonormal frame: `y_airf` runs along
+the quarter-chord line the bound vortex sits on, `x_airf` is chordwise and square to
+it, and `z_airf` is `x_airf × y_airf`. `chord_weight`
 ([`panel_chord_weight`](@ref)) is section 1's share of the chord-direction blend;
 `orient` is `±1` and flips `y_airf` and `z_airf` together.
 """
@@ -59,8 +72,10 @@ a swept panel — and `z_airf` is `x_airf × y_airf` normalised. `chord_weight`
         lean .* ((te_1 .- te_2) .- (le_1 .- le_2))
     span_vec = panel_span_vector(le_1, te_1, le_2, te_2)
     width = smooth_norm(span_vec)
-    x_airf = chord_vec ./ smooth_norm(chord_vec)
-    y_airf = orient .* (span_vec ./ width)
+    span_unit = span_vec ./ width
+    chord_square = perpendicular_part(chord_vec, span_unit)
+    x_airf = chord_square ./ smooth_norm(chord_square)
+    y_airf = orient .* span_unit
     z_cross = cross(x_airf, span_vec)
     z_airf = orient .* (z_cross ./ smooth_norm(z_cross))
     return (; x_airf, y_airf, z_airf,
@@ -149,18 +164,18 @@ Panel dynamic pressure from its two section densities and the
     0.25 * (rho_1 + rho_2) * v_rel^2
 
 """
-    panel_force_directions(axes, alpha_dir, spanwise)
+    panel_force_directions(axes, alpha_dir)
 
-Lift and drag unit vectors, `(; dir_lift, dir_drag)`. `alpha_dir` is the angle that
-turns the force, `spanwise` the wing's spanwise direction.
+Lift and drag unit vectors, `(; dir_lift, dir_drag)`. `alpha_dir` is the angle of the
+flow that turns the force: drag runs along it in the section plane and lift square to
+it and to `y_airf`.
 """
-@inline function panel_force_directions(axes, alpha_dir, spanwise)
+@inline function panel_force_directions(axes, alpha_dir)
     (; y_airf, z_airf) = axes
     dir_inflow = cos(alpha_dir) .* cross(y_airf, z_airf) .+ sin(alpha_dir) .* z_airf
     lift_cross = cross(dir_inflow, y_airf)
-    dir_lift = lift_cross ./ smooth_norm(lift_cross)
-    drag_cross = cross(spanwise, dir_lift)
-    return (; dir_lift, dir_drag=drag_cross ./ smooth_norm(drag_cross))
+    return (; dir_lift=lift_cross ./ smooth_norm(lift_cross),
+            dir_drag=dir_inflow ./ smooth_norm(dir_inflow))
 end
 
 """Panel pitching moment per unit span about `y_airf`, positive nose-up."""

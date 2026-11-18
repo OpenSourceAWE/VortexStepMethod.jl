@@ -153,12 +153,12 @@ Solver configuration, used within [`VSMSettings`](@ref).
     [`LLT`](@ref Model) (default `VSM`)
 - `solver_type`: `"LOOP"` or `"NONLIN"` (default `"LOOP"`)
 - `density`: Air density (kg/m^3) (default `1.225`)
-- `max_iterations`: Maximum solver iterations (default `1500`)
+- `max_iterations`: Maximum solver iterations (default `5000`)
 - `rtol`: Relative tolerance on the fixed-point residual (default `1e-5`)
 - `tol_reference_error`: Reference error tolerance
     (default `0.001`)
-- `relaxation_factor`: Convergence relaxation factor
-    (default `0.03`)
+- `relaxation_factor`: Convergence relaxation factor, `nothing` for 0.8 of
+    [`relaxation_factor_limit`](@ref) (default `nothing`)
 - `is_with_artificial_viscosity`: Enable Li/Gaunaa post-stall
     artificial viscosity (default `false`)
 - `artificial_viscosity_factor`: Viscosity scaling coefficient k
@@ -174,24 +174,24 @@ Solver configuration, used within [`VSMSettings`](@ref).
 - `calc_only_f_and_gamma`: Leave the analysis fields of [`VSMSolution`](@ref) (`lift`,
     `cl`, their distributions, span and centers of pressure) at their last values
     (default `false`)
-- `correct_aoa`: Perform angle of attack correction (VSM model only)
-    (default `false`)
+- `correct_aoa`: Turn the panel forces by the flow at the quarter chord rather than at the
+    control point (VSM model only) (default `true`)
 - `flow_curvature`: Add the thin-airfoil pitch-rate moment increment to each
     section (default `false`)
 - `is_with_viscous_drag_correction`: Add the spanwise-flow viscous drag and side
     force to each section (default `false`)
 - `is_with_attached_trailed_force`: Add the force on the chordwise trailed vortex
-    segments bound to each panel (default `false`)
+    segments bound to each panel (default `true`)
 """
 @with_kw mutable struct SolverSettings
     n_panels::Int64 = 40
     aerodynamic_model_type::Model = VSM
     solver_type::String = "LOOP"    # type of solver
     density::Float64 = 1.225                # air density  [kg/m³] 
-    max_iterations::Int64 = 1500
+    max_iterations::Int64 = 5000
     rtol::Float64 = 1e-5                    # relative residual tolerance [-]
     tol_reference_error::Float64 = 0.001
-    relaxation_factor::Float64 = 0.03       # relaxation factor for convergence
+    relaxation_factor::Union{Nothing, Float64} = nothing # relaxation factor for convergence
     is_with_artificial_viscosity::Bool = false  # Li/Gaunaa post-stall artificial viscosity
     artificial_viscosity_factor::Float64 = 0.035 # viscosity scaling coefficient k
     type_initial_gamma_distribution::InitialGammaDistribution = ZEROS # see: [`InitialGammaDistribution`](@ref)
@@ -199,10 +199,10 @@ Solver configuration, used within [`VSMSettings`](@ref).
     core_radius_fraction::Float64 = 0.05
     mu::Float64 = 1.81e-5                   # dynamic viscosity [N·s/m²]
     calc_only_f_and_gamma::Bool=false       # skip the analysis fields of VSMSolution
-    correct_aoa::Bool=false                 # perform aoa correction
+    correct_aoa::Bool=true                  # turn the forces by the quarter-chord flow
     flow_curvature::Bool=false              # thin-airfoil pitch-rate moment increment
     is_with_viscous_drag_correction::Bool=false # spanwise-flow viscous force (Gaunaa 2024)
-    is_with_attached_trailed_force::Bool=false # chordwise bound-vortex force (Gaunaa 2026)
+    is_with_attached_trailed_force::Bool=true # chordwise bound-vortex force (Gaunaa 2026)
 end
 
 """
