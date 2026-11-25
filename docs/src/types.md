@@ -43,6 +43,7 @@ Wing
 Wing(n_panels::Int; spanwise_distribution::PanelDistribution=LINEAR,
      spanwise_direction::PosVector=MVec3([0.0, 1.0, 0.0]))
 ObjWing
+KiteShape
 BodyAerodynamics
 ```
 

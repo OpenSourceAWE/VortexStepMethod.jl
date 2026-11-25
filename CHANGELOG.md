@@ -4,6 +4,7 @@
 
 ### Added
 
+- `KiteShape` and `kite_sections` generate an LEI kite's section edges from projected area, aspect ratio, arc angle and distribution, taper, leading-edge sweep and twist. `examples/inverse_design.jl` finds the kite geometry for a target polar, and `examples/inverse_design_table.jl` writes the table of sampled kites `docs/src/assets/inverse_design_kites.json.gz`; see the docs page Inverse design.
 - `masure_regression` airfoils `{t, eta, kappa, delta, lambda, phi}` resolve to polars: `resolve_aero_geometry(...; ml_models_dir)` evaluates the Masure Extra-Trees regression (`masure_aero`, `load_masure_model`) in pure Julia, with `phi` (leading-edge tension) as the models' 5th input and `lambda` (camber tension) as their 6th, from models converted once with `scripts/export_masure_models.py`.
 - `plot_geometry`, `plot_distribution`, `plot_combined_analysis`, `plot_section_polars`,
   `plot_airfoil_fit` and `plot_airfoils` take `show_title=true`; with `false` the title

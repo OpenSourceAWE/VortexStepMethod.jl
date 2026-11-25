@@ -40,6 +40,7 @@ function include_selected_tests()
     should_run_test("filament/test_bound_filament.jl") && include("filament/test_bound_filament.jl")
     should_run_test("filament/test_semi_infinite_filament.jl") && include("filament/test_semi_infinite_filament.jl")
     should_run_test("panel/test_panel.jl") && include("panel/test_panel.jl")
+    should_run_test("wing_geometry/test_kite_shape.jl") && include("wing_geometry/test_kite_shape.jl")
     if should_run_test("plotting/test_plotting.jl")
         # MakieControlPlots activates GLMakie on load, which needs a display. Only the
         # Linux CI provides one (via xvfb); skip on headless macOS/Windows runners.
