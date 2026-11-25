@@ -1,5 +1,5 @@
 "Airfoil parameters the masure regression takes, in its input order (alpha follows)."
-const MASURE_PARAMETERS = ("t", "eta", "kappa", "delta", "lambda", "phi")
+const MASURE_PARAMETERS = ("t", "eta", "kappa", "delta", "phi", "lambda")
 
 "Reynolds numbers a masure regression model exists for, with their file suffix."
 const MASURE_REYNOLDS = Dict(1.0e6 => "1e6", 5.0e6 => "5e6", 2.0e7 => "2e7")

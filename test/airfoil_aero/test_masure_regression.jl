@@ -2,8 +2,9 @@ using Test
 import YAML
 using VortexStepMethod
 using VortexStepMethod.ObjAdapter: resolve_aero_geometry
-using VortexStepMethod.AirfoilAero: MASURE_PARAMETERS, load_masure_model, masure_aero,
-                                    resolve_airfoil, write_yaml, npzread
+using VortexStepMethod.AirfoilAero: MASURE_PARAMETERS, ExtraTreesForest, MasureModel,
+                                    load_masure_model, masure_aero, resolve_airfoil,
+                                    write_yaml, npzread
 
 fixture_dir = joinpath(@__DIR__, "data", "masure")
 
@@ -15,6 +16,19 @@ fixture_dir = joinpath(@__DIR__, "data", "masure")
             params = Dict(zip(MASURE_PARAMETERS, row[1:6]))
             cl, cd, cm = masure_aero(model, params, [row[7]])
             @test [cd[1], cl[1], cm[1]] == expected
+        end
+    end
+
+    @testset "phi feeds the model's 5th input and lambda its 6th, as it was trained" begin
+        # One stump per output, splitting the unscaled input `feature` at 0.5.
+        stump(feature) = ExtraTreesForest(Int32[1], Int32[2, 0, 0], Int32[3, 0, 0],
+                                          Int32[feature, 0, 0], [0.5, 0, 0], [0, 1.0, 2.0])
+        params = Dict("t" => 0.08, "eta" => 0.2, "kappa" => 0.09, "delta" => -2.0,
+                      "lambda" => 0.3, "phi" => 0.65)
+        for (feature, name) in ((5, "phi"), (6, "lambda"))
+            model = MasureModel(zeros(7), ones(7), fill(stump(feature), 3))
+            cl, _, _ = masure_aero(model, params, [0.0])
+            @test cl[1] == (params[name] > 0.5 ? 2.0 : 1.0)
         end
     end
 
