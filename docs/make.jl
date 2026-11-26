@@ -21,6 +21,7 @@ makedocs(;
         "CAD mesh to model" => "airfoil_pipeline.md",
         "Settings file" => "settings.md",
         "Examples" => "examples.md",
+        "Inverse design" => "inverse_design.md",
         "Exported Functions" => "functions.md",
         "Exported Types" => "types.md",
         "Private Functions" => "private_functions.md",

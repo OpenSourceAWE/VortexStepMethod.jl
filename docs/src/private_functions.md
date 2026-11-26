@@ -10,6 +10,13 @@ airfoil_settings
 settings_range
 ```
 
+### Parametric kite
+```@docs
+tangent_angle
+arc_position
+chord_fraction
+```
+
 ### Solver, forces and circulation
 ```@docs
 n_unrefined_sections

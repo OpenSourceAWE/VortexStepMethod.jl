@@ -7,6 +7,7 @@ add_section!
 refine!
 calculate_span
 calculate_projected_area
+kite_sections
 ```
 
 ## Surface aero (contour + Cp + cf) tables
