@@ -40,6 +40,7 @@ function include_selected_tests()
     should_run_test("filament/test_bound_filament.jl") && include("filament/test_bound_filament.jl")
     should_run_test("filament/test_semi_infinite_filament.jl") && include("filament/test_semi_infinite_filament.jl")
     should_run_test("panel/test_panel.jl") && include("panel/test_panel.jl")
+    should_run_test("wing_geometry/test_kite_shape.jl") && include("wing_geometry/test_kite_shape.jl")
     if should_run_test("plotting/test_plotting.jl")
         # MakieControlPlots activates GLMakie on load, which needs a display. Only the
         # Linux CI provides one (via xvfb); skip on headless macOS/Windows runners.
@@ -70,6 +71,7 @@ function include_selected_tests()
     should_run_test("yaml_geometry/test_yaml_geometry.jl") && include("yaml_geometry/test_yaml_geometry.jl")
     should_run_test("airfoil_aero/test_airfoil_aero.jl") && include("airfoil_aero/test_airfoil_aero.jl")
     should_run_test("airfoil_aero/test_live_polar.jl") && include("airfoil_aero/test_live_polar.jl")
+    should_run_test("airfoil_aero/test_masure_regression.jl") && include("airfoil_aero/test_masure_regression.jl")
     should_run_test("obj_adapter/test_obj_adapter.jl") && include("obj_adapter/test_obj_adapter.jl")
     should_run_test("surfplan/test_surfplan.jl") && include("surfplan/test_surfplan.jl")
     # bin/release is a bash script, so only the unix runners can run it.

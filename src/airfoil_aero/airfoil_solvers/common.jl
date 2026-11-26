@@ -32,21 +32,28 @@ struct SectionSolution
 end
 
 """
+    write_polar(filepath, alpha, cl, cd, cm)
+
+Write a polar to a `POLAR_VECTORS` table (`alpha, Cd, Cs, Cl, Cm`), CSV or Arrow as the
+suffix of `filepath` says. `alpha` is in radians and is written in degrees.
+"""
+function write_polar(filepath::String, alpha, cl, cd, cm)
+    return write_node_rows(filepath, alpha, nothing, [cd zero(cd) cl cm];
+                           columns=["Cd", "Cs", "Cl", "Cm"])
+end
+
+"""
     write_polar(filepath, sols::Vector{SectionSolution})
 
 Write a solver sweep (from any [`AbstractAirfoilSolver`](@ref)) to a `POLAR_VECTORS`
-table (`alpha, Cd, Cs, Cl, Cm`; alpha in degrees), CSV or Arrow as the suffix of
-`filepath` says. Non-converged angles (`NaN`) are skipped, so this works for both
-NeuralFoil and XFoil sweeps.
+table, skipping non-converged angles (`NaN`), so this works for both NeuralFoil and
+XFoil sweeps.
 """
 function write_polar(filepath::String, sols::Vector{SectionSolution})
     converged = filter(sol -> !isnan(sol.cl), sols)
-    alpha = [sol.alpha for sol in converged]
-    cd = [sol.cd for sol in converged]
-    cl = [sol.cl for sol in converged]
-    cm = [sol.cm for sol in converged]
-    return write_node_rows(filepath, alpha, nothing, [cd zero(cd) cl cm];
-                           columns=["Cd", "Cs", "Cl", "Cm"])
+    return write_polar(filepath, [sol.alpha for sol in converged],
+                       [sol.cl for sol in converged], [sol.cd for sol in converged],
+                       [sol.cm for sol in converged])
 end
 
 """

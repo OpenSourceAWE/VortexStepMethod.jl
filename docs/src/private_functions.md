@@ -10,6 +10,13 @@ airfoil_settings
 settings_range
 ```
 
+### Parametric kite
+```@docs
+tangent_angle
+arc_position
+chord_fraction
+```
+
 ### Solver, forces and circulation
 ```@docs
 n_unrefined_sections
@@ -228,6 +235,15 @@ mahalanobis_case
 penalize_confidence!
 swish
 sigmoid
+```
+
+### Masure regression
+```@docs
+MASURE_PARAMETERS
+MASURE_REYNOLDS
+forest_predict
+one_based
+scale_input
 ```
 
 ### Polars and airfoil IO

@@ -30,6 +30,8 @@ KulfanBasis
 LivePolarSettings
 LivePolars
 NeuralFoilModel
+MasureModel
+ExtraTreesForest
 NeuralFoilResult
 NeuralFoilWorkspace
 ContourPressureScratch

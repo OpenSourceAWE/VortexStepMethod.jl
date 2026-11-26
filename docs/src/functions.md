@@ -7,6 +7,7 @@ add_section!
 refine!
 calculate_span
 calculate_projected_area
+kite_sections
 ```
 
 ## Surface aero (contour + Cp + cf) tables
@@ -41,6 +42,8 @@ deform_section
 analyze_section
 analyze_sweep
 neuralfoil_aero
+masure_aero
+load_masure_model
 deform_kulfan
 chord_residual
 chord_line

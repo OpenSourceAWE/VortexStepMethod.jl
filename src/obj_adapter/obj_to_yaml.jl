@@ -263,17 +263,20 @@ function obj_to_yaml(obj_path::String, output_dir::String;
 end
 
 """
-    resolve_aero_geometry(yaml_in, out_dir; table_format=:csv, verbose=true) -> yaml_out
+    resolve_aero_geometry(yaml_in, out_dir; table_format=:csv, ml_models_dir=nothing,
+                          verbose=true) -> yaml_out
 
 Read an awesIO-style geometry YAML and resolve every `wing_airfoils` entry to a
 core-loadable form via [`resolve_airfoil`](@ref) (`breukels_regression` → `poly`,
-`neuralfoil` → `polars` table, others pass through). The generated polars go to
+`neuralfoil` and `masure_regression` → `polars` table, others pass through);
+`ml_models_dir` holds the masure regression models. The generated polars go to
 `out_dir/polars` as `table_format` (`:csv` or `:arrow`), the resolved YAML to
 `out_dir/geometry.yaml`. `wing_sections` (incl. any `VUP` up-vectors) pass through
 unchanged. Load the result with `Wing(yaml_out)`.
 """
 function resolve_aero_geometry(yaml_in::String, out_dir::String;
-                               table_format::Symbol=:csv, verbose=true)
+                               table_format::Symbol=:csv, ml_models_dir=nothing,
+                               verbose=true)
     mkpath(out_dir)
     polar_dir = joinpath(out_dir, "polars")
     mkpath(polar_dir)
@@ -296,7 +299,7 @@ function resolve_aero_geometry(yaml_in::String, out_dir::String;
         end
         new_type, new_info = resolve_airfoil(String(row[ti]), info, polar_dir,
                                              row[idi]; Re, alpha_range,
-                                             table_format)
+                                             table_format, ml_models_dir)
         row[ti] = new_type
         row[ii] = new_info
     end

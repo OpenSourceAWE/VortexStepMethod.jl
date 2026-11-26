@@ -38,6 +38,7 @@ export SolveFailure
 export calculate_results
 export add_section!, apparent_wind, set_va!, section_pitch_rate
 export calculate_projected_area, calculate_span
+export KiteShape, kite_sections
 export MVec3
 
 export LLT, Model, VSM
@@ -436,6 +437,7 @@ include("panel_aerodynamics.jl")
 include("settings.jl")
 include("section_aero.jl")
 include("wing_geometry.jl")
+include("kite_shape.jl")
 include("polars.jl")
 include("yaml_geometry.jl")
 include("filament.jl")

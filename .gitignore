@@ -39,6 +39,7 @@ data/ram_air_kite/ram_air_kite_foil_cl_polar.csv
 data/ram_air_kite/ram_air_kite_foil_cd_polar.csv
 data/ram_air_kite/ram_air_kite_foil_cm_polar.csv
 output/
+data/masure/
 output_cairo/
 .CondaPkg/
 LocalPreferences.toml
